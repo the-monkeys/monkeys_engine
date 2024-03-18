@@ -13,7 +13,9 @@ message UserProfileReq {
     string user_id = 1;
     string user_name = 2;
     string email = 3;
+    bool is_private = 4;
 }
+
 message UserProfileRes {
     string profile_id = 1;
     string username = 2; 
@@ -29,6 +31,7 @@ message UserProfileRes {
     int64 contact_number = 12;
     string user_status = 13;
 }
+
 message UserActivityReq {
     string user_id = 1;
     string user_name = 2;

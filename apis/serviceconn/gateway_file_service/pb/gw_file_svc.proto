@@ -6,9 +6,9 @@ option go_package = "./apis/serviceconn/gateway_file_service/pb";
 
 
 message UploadBlogFileReq {
-    string blogId = 1;
+    string blog_id = 1;
 	bytes data = 2;
-    string fileName = 3;
+    string file_name = 3;
     // int64 id = 4;
 }
 
@@ -16,12 +16,12 @@ message UploadBlogFileRes {
     int64 status = 1;
     string error = 2;
     int64 id = 3;
-    string newFileName = 4;
+    string new_file_name = 4;
 }
 
 message GetBlogFileReq {
-	string blogId = 1;
-    string fileName = 2;
+	string blog_id = 1;
+    string file_name = 2;
 }
 
 message GetBlogFileRes {
@@ -31,8 +31,8 @@ message GetBlogFileRes {
 }
 
 message DeleteBlogFileReq {
-	string blogId = 1;
-    string fileName = 2;
+	string blog_id = 1;
+    string file_name = 2;
 }
 
 message DeleteBlogFileRes {

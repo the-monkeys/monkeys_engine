@@ -1,0 +1,70 @@
+swagger: '2.0'
+info:
+  title: Blog Text Editor API
+  version: '1.0'
+host: themonkeys.tech
+basePath: /api/v1
+schemes:
+  - https
+paths:
+  /files/post/{postId}:
+    post:
+      summary: Upload file from blog text editor
+      consumes:
+        - multipart/form-data
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          required: true
+          type: string
+        - in: formData
+          name: file
+          required: true
+          type: file
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+              newFileName:
+                type: string
+    get:
+      summary: Get file from blog text editor
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          type: string
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: string
+    delete:
+      summary: Delete a file
+      parameters:
+        - in: path
+          name: postId
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          required: true
+          type: string
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              status:
+                type: integer

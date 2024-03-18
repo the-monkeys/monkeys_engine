@@ -5,11 +5,11 @@ package auth_svc;
 option go_package = "./apis/serviceconn/gateway_authz/pb";
 
 message RegisterUserRequest {
-  string firstName = 1;
-  string lastName = 2;
+  string first_name = 1;
+  string last_name = 2;
   string email = 3;
   string password = 4;
-  LoginMethod loginMethod = 5;
+  LoginMethod login_method = 5;
 
   enum LoginMethod {
     The_MONKEYS = 0;
@@ -20,16 +20,16 @@ message RegisterUserRequest {
 }
 
 message RegisterUserResponse {
-    int64 statusCode = 1;
-    string token = 2;
-    bool emailVerified = 3;
-    int64 userId = 4;
-    string userName = 5;
-    string first_name = 6;
-    string last_name = 7;
-    string email = 8;
-    bool email_verification_status = 9;
-    Error error = 10;
+  int64 status_code = 1;
+  string token = 2;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string username = 5;
+  string first_name = 6;
+  string last_name = 7;
+  string email = 8;
+  bool email_verification_status = 9;
+  Error error = 10;
 }
 
 message Error {
@@ -41,15 +41,15 @@ message Error {
 message ValidateRequest { 
   string token = 1;
   string email = 2;
-  int64 userId = 3;
-  string userName = 4;
+  int64 user_id = 3;
+  string user_name = 4;
 }
 
 message ValidateResponse {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   string email = 2;
-  int64 userId = 3;
-  string userName = 4;
+  int64 user_id = 3;
+  string user_name = 4;
   Error error = 5;
 }
 
@@ -59,11 +59,11 @@ message LoginUserRequest {
 }
 
 message LoginUserResponse {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   string token = 2;
-  bool emailVerified = 3;
-  int64 userId = 4;
-  string userName = 5;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string user_name = 5;
   string first_name = 6;
   string last_name = 7;
   string email = 8;
@@ -87,11 +87,11 @@ message ResetPasswordReq {
 }
 
 message ResetPasswordRes {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   string token = 2;
-  bool emailVerified = 3;
-  int64 userId = 4;
-  string userName = 5;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string user_name = 5;
   string first_name = 6;
   string last_name = 7;
   string email = 8;
@@ -106,7 +106,7 @@ message UpdatePasswordReq {
 }
 
 message UpdatePasswordRes {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   Error error = 2;
 }
 
@@ -115,7 +115,7 @@ message EmailVerificationReq {
 }
 
 message EmailVerificationRes {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   Error error = 2;
 }
 
@@ -126,7 +126,7 @@ message VerifyEmailReq {
 }
 
 message VerifyEmailRes {
-  int64 statusCode = 1;
+  int64 status_code = 1;
   Error error = 2;
 }
 

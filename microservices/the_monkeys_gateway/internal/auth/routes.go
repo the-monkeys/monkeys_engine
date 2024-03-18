@@ -47,7 +47,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 
 	// Forgot password
 	routes.POST("/forgot-pass", asc.ForgotPassword)
-	routes.POST("/reset-password", asc.ResetPassword)
+	routes.POST("/reset-password", asc.ConfirmPasswordVerificationLink)
 
 	// Is the user authenticated
 
@@ -57,6 +57,12 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/update-password", asc.UpdatePassword)
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
 	routes.POST("/verify-email", asc.VerifyEmail)
+
+	// Roles for blog
+	routes.GET("/roles", asc.GetRoles)
+	routes.GET("/roles/:blog_id", asc.GetRoles)
+	routes.GET("/roles/:user_id", asc.GetRoles)
+	routes.POST("/roles/:blog_id", asc.GetRoles)
 
 	return asc
 }
@@ -167,7 +173,7 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 }
 
 // TODO: Rename it to Password Reset Email Verification
-func (asc *ServiceClient) ResetPassword(ctx *gin.Context) {
+func (asc *ServiceClient) ConfirmPasswordVerificationLink(ctx *gin.Context) {
 	userAny := ctx.Query("user")
 	secretAny := ctx.Query("evpw")
 
@@ -199,8 +205,6 @@ func (asc *ServiceClient) ResetPassword(ctx *gin.Context) {
 
 func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 	authorization := ctx.Request.Header.Get("Authorization")
-	// TODO: Take more fields from header like: email, username,
-	// account id etc and pass it in ValidateRequest{} to check if the token matches with all of those
 	if authorization == "" {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -217,8 +221,6 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		Token: token[1],
 	})
 
-	logrus.Infof("Validation response: %+v\n", res)
-
 	if err != nil || res.StatusCode != http.StatusOK {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -230,8 +232,7 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	// logrus.Infof("Password: %v", pass.Password)
-	// logrus.Infof("res: %+v", res)
+
 	passResp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
 		Password: pass.Password,
 		Username: res.UserName,
@@ -344,4 +345,8 @@ func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, "authorized")
+}
+
+func (asc *ServiceClient) GetRoles(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, "administrator")
 }

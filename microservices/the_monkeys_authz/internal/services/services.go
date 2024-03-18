@@ -126,7 +126,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		StatusCode:    http.StatusCreated,
 		Token:         token,
 		EmailVerified: false,
-		UserName:      user.Username,
+		Username:      user.Username,
 		Email:         user.Email,
 		UserId:        userId,
 		FirstName:     user.FirstName,
