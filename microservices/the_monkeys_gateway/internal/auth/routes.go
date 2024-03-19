@@ -60,7 +60,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
-	routes.GET("/roles/:blog_id", asc.GetRoles)
+	routes.GET("/role/:id", asc.GetRoles)
 	routes.GET("/roles/:user_id", asc.GetRoles)
 	routes.POST("/roles/:blog_id", asc.GetRoles)
 

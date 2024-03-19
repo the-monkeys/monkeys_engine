@@ -1,0 +1,67 @@
+swagger: '2.0'
+info:
+  title: The Monkeys
+  version: 0.0.1
+tags:
+  - name: Authentication
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /user/:username:
+    post:
+      operationId: UserService.getProfile
+      responses:
+        '202':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              profile_id:
+                type: string
+                example: zfvzf8fB6j6N2x2D
+              username:
+                type: string
+                example: nnJ2zlT0RDJB
+              first_name:
+                type: string
+                example: example
+              last_name:
+                type: string
+                example: example
+              date_of_birth:
+                type: string
+                example: "2006-01-02 00:00:00 +0000 +0000"
+              bio:
+                type: string
+                example: "Student of Science, learning, un-learning, relearning"
+              avatar_url:
+                type: string
+                example: "https://example.com/avatar/profile.jpg"
+              address:
+                type: string
+                example: example
+              contact_number:
+                type: string
+                example: +9876543210
+              user_status:
+                type: string
+                example: active
+        default:
+          description: An unexpected error response.
+          schema: {}
+      parameters:
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Description for Header1
+        - in: header
+          name: email
+          type: string
+          required: true
+          description: Description for Header2
+              
+      tags:
+        - Register

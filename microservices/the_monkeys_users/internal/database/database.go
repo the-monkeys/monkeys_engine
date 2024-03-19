@@ -15,7 +15,7 @@ import (
 type UserDb interface {
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
-	GetMyProfile(email string) (*models.UserProfileRes, error)
+	GetMyProfile(username string) (*models.UserProfileRes, error)
 }
 
 type uDBHandler struct {
@@ -33,7 +33,7 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 	)
 	dbPsql, err := sql.Open("postgres", url)
 	if err != nil {
-		logrus.Fatalf("cannot connect psql using sql driver, error:, %+v", err)
+		logrus.Fatalf("cannot connect psql using sql driver, error: %+v", err)
 		return nil, err
 	}
 
@@ -46,19 +46,13 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 }
 
 // To get User Profile
-func (uh *uDBHandler) GetUserProfile(profile_id string) (*models.TheMonkeysUser, error) {
-	var tmu models.TheMonkeysUser
-	if err := uh.db.QueryRow(`SELECT ua.user_id, ua.profile_id, ua.username, ua.first_name, ua.last_name, 
-		uai.email_id, uai.password_hash, evs.ev_status, us.usr_status, uai.email_validation_token,
-		uai.email_verification_timeout
-		FROM USER_ACCOUNT ua
-		LEFT JOIN USER_AUTH_INFO uai ON ua.user_id = uai.user_id
-		LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-		LEFT JOIN user_status us ON ua.user_status = us.id
-		WHERE uai.profile_id = $1;
-	`, profile_id).Scan(&tmu.Id, &tmu.ProfileId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email, &tmu.Password,
-		&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken, &tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with this profile id  %s, error: %+v", profile_id, err)
+func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, error) {
+	var tmu models.UserAccount
+	if err := uh.db.QueryRow(`
+        SELECT username, first_name, last_name, bio, avatar_url 
+        FROM user_account WHERE username = $1;`, username).
+		Scan(&tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl); err != nil {
+		logrus.Errorf("can't find a user existing with this profile id  %s, error: %+v", username, err)
 		return nil, err
 	}
 
@@ -69,16 +63,16 @@ func (uh *uDBHandler) GetUserProfile(profile_id string) (*models.TheMonkeysUser,
 func (uh *uDBHandler) CheckIfEmailExist(email string) (*models.TheMonkeysUser, error) {
 	var tmu models.TheMonkeysUser
 	if err := uh.db.QueryRow(`
-			SELECT ua.user_id, ua.profile_id, ua.username, ua.first_name, ua.last_name, 
-			uai.email_id, uai.password_hash, evs.ev_status, us.usr_status, uai.email_validation_token,
-			uai.email_verification_timeout
-			FROM USER_ACCOUNT ua
-			LEFT JOIN USER_AUTH_INFO uai ON ua.user_id = uai.user_id
-			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-			LEFT JOIN user_status us ON ua.user_status = us.id
-			WHERE uai.email_id = $1;
-		`, email).
-		Scan(&tmu.Id, &tmu.ProfileId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email, &tmu.Password,
+            SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
+            ua.email, uai.password_hash, evs.status, us.status, uai.email_validation_token,
+            uai.email_verification_timeout
+            FROM USER_ACCOUNT ua
+            LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
+            LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
+            LEFT JOIN user_status us ON ua.user_status = us.id
+            WHERE ua.email = $1;
+        `, email).
+		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email, &tmu.Password,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken, &tmu.EmailVerificationTimeout); err != nil {
 		logrus.Errorf("can't find a user existing with email %s, error: %+v", email, err)
 		return nil, err
@@ -90,16 +84,16 @@ func (uh *uDBHandler) CheckIfEmailExist(email string) (*models.TheMonkeysUser, e
 func (uh *uDBHandler) CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error) {
 	var tmu models.TheMonkeysUser
 	if err := uh.db.QueryRow(`
-			SELECT ua.user_id, ua.profile_id, ua.username, ua.first_name, ua.last_name, 
-			uai.email_id, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
-			evs.ev_status, us.usr_status, uai.email_validation_token, uai.email_verification_timeout
+			SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
+			ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
+			evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
 			FROM USER_ACCOUNT ua
-			LEFT JOIN USER_AUTH_INFO uai ON ua.user_id = uai.user_id
+			LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
 			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
 			LEFT JOIN user_status us ON ua.user_status = us.id
 			WHERE ua.username = $1;
 		`, username).
-		Scan(&tmu.Id, &tmu.ProfileId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
+		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
 			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
 			&tmu.EmailVerificationTimeout); err != nil {
@@ -110,21 +104,20 @@ func (uh *uDBHandler) CheckIfUsernameExist(username string) (*models.TheMonkeysU
 	return &tmu, nil
 }
 
-func (uh *uDBHandler) GetMyProfile(email string) (*models.UserProfileRes, error) {
+func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, error) {
 	var profile models.UserProfileRes
 	if err := uh.db.QueryRow(`
-			SELECT ua.profile_id, ua.username, ua.first_name, ua.last_name,  ua.date_of_birth, 
-			ua.bio, ua.avatar_url, ua.created_at, ua.updated_at, ua.address,
-			ua.contact_number, us.usr_status
-			FROM USER_ACCOUNT ua
-			LEFT JOIN USER_AUTH_INFO uai ON ua.user_id = uai.user_id
-			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-			LEFT JOIN user_status us ON ua.user_status = us.id
-			WHERE uai.email_id = $1;
-		`, email).
-		Scan(&profile.ProfileId, &profile.Username, &profile.FirstName, &profile.LastName, &profile.DateOfBirth, &profile.Bio, &profile.AvatarUrl,
-			&profile.CreatedAt, &profile.UpdatedAt, &profile.Address, &profile.ContactNumber, &profile.UserStatus); err != nil {
-		logrus.Errorf("can't find a user profile existing with email %s, error: %+v", email, err)
+			SELECT ua.account_id, ua.username, ua.first_name, ua.last_name, ua.email, ua.date_of_birth,
+			ua.bio, ua.avatar_url, ua.created_at, ua.updated_at, ua.address, ua.contact_number, us.status,
+			ua.view_permission
+			FROM user_account ua
+			INNER JOIN user_status us ON us.id = ua.user_status
+			WHERE ua.username = $1;
+		`, username).
+		Scan(&profile.AccountId, &profile.Username, &profile.FirstName, &profile.LastName, &profile.Email,
+			&profile.DateOfBirth, &profile.Bio, &profile.AvatarUrl, &profile.CreatedAt, &profile.UpdatedAt,
+			&profile.Address, &profile.ContactNumber, &profile.UserStatus, &profile.ViewPermission); err != nil {
+		logrus.Errorf("can't find a user profile existing with username %s, error: %+v", username, err)
 		return nil, err
 	}
 

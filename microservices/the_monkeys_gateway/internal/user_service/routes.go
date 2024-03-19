@@ -47,7 +47,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 	username := ctx.Param("id")
 	var isPrivate bool
-	if username == ctx.GetString("userId") {
+	if username == ctx.GetString("userName") {
 		isPrivate = true
 	}
 
@@ -57,14 +57,7 @@ func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	userId := ctx.Request.Header.Get("user_id")
-	if userId == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
 	res, err := asc.Client.GetUserProfile(context.Background(), &pb.UserProfileReq{
-		UserId:    userId,
 		UserName:  username,
 		Email:     email,
 		IsPrivate: isPrivate,

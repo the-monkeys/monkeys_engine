@@ -63,7 +63,7 @@ func (adh *authDBHandler) CheckIfEmailExist(email string) (*models.TheMonkeysUse
 	var tmu models.TheMonkeysUser
 	if err := adh.db.QueryRow(`
             SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
-            ua.email, uai.password_hash, evs.status, us.usr_status, uai.email_validation_token,
+            ua.email, uai.password_hash, evs.status, us.status, uai.email_validation_token,
             uai.email_verification_timeout
             FROM USER_ACCOUNT ua
             LEFT JOIN user_auth_info uai ON ua.id = uai.user_id
