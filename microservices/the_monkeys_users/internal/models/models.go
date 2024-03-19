@@ -14,7 +14,7 @@ type UserAccount struct {
 	Email         string         `json:"email"`
 	DateOfBirth   sql.NullTime   `json:"date_of_birth"`
 	Bio           sql.NullString `json:"bio"`
-	AvatarUrl     string         `json:"avatar_url"`
+	AvatarUrl     sql.NullString  `json:"avatar_url"`
 	Address       sql.NullString `json:"address"`
 	ContactNumber sql.NullInt64  `json:"contact_number"`
 	UserStatus    string         `json:"user_status"`

@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"errors"
+	
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
@@ -24,11 +24,24 @@ func NewUserSvc(dbConn database.UserDb, log *logrus.Logger) *UserSvc {
 }
 
 func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (*pb.UserProfileRes, error) {
+	us.log.Infof("user %v has requested profile info.", req.Email)
 	if !req.IsPrivate {
-		return nil, errors.New("cannot find the private profile")
+		userProfile, err := us.dbConn.GetUserProfile(req.UserName)
+		if err != nil {
+			us.log.Errorf("the user doesn't exists: %v", err)
+			return nil, err
+
+		}
+		return &pb.UserProfileRes{
+			Username:  userProfile.UserName,
+			FirstName: userProfile.FirstName,
+			LastName:  userProfile.LastName,
+			Bio:       userProfile.Bio.String,
+			AvatarUrl: userProfile.AvatarUrl.String,
+		}, nil
+
 	}
 
-	us.log.Infof("user %v has requested profile info.", req.Email)
 	_, err := us.dbConn.CheckIfUsernameExist(req.UserName)
 	if err != nil {
 		us.log.Errorf("the user doesn't exists: %v", err)

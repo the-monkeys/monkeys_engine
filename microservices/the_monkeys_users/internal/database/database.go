@@ -16,6 +16,7 @@ type UserDb interface {
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
 	GetMyProfile(username string) (*models.UserProfileRes, error)
+	GetUserProfile(username string) (*models.UserAccount, error)
 }
 
 type uDBHandler struct {
