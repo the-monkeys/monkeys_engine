@@ -42,6 +42,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.POST("/activities/:user_name", usc.GetUserActivities)
 	routes.PATCH("/:username", usc.UpdateUserProfile)
 	routes.PUT("/:username", usc.UpdateUserProfile)
+	routes.DELETE("/:username", usc.DeleteUserProfile)
 	return usc
 }
 func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
@@ -142,6 +143,25 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+		return
+	}
+	ctx.JSON(http.StatusOK, res)
+
+}
+func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context){
+	username := ctx.Param("username")
+	tokenUsername := ctx.GetString("userName")
+	
+	if username != tokenUsername {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	res, err := asc.Client.DeleteUserProfile(context.Background(), &pb.DeleteUserProfileReq{
+		Username: username,
+
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user profile"})
 		return
 	}
 	ctx.JSON(http.StatusOK, res)

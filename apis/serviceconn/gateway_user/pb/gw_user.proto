@@ -82,10 +82,24 @@ message UpdateUserProfileRes {
     string error = 11;
 }
 
+message DeleteUserProfileReq {
+    string account_id = 1;
+    string username = 2;
+    string email    = 3;
+    string client   = 4;
+    string ip_address = 5;
+}
+
+message DeleteUserProfileRes {
+    string success = 1;
+    string error = 2;
+    string status = 3;
+}
 
 
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityRes) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
     rpc UpdateUserProfile(UpdateUserProfileReq) returns (UpdateUserProfileRes) {}
+    rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
 }

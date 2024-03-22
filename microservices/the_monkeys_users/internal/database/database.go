@@ -20,6 +20,7 @@ type UserDb interface {
 	GetMyProfile(username string) (*models.UserProfileRes, error)
 	GetUserProfile(username string) (*models.UserAccount, error)
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
+	DeleteUserProfile(username string) error
 }
 
 type uDBHandler struct {
@@ -250,6 +251,29 @@ func (uh *uDBHandler) DeactivateMyAccount(id int64) error {
 	if row != 1 {
 		logrus.Errorf("more or less than 1 row is affected for %d, error: %v", id, err)
 		return errors.New("more or less than 1 row is affected")
+	}
+
+	return nil
+}
+func (uh *uDBHandler) DeleteUserProfile(username string) error {
+	var id int64
+	//using this username get id field from useraccount table
+	if err := uh.db.QueryRow(`
+			SELECT id FROM user_account where username = $1;`, username).Scan(&id); err != nil {
+		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
+		return nil
+	}
+
+	//using that id delete the row in userauthinfo table
+	row := uh.db.QueryRow(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
+	if row.Err() != nil {
+		return row.Err()
+	}
+
+	//using that id delete the row from useraccount table
+	row = uh.db.QueryRow(`DELETE FROM user_account WHERE id = $1`, id)
+	if row.Err() != nil {
+		return row.Err()
 	}
 
 	return nil

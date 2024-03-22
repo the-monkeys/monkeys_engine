@@ -143,3 +143,27 @@ func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProf
 
 	return dbUserInfo
 }
+func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
+ 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
+
+	// Check if username exits or not
+    _, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		us.log.Errorf("the user doesn't exists: %v", err)
+		return nil, err
+	}
+
+	// Run delete user query
+	err = us.dbConn.DeleteUserProfile(req.Username)
+	if err != nil {
+		us.log.Errorf("could not delete the user profile: %v", err)
+		return nil, err
+	}
+
+	// Return the response
+	return &pb.DeleteUserProfileRes{
+		Success: "user has been deleted successfully",
+		Status:  "200",
+	}, nil
+
+}
