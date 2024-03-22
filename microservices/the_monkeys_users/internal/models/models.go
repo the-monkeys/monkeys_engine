@@ -14,7 +14,7 @@ type UserAccount struct {
 	Email         string         `json:"email"`
 	DateOfBirth   sql.NullTime   `json:"date_of_birth"`
 	Bio           sql.NullString `json:"bio"`
-	AvatarUrl     sql.NullString  `json:"avatar_url"`
+	AvatarUrl     sql.NullString `json:"avatar_url"`
 	Address       sql.NullString `json:"address"`
 	ContactNumber sql.NullInt64  `json:"contact_number"`
 	UserStatus    string         `json:"user_status"`
@@ -67,7 +67,7 @@ type UserProfileRes struct {
 	CreatedAt      sql.NullTime   `json:"created_at,omitempty"`
 	UpdatedAt      sql.NullTime   `json:"updated_at,omitempty"`
 	Address        sql.NullString `json:"address,omitempty"`
-	ContactNumber  sql.NullInt64  `json:"contact_number,omitempty"`
+	ContactNumber  sql.NullString `json:"contact_number,omitempty"`
 	UserStatus     string         `json:"user_status,omitempty"`
 	ViewPermission string         `json:"view_permission,omitempty"`
 }

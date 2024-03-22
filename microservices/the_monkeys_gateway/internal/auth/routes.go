@@ -47,7 +47,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 
 	// Forgot password
 	routes.POST("/forgot-pass", asc.ForgotPassword)
-	routes.POST("/reset-password", asc.ConfirmPasswordVerificationLink)
+	routes.GET("/reset-password", asc.ConfirmPasswordVerificationLink)
 
 	// Is the user authenticated
 
@@ -56,7 +56,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 
 	routes.POST("/update-password", asc.UpdatePassword)
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
-	routes.POST("/verify-email", asc.VerifyEmail)
+	routes.GET("/verify-email", asc.VerifyEmail)
 
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
@@ -281,13 +281,13 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 
 // To verify email
 func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
-	userAny := ctx.Query("user")
-	secretAny := ctx.Query("evpw")
+	username := ctx.Query("user")
+	evsecret := ctx.Query("evpw")
 
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
-		Username: userAny,
-		Token:    secretAny,
+		Username: username,
+		Token:    evsecret,
 	})
 
 	if err != nil {
@@ -298,7 +298,7 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 
 	// TODO: COrrect the errors
 	if res.StatusCode == http.StatusNotFound || res.Error != nil {
-		asc.Log.Infof("user containing username: %s, doesn't exists", userAny)
+		asc.Log.Infof("user containing username: %s, doesn't exists", username)
 		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrNotFound)
 		return
 	}

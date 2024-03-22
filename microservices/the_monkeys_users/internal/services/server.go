@@ -2,10 +2,11 @@ package services
 
 import (
 	"context"
-	
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 )
@@ -54,6 +55,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		return nil, err
 	}
 
+	us.log.Infof("GEt profile: userDetails, %+v", userDetails)
 	return &pb.UserProfileRes{
 		ProfileId:   userDetails.AccountId,
 		Username:    userDetails.Username,
@@ -64,9 +66,9 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		AvatarUrl:   userDetails.AvatarUrl.String,
 		// CreatedAt:     userDetails.CreatedAt.,
 		// UpdatedAt:     userDetails.UpdatedAt,
-		Address:       userDetails.Address.String,
-		ContactNumber: userDetails.ContactNumber.Int64,
-		UserStatus:    userDetails.UserStatus,
+		Address: userDetails.Address.String,
+		// ContactNumber: userDetails.ContactNumber.String,
+		UserStatus: userDetails.UserStatus,
 	}, err
 }
 
@@ -76,20 +78,20 @@ func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityRe
 	return &pb.UserActivityRes{}, nil
 }
 func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProfileReq) (*pb.UpdateUserProfileRes, error) {
-	us.log.Infof("user %s is updating the profile.", req.Username)
+	us.log.Infof("user %s is updating the profile.", req.CurrentUsername)
 
 	// Check if the user exists
-	_, err := us.dbConn.CheckIfEmailExist(req.Email)
+	_, err := us.dbConn.CheckIfUsernameExist(req.CurrentUsername)
 	if err != nil {
 		us.log.Errorf("the user doesn't exists: %v", err)
 		return nil, err
 	}
 
 	// Check if the method isPartial true
-	var userDetails *models.UserProfileRes
-	if req.Partial == true {
+	var dbUserInfo *models.UserProfileRes
+	if req.Partial {
 		// If isPartial is true fetch the remaining data from the db
-		userDetails, err = us.dbConn.GetMyProfile(req.Email)
+		dbUserInfo, err = us.dbConn.GetMyProfile(req.CurrentUsername)
 		if err != nil {
 			us.log.Errorf("error while finding the user profile: %v", err)
 			return nil, err
@@ -97,54 +99,47 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}
 
 	// Map the user
-	_, err = MapUserUpdateData(req, userDetails)
+	mappedDBUser := MapUserUpdateData(req, dbUserInfo)
 	if err != nil {
 		return nil, err
 	}
 
+	us.log.Infof("mappedDBUser: %+v\n", mappedDBUser)
 	// Update the user
+	err = us.dbConn.UpdateUserProfile(req.CurrentUsername, mappedDBUser)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	return &pb.UpdateUserProfileRes{
+		Username: mappedDBUser.Username,
+	}, err
 }
 
 // MapUserUpdateData maps the user update request data to the database model.
-func MapUserUpdateData(req *pb.UpdateUserProfileReq, userDetails *models.UserProfileRes) (models.UserAccount, error) {
-	// Map the request data to the database model
-	userModel := models.UserAccount{
-		Email: req.Email,
+func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
+	if req.Username != "" {
+		dbUserInfo.Username = req.Username
 	}
-
-	// Check if the first name is provided
 	if req.FirstName != "" {
-		userModel.FirstName = req.FirstName
+		dbUserInfo.FirstName = req.FirstName
 	}
-
-	// Check if the last name is provided
 	if req.LastName != "" {
-		userModel.LastName = req.LastName
+		dbUserInfo.LastName = req.LastName
 	}
-
-	// Check if the date of birth is provided
-	if req.DateOfBirth != "" {
-
-	}
-
-	// Check if the bio is provided
 	if req.Bio != "" {
+		dbUserInfo.Bio.String = req.Bio
 	}
-
-	// // Check if the avatar URL is provided
-	// if req.AvatarUrl != "" {
-	// 	userModel.AvatarUrl = req.AvatarUrl
-	// }
-
-	// Check if the address is provided
+	if req.DateOfBirth != "" {
+		time, _ := time.Parse(constants.DateTimeFormat, req.DateOfBirth)
+		dbUserInfo.DateOfBirth.Time = time
+	}
 	if req.Address != "" {
+		dbUserInfo.Address.String = req.Address
+	}
+	if req.ContactNumber != "0" {
+		dbUserInfo.ContactNumber.String = req.ContactNumber
 	}
 
-	// Check if the contact number is provided
-	if req.ContactNumber != "" {
-	}
-
-	return userModel, nil
+	return dbUserInfo
 }

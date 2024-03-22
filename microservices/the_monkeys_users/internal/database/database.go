@@ -8,6 +8,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 )
@@ -17,6 +19,7 @@ type UserDb interface {
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
 	GetMyProfile(username string) (*models.UserProfileRes, error)
 	GetUserProfile(username string) (*models.UserAccount, error)
+	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
 }
 
 type uDBHandler struct {
@@ -123,6 +126,48 @@ func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, err
 	}
 
 	return &profile, nil
+}
+
+func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error {
+	// TODO: start a database transaction from here till all the process are complete
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`
+	UPDATE user_account
+		SET 
+		username = $1,
+		first_name = $2,
+		last_name = $3,
+		email = $4,
+		date_of_birth = $5,
+		bio = $6,
+        updated_at = now(),
+		address = $7,
+		contact_number = $8
+		WHERE username = $9;
+	`)
+	if err != nil {
+		logrus.Errorf("cannot prepare the update user query for user %s, error: %v", dbUserInfo.Username, err)
+		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
+	}
+
+	defer stmt.Close()
+	result := stmt.QueryRow(dbUserInfo.Username, dbUserInfo.FirstName, dbUserInfo.LastName, dbUserInfo.Email,
+		dbUserInfo.DateOfBirth.Time, dbUserInfo.Bio.String, dbUserInfo.Address.String, dbUserInfo.ContactNumber.String, username)
+	if result.Err() != nil {
+		logrus.Errorf("cannot update user %s, error: %v", dbUserInfo.Username, err)
+		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("cannot commit the update profile for user %s, error: %v", dbUserInfo.Username, err)
+		return err
+	}
+	return nil
 }
 
 // TODO: If the record doesn't exist throw 404 error

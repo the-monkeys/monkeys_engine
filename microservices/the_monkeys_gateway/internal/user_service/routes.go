@@ -71,41 +71,6 @@ func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusAccepted, &res)
 }
 
-// func (asc *UserServiceClient) UpdateProfile(ctx *gin.Context) {
-// 	// get id
-// 	id := ctx.Param("id")
-// 	userId, err := strconv.ParseInt(id, 10, 64)
-// 	if err != nil {
-// 		ctx.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
-
-// 	body := UpdateProfile{}
-// 	if err := ctx.BindJSON(&body); err != nil {
-// 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
-
-// 	res, err := asc.Client.SetMyProfile(context.Background(), &pb.SetMyProfileReq{
-// 		FirstName:   body.FirstName,
-// 		LastName:    body.LastName,
-// 		CountryCode: body.CountryCode,
-// 		MobileNo:    body.MobileNo,
-// 		About:       body.About,
-// 		Instagram:   body.Instagram,
-// 		Twitter:     body.Twitter,
-// 		Email:       body.Email,
-// 		Id:          userId,
-// 	})
-
-// 	if err != nil {
-// 		errors.RestError(ctx, err, "user")
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusAccepted, &res)
-// }
-
 // func (asc *UserServiceClient) DeleteMyAccount(ctx *gin.Context) {
 // 	// get id
 // 	id := ctx.Param("id")
@@ -138,31 +103,15 @@ func (asc *UserServiceClient) GetUserActivities(ctx *gin.Context) {
 
 func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	var isPartial bool
-	var isPrivate bool
 
-	username := ctx.Param("id")
-	if username == ctx.GetString("userId") {
-		isPrivate = true
-	}
-
-	if !isPrivate {
+	username := ctx.Param("username")
+	if username != ctx.GetString("userName") {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
 	email := ctx.Request.Header.Get("email")
 	if email == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	profileId := ctx.Request.Header.Get("profile_id")
-	if profileId == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-	client := ctx.Request.Header.Get("client_id")
-	if client == "" {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -187,9 +136,9 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		Bio:             body.Bio,
 		Address:         body.Address,
 		ContactNumber:   body.ContactNumber,
-		ProfileId:       profileId,
-		Client:          client,
-		Partial:         isPartial,
+		// ProfileId:       profileId,
+		// Client:          client,
+		Partial: isPartial,
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})

@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/gin-contrib/cors" // Use this package
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,4 +28,14 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func NewCorsMiddleware() gin.HandlerFunc {
+	return cors.New(cors.Config{
+		AllowOrigins:     []string{"http://example.com"},
+		AllowMethods:     []string{"PUT", "PATCH", "GET", "POST"},
+		AllowHeaders:     []string{"Origin", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	})
 }
