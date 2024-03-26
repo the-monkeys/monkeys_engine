@@ -256,25 +256,32 @@ func (uh *uDBHandler) DeactivateMyAccount(id int64) error {
 	return nil
 }
 func (uh *uDBHandler) DeleteUserProfile(username string) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	var id int64
 	//using this username get id field from useraccount table
-	if err := uh.db.QueryRow(`
+	if err := tx.QueryRow(`
 			SELECT id FROM user_account where username = $1;`, username).Scan(&id); err != nil {
 		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
 		return nil
 	}
 
 	//using that id delete the row in userauthinfo table
-	row := uh.db.QueryRow(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
-	if row.Err() != nil {
-		return row.Err()
+	_, err = tx.Exec(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
+	if err != nil {
+		return err
 	}
 
 	//using that id delete the row from useraccount table
-	row = uh.db.QueryRow(`DELETE FROM user_account WHERE id = $1`, id)
-	if row.Err() != nil {
-		return row.Err()
+	_, err = tx.Exec(`DELETE FROM user_account WHERE id = $1`, id)
+	if err != nil {
+		return err
 	}
 
+	tx.Commit()
 	return nil
 }
