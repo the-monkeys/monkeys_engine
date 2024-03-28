@@ -255,6 +255,7 @@ func (uh *uDBHandler) DeactivateMyAccount(id int64) error {
 
 	return nil
 }
+
 func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	tx, err := uh.db.Begin()
 	if err != nil {
@@ -283,5 +284,41 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	}
 
 	tx.Commit()
+	return nil
+}
+
+// Write a function to create a user log user_account_log
+func (uh *uDBHandler) AddUserLog(username string, ip string, description string, clientName string) error {
+	var userId int64
+	var clientId int8
+	//From username find user id
+	if err := uh.db.QueryRow(`
+			SELECT id FROM user_account WHERE username = $1;`, username).Scan(&userId); err != nil {
+		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
+		return nil
+	}
+
+	//From clientname find client id
+	if err := uh.db.QueryRow(`
+			SELECT id FROM clients WHERE c_name = $1;`, clientName).Scan(&clientId); err != nil {
+		logrus.Errorf("can't get id by using client name %s, error: %+v", clientName, err)
+		return nil
+	}
+
+	//Add a user log to user_account_log table
+	stmt, err := uh.db.Prepare(`INSERT INTO user_account_log (user_id, ip_address, description, client_id) VALUES ($1, $2, $3, $4)`)
+	if err != nil {
+		logrus.Errorf("cannot prepare statement to add user log into the user_account_log: %v", err)
+		return err
+	}
+
+	defer stmt.Close()
+
+	row := stmt.QueryRow(userId, ip, description, clientId)
+	if row.Err() != nil {
+		logrus.Errorf("cannot execute query to log user into user_account_log: %v", row.Err())
+		return row.Err()
+	}
+
 	return nil
 }
