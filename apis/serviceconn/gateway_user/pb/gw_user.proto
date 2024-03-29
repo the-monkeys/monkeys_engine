@@ -10,14 +10,14 @@ import "google/protobuf/timestamp.proto";
 option go_package = "./apis/serviceconn/gateway_user/pb";
 
 message UserProfileReq {
-    string user_id = 1;
-    string user_name = 2;
+    string account_id = 1;
+    string username = 2;
     string email = 3;
     bool is_private = 4;
 }
 
 message UserProfileRes {
-    string profile_id = 1;
+    string account_id = 1;
     string username = 2; 
     string first_name = 3;
     string last_name = 4;
@@ -53,23 +53,21 @@ message UserActivityRes {
 // }
 
 message UpdateUserProfileReq {
-    string profile_id = 1;
-    string username = 2; 
+    string username = 1;
+    string username_to_be_updated = 2; 
     string first_name = 3;
     string last_name = 4;
     string date_of_birth = 5;
     string bio = 6;
     string address = 7;
     string contact_number = 8;
-    string email = 9;
-    string ip_address = 10;
-    string client = 11;
-    bool partial = 12;
-    string current_username = 13;
+    string ip_address = 9;
+    string client = 10;
+    bool partial = 11;
 }
 
 message UpdateUserProfileRes {
-    string profile_id = 1;
+    string account_id = 1;
     string username = 2; 
     string first_name = 3;
     string last_name = 4;

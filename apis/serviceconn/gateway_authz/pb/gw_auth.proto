@@ -76,7 +76,9 @@ message ForgotPasswordReq {
 }
 
 message ForgotPasswordRes {
-  Error error = 1;
+  int64 status_code = 1;
+  string message = 2;
+  Error error = 3;
 }
 
 message ResetPasswordReq {

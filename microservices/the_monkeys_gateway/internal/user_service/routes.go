@@ -59,7 +59,7 @@ func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 	}
 
 	res, err := asc.Client.GetUserProfile(context.Background(), &pb.UserProfileReq{
-		UserName:  username,
+		Username:  username,
 		Email:     email,
 		IsPrivate: isPrivate,
 	})
@@ -128,15 +128,14 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	}
 
 	res, err := asc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
-		CurrentUsername: username,
-		Username:        body.UserName,
-		Email:           body.Email,
-		FirstName:       body.FirstName,
-		LastName:        body.LastName,
-		DateOfBirth:     body.DateOfBirth,
-		Bio:             body.Bio,
-		Address:         body.Address,
-		ContactNumber:   body.ContactNumber,
+		Username:            username,
+		UsernameToBeUpdated: body.UserName,
+		FirstName:           body.FirstName,
+		LastName:            body.LastName,
+		DateOfBirth:         body.DateOfBirth,
+		Bio:                 body.Bio,
+		Address:             body.Address,
+		ContactNumber:       body.ContactNumber,
 		// ProfileId:       profileId,
 		// Client:          client,
 		Partial: isPartial,

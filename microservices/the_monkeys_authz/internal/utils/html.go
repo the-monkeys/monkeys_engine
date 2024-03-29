@@ -13,10 +13,10 @@ func init() {
 		logrus.Errorf("cannot load the config: %v", err)
 	}
 	Address = cfg.Authentication.EmailVerificationAddr
-	logrus.Infof("✅ email verification address: %v", Address)
+	logrus.Infof("✅ the email verification address is: %v", Address)
 }
 
-func ResetPasswordTemplate(firstName, LastName, secret string, userId string) string {
+func ResetPasswordTemplate(firstName, LastName, secret string, username string) string {
 	return `<!DOCTYPE html PUBLIC>
 	<html xmlns="http://www.w3.org/1999/xhtml">
 	  <head>
@@ -486,7 +486,7 @@ func ResetPasswordTemplate(firstName, LastName, secret string, userId string) st
 								  <table width="100%" border="0" cellspacing="0" cellpadding="0" role="presentation">
 									<tr>
 									  <td align="center">
-										<a href="https://` + Address + `/api/v1/auth/reset-password?user=` + userId + `&evpw=` + secret + `" class="f-fallback button button--green" target="_blank">Reset your password</a>
+										<a href="` + Address + `/api/v1/auth/reset-password?user=` + username + `&evpw=` + secret + `" class="f-fallback button button--green" target="_blank">Reset your password</a>
 									  </td>
 									</tr>
 								  </table>
@@ -513,7 +513,7 @@ func ResetPasswordTemplate(firstName, LastName, secret string, userId string) st
 
 }
 
-func EmailVerificationHTML(email, secret string) string {
+func EmailVerificationHTML(username, secret string) string {
 	return `<!DOCTYPE html>
 	<html>
 	<head>
@@ -567,7 +567,7 @@ func EmailVerificationHTML(email, secret string) string {
 										<td bgcolor="#ffffff" align="center" style="padding: 20px 30px 60px 30px;">
 											<table border="0" cellspacing="0" cellpadding="0">
 												<tr>
-													<td align="center" style="border-radius: 3px;" bgcolor="#FFA73B"><a href="https://` + Address + `/api/v1/auth/verify-email?user=` + email + `&evpw=` + secret + `" target="_blank" style="font-size: 20px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; color: #ffffff; text-decoration: none; padding: 15px 25px; border-radius: 2px; border: 1px solid #FFA73B; display: inline-block;">Confirm Account</a></td>
+													<td align="center" style="border-radius: 3px;" bgcolor="#FFA73B"><a href="` + Address + `/api/v1/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="font-size: 20px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; color: #ffffff; text-decoration: none; padding: 15px 25px; border-radius: 2px; border: 1px solid #FFA73B; display: inline-block;">Confirm Account</a></td>
 												</tr>
 											</table>
 										</td>
@@ -582,7 +582,7 @@ func EmailVerificationHTML(email, secret string) string {
 						</tr> <!-- COPY -->
 						<tr>
 							<td bgcolor="#ffffff" align="left" style="padding: 20px 30px 20px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;"><a href="https://` + Address + `/api/v1/auth/verify-email?user=` + email + `&evpw=` + secret + `" target="_blank" style="color: #FFA73B;">https://` + Address + `/api/v1/auth/verify-email?user=` + email + `&evpw=` + secret + `</a></p>
+								<p style="margin: 0;"><a href="` + Address + `/api/v1/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="color: #FFA73B;">` + Address + `/api/v1/auth/verify-email?user=` + username + `&evpw=` + secret + `</a></p>
 							</td>
 						</tr>
 						<tr>

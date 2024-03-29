@@ -269,10 +269,8 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 	}()
 
 	return &pb.ForgotPasswordRes{
-		Error: &pb.Error{
-			Status:  http.StatusOK,
-			Message: "Verification link has been sent to this email!",
-		},
+		StatusCode: 200,
+		Message:    "Verification link has been sent to the email!",
 	}, nil
 }
 
@@ -322,14 +320,14 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 	}
 
 	return &pb.ResetPasswordRes{
-		StatusCode:    http.StatusCreated,
-		Token:         token,
-		EmailVerified: false,
-		UserName:      user.Username,
-		Email:         user.Email,
-		UserId:        user.Id,
-		FirstName:     user.FirstName,
-		LastName:      user.LastName,
+		StatusCode: http.StatusOK,
+		Token:      token,
+		// EmailVerified: false,
+		// UserName:      user.Username,
+		// Email:         user.Email,
+		// UserId:        user.Id,
+		// FirstName:     user.FirstName,
+		// LastName:      user.LastName,
 	}, nil
 }
 
@@ -459,3 +457,5 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 		StatusCode: 200,
 	}, nil
 }
+
+// psql -U root -d the_monkeys_user_dev

@@ -1,88 +1,51 @@
-CERTS_PATH="./certs"
-CSR_CONFIG_FILE="./csr.conf"
-CERT_CONFIG_FILE="./cert.conf"
-PRIVATE_KEY_FILE="./prv_key.pem"
-CSR_FILE="./csr.pem"
-ROOT_CA_FILE="./root_ca.pem"
-ROOT_CA_KEY_FILE="./root_ca_key.pem"
-CERT_FILE="./cert.pem"
+#!/bin/bash
 
-# STEP 1: Generate certs and key for TLS.
-# /the_monkeys/vault/certs/{cert.pem,prv_key.pem}
-# OpenVPN.
-function installCerts()
-{
-    # TODO
-    # Check if certificate already exists.
-    # Then either leave it or install new certs.
-    mkdir -p "$CERTS_PATH"
+# Author: Dave Augustus
 
-    cd "$CERTS_PATH"
+# Define the directory for OpenSSL
+dir="config/certs/openssl"
 
-    # Create a private key.
-    openssl genrsa -out prv_key.pem 2048
+# Create the directory and navigate into it
+mkdir -p $dir && cd $dir
 
-    # Create a default CSR config file.
-    if ! cat > "$CSR_CONFIG_FILE" ; then
-        sh_perror "ERROR: failed to write to file"
-        exit 1
-    fi << EOF
-    [ req ]
-    default_bits = 2048
-    prompt = no
-    default_md = sha256
-    req_extensions = req_ext
-    distinguished_name = dn
-    
-    [ dn ]
-    C = IN
-    ST = KARNATAKA
-    L = BANGALORE
-    O = TheMonkeys
-    OU = TheMonkeys-Dev
-    CN = themonkeys.life
-    
-    [ req_ext ]
-    subjectAltName = @alt_names
-    
-    [ alt_names ]
-    DNS.1 = themonkeys.life
-    DNS.1 = www.themonkeys.life
+# Generate the CA private key file
+openssl genrsa -out ca.key 2048
+
+# Generate the CA x509 certificate file
+openssl req -x509 -new -nodes -key ca.key -subj "/CN=themonkeys/C=IN/L=BENGALURU" -days 1825 -out ca.crt
+
+# Create a server private key
+openssl genrsa -out server.key 2048
+
+# Create a configuration file for generating the Certificate Signing Request (CSR)
+cat > csr.conf << EOF
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+
+[dn]
+C = IN
+ST = Karnataka
+L = Bengaluru
+O = themonkeys
+OU = IT
+emailAddress = admin@themonkeys.live
+CN = www.themonkeys.live
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = www.themonkeys.live
+DNS.2 = themonkeys.live
+IP.1 = 192.168.1.100
+IP.2 = 192.168.1.101
 EOF
 
-    # Generate a CSR
-    openssl req -new -key "$PRIVATE_KEY_FILE" -out "$CSR_FILE" -config "$CSR_CONFIG_FILE"
+# Generate the CSR using the configuration file and the server private key
+openssl req -new -key server.key -out server.csr -config csr.conf
 
-    # Create a default cert config file.
-    if ! cat > "$CERT_CONFIG_FILE" ; then
-        sh_perror "ERROR: failed to write to file"
-        exit 1
-    fi << EOF
-    authorityKeyIdentifier=keyid,issuer
-    basicConstraints=CA:FALSE
-    keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-    subjectAltName = @alt_names
-    
-    [alt_names]
-    DNS.1 = themonkeys.life
-    DNS.1 = www.themonkeys.life
-EOF
-
-    # Create our Root CA
-    openssl req -x509 \
-        -sha256 -days 356 \
-        -nodes \
-        -newkey rsa:2048 \
-        -subj "/CN=themonkeys.life/C=IN/L=Bangalore" \
-        -keyout "$ROOT_CA_KEY_FILE" -out "$ROOT_CA_FILE"
-
-    # Generate the SSL certificate
-    openssl x509 -req \
-        -in "$CSR_FILE" \
-        -CA "$ROOT_CA_FILE" -CAkey "$ROOT_CA_KEY_FILE" \
-        -CAcreateserial -out "$CERT_FILE" \
-        -days 365 \
-        -sha256 -extfile "$CERT_CONFIG_FILE"
-}
-
-installCerts()
+# Generate the server certificate using the CSR, the CA private key, and the CA certificate
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 1825 -sha256 -extfile csr.conf -extensions req_ext

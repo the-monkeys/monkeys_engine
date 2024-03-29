@@ -27,7 +27,7 @@ func NewUserSvc(dbConn database.UserDb, log *logrus.Logger) *UserSvc {
 func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (*pb.UserProfileRes, error) {
 	us.log.Infof("user %v has requested profile info.", req.Email)
 	if !req.IsPrivate {
-		userProfile, err := us.dbConn.GetUserProfile(req.UserName)
+		userProfile, err := us.dbConn.GetUserProfile(req.Username)
 		if err != nil {
 			us.log.Errorf("the user doesn't exists: %v", err)
 			return nil, err
@@ -43,13 +43,13 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 
 	}
 
-	_, err := us.dbConn.CheckIfUsernameExist(req.UserName)
+	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
 		us.log.Errorf("the user doesn't exists: %v", err)
 		return nil, err
 	}
 
-	userDetails, err := us.dbConn.GetMyProfile(req.UserName)
+	userDetails, err := us.dbConn.GetMyProfile(req.Username)
 	if err != nil {
 		us.log.Errorf("error while finding the user profile: %v", err)
 		return nil, err
@@ -57,7 +57,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 
 	us.log.Infof("GEt profile: userDetails, %+v", userDetails)
 	return &pb.UserProfileRes{
-		ProfileId:   userDetails.AccountId,
+		AccountId:   userDetails.AccountId,
 		Username:    userDetails.Username,
 		FirstName:   userDetails.FirstName,
 		LastName:    userDetails.LastName,
@@ -78,10 +78,10 @@ func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityRe
 	return &pb.UserActivityRes{}, nil
 }
 func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProfileReq) (*pb.UpdateUserProfileRes, error) {
-	us.log.Infof("user %s is updating the profile.", req.CurrentUsername)
+	us.log.Infof("user %s is updating the profile.", req.Username)
 
 	// Check if the user exists
-	_, err := us.dbConn.CheckIfUsernameExist(req.CurrentUsername)
+	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
 		us.log.Errorf("the user doesn't exists: %v", err)
 		return nil, err
@@ -91,7 +91,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	var dbUserInfo *models.UserProfileRes
 	if req.Partial {
 		// If isPartial is true fetch the remaining data from the db
-		dbUserInfo, err = us.dbConn.GetMyProfile(req.CurrentUsername)
+		dbUserInfo, err = us.dbConn.GetMyProfile(req.Username)
 		if err != nil {
 			us.log.Errorf("error while finding the user profile: %v", err)
 			return nil, err
@@ -106,7 +106,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 
 	us.log.Infof("mappedDBUser: %+v\n", mappedDBUser)
 	// Update the user
-	err = us.dbConn.UpdateUserProfile(req.CurrentUsername, mappedDBUser)
+	err = us.dbConn.UpdateUserProfile(req.Username, mappedDBUser)
 	if err != nil {
 		return nil, err
 	}

@@ -45,18 +45,16 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/login", asc.Login)
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
 
-	// Forgot password
 	routes.POST("/forgot-pass", asc.ForgotPassword)
 	routes.GET("/reset-password", asc.ConfirmPasswordVerificationLink)
+	routes.POST("/update-password", asc.UpdatePassword)
+	routes.GET("/verify-email", asc.VerifyEmail)
 
-	// Is the user authenticated
-
+	// Authentication Point
 	mware := InitAuthMiddleware(asc)
 	routes.Use(mware.AuthRequired)
 
-	routes.POST("/update-password", asc.UpdatePassword)
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
-	routes.GET("/verify-email", asc.VerifyEmail)
 
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
@@ -84,7 +82,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 
 	// check for google login
 	var loginMethod pb.RegisterUserRequest_LoginMethod
-	if body.LoginMethod == "google_acc" {
+	if body.LoginMethod == "google-oauth2" {
 		loginMethod = pb.RegisterUserRequest_GOOGLE_ACC
 	} else if body.LoginMethod == "the-monkeys" {
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
@@ -344,7 +342,9 @@ func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, "authorized")
+	ctx.JSON(http.StatusOK, struct {
+		Authorized bool `json:"authorized"`
+	}{Authorized: true})
 }
 
 func (asc *ServiceClient) GetRoles(ctx *gin.Context) {
