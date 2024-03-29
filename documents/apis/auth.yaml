@@ -113,6 +113,32 @@ paths:
               
       tags:
         - Login
+  /auth/is-authenticated:
+    post:
+      operationId: AuthService.UserAuthenticated
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              schema: {}
+        default:
+          description: An unexpected error response.
+          schema: {}
+      parameters:
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Description for Header1
+        - in: header
+          name: user
+          type: string
+          required: true
+          description: Description for Header2
+      tags:
+        - Is User authenticated
   /auth/forgot-pass:
     post:
       operationId: AuthService.ForgetPass
@@ -140,64 +166,33 @@ paths:
                 example: "email@example.com"
       tags:
         - Forget Password
-  /api/v1/auth/reset-password:
-  post:
-    operationId: AuthService.ResetPassword
-    tags:
-      - Reset Password
-    parameters:
-      - name: user
-        in: query
-        required: true
-        description: Username of the user
-        type: string
-      - name: evpw
-        in: query
-        required: true
-        description: Reset password token
-        type: string
-    responses:
-      '200':
-        description: Password reset successful
-        schema:
-          type: object
-          properties:
-            status_code:
-              type: integer
-              description: HTTP Status Code
-              example: 200
-            token:
-              type: string
-              description: Access token upon successful reset
-              example: eyJhbGciOiJIUzI1NiIsIn
-      default:
-        description: An unexpected error response.
-        schema: {}
-  /auth/is-authenticated:
-    post:
-      operationId: AuthService.UserAuthenticated
-      responses:
-        '200':
-          description: A successful response.
-          schema:
-            type: object
-            properties:
-              schema: {}
-        default:
-          description: An unexpected error response.
-          schema: {}
-      parameters:
-        - in: header
-          name: Authorization
-          type: string
+  /auth/reset-password:
+      post:
+        operationId: Reset.Pass 
+        responses:
+          '200':
+            description: A successful response.
+            schema:
+              type: object
+              properties:
+                status:
+                  type: integer
+                  example: 200
+          default:
+            description: An unexpected error response.
+            schema: {}
+        parameters:
+        - name: user
+          in: query
           required: true
-          description: Description for Header1
-        - in: header
-          name: user
+          description: Username of the user
           type: string
+        - name: evpw
+          in: query
           required: true
-          description: Description for Header2
-      tags:
-        - Is User authenticated
-
+          description: Reset password token
+          type: string
+        tags:
+          - Reset Password
+  
 definitions: {}
