@@ -140,6 +140,39 @@ paths:
                 example: "email@example.com"
       tags:
         - Forget Password
+  /api/v1/auth/reset-password:
+  post:
+    operationId: AuthService.ResetPassword
+    tags:
+      - Reset Password
+    parameters:
+      - name: user
+        in: query
+        required: true
+        description: Username of the user
+        type: string
+      - name: evpw
+        in: query
+        required: true
+        description: Reset password token
+        type: string
+    responses:
+      '200':
+        description: Password reset successful
+        schema:
+          type: object
+          properties:
+            status_code:
+              type: integer
+              description: HTTP Status Code
+              example: 200
+            token:
+              type: string
+              description: Access token upon successful reset
+              example: eyJhbGciOiJIUzI1NiIsIn
+      default:
+        description: An unexpected error response.
+        schema: {}
   /auth/is-authenticated:
     post:
       operationId: AuthService.UserAuthenticated
