@@ -22,7 +22,7 @@ Thank you for visiting our platform. We hope you find it informative and educati
 # Contribution Guidelines:
 We're glad you're thinking about contributing to The Monkeys. If you think something is missing or could be improved, please open issues and pull requests. If you'd like to help this project grow, we'd love to have you. To start contributing, check the [Contributing Guidelines](contribution/contribution.md).
 
- # Native installation steps
+ <!-- # Native installation steps
  1. Move to the the_new_project directory
    - `cd the_new_projects`
 
@@ -45,4 +45,4 @@ We're glad you're thinking about contributing to The Monkeys. If you think somet
     * On docker
      `./scripts/uninstall.sh`
     * On linux
-     `sudo -E ./scripts/uninstall.sh `
+     `sudo -E ./scripts/uninstall.sh ` -->
