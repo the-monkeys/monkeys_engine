@@ -21,9 +21,11 @@ jobs:
       with:
         go-version: 1.19
 
-    - name: Build
-      run: ./build.sh
-
+    - name: Docker Compose Action
+      uses: hoverkraft-tech/compose-action@v1.5.1
+      with:
+        compose-file: "../../docker-compose.yml"
+        
     - name: Test
       run: go test -v ./...
 
