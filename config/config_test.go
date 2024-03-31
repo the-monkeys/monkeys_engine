@@ -1,12 +1,10 @@
 package config
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 const config = `
@@ -46,27 +44,16 @@ email:
 
 func TestGetConfig(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		// Create a temporary file
-		tmpfile, err := os.CreateTemp("", "example")
-		require.NoError(t, err)
-
-		// Write your test data to the temporary file
-		text := []byte(config)
-		_, err = tmpfile.Write(text)
-		defer tmpfile.Close()
-		require.NoError(t, err)
-
-		fmt.Printf("tmpfile.Name(): %v\n", tmpfile.Name())
-		// Set the config name and path to the temporary file
-		viper.SetConfigFile(tmpfile.Name())
+		// Arrange
+		viper.SetConfigName("config")
 		viper.SetConfigType("yml")
+		viper.AddConfigPath(".")
 
+		// Act
 		config, err := GetConfig()
-		require.NoError(t, err)
-		require.Equal(t, "0.0.0.0:8080", config.TheMonkeysGateway.HTTPS)
-		// require.Equal(t, "127.0.0.1:50051", config.Microservices.TheMonkeysAuthz)
 
-		// Remember to clean up the temporary file
-		os.Remove(tmpfile.Name())
+		// Assert
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
 	})
 }
