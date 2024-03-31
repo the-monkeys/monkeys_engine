@@ -111,19 +111,23 @@ CREATE TABLE IF NOT EXISTS payment_info (
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
--- Creating interest table
-CREATE TABLE IF NOT EXISTS interest (
-    interest_id INTEGER PRIMARY KEY,
-    interest_name VARCHAR(100) NOT NULL
+-- Creating topics table
+CREATE TABLE IF NOT EXISTS topics (
+    id SERIAL PRIMARY KEY,
+    description VARCHAR(100) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    user_id BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
--- Creating user interest table
+-- Creating user interestd in topics table
 CREATE TABLE IF NOT EXISTS user_interest (
     user_id BIGINT NOT NULL,
-    interest_id INTEGER NOT NULL,
-    PRIMARY KEY (user_id, interest_id),
+    topics_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, topics_id),
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (interest_id) REFERENCES interest(interest_id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (topics_id) REFERENCES topics(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
 -- Creating clients table
@@ -178,26 +182,94 @@ CREATE TABLE IF NOT EXISTS blog_permissions (
 
 
 -- Inserting predefined roles
-INSERT INTO user_role (role_desc) VALUES ('admin'), ('owner'), ('editor'), ('viewer');
+INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer');
 
 -- Inserting predefined permissions
-INSERT INTO permissions (permission_desc) VALUES ('read'), ('edit'), ('delete'), ('archive');
+INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive');
 
 -- Inserting predefined clients
-INSERT INTO clients (c_name) VALUES ('chrome'), ('firefox'), ('safari'), ('edge'), ('opera'), ('android'), ('ios'), ('brave'), ('others');
+INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'), ('Opera'), ('Android'), ('iOS'), ('Brave'), ('Others');
 
 -- Inserting predefined email validation statuses
-INSERT INTO email_validation_status (status) VALUES ('unverified'), ('verification-link-sent'), ('verified');
+INSERT INTO email_validation_status (status) VALUES ('Unverified'), ('Verification link sent'), ('verified');
 
 -- Inserting predefined auth providers
-INSERT INTO auth_provider (provider_name) VALUES ('the-monkeys'), ('google-oauth2'), ('instagram-oauth2');
+INSERT INTO auth_provider (provider_name) VALUES ('The Monkeys'), ('Google Oauth2'), ('Instagram Oauth2');
 
 -- Inserting predefined user statuses
-INSERT INTO user_status (status) VALUES ('active'), ('inactive'), ('hidden');
+INSERT INTO user_status (status) VALUES ('Active'), ('Inactive'), ('Hidden');
 
 -- Inserting data into permissions granted for all roles
 INSERT INTO permissions_granted (role_id, permission_id)
 SELECT r.id, p.permission_id
 FROM user_role r
-JOIN permissions p ON r.role_desc IN ('admin', 'owner', 'editor', 'viewer')
-AND p.permission_desc IN ('read', 'write', 'edit', 'delete', 'archive');
+JOIN permissions p ON r.role_desc IN ('Admin', 'Owner', 'Editor', 'Viewer')
+AND p.permission_desc IN ('Read', 'Write', 'Edit', 'Delete', 'Archive');
+
+-- Insert some default topics
+INSERT INTO topics (description, category) VALUES
+('Reading', 'Hobbies'),
+('Writing', 'Hobbies'),
+('Coding', 'Tech'),
+('Hiking', 'Outdoors'),
+('Photography', 'Hobbies'),
+('Music', 'Entertainment'),
+('Traveling', 'Lifestyle'),
+('Painting', 'Arts'),
+('Gardening', 'Hobbies'),
+('Cooking', 'Food'),
+('Dancing', 'Arts'),
+('Sports', 'Fitness'),
+('Gaming', 'Entertainment'),
+('Blogging', 'Writing'),
+('Volunteering', 'Social'),
+('Fishing', 'Outdoors'),
+('Crafting', 'Hobbies'),
+('Collecting', 'Hobbies'),
+('Food and Cuisine', 'Food'),
+('Technology', 'Tech'),
+('Business and Finance', 'Business'),
+('Infrastructure', 'Business'),
+('Agriculture', 'Science'),
+('Healthcare', 'Science'),
+('Science', 'Science'),
+('Education', 'Learning'),
+('Space', 'Science'),
+('Movies', 'Entertainment'),
+('Psychology', 'Science'),
+('Mental Health', 'Wellness'),
+('Research', 'Science'),
+('Geography', 'Science'),
+('Software', 'Tech'),
+('Maths', 'Science'),
+('Social Media', 'Communication'),
+('The Internet', 'Communication'),
+('Blockchain', 'Tech'),
+('Language', 'Learning'),
+('Spirituality', 'Wellness'),
+('Hardware and IOTs', 'Tech'),
+('Humour', 'Entertainment'),
+('Opinion', 'Writing'),
+('Books', 'Reading'),
+('Trains', 'Transportation'),
+('Aviation', 'Transportation'),
+('Rock n Roll', 'Music'),
+('Night Life', 'Entertainment'),
+('Restaurants', 'Food'),
+('Motivation', 'Self-Improvement'),
+('Vibe', 'Lifestyle'),
+('Scandinavia', 'Travel'),
+('Economics', 'Business'),
+('Brands', 'Business'),
+('Careers', 'Business'),
+('Automobiles', 'Transportation'),
+('Fashion', 'Lifestyle'),
+('Family', 'Lifestyle'),
+('Television', 'Entertainment'),
+('Design', 'Arts'),
+('Startups', 'Business'),
+('Mobiles', 'Tech'),
+('Love and Romance', 'Relationships'),
+('Emotions', 'Wellness'),
+('Personal Development', 'Self-Improvement'),
+('Nature', 'Outdoors');

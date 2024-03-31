@@ -40,7 +40,7 @@ func main() {
 
 	pb.RegisterAuthServiceServer(grpcServer, authServer)
 
-	logrus.Info("✅ starting the authentication server at address: ", cfg.Microservices.TheMonkeysAuthz)
+	logrus.Info("✅ the authentication server started at address: ", cfg.Microservices.TheMonkeysAuthz)
 	if err := grpcServer.Serve(lis); err != nil {
 		logrus.Fatalf("gRPC auth server cannot start, error: %v", err)
 	}
