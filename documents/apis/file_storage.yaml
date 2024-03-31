@@ -35,6 +35,9 @@ paths:
                 type: integer
               newFileName:
                 type: string
+      tags:
+        - Blog Files
+  /files/post/{postId}/{filename}:
     get:
       summary: Get file from blog text editor
       parameters:
@@ -42,16 +45,26 @@ paths:
           name: postId
           required: true
           type: string
+        - in: path
+          name: filename
+          required: true
+          type: string
       responses:
         '200':
           description: A successful response
           schema:
             type: string
+      tags:
+        - Blog Files
     delete:
       summary: Delete a file
       parameters:
         - in: path
           name: postId
+          required: true
+          type: string
+        - in: path
+          name: filename
           required: true
           type: string
         - in: header
@@ -68,3 +81,79 @@ paths:
                 type: string
               status:
                 type: integer
+      tags:
+        - Blog Files
+  /files/profile/{userId}/profile:
+    post:
+      summary: Upload profile picture
+      consumes:
+        - multipart/form-data
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          required: true
+          type: string
+        - in: formData
+          name: profile_pic
+          required: true
+          type: file
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+              file_name:
+                type: string
+      tags:
+        - Profile pic
+    get:
+      summary: Get profile picture
+      produces:
+        - image/png
+        - image/jpeg
+        - image/gif
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          type: string
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: file
+      tags:
+          - Profile pic
+    delete:
+      summary: Delete profile picture
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          required: true
+          type: string
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              status:
+                type: integer
+      tags:
+          - Profile pic
+
+
+
