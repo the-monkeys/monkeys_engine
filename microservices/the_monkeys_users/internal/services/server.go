@@ -27,7 +27,7 @@ func NewUserSvc(dbConn database.UserDb, log *logrus.Logger) *UserSvc {
 }
 
 func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (*pb.UserProfileRes, error) {
-	us.log.Infof("user %v has requested profile info.", req.Email)
+	us.log.Infof("user %v has requested profile info.", req.Username)
 	if !req.IsPrivate {
 		userProfile, err := us.dbConn.GetUserProfile(req.Username)
 		if err != nil {

@@ -64,7 +64,7 @@ paths:
           description: Description for Header2
               
       tags:
-        - Register
+        - User
 
     patch:
       operationId: UserService.updateProfile
@@ -97,9 +97,6 @@ paths:
           schema:
             type: object
             properties:
-              username:
-                type: string
-                example: new_user_name
               first_name:
                 type: string
                 example: First
@@ -122,4 +119,29 @@ paths:
                 type: string
                 example: chrome
       tags:
-        - Update
+        - User
+  /user/topics:
+    get:
+      operationId: UserService.getTopics
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              topics:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    topic:
+                      type: string
+                      example: Reading
+                    category:
+                      type: string
+                      example: Hobbies
+        default:
+          description: An unexpected error response.
+          schema: {}
+      tags:
+        - Topics

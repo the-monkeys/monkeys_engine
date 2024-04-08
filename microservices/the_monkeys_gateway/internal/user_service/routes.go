@@ -53,15 +53,15 @@ func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 		isPrivate = true
 	}
 
-	email := ctx.Request.Header.Get("email")
-	if email == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
+	// email := ctx.Request.Header.Get("email")
+	// if email == "" {
+	// 	ctx.AbortWithStatus(http.StatusUnauthorized)
+	// 	return
+	// }
 
 	res, err := asc.Client.GetUserProfile(context.Background(), &pb.UserProfileReq{
-		Username:  username,
-		Email:     email,
+		Username: username,
+		// Email:     email,
 		IsPrivate: isPrivate,
 	})
 
@@ -112,11 +112,11 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	email := ctx.Request.Header.Get("email")
-	if email == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
+	// email := ctx.Request.Header.Get("email")
+	// if email == "" {
+	// 	ctx.AbortWithStatus(http.StatusUnauthorized)
+	// 	return
+	// }
 
 	body := UpdateUserProfile{}
 	if err := ctx.BindJSON(&body); err != nil {

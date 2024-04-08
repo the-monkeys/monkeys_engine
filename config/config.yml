@@ -35,4 +35,4 @@ email:
 
 authentication:
   # provide the domain name or the gateway addr
-  email_verification_addr: 0.0.0.0:8081
+  email_verification_addr: http://127.0.0.1:8081
