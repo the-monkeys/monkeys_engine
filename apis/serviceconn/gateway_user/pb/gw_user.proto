@@ -94,10 +94,26 @@ message DeleteUserProfileRes {
     string status = 3;
 }
 
+message GetTopicsRequests {
+
+}
+
+message Topics {
+    string topic = 1;
+    string category = 2;
+}
+
+message GetTopicsResponse {
+    repeated Topics topics = 1; 
+}
+
+
 
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityRes) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
     rpc UpdateUserProfile(UpdateUserProfileReq) returns (UpdateUserProfileRes) {}
     rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
+    rpc GetAllTopics(GetTopicsRequests) returns (GetTopicsResponse) {}
 }
+

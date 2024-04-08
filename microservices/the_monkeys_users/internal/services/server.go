@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -144,10 +146,10 @@ func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProf
 	return dbUserInfo
 }
 func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
- 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
+	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
 	// Check if username exits or not
-    _, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
 		us.log.Errorf("the user doesn't exists: %v", err)
 		return nil, err
@@ -166,4 +168,19 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		Status:  "200",
 	}, nil
 
+}
+
+func (us *UserSvc) GetAllTopics(context.Context, *pb.GetTopicsRequests) (*pb.GetTopicsResponse, error) {
+	us.log.Info("getting all the topics")
+
+	res, err := us.dbConn.GetAllTopicsFromDb()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			us.log.Errorf("cannot find the topics in the database: %v", err)
+		}
+		us.log.Errorf("error while querrying the topics: %v", err)
+		return nil, errors.New("error while querrying the topics")
+	}
+
+	return res, err
 }

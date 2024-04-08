@@ -35,7 +35,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		Client: NewUserServiceClient(cfg),
 	}
 	routes := router.Group("/api/v1/user")
-
+	routes.GET("/topics", usc.GetAllTopics)
 	routes.Use(mware.AuthRequired)
 
 	routes.GET("/:id", usc.GetUserProfile)
@@ -43,6 +43,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.PATCH("/:username", usc.UpdateUserProfile)
 	routes.PUT("/:username", usc.UpdateUserProfile)
 	routes.DELETE("/:username", usc.DeleteUserProfile)
+
 	return usc
 }
 func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
@@ -147,17 +148,16 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 
 }
-func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context){
+func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context) {
 	username := ctx.Param("username")
 	tokenUsername := ctx.GetString("userName")
-	
+
 	if username != tokenUsername {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	res, err := asc.Client.DeleteUserProfile(context.Background(), &pb.DeleteUserProfileReq{
 		Username: username,
-
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user profile"})
@@ -165,4 +165,14 @@ func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context){
 	}
 	ctx.JSON(http.StatusOK, res)
 
+}
+
+func (asc *UserServiceClient) GetAllTopics(ctx *gin.Context) {
+	res, err := asc.Client.GetAllTopics(context.Background(), &pb.GetTopicsRequests{})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get the list of topics"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, res)
 }
