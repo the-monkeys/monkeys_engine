@@ -95,7 +95,6 @@ message DeleteUserProfileRes {
 }
 
 message GetTopicsRequests {
-
 }
 
 message Topics {
@@ -107,7 +106,16 @@ message GetTopicsResponse {
     repeated Topics topics = 1; 
 }
 
+message Category {
+    repeated string Topics = 1;
+} 
 
+message GetAllCategoriesReq {
+}
+
+message GetAllCategoriesRes {
+    map<string, Category> category = 1;
+}
 
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityRes) {}
@@ -115,5 +123,6 @@ service UserService {
     rpc UpdateUserProfile(UpdateUserProfileReq) returns (UpdateUserProfileRes) {}
     rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
     rpc GetAllTopics(GetTopicsRequests) returns (GetTopicsResponse) {}
+    rpc GetAllCategories(GetAllCategoriesReq) returns (GetAllCategoriesRes) {}
 }
 

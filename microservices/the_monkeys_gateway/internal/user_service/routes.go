@@ -36,6 +36,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	}
 	routes := router.Group("/api/v1/user")
 	routes.GET("/topics", usc.GetAllTopics)
+	routes.GET("/category", usc.GetAllCategories)
 	routes.Use(mware.AuthRequired)
 
 	routes.GET("/:id", usc.GetUserProfile)
@@ -171,6 +172,16 @@ func (asc *UserServiceClient) GetAllTopics(ctx *gin.Context) {
 	res, err := asc.Client.GetAllTopics(context.Background(), &pb.GetTopicsRequests{})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get the list of topics"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) GetAllCategories(ctx *gin.Context) {
+	res, err := asc.Client.GetAllCategories(context.Background(), &pb.GetAllCategoriesReq{})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get the all the Categories"})
 		return
 	}
 
