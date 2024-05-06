@@ -17,5 +17,18 @@ func NewOSClient(url, username, password string) (*opensearch.Client, error) {
 		Password:  password,
 	})
 
-	return client, err
+	if err != nil {
+		return nil, err
+	}
+
+	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// defer cancel()
+
+	// // Perform a simple operation to check the connection
+	// res, err := client.Ping(ctx, nil)
+	// if err != nil || res.IsError() {
+	// 	return nil, err
+	// }
+
+	return client, nil
 }

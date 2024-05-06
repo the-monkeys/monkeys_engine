@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
@@ -63,7 +64,7 @@ func main() {
 	user_service.RegisterUserRouter(server.router, cfg, authClient)
 	// article.RegisterArticleRoutes(server.router, cfg, authClient)
 
-	// blogsandposts.RegisterBlogRouter(server.router, &cfg, authClient)
+	blog_client.RegisterBlogRouter(server.router, cfg, authClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 
 	server.start(context.Background(), cfg)

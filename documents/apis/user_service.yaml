@@ -10,17 +10,31 @@ produces:
   - application/json
 paths:
   /user/:username:
-    post:
+    get:
       operationId: UserService.getProfile
+      responses:
+        '200':
+          description: A successful response.
+        default:
+          description: An unexpected error response.
+          schema: {}
+      parameters:
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Bearer token for authorization
+      tags:
+        - User
+        
+    put:
+      operationId: UserService.UpdateProfile
       responses:
         '202':
           description: A successful response.
           schema:
             type: object
             properties:
-              profile_id:
-                type: string
-                example: zfvzf8fB6j6N2x2D
               username:
                 type: string
                 example: nnJ2zlT0RDJB
@@ -120,6 +134,23 @@ paths:
                 example: chrome
       tags:
         - User
+    delete:
+      operationId: UserService.deleteProfile
+      responses:
+        '200':
+          description: A successful response.
+        default:
+          description: An unexpected error response.
+          schema: {}
+      parameters:
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Bearer token for authorization
+      tags:
+        - User
+      
   /user/topics:
     get:
       operationId: UserService.getTopics
@@ -145,3 +176,6 @@ paths:
           schema: {}
       tags:
         - Topics
+        
+        
+  

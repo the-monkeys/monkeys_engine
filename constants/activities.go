@@ -15,6 +15,7 @@ const (
 	RemoveProfilePic            = "remove profile picture"
 
 	DraftBlog                = "draft blog"
+	UpdateDraftedBlog        = "update draft blog"
 	UpdateBlog               = "updated blog"
 	DeleteBlog               = "deleted blog"
 	PublishBlog              = "published blog"

@@ -131,6 +131,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		UserId:        userId,
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
+		AccountId:     user.AccountId,
 	}, nil
 }
 
@@ -227,6 +228,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 		UserId:        user.Id,
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
+		AccountId:     user.AccountId,
 	}, nil
 }
 

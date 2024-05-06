@@ -30,6 +30,7 @@ message RegisterUserResponse {
   string email = 8;
   bool email_verification_status = 9;
   Error error = 10;
+  string account_id = 11;
 }
 
 message Error {
@@ -69,6 +70,7 @@ message LoginUserResponse {
   string email = 8;
   bool email_verification_status = 9;
   Error error = 10;
+  string account_id = 11;
 }
 
 message ForgotPasswordReq {

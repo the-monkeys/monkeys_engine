@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package blog_svc;
+
+// import "google/protobuf/timestamp.proto";
+
+option go_package = "./apis/serviceconn/gateway_blog/pb";
+
+// TODO: Add isDraft, 
+message DraftBlogRequest {
+    string ID = 1;
+    string owner_account_id = 2;
+    Blog blog = 3;
+}
+
+message BlogResponse {
+    string message = 1;
+    Blog blog = 2;
+}
+
+message Blog {
+    int64 Time = 1;
+    repeated Block Blocks = 2;
+}
+
+message Block {
+    string ID = 1;
+    string Type = 2;
+    Data Data = 3;
+    string Author = 4;
+    int64 Time = 5;
+    Tunes Tunes = 6;
+}
+
+message Data {
+    string Text = 1;
+}
+
+message Tunes {
+    repeated string Footnotes = 1;
+}
+
+service BlogService {
+    rpc DraftBlog (DraftBlogRequest) returns (BlogResponse);
+}

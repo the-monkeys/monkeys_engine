@@ -358,7 +358,7 @@ func (uh *uDBHandler) GetAllTopicsFromDb() (*pb.GetTopicsResponse, error) {
 func (uh *uDBHandler) GetAllCategories() (*pb.GetAllCategoriesRes, error) {
 	resp := &pb.GetAllCategoriesRes{}
 	categories := make(map[string]*pb.Category)
-	rows, err := uh.db.Query("SELECT  DISTINCT description, category FROM topics ")
+	rows, err := uh.db.Query("SELECT  DISTINCT description, category FROM topics")
 	if err != nil {
 		// Check if the error is "not found" or "internal server error" and return accordingly
 		if errors.Is(err, sql.ErrNoRows) {

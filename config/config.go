@@ -36,6 +36,7 @@ type JWT struct {
 
 type Opensearch struct {
 	Address  string `mapstructure:"address"`
+	Host     string `mapstructure:"os_host"`
 	Username string `mapstructure:"os_username"`
 	Password string `mapstructure:"os_password"`
 }
