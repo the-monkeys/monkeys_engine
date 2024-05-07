@@ -16,6 +16,8 @@ import (
 
 type OpensearchStorage interface {
 	DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*opensearchapi.Response, error)
+	DoesBlogExist(ctx context.Context, blogID string) (bool, error)
+	PublishBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
 }
 
 type opensearchStorage struct {
@@ -37,7 +39,7 @@ func NewOpenSearchClient(url, username, password string, log *logrus.Logger) (Op
 }
 
 func (os *opensearchStorage) DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*opensearchapi.Response, error) {
-	os.log.Infof("DraftABlog: received an article with id: %s", blog.ID)
+	os.log.Infof("DraftABlog: received an article with id: %s", blog.BlogId)
 
 	bs, err := json.Marshal(blog)
 	if err != nil {
@@ -49,7 +51,7 @@ func (os *opensearchStorage) DraftABlog(ctx context.Context, blog *pb.DraftBlogR
 
 	osReq := opensearchapi.IndexRequest{
 		Index:      constants.OpensearchArticleIndex,
-		DocumentID: blog.ID,
+		DocumentID: blog.BlogId,
 		Body:       document,
 	}
 
@@ -85,8 +87,8 @@ func (os *opensearchStorage) DoesBlogExist(ctx context.Context, blogID string) (
 
 	if getResponse.IsError() {
 		if getResponse.StatusCode == http.StatusNotFound {
-			os.log.Infof("Blog with id: %s does not exist", blogID)
-			return false, nil
+			os.log.Errorf("Blog with id: %s does not exist", blogID)
+			return false, fmt.Errorf("blog with id: %s does not exist", blogID)
 		}
 		err = fmt.Errorf("error checking if blog exists, get response: %+v", getResponse)
 		os.log.Error(err)
@@ -95,4 +97,39 @@ func (os *opensearchStorage) DoesBlogExist(ctx context.Context, blogID string) (
 
 	os.log.Infof("Blog with id: %s exists", blogID)
 	return true, nil
+}
+func (os *opensearchStorage) PublishBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error) {
+	os.log.Infof("Publishing blog with id: %s", blogId)
+
+	// Define the update script
+	updateScript := `{
+		"script" : {
+			"source": "ctx._source.is_draft = params.is_draft",
+			"lang": "painless",
+			"params" : {
+				"is_draft" : false
+			}
+		}
+	}`
+
+	osReq := opensearchapi.UpdateRequest{
+		Index:      constants.OpensearchArticleIndex,
+		DocumentID: blogId,
+		Body:       strings.NewReader(updateScript),
+	}
+
+	updateResponse, err := osReq.Do(ctx, os.client)
+	if err != nil {
+		os.log.Errorf("Error while publishing blog, error: %+v", err)
+		return updateResponse, err
+	}
+
+	if updateResponse.IsError() {
+		err = fmt.Errorf("error publishing blog, update response: %+v", updateResponse)
+		os.log.Error(err)
+		return updateResponse, err
+	}
+
+	os.log.Infof("Successfully published blog with id: %s", blogId)
+	return updateResponse, nil
 }

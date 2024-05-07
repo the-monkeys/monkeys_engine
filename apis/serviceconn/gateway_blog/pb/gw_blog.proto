@@ -8,14 +8,17 @@ option go_package = "./apis/serviceconn/gateway_blog/pb";
 
 // TODO: Add isDraft, 
 message DraftBlogRequest {
-    string ID = 1;
+    string blog_id = 1;
     string owner_account_id = 2;
     Blog blog = 3;
+    bool is_draft = 4;
+    bool is_archive = 5;
 }
 
 message BlogResponse {
     string message = 1;
     Blog blog = 2;
+    string error = 3;
 }
 
 message Blog {
@@ -40,6 +43,27 @@ message Tunes {
     repeated string Footnotes = 1;
 }
 
+message PublishBlogReq {
+    string blog_id = 1;
+}
+
+message PublishBlogResp {
+    string message = 1;
+    string error = 2;
+}
+
+message GetBlogByIdReq {
+    string blog_id = 1;
+}
+
+message GetBlogByIdRes {
+    string message = 1;
+    Blog blog = 2;
+    string error = 3;
+}
+
 service BlogService {
     rpc DraftBlog (DraftBlogRequest) returns (BlogResponse);
+    rpc PublishBlog (PublishBlogReq) returns (PublishBlogResp);
+    rpc GetBlogById (GetBlogByIdReq) returns (GetBlogByIdRes);
 }

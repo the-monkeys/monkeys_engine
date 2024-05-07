@@ -44,6 +44,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
+	routes.POST("/publish/:id", blogClient.PublishBlogById)
 
 	// routes.POST("/", blogCli.CreateABlog)
 	// routes.PUT("/edit/:id", blogCli.EditArticles)
@@ -81,8 +82,8 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		}
 
 		resp, err := asc.Client.DraftBlog(context.Background(), &pb.DraftBlogRequest{
-			ID:   id,
-			Blog: blog,
+			BlogId: id,
+			Blog:   blog,
 		})
 		if err != nil {
 			logrus.Errorf("error while creating draft blog: %v", err)
@@ -103,6 +104,21 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 			return
 		}
 	}
+}
+
+func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
+	id := ctx.Param("id")
+	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
+		BlogId: id,
+	})
+
+	if err != nil {
+		logrus.Errorf("error while creating draft blog: %v", err)
+		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // func (asc *BlogServiceClient) CreateABlog(ctx *gin.Context) {

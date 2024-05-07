@@ -23,6 +23,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BlogServiceClient interface {
 	DraftBlog(ctx context.Context, in *DraftBlogRequest, opts ...grpc.CallOption) (*BlogResponse, error)
+	PublishBlog(ctx context.Context, in *PublishBlogReq, opts ...grpc.CallOption) (*PublishBlogResp, error)
+	GetBlogById(ctx context.Context, in *GetBlogByIdReq, opts ...grpc.CallOption) (*GetBlogByIdRes, error)
 }
 
 type blogServiceClient struct {
@@ -42,11 +44,31 @@ func (c *blogServiceClient) DraftBlog(ctx context.Context, in *DraftBlogRequest,
 	return out, nil
 }
 
+func (c *blogServiceClient) PublishBlog(ctx context.Context, in *PublishBlogReq, opts ...grpc.CallOption) (*PublishBlogResp, error) {
+	out := new(PublishBlogResp)
+	err := c.cc.Invoke(ctx, "/blog_svc.BlogService/PublishBlog", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogServiceClient) GetBlogById(ctx context.Context, in *GetBlogByIdReq, opts ...grpc.CallOption) (*GetBlogByIdRes, error) {
+	out := new(GetBlogByIdRes)
+	err := c.cc.Invoke(ctx, "/blog_svc.BlogService/GetBlogById", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BlogServiceServer is the server API for BlogService service.
 // All implementations must embed UnimplementedBlogServiceServer
 // for forward compatibility
 type BlogServiceServer interface {
 	DraftBlog(context.Context, *DraftBlogRequest) (*BlogResponse, error)
+	PublishBlog(context.Context, *PublishBlogReq) (*PublishBlogResp, error)
+	GetBlogById(context.Context, *GetBlogByIdReq) (*GetBlogByIdRes, error)
 	mustEmbedUnimplementedBlogServiceServer()
 }
 
@@ -56,6 +78,12 @@ type UnimplementedBlogServiceServer struct {
 
 func (UnimplementedBlogServiceServer) DraftBlog(context.Context, *DraftBlogRequest) (*BlogResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DraftBlog not implemented")
+}
+func (UnimplementedBlogServiceServer) PublishBlog(context.Context, *PublishBlogReq) (*PublishBlogResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishBlog not implemented")
+}
+func (UnimplementedBlogServiceServer) GetBlogById(context.Context, *GetBlogByIdReq) (*GetBlogByIdRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlogById not implemented")
 }
 func (UnimplementedBlogServiceServer) mustEmbedUnimplementedBlogServiceServer() {}
 
@@ -88,6 +116,42 @@ func _BlogService_DraftBlog_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BlogService_PublishBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishBlogReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).PublishBlog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/blog_svc.BlogService/PublishBlog",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).PublishBlog(ctx, req.(*PublishBlogReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlogService_GetBlogById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlogByIdReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).GetBlogById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/blog_svc.BlogService/GetBlogById",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).GetBlogById(ctx, req.(*GetBlogByIdReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BlogService_ServiceDesc is the grpc.ServiceDesc for BlogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,6 +162,14 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DraftBlog",
 			Handler:    _BlogService_DraftBlog_Handler,
+		},
+		{
+			MethodName: "PublishBlog",
+			Handler:    _BlogService_PublishBlog_Handler,
+		},
+		{
+			MethodName: "GetBlogById",
+			Handler:    _BlogService_GetBlogById_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

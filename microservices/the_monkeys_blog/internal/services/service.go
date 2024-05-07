@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -19,7 +20,9 @@ func NewBlogService(client database.OpensearchStorage, logger *logrus.Logger) *B
 }
 
 func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
-	blog.logger.Infof("blog id %s is being updated", req.ID)
+	blog.logger.Infof("blog id %s is being updated", req.BlogId)
+
+	req.IsDraft = true
 
 	_, err := blog.osClient.DraftABlog(ctx, req)
 	if err != nil {
@@ -30,6 +33,29 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	return &pb.BlogResponse{
 		Blog: req.Blog,
 	}, nil
+}
+
+func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
+	blog.logger.Infof("publishing the blog %s", req.BlogId)
+
+	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if err != nil && !exists {
+		blog.logger.Errorf("cannot find the blog %s, error: %v", req.BlogId, err)
+		return nil, err
+	}
+
+	updateResp, err := blog.osClient.PublishBlogById(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("cannot publish blog: %v", err)
+		return nil, err
+	}
+	return &pb.PublishBlogResp{
+		Message: fmt.Sprintf("the blog %s has been published, status: %d", req.BlogId, updateResp.StatusCode),
+	}, nil
+}
+
+func (blog *BlogService) GetBlogById(context.Context, *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+	panic("implement me")
 }
 
 // func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {
