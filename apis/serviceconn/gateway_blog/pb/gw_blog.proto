@@ -57,9 +57,11 @@ message GetBlogByIdReq {
 }
 
 message GetBlogByIdRes {
-    string message = 1;
-    Blog blog = 2;
-    string error = 3;
+    string blog_id = 1;
+    string owner_account_id = 2;
+    Blog blog = 3;
+    bool is_draft = 4;
+    bool is_archive = 5;
 }
 
 service BlogService {

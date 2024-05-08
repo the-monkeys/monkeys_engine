@@ -39,7 +39,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	}
 	routes := router.Group("/api/v1/blog")
 	// routes.GET("/", blogCli.Get100Blogs)
-	// routes.GET("/:id", blogCli.GetArticleById)
+	routes.GET("/:id", blogClient.GetBlogeById)
 	// routes.GET("/tag", blogCli.Get100PostsByTags)
 
 	routes.Use(mware.AuthRequired)
@@ -175,18 +175,18 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 // 	ctx.JSON(http.StatusCreated, response)
 // }
 
-// func (svc *BlogServiceClient) GetArticleById(ctx *gin.Context) {
-// 	id := ctx.Param("id")
+func (svc *BlogServiceClient) GetBlogeById(ctx *gin.Context) {
+	id := ctx.Param("id")
 
-// 	res, err := svc.Client.GetBlogById(context.Background(), &pb.GetBlogByIdRequest{Id: id})
-// 	if err != nil {
-// 		logrus.Errorf("cannot connect to article rpc server, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-// 		return
-// 	}
+	res, err := svc.Client.GetBlogById(context.Background(), &pb.GetBlogByIdReq{BlogId: id})
+	if err != nil {
+		logrus.Errorf("cannot get the blog from rpc server, error: %v", err)
+		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 
-// 	ctx.JSON(http.StatusCreated, res)
-// }
+	ctx.JSON(http.StatusCreated, res)
+}
 
 // func (blog *BlogServiceClient) EditArticles(ctx *gin.Context) {
 // 	id := ctx.Param("id")

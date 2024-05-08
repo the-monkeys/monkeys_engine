@@ -54,8 +54,8 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	}, nil
 }
 
-func (blog *BlogService) GetBlogById(context.Context, *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
-	panic("implement me")
+func (blog *BlogService) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+	return blog.osClient.GetBlogById(ctx, req)
 }
 
 // func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {

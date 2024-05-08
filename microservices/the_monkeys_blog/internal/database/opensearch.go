@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -18,6 +19,7 @@ type OpensearchStorage interface {
 	DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*opensearchapi.Response, error)
 	DoesBlogExist(ctx context.Context, blogID string) (bool, error)
 	PublishBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
+	GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error)
 }
 
 type opensearchStorage struct {
@@ -132,4 +134,58 @@ func (os *opensearchStorage) PublishBlogById(ctx context.Context, blogId string)
 
 	os.log.Infof("Successfully published blog with id: %s", blogId)
 	return updateResponse, nil
+}
+
+func (storage *opensearchStorage) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+	storage.log.Infof("fetching blog with id: %s", req.BlogId)
+
+	osReq := opensearchapi.GetRequest{
+		Index:      constants.OpensearchArticleIndex,
+		DocumentID: req.BlogId,
+	}
+
+	getResponse, err := osReq.Do(ctx, storage.client)
+	if err != nil {
+		storage.log.Errorf("error while fetching blog, error: %+v", err)
+		return nil, err
+	}
+
+	if getResponse.IsError() {
+		if getResponse.StatusCode == http.StatusNotFound {
+			storage.log.Errorf("blog with id: %s does not exist", req.BlogId)
+			return nil, fmt.Errorf("blog with id: %s does not exist", req.BlogId)
+		}
+		err = fmt.Errorf("error fetching blog, get response: %+v", getResponse)
+		storage.log.Error(err)
+		return nil, err
+	}
+
+	// Read the body into a byte slice
+	bodyBytes, err := io.ReadAll(getResponse.Body)
+	if err != nil {
+		storage.log.Errorf("error reading response body, error: %+v", err)
+		return nil, err
+	}
+
+	var source map[string]interface{}
+	err = json.Unmarshal(bodyBytes, &source)
+	if err != nil {
+		storage.log.Errorf("error unmarshalling blog, error: %+v", err)
+		return nil, err
+	}
+
+	bx, err := json.MarshalIndent(source["_source"].(map[string]interface{}), "", "\t")
+	if err != nil {
+		storage.log.Errorf("error marshalling the _source, error: %+v", err)
+		return nil, err
+	}
+	blogRes := &pb.GetBlogByIdRes{}
+
+	if err = json.Unmarshal(bx, blogRes); err != nil {
+		storage.log.Errorf("error un-marshalling the bytes into struct, error: %+v", err)
+		return nil, err
+	}
+
+	storage.log.Infof("successfully fetched blog with id: %s", req.BlogId)
+	return blogRes, nil
 }
