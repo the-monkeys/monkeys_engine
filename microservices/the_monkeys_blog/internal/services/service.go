@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -20,9 +21,26 @@ func NewBlogService(client database.OpensearchStorage, logger *logrus.Logger) *B
 }
 
 func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
-	blog.logger.Infof("blog id %s is being updated", req.BlogId)
-
+	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
 	req.IsDraft = true
+
+	exists, _ := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if exists {
+		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
+		owner, _, err := blog.osClient.GetBlogDetailsById(ctx, req.BlogId)
+
+		if err != nil {
+			blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
+			return nil, fmt.Errorf("cannot find the blog with id: %s", req.BlogId)
+		}
+
+		if req.OwnerAccountId != owner {
+			blog.logger.Errorf("user %s is trying to take the ownershipt of the containt, original owner is: %s", req.OwnerAccountId, owner)
+			return nil, errors.New("you don't have permission to change the owner id")
+		}
+	} else {
+		blog.logger.Infof("creating the blog with id: %s", req.BlogId)
+	}
 
 	_, err := blog.osClient.DraftABlog(ctx, req)
 	if err != nil {
@@ -55,7 +73,27 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 }
 
 func (blog *BlogService) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
-	return blog.osClient.GetBlogById(ctx, req)
+	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	return blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
+}
+
+func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
+	blog.logger.Infof("archiving the blog %s", req.BlogId)
+
+	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if err != nil && !exists {
+		blog.logger.Errorf("cannot find the blog %s, error: %v", req.BlogId, err)
+		return nil, err
+	}
+
+	updateResp, err := blog.osClient.ArchieveBlogById(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("cannot archive the blog: %v", err)
+		return nil, err
+	}
+	return &pb.ArchiveBlogResp{
+		Message: fmt.Sprintf("the blog %s has been archived, status: %d", req.BlogId, updateResp.StatusCode),
+	}, nil
 }
 
 // func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {

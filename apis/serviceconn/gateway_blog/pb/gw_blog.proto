@@ -13,6 +13,7 @@ message DraftBlogRequest {
     Blog blog = 3;
     bool is_draft = 4;
     bool is_archive = 5;
+    repeated string tags = 6;
 }
 
 message BlogResponse {
@@ -30,7 +31,7 @@ message Block {
     string ID = 1;
     string Type = 2;
     Data Data = 3;
-    string Author = 4;
+    repeated string Author = 4;
     int64 Time = 5;
     Tunes Tunes = 6;
 }
@@ -62,10 +63,21 @@ message GetBlogByIdRes {
     Blog blog = 3;
     bool is_draft = 4;
     bool is_archive = 5;
+    repeated string tags = 6;
+}
+
+message ArchiveBlogReq {
+    string blog_id = 1;
+}
+
+message ArchiveBlogResp {
+    string message = 1;
+    string error = 2;
 }
 
 service BlogService {
     rpc DraftBlog (DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog (PublishBlogReq) returns (PublishBlogResp);
     rpc GetBlogById (GetBlogByIdReq) returns (GetBlogByIdRes);
+    rpc ArchivehBlogById (ArchiveBlogReq) returns (ArchiveBlogResp);
 }

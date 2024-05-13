@@ -45,6 +45,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
 	routes.POST("/publish/:id", blogClient.PublishBlogById)
+	routes.POST("/archive/:id", blogClient.ArchiveBlogById)
 
 	// routes.POST("/", blogCli.CreateABlog)
 	// routes.PUT("/edit/:id", blogCli.EditArticles)
@@ -74,17 +75,16 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		}
 
 		// Unmarshal the received message into the Blog struct
-		var blog *pb.Blog
-		err = json.Unmarshal(msg, &blog)
+		var draftBlog *pb.DraftBlogRequest
+		err = json.Unmarshal(msg, &draftBlog)
 		if err != nil {
 			logrus.Println("Error unmarshalling message:", err)
 			return
 		}
 
-		resp, err := asc.Client.DraftBlog(context.Background(), &pb.DraftBlogRequest{
-			BlogId: id,
-			Blog:   blog,
-		})
+		draftBlog.BlogId = id
+
+		resp, err := asc.Client.DraftBlog(context.Background(), draftBlog)
 		if err != nil {
 			logrus.Errorf("error while creating draft blog: %v", err)
 			_ = ctx.AbortWithError(http.StatusInternalServerError, err)
@@ -109,6 +109,21 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	id := ctx.Param("id")
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
+		BlogId: id,
+	})
+
+	if err != nil {
+		logrus.Errorf("error while creating draft blog: %v", err)
+		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
+	id := ctx.Param("id")
+	resp, err := asc.Client.ArchivehBlogById(context.Background(), &pb.ArchiveBlogReq{
 		BlogId: id,
 	})
 
