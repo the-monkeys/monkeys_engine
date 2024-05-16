@@ -40,7 +40,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes := router.Group("/api/v1/blog")
 	// routes.GET("/", blogCli.Get100Blogs)
 	routes.GET("/:id", blogClient.GetBlogeById)
-	// routes.GET("/tag", blogCli.Get100PostsByTags)
+	routes.GET("/tags", blogClient.GetBlogsByTagsName)
 
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
@@ -125,6 +125,20 @@ func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 	id := ctx.Param("id")
 	resp, err := asc.Client.ArchivehBlogById(context.Background(), &pb.ArchiveBlogReq{
 		BlogId: id,
+	})
+
+	if err != nil {
+		logrus.Errorf("error while creating draft blog: %v", err)
+		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *BlogServiceClient) GetBlogsByTagsName(ctx *gin.Context) {
+	resp, err := asc.Client.GetBlogByTagName(context.Background(), &pb.GetBlogByTagNameReq{
+		TagName: "alpha",
 	})
 
 	if err != nil {

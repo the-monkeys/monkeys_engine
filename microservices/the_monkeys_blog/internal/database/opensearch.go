@@ -24,6 +24,7 @@ type OpensearchStorage interface {
 	GetBlogDetailsById(ctx context.Context, blogId string) (string, []string, error)
 	ArchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.GetBlogByIdRes, error)
+	GetPublishedBlogByTagsName(ctx context.Context, id ...string) (*pb.GetBlogByTagNameRes, error)
 }
 
 type opensearchStorage struct {
@@ -292,6 +293,80 @@ func (os *opensearchStorage) GetBlogDetailsById(ctx context.Context, blogId stri
 	}
 
 	return "", nil, fmt.Errorf("No matching blog found")
+}
+
+func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogByTagNameRes, error) {
+	// Convert the tags slice to a JSON array
+	tagsJson, err := json.Marshal(tags)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the query
+	query := fmt.Sprintf(`{
+        "query": {
+            "bool": {
+                "must": [
+                    { "terms": { "tags": %s } },
+                    { "term": { "is_draft": false } }
+                ],
+                "should": [
+                    { "bool": { "must_not": { "exists": { "field": "is_archive" } } } },
+                    { "term": { "is_archive": false } }
+                ],
+                "minimum_should_match": 1
+            }
+        }
+    }`, string(tagsJson))
+
+	// Send the search request
+	res, err := os.client.Search(
+		os.client.Search.WithContext(context.Background()),
+		os.client.Search.WithIndex(constants.OpensearchArticleIndex),
+		os.client.Search.WithBody(strings.NewReader(query)),
+		os.client.Search.WithPretty(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	// Read and unmarshal the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	var source map[string]interface{}
+	err = json.Unmarshal(bodyBytes, &source)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract the hits
+	hits := source["hits"].(map[string]interface{})["hits"].([]interface{})
+	if len(hits) == 0 {
+		return nil, fmt.Errorf("no blogs found with tags: %v", tags)
+	}
+
+	// Unmarshal each hit into a GetBlogByTagNameRes struct
+	blogsRes := &pb.GetBlogByTagNameRes{}
+	for _, hit := range hits {
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("error converting hit to map[string]interface{}")
+		}
+		bx, err := json.MarshalIndent(hitMap["_source"], "", "\t")
+		if err != nil {
+			return nil, err
+		}
+		blogRes := &pb.GetBlogByTagName{}
+		if err = json.Unmarshal(bx, blogRes); err != nil {
+			return nil, err
+		}
+		blogsRes.GetBlogByTagName = append(blogsRes.GetBlogByTagName, blogRes)
+	}
+
+	return blogsRes, nil
 }
 
 // func (storage *opensearchStorage) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
