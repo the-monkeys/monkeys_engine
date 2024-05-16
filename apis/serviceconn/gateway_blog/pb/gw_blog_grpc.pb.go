@@ -26,6 +26,7 @@ type BlogServiceClient interface {
 	PublishBlog(ctx context.Context, in *PublishBlogReq, opts ...grpc.CallOption) (*PublishBlogResp, error)
 	GetBlogById(ctx context.Context, in *GetBlogByIdReq, opts ...grpc.CallOption) (*GetBlogByIdRes, error)
 	ArchivehBlogById(ctx context.Context, in *ArchiveBlogReq, opts ...grpc.CallOption) (*ArchiveBlogResp, error)
+	GetBlogByTagName(ctx context.Context, in *GetBlogByTagNameReq, opts ...grpc.CallOption) (*GetBlogByTagNameRes, error)
 }
 
 type blogServiceClient struct {
@@ -72,6 +73,15 @@ func (c *blogServiceClient) ArchivehBlogById(ctx context.Context, in *ArchiveBlo
 	return out, nil
 }
 
+func (c *blogServiceClient) GetBlogByTagName(ctx context.Context, in *GetBlogByTagNameReq, opts ...grpc.CallOption) (*GetBlogByTagNameRes, error) {
+	out := new(GetBlogByTagNameRes)
+	err := c.cc.Invoke(ctx, "/blog_svc.BlogService/GetBlogByTagName", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BlogServiceServer is the server API for BlogService service.
 // All implementations must embed UnimplementedBlogServiceServer
 // for forward compatibility
@@ -80,6 +90,7 @@ type BlogServiceServer interface {
 	PublishBlog(context.Context, *PublishBlogReq) (*PublishBlogResp, error)
 	GetBlogById(context.Context, *GetBlogByIdReq) (*GetBlogByIdRes, error)
 	ArchivehBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error)
+	GetBlogByTagName(context.Context, *GetBlogByTagNameReq) (*GetBlogByTagNameRes, error)
 	mustEmbedUnimplementedBlogServiceServer()
 }
 
@@ -98,6 +109,9 @@ func (UnimplementedBlogServiceServer) GetBlogById(context.Context, *GetBlogByIdR
 }
 func (UnimplementedBlogServiceServer) ArchivehBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ArchivehBlogById not implemented")
+}
+func (UnimplementedBlogServiceServer) GetBlogByTagName(context.Context, *GetBlogByTagNameReq) (*GetBlogByTagNameRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlogByTagName not implemented")
 }
 func (UnimplementedBlogServiceServer) mustEmbedUnimplementedBlogServiceServer() {}
 
@@ -184,6 +198,24 @@ func _BlogService_ArchivehBlogById_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BlogService_GetBlogByTagName_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlogByTagNameReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).GetBlogByTagName(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/blog_svc.BlogService/GetBlogByTagName",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).GetBlogByTagName(ctx, req.(*GetBlogByTagNameReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BlogService_ServiceDesc is the grpc.ServiceDesc for BlogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -206,6 +238,10 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ArchivehBlogById",
 			Handler:    _BlogService_ArchivehBlogById_Handler,
+		},
+		{
+			MethodName: "GetBlogByTagName",
+			Handler:    _BlogService_GetBlogByTagName_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
