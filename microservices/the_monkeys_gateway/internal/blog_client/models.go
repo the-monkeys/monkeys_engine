@@ -21,3 +21,7 @@ type Data struct {
 type Tunes struct {
 	Footnotes []string `json:"footnotes"`
 }
+
+type Tags struct {
+	Tags []string `json:"tags"`
+}

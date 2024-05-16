@@ -96,11 +96,14 @@ func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBl
 		Message: fmt.Sprintf("the blog %s has been archived, status: %d", req.BlogId, updateResp.StatusCode),
 	}, nil
 }
-func (blog *BlogService) GetBlogByTagName(ctx context.Context, req *pb.GetBlogByTagNameReq) (*pb.GetBlogByTagNameRes, error) {
-	blog.logger.Infof("fetching blog with tag: %s", req.TagName)
+func (blog *BlogService) GetBlogsByTagsName(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
+	blog.logger.Infof("fetching blog with tag: %s", req.TagNames)
 
-	req.TagName = strings.TrimSpace(req.TagName)
-	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagName)
+	for i := 0; i < len(req.TagNames); i++ {
+		req.TagNames[i] = strings.TrimSpace(req.TagNames[i])
+	}
+
+	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
 }
 
 // func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {

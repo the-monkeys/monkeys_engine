@@ -75,19 +75,19 @@ message ArchiveBlogResp {
     string error = 2;
 }
 
-message GetBlogByTagNameReq {
-    string tag_name = 1;
+message GetBlogsByTagsNameReq {
+    repeated string tag_names = 1;
 }
 
-message GetBlogByTagName {
+message GetBlogsByTags {
     string blog_id = 1;
     string owner_account_id = 2;
     Blog blog = 3;
     repeated string tags = 6;
 }
 
-message GetBlogByTagNameRes {
-    repeated GetBlogByTagName get_blog_by_tag_name = 1;
+message GetBlogsByTagsNameRes {
+    repeated GetBlogsByTags the_blogs = 1;
     string error = 2;
 }
 
@@ -96,5 +96,5 @@ service BlogService {
     rpc PublishBlog (PublishBlogReq) returns (PublishBlogResp);
     rpc GetBlogById (GetBlogByIdReq) returns (GetBlogByIdRes);
     rpc ArchivehBlogById (ArchiveBlogReq) returns (ArchiveBlogResp);
-    rpc GetBlogByTagName (GetBlogByTagNameReq) returns (GetBlogByTagNameRes);
+    rpc GetBlogsByTagsName (GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
 }

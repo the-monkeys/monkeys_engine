@@ -24,7 +24,7 @@ type OpensearchStorage interface {
 	GetBlogDetailsById(ctx context.Context, blogId string) (string, []string, error)
 	ArchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.GetBlogByIdRes, error)
-	GetPublishedBlogByTagsName(ctx context.Context, id ...string) (*pb.GetBlogByTagNameRes, error)
+	GetPublishedBlogByTagsName(ctx context.Context, id ...string) (*pb.GetBlogsByTagsNameRes, error)
 }
 
 type opensearchStorage struct {
@@ -295,7 +295,7 @@ func (os *opensearchStorage) GetBlogDetailsById(ctx context.Context, blogId stri
 	return "", nil, fmt.Errorf("No matching blog found")
 }
 
-func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogByTagNameRes, error) {
+func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error) {
 	// Convert the tags slice to a JSON array
 	tagsJson, err := json.Marshal(tags)
 	if err != nil {
@@ -349,7 +349,7 @@ func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tag
 	}
 
 	// Unmarshal each hit into a GetBlogByTagNameRes struct
-	blogsRes := &pb.GetBlogByTagNameRes{}
+	blogsRes := &pb.GetBlogsByTagsNameRes{}
 	for _, hit := range hits {
 		hitMap, ok := hit.(map[string]interface{})
 		if !ok {
@@ -359,11 +359,11 @@ func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tag
 		if err != nil {
 			return nil, err
 		}
-		blogRes := &pb.GetBlogByTagName{}
+		blogRes := &pb.GetBlogsByTags{}
 		if err = json.Unmarshal(bx, blogRes); err != nil {
 			return nil, err
 		}
-		blogsRes.GetBlogByTagName = append(blogsRes.GetBlogByTagName, blogRes)
+		blogsRes.TheBlogs = append(blogsRes.TheBlogs, blogRes)
 	}
 
 	return blogsRes, nil
