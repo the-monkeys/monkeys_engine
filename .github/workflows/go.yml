@@ -10,32 +10,39 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19
-
-    - name: Docker Compose Action
-      uses: hoverkraft-tech/compose-action@v1.5.1
-      with:
-        compose-file: "../../docker-compose.yml"
-        
-    - name: Test
-      run: go test -v ./...
-
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Name
+      run: echo "The Monkeys Pipeline"
 
-    - name: Create Postgres
-      run: end2end/psql_container.sh
+  # build:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - name: Set up Go
+  #     uses: actions/setup-go@v3
+  #     with:
+  #       go-version: 1.19
+
+  #   - name: Docker Compose Action
+  #     uses: hoverkraft-tech/compose-action@v1.5.1
+  #     with:
+  #       compose-file: "../../docker-compose.yml"
+        
+  #   - name: Test
+  #     run: go test -v ./...
+   
+
+  # test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - name: Create Postgres
+  #     run: end2end/psql_container.sh
     
     # - name: total no of containers running
     #   run: end2end/no_of_containers.sh

@@ -188,8 +188,8 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 			StatusCode: http.StatusNotFound,
 			Error: &pb.Error{
 				Status:  http.StatusNotFound,
-				Message: service_types.EmailNotRegistered,
-				Error:   service_types.ErrEmailNotRegistered,
+				Message: service_types.EmailPasswordWrong,
+				Error:   service_types.ErrEmailPasswordWrong,
 			},
 		}, nil
 	}
@@ -241,8 +241,8 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 		return &pb.ForgotPasswordRes{
 			Error: &pb.Error{
 				Status:  http.StatusNotFound,
-				Message: service_types.EmailNotRegistered,
-				Error:   service_types.ErrEmailNotRegistered,
+				Message: service_types.IfEmailExists,
+				Error:   service_types.ErrIfEmailExists,
 			},
 		}, err
 	}

@@ -24,3 +24,12 @@ type VerifyEmail struct {
 type UpdatePassword struct {
 	Password string `json:"new_password"`
 }
+
+type Authorization struct {
+	AuthorizationStatus bool   `json:"authorization_status"`
+	Error               string `json:"error,omitempty"`
+}
+
+type IncorrectReqBody struct {
+	Error string `json:"error,omitempty"`
+}

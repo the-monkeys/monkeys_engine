@@ -136,7 +136,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	if res.StatusCode == http.StatusNotFound {
 		asc.Log.Errorf("user containing email: %s, doesn't exists", body.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrNotFound)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 		return
 	}
 
@@ -249,9 +249,10 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 
 	if err := ctx.BindJSON(&vrEmail); err != nil {
 		asc.Log.Errorf("json body is not correct, error: %v", err)
-		_ = ctx.AbortWithError(http.StatusBadRequest, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, IncorrectReqBody{Error: "Invalid json body"})
 		return
 	}
+
 	res, err := asc.Client.RequestForEmailVerification(context.Background(), &pb.EmailVerificationReq{
 		Email: vrEmail.Email,
 	})
@@ -321,24 +322,24 @@ func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
 	token := strings.Split(authorization, "Bearer ")
 
 	if len(token) < 2 {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
 	user := ctx.Request.Header.Get("user")
 	if user == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
 	res, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{
 		Token: token[1],
 	})
 	if err != nil || res.StatusCode != http.StatusOK {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
 
 	if res.UserName != user {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
 
