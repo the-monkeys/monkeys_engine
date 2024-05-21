@@ -69,6 +69,25 @@ services:
       timeout: 10s
       retries: 3
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: the-monkeys-rabbitmq
+    ports:
+      - "5672:5672"  # RabbitMQ default port
+      - "15672:15672"  # RabbitMQ Management UI port
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq  # Persist data
+    networks:
+      - monkeys-network
+    environment:
+      RABBITMQ_DEFAULT_USER: secure_username
+      RABBITMQ_DEFAULT_PASS: strong_password
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s  # Check every 10 seconds
+      timeout: 5s   # Time out after 5 seconds
+      retries: 2    # Retry 2 times before considering unhealthy
+
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
     image: golang:latest
@@ -78,6 +97,7 @@ services:
       - the_monkeys_db
       - db-migrations
       - opensearch_node1
+      - rabbitmq
     volumes:
       - .:/go/src/app
     ports:
@@ -94,6 +114,7 @@ services:
       - the_monkeys_db
       - db-migrations
       - opensearch_node1
+      - rabbitmq
     volumes:
       - .:/go/src/app
     ports:
@@ -110,6 +131,7 @@ services:
       - the_monkeys_db
       - db-migrations
       - opensearch_node1
+      - rabbitmq
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -128,6 +150,7 @@ services:
       - the_monkeys_db
       - db-migrations
       - opensearch_node1
+      - rabbitmq
     volumes:
       - .:/go/src/app
     ports:
@@ -144,6 +167,7 @@ services:
       - the_monkeys_db
       - db-migrations
       - opensearch_node1
+      - rabbitmq
     volumes:
       - .:/go/src/app
     ports:
@@ -159,17 +183,8 @@ volumes:
   postgres_data:
   the_monkeys_profile:
   blogs_volume:
+  rabbitmq-data:  # Named volume for better organization
 
 
-  # the-monkeys-rabbitmq:
-  #   image: rabbitmq:latest
-  #   container_name: monkeys-rabbitmq
-  #   restart: always
-  #   ports:
-  #     - "5672:5672"  # RabbitMQ default port
-  #     - "15672:15672"  # RabbitMQ Management UI port
-  #   networks:
-  #     - monkeys-network    
-  #   volumes:
-  #     - /var/lib/rabbitmq
+
 

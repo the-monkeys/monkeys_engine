@@ -33,3 +33,7 @@ type UpdateUserProfile struct {
 	Client        string `json:"client_id"`
 	Partial       bool   `json:"partial"`
 }
+
+type ReturnMessage struct {
+	Message string `json:"message"`
+}

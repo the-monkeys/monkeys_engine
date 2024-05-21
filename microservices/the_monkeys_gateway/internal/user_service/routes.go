@@ -12,7 +12,9 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/errors"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type UserServiceClient struct {
@@ -37,6 +39,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes := router.Group("/api/v1/user")
 	routes.GET("/topics", usc.GetAllTopics)
 	routes.GET("/category", usc.GetAllCategories)
+	routes.GET("/public/:id", usc.GetUserPublicProfile)
+
 	routes.Use(mware.AuthRequired)
 
 	routes.GET("/:id", usc.GetUserProfile)
@@ -69,6 +73,28 @@ func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 	if err != nil {
 		errors.RestError(ctx, err, "user")
 		return
+	}
+
+	ctx.JSON(http.StatusAccepted, &res)
+}
+
+func (asc *UserServiceClient) GetUserPublicProfile(ctx *gin.Context) {
+	username := ctx.Param("id")
+	var isPrivate bool
+
+	res, err := asc.Client.GetUserProfile(context.Background(), &pb.UserProfileReq{
+		Username:  username,
+		IsPrivate: isPrivate,
+	})
+
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, ReturnMessage{Message: "user not found"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, ReturnMessage{Message: "something went wrong"})
+			return
+		}
 	}
 
 	ctx.JSON(http.StatusAccepted, &res)

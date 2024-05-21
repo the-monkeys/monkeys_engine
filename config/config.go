@@ -52,6 +52,18 @@ type Authentication struct {
 	EmailVerificationAddr string `mapstructure:"email_verification_addr"`
 }
 
+type RabbitMQ struct {
+	Protocol    string `mapstructure:"protocol"`
+	Host        string `mapstructure:"host"`
+	Port        string `mapstructure:"port"`
+	Username    string `mapstructure:"username"`
+	Password    string `mapstructure:"password"`
+	VirtualHost string `mapstructure:"virtual_host"`
+	Exchange    string `mapstructure:"exchange"`
+	Queue       string `mapstructure:"queue"`
+	RoutingKey  string `mapstructure:"routing_key"`
+}
+
 type Config struct {
 	TheMonkeysGateway TheMonkeysGateway `mapstructure:"the_monkeys_gateway"`
 	Microservices     Microservices     `mapstructure:"microservices"`
@@ -60,6 +72,7 @@ type Config struct {
 	Opensearch        Opensearch        `mapstructure:"opensearch"`
 	Email             Email             `mapstructure:"email"`
 	Authentication    Authentication    `mapstructure:"authentication"`
+	RabbitMQ          RabbitMQ          `mapstructure:"rabbitmq"`
 }
 
 // TODO: remove the print statement and add logger instead
