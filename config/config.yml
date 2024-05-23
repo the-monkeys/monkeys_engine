@@ -39,12 +39,12 @@ authentication:
   email_verification_addr: http://127.0.0.1:8081
 
 rabbitMQ:
-  protocol: ""
-  host: ""
+  protocol: "amqp"
+  host: "rabbitMQ"
   port: ""
   username: ""
-  password: ""
-  virtualHost: ""
+  password: "secure_username"
+  virtualHost: "strong_password"
   exchange: ""
   queue: ""
   routing_key: ""

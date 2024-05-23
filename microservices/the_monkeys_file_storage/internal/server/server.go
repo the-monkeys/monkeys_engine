@@ -196,6 +196,4 @@ func (fs *FileService) DeleteProfilePic(ctx context.Context, req *pb.DeleteProfi
 		Message: "successfully deleted",
 		Status:  http.StatusOK,
 	}, nil
-
-	return &pb.DeleteProfilePicRes{}, nil
 }

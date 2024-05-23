@@ -77,19 +77,19 @@ type Config struct {
 
 // TODO: remove the print statement and add logger instead
 func GetConfig() (*Config, error) {
-	viper.SetConfigName("config")   // name of config file (without extension)
-	viper.SetConfigType("yml")      // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("./config") // path to look for the config file in
-
-	if err := viper.ReadInConfig(); err != nil {
-		logrus.Errorf("Error reading config file, %v", err)
-		return nil, err
-	}
+	viper.SetConfigName("config")
+	viper.SetConfigType("yml")
+	viper.AddConfigPath("./config")
 
 	config := &Config{}
+	if err := viper.ReadInConfig(); err != nil {
+		logrus.Errorf("Error reading config file, %v", err)
+		return config, err
+	}
+
 	if err := viper.Unmarshal(config); err != nil {
 		logrus.Errorf("Unable to decode into struct, %v", err)
-		return nil, err
+		return config, err
 	}
 
 	return config, nil

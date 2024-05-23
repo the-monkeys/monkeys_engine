@@ -32,3 +32,16 @@ func RestError(ctx *gin.Context, err error, service string) {
 		return
 	}
 }
+
+func Error(ctx *gin.Context, err error, resp interface{}) {
+	if status.Code(err) == codes.NotFound {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, resp)
+		return
+	} else if status.Code(err) == codes.AlreadyExists {
+		ctx.AbortWithStatusJSON(http.StatusConflict, resp)
+		return
+	} else if status.Code(err) == codes.Internal {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, resp)
+		return
+	}
+}

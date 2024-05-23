@@ -35,7 +35,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		userProfile, err := us.dbConn.GetUserProfile(req.Username)
 		if err != nil {
 			us.log.Errorf("the user doesn't exists: %v", err)
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist: %v", err))
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist: %v", req.Username, err))
 		}
 		return &pb.UserProfileRes{
 			Username:  userProfile.UserName,
@@ -59,7 +59,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		return nil, err
 	}
 
-	us.log.Infof("GEt profile: userDetails, %+v", userDetails)
+	// us.log.Infof("get profile: userDetails, %+v", userDetails)
 	return &pb.UserProfileRes{
 		AccountId:   userDetails.AccountId,
 		Username:    userDetails.Username,

@@ -1,7 +1,7 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go
+name: Check
 
 on:
   push:
@@ -9,40 +9,29 @@ on:
   pull_request:
     branches: [ "main" ]
 
+
 jobs:
-  test:
+  checks:
+    name: Code Checks and Verification
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Name
-      run: echo "The Monkeys Pipeline"
-
-  # build:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v3
-
-  #   - name: Set up Go
-  #     uses: actions/setup-go@v3
-  #     with:
-  #       go-version: 1.19
-
-  #   - name: Docker Compose Action
-  #     uses: hoverkraft-tech/compose-action@v1.5.1
-  #     with:
-  #       compose-file: "../../docker-compose.yml"
-        
-  #   - name: Test
-  #     run: go test -v ./...
-   
-
-  # test:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v3
-
-  #   - name: Create Postgres
-  #     run: end2end/psql_container.sh
     
-    # - name: total no of containers running
-    #   run: end2end/no_of_containers.sh
+    steps:
+      - name: Checkout Repositorys
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21.6
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Download Dependencies
+        run: go get ./...
+      
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run unit tests
+        run: go test -race -vet=off -v ./...
