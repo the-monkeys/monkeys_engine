@@ -7,8 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/the-monkeys/the_monkeys/common"
+
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/errors"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
@@ -142,7 +143,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	if res.StatusCode == http.StatusBadRequest {
 		asc.Log.Errorf("incorrect password given for the user containing email: %s", body.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrBadRequest)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
 		return
 	}
 
@@ -188,13 +189,13 @@ func (asc *ServiceClient) ConfirmPasswordVerificationLink(ctx *gin.Context) {
 
 	if res.StatusCode == http.StatusNotFound {
 		asc.Log.Infof("user containing email: %s, doesn't exists", userAny)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrNotFound)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
 		return
 	}
 
 	if res.StatusCode == http.StatusBadRequest {
 		asc.Log.Infof("incorrect password given for the user containing email: %s", userAny)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrBadRequest)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
 		return
 	}
 
@@ -265,13 +266,13 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 
 	if res.StatusCode == http.StatusNotFound || res.Error != nil {
 		asc.Log.Infof("user containing email: %s, doesn't exists", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrNotFound)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
 		return
 	}
 
 	if res.StatusCode == http.StatusBadRequest || res.Error != nil {
 		asc.Log.Infof("incorrect password given for the user containing email: %s", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrBadRequest)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
 		return
 	}
 
@@ -298,13 +299,13 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	// TODO: COrrect the errors
 	if res.StatusCode == http.StatusNotFound || res.Error != nil {
 		asc.Log.Infof("user containing username: %s, doesn't exists", username)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrNotFound)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
 		return
 	}
 
 	if res.StatusCode == http.StatusBadRequest || res.Error != nil {
 		// asc.Log.Infof("incorrect password given for the user containing email: %s", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, common.ErrBadRequest)
+		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
 		return
 	}
 

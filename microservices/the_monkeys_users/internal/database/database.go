@@ -8,7 +8,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
-	"github.com/the-monkeys/the_monkeys/common"
+	"github.com/the-monkeys/the_monkeys/constants"
+
 	"github.com/the-monkeys/the_monkeys/config"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -334,9 +335,9 @@ func (uh *uDBHandler) GetAllTopicsFromDb() (*pb.GetTopicsResponse, error) {
 	if err != nil {
 		// Check if the error is "not found" or "internal server error" and return accordingly
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, common.ErrNotFound
+			return nil, constants.ErrNotFound
 		}
-		return nil, common.ErrInternal
+		return nil, constants.ErrInternal
 	}
 	defer rows.Close()
 
@@ -362,9 +363,9 @@ func (uh *uDBHandler) GetAllCategories() (*pb.GetAllCategoriesRes, error) {
 	if err != nil {
 		// Check if the error is "not found" or "internal server error" and return accordingly
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, common.ErrNotFound
+			return nil, constants.ErrNotFound
 		}
-		return nil, common.ErrInternal
+		return nil, constants.ErrInternal
 	}
 	defer rows.Close()
 

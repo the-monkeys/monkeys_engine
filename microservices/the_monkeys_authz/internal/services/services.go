@@ -13,8 +13,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
-	"github.com/the-monkeys/the_monkeys/common"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/service_types"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
@@ -150,8 +150,8 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 			StatusCode: http.StatusBadRequest,
 			Error: &pb.Error{
 				Status:  http.StatusUnauthorized,
-				Error:   common.ErrTokenIsNotValid.Error(),
-				Message: common.ErrTokenIsNotValid.Error(),
+				Error:   constants.ErrTokenIsNotValid.Error(),
+				Message: constants.ErrTokenIsNotValid.Error(),
 			},
 		}, nil
 	}
@@ -164,8 +164,8 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 			StatusCode: http.StatusNotFound,
 			Error: &pb.Error{
 				Status:  http.StatusUnauthorized,
-				Error:   common.ErrTokenIsNotValid.Error(),
-				Message: common.ErrTokenIsNotValid.Error(),
+				Error:   constants.ErrTokenIsNotValid.Error(),
+				Message: constants.ErrTokenIsNotValid.Error(),
 			},
 		}, nil
 	}
@@ -363,7 +363,7 @@ func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordRe
 
 func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.EmailVerificationReq) (*pb.EmailVerificationRes, error) {
 	if req.Email == "" {
-		return nil, common.ErrBadRequest
+		return nil, constants.ErrBadRequest
 	}
 	logrus.Infof("user %v has requested for email verification", req.Email)
 

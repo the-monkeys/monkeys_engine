@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
-	"github.com/the-monkeys/the_monkeys/common"
+	"github.com/the-monkeys/the_monkeys/constants"
+
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/server"
@@ -58,7 +59,7 @@ func main() {
 	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir)
 	// newFileServer := server.NewFileServer(common.PROFILE_PIC_DIR, common.BLOG_FILES, log)
 
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(common.MaxMsgSize), grpc.MaxSendMsgSize(common.MaxMsgSize))
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(constants.MaxMsgSize), grpc.MaxSendMsgSize(constants.MaxMsgSize))
 
 	pb.RegisterUploadBlogFileServer(grpcServer, fileService)
 	// fs.RegisterFileServiceServer(grpcServer, newFileServer)
