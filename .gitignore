@@ -30,3 +30,5 @@ tracker
 # TODO: remove these two files and lines
 cloud/*
 local/*
+profile/*
+main.go

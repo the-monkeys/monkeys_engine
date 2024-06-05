@@ -28,6 +28,9 @@ type AuthDBHandler interface {
 	UpdatePassword(password string, user *models.TheMonkeysUser) error
 	UpdateEmailVerificationToken(req *models.TheMonkeysUser) error
 	UpdateEmailVerificationStatus(req *models.TheMonkeysUser) error
+
+	// Create user logs to track activity
+	CreateUserLog(user *models.TheMonkeysUser, description string) error
 }
 type authDBHandler struct {
 	db *sql.DB
@@ -238,46 +241,46 @@ func (adh *authDBHandler) UpdatePassword(password string, user *models.TheMonkey
 	return nil
 }
 
-func (adh *authDBHandler) InsertIntoUserLog(username, ipAddress, description, clientName string) error {
+func (adh *authDBHandler) CreateUserLog(user *models.TheMonkeysUser, description string) error {
 	var userId int64
 	var clientId int8
 	var err error
 
 	//From username find user id
 	if err = adh.db.QueryRow(`
-			SELECT id FROM user_account WHERE username = $1;`, username).Scan(&userId); err != nil {
-		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
-		return nil
+			SELECT id FROM user_account WHERE account_id = $1;`, user.AccountId).Scan(&userId); err != nil {
+		logrus.Errorf("can't get id by using account_id %s, error: %v", user.AccountId, err)
+		return err
 	}
 
-	//From clientname find client id
+	//From client name find client id
 	if err := adh.db.QueryRow(`
-			SELECT id FROM clients WHERE c_name = $1;`, clientName).Scan(&clientId); err != nil {
-		logrus.Errorf("can't get id by using client name %s, error: %+v", clientName, err)
-		return nil
+			SELECT id FROM clients WHERE c_name = $1;`, user.Client).Scan(&clientId); err != nil {
+		logrus.Errorf("can't get id by using client name %s, error: %+v", user.Client, err)
+		return err
 	}
 
-	stmt, err := adh.db.Prepare(`INSERT INTO USER_ACCOUNT_LOG (user_id, ip_address, description, clientId) VALUES ($1, $2, $3, $4);`)
+	stmt, err := adh.db.Prepare(`INSERT INTO user_account_log (user_id, ip_address, description, client_id) VALUES ($1, $2, $3, $4);`)
 	if err != nil {
-		logrus.Errorf("cannot prepare statement to add user activity into the USER_ACCOUNT_LOG: %v", err)
+		logrus.Errorf("cannot prepare statement to add user activity into the user_account_log: %v", err)
 		return err
 	}
 	defer stmt.Close()
 
-	row, err := stmt.Exec(userId, ipAddress, description, clientId)
+	row, err := stmt.Exec(userId, user.IpAddress, description, clientId)
 	if err != nil {
-		logrus.Errorf("cannot execute query to add user to the USER_ACCOUNT_LOG: %v", err)
+		logrus.Errorf("cannot execute query to add user to the user_account_log: %v", err)
 		return err
 	}
 
 	affectedRow, err := row.RowsAffected()
 	if err != nil {
-		logrus.Errorf("error finding affected rows for USER_ACCOUNT_LOG: %v", err)
+		logrus.Errorf("error finding affected rows for user_account_log: %v", err)
 		return err
 	}
 
 	if affectedRow == 0 {
-		logrus.Errorf("cannot create a record in the log table for USER_ACCOUNT_LOG: %v", err)
+		logrus.Errorf("cannot create a record in the log table for user_account_log: %v", err)
 		return errors.New("cannot create a record in the log table")
 	}
 

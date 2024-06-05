@@ -47,7 +47,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
 
 	routes.POST("/forgot-pass", asc.ForgotPassword)
-	routes.GET("/reset-password", asc.ConfirmPasswordVerificationLink)
+	routes.GET("/reset-password", asc.PasswordResetEmailVerification)
 	routes.POST("/update-password", asc.UpdatePassword)
 	routes.GET("/verify-email", asc.VerifyEmail)
 
@@ -89,12 +89,17 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
 	}
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
 		FirstName:   body.FirstName,
 		LastName:    body.LastName,
 		Email:       body.Email,
 		Password:    body.Password,
 		LoginMethod: loginMethod,
+		IpAddress:   ipAddress,
+		Client:      client,
 	})
 
 	if err != nil {
@@ -124,9 +129,14 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	body.Email = strings.TrimSpace(body.Email)
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	res, err := asc.Client.Login(context.Background(), &pb.LoginUserRequest{
-		Email:    body.Email,
-		Password: body.Password,
+		Email:     body.Email,
+		Password:  body.Password,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {
@@ -159,8 +169,13 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	res, err := asc.Client.ForgotPassword(context.Background(), &pb.ForgotPasswordReq{
-		Email: body.Email,
+		Email:     body.Email,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {
@@ -172,13 +187,18 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 }
 
 // TODO: Rename it to Password Reset Email Verification
-func (asc *ServiceClient) ConfirmPasswordVerificationLink(ctx *gin.Context) {
+func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 	userAny := ctx.Query("user")
 	secretAny := ctx.Query("evpw")
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	res, err := asc.Client.ResetPassword(context.Background(), &pb.ResetPasswordReq{
-		Username: userAny,
-		Token:    secretAny,
+		Username:  userAny,
+		Token:     secretAny,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {
@@ -232,10 +252,15 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		return
 	}
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	passResp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
-		Password: pass.Password,
-		Username: res.UserName,
-		Email:    res.Email,
+		Password:  pass.Password,
+		Username:  res.UserName,
+		Email:     res.Email,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 	if err != nil {
 		errors.RestError(ctx, err, "user")
@@ -254,8 +279,13 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 		return
 	}
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	res, err := asc.Client.RequestForEmailVerification(context.Background(), &pb.EmailVerificationReq{
-		Email: vrEmail.Email,
+		Email:     vrEmail.Email,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {
@@ -284,10 +314,15 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	username := ctx.Query("user")
 	evsecret := ctx.Query("evpw")
 
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
-		Username: username,
-		Token:    evsecret,
+		Username:  username,
+		Token:     evsecret,
+		IpAddress: ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {

@@ -53,15 +53,15 @@ type Authentication struct {
 }
 
 type RabbitMQ struct {
-	Protocol    string `mapstructure:"protocol"`
-	Host        string `mapstructure:"host"`
-	Port        string `mapstructure:"port"`
-	Username    string `mapstructure:"username"`
-	Password    string `mapstructure:"password"`
-	VirtualHost string `mapstructure:"virtual_host"`
-	Exchange    string `mapstructure:"exchange"`
-	Queue       string `mapstructure:"queue"`
-	RoutingKey  string `mapstructure:"routing_key"`
+	Protocol    string   `mapstructure:"protocol"`
+	Host        string   `mapstructure:"host"`
+	Port        string   `mapstructure:"port"`
+	Username    string   `mapstructure:"username"`
+	Password    string   `mapstructure:"password"`
+	VirtualHost string   `mapstructure:"virtual_host"`
+	Exchange    string   `mapstructure:"exchange"`
+	Queues      []string `yaml:"queues"`
+	RoutingKeys []string `yaml:"routingKeys"`
 }
 
 type Config struct {
@@ -72,7 +72,7 @@ type Config struct {
 	Opensearch        Opensearch        `mapstructure:"opensearch"`
 	Email             Email             `mapstructure:"email"`
 	Authentication    Authentication    `mapstructure:"authentication"`
-	RabbitMQ          RabbitMQ          `mapstructure:"rabbitmq"`
+	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 }
 
 // TODO: remove the print statement and add logger instead
@@ -91,6 +91,8 @@ func GetConfig() (*Config, error) {
 		logrus.Errorf("Unable to decode into struct, %v", err)
 		return config, err
 	}
+
+	logrus.Infof("Configuration loaded: %+v", config) // Add this line to print the loaded configuration
 
 	return config, nil
 }

@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"encoding/json"
 	"fmt"
 
 	"log"
@@ -11,11 +11,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/the-monkeys/the_monkeys/microservices/queue"
+
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/service_types"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
 	"google.golang.org/grpc/codes"
@@ -28,14 +31,18 @@ type AuthzSvc struct {
 	dbConn db.AuthDBHandler
 	jwt    utils.JwtWrapper
 	config *config.Config
+	logger *logrus.Logger
+	qConn  queue.Conn
 	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config) *AuthzSvc {
+func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn queue.Conn) *AuthzSvc {
 	return &AuthzSvc{
 		dbConn: dbCli,
 		jwt:    jwt,
 		config: config,
+		logger: logrus.New(),
+		qConn:  qConn,
 	}
 }
 
@@ -47,10 +54,10 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 			StatusCode: http.StatusBadRequest,
 			Error: &pb.Error{
 				Status:  http.StatusBadRequest,
-				Message: "Email FirstName LastName Password are not  entered",
-				Error:   "Incomplete,information required ",
+				Message: "Incomplete information: email, first name, last name and password are required.",
+				Error:   "All fields (email, first_name, last_name and password) are mandatory and must be provided.",
 			},
-		}, errors.New("Incomplete, information required")
+		}, nil
 	}
 
 	// Check if the user exists with the same email id return conflict
@@ -67,6 +74,14 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		}, nil
 	}
 
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+
 	hash := string(utils.GenHash())
 	encHash := utils.HashPassword(hash)
 
@@ -77,8 +92,6 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	user.LastName = req.GetLastName()
 	user.Email = req.GetEmail()
 	user.Password = utils.HashPassword(req.Password)
-	// user.CreateTime = time.Now().Format(common.DATE_TIME_FORMAT)
-	// user.UpdateTime = time.Now().Format(common.DATE_TIME_FORMAT)
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
 	user.EmailVerificationTimeout = sql.NullTime{
@@ -88,6 +101,9 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	if req.LoginMethod.String() == pb.RegisterUserRequest_LoginMethod_name[0] {
 		user.LoginMethod = "the-monkeys"
 	}
+
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
 
 	logrus.Infof("registering the user with email %v", req.Email)
 	userId, err := as.dbConn.RegisterUser(user)
@@ -100,11 +116,12 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	go func() {
 		err := as.SendMail(user.Email, emailBody)
 		if err != nil {
-			// Handle error
 			log.Printf("Failed to send mail post registration: %v", err)
 		}
 		logrus.Info("Email Sent!")
 	}()
+
+	go cache.AddUserLog(as.dbConn, user, constants.Register, constants.ServiceAuth, constants.EventRegister, as.logger)
 
 	logrus.Infof("user %s is successfully registered.", user.Email)
 
@@ -113,14 +130,28 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	if err != nil {
 		logrus.Errorf(service_types.CannotCreateToken(req.Email, err))
 		return &pb.RegisterUserResponse{
-			StatusCode: http.StatusBadRequest,
+			StatusCode: http.StatusInternalServerError,
 			Error: &pb.Error{
 				Status:  http.StatusInternalServerError,
-				Message: "You are successfully registered",
-				Error:   service_types.LoginMsg,
+				Message: "You are successfully registered, try to login!",
+				Error:   service_types.ErrFailedToGenerateToken,
 			},
 		}, nil
 	}
+
+	bx, err := json.Marshal(user)
+	if err != nil {
+		return &pb.RegisterUserResponse{
+			StatusCode: http.StatusInternalServerError,
+			Error: &pb.Error{
+				Status:  http.StatusInternalServerError,
+				Message: "You are successfully registered, try to login!",
+				Error:   service_types.ErrMessagingQueue,
+			},
+		}, nil
+	}
+
+	go as.qConn.PublishDefaultProfilePhoto(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 
 	return &pb.RegisterUserResponse{
 		StatusCode:    http.StatusCreated,
@@ -219,6 +250,18 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 		}, nil
 	}
 
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.Login, constants.ServiceAuth, constants.EventLogin, as.logger)
+
 	return &pb.LoginUserResponse{
 		StatusCode:    http.StatusOK,
 		Token:         token,
@@ -269,6 +312,18 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 			log.Printf("Failed to send mail for password recovery: %v", err)
 		}
 	}()
+
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.ForgotPassword, constants.ServiceAuth, constants.EventForgotPassword, as.logger)
 
 	return &pb.ForgotPasswordRes{
 		StatusCode: 200,
@@ -321,6 +376,18 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 		}, nil
 	}
 
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.VerifiedEmailForPassChange, constants.ServiceAuth, constants.EventVerifiedEmailForPassChange, as.logger)
+
 	return &pb.ResetPasswordRes{
 		StatusCode: http.StatusOK,
 		Token:      token,
@@ -356,6 +423,19 @@ func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordRe
 		return nil, err
 	}
 	logrus.Infof("updated password for: %+v", req.Email)
+
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.UpdatedPassword, constants.ServiceAuth, constants.EventUpdatedPassword, as.logger)
+
 	return &pb.UpdatePasswordRes{
 		StatusCode: http.StatusOK,
 	}, nil
@@ -408,6 +488,18 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 		logrus.Info("Email Sent!")
 	}()
 
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.RequestForEmailVerification, constants.ServiceAuth, constants.EventRequestForEmailVerification, as.logger)
+
 	return &pb.EmailVerificationRes{
 		StatusCode: http.StatusOK,
 	}, nil
@@ -454,10 +546,20 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 
 	logrus.Infof("verified email: %s", user.Email)
 
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	go cache.AddUserLog(as.dbConn, user, constants.VerifyEmail, constants.ServiceAuth, constants.EventVerifiedEmail, as.logger)
+
 	// Return a success response with the status code 200
 	return &pb.VerifyEmailRes{
 		StatusCode: 200,
 	}, nil
 }
-
-// psql -U root -d the_monkeys_user_dev

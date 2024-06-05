@@ -41,33 +41,35 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  opensearch_node1: 
-    image: opensearchproject/opensearch:1.2.1
-    container_name: "the-monkeys-os"
-    environment:
-      - cluster.name=opensearch-cluster
-      - node.name=opensearch_node1
-      - discovery.seed_hosts=opensearch_node1
-      - cluster.initial_master_nodes=opensearch_node1
-      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
-      - plugins.security.disabled=true
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-     - /usr/share/opensearch/data
-    ports:
-      - 9200:9200
-      - 9600:9600 # required for Performance Analyzer
-    networks:
-      - monkeys-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # opensearch_node1:
+  #   image: opensearchproject/opensearch:1.2.1
+  #   container_name: "the-monkeys-os"
+  #   environment:
+  #     - cluster.name=opensearch-cluster
+  #     - node.name=opensearch_node1
+  #     - discovery.seed_hosts=opensearch_node1
+  #     - cluster.initial_master_nodes=opensearch_node1
+  #     - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+  #     - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #     nofile:
+  #       soft: 65536
+  #       hard: 65536
+  #   volumes:
+  #     - /usr/share/opensearch/data
+  #   ports:
+  #     - 9200:9200
+  #     - 9600:9600 # required for Performance Analyzer
+  #   networks:
+  #     - monkeys-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9200"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -75,18 +77,16 @@ services:
     ports:
       - "5672:5672"  # RabbitMQ default port
       - "15672:15672"  # RabbitMQ Management UI port
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq  # Persist data
     networks:
       - monkeys-network
     environment:
-      RABBITMQ_DEFAULT_USER: secure_username
-      RABBITMQ_DEFAULT_PASS: strong_password
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s  # Check every 10 seconds
-      timeout: 5s   # Time out after 5 seconds
-      retries: 2    # Retry 2 times before considering unhealthy
+      interval: 10s
+      timeout: 5s
+      retries: 2
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
@@ -94,10 +94,12 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      - the_monkeys_db
-      - db-migrations
-      - opensearch_node1
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      db-migrations:
+        condition: service_completed_successfully  
+      the_monkeys_db:
+        condition: service_healthy
     volumes:
       - .:/go/src/app
     ports:
@@ -111,10 +113,13 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      - the_monkeys_db
-      - db-migrations
-      - opensearch_node1
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      db-migrations:
+        condition: service_completed_successfully  
+      the_monkeys_db:
+        condition: service_healthy
+      # - opensearch_node1
     volumes:
       - .:/go/src/app
     ports:
@@ -127,11 +132,13 @@ services:
     image: golang:latest
     networks:
       - monkeys-network
-    depends_on: # TODO: File server doesn't depend on any db so remove this field
-      - the_monkeys_db
-      - db-migrations
-      - opensearch_node1
-      - rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      db-migrations:
+        condition: service_completed_successfully  
+      the_monkeys_db:
+        condition: service_healthy
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -147,10 +154,12 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      - the_monkeys_db
-      - db-migrations
-      - opensearch_node1
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      db-migrations:
+        condition: service_completed_successfully  
+      the_monkeys_db:
+        condition: service_healthy
     volumes:
       - .:/go/src/app
     ports:
@@ -164,10 +173,12 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      - the_monkeys_db
-      - db-migrations
-      - opensearch_node1
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      db-migrations:
+        condition: service_completed_successfully  
+      the_monkeys_db:
+        condition: service_healthy
     volumes:
       - .:/go/src/app
     ports:

@@ -1,5 +1,18 @@
 {
     "cSpell.words": [
-        "evpw"
+        "amqp",
+        "evpw",
+        "Infof",
+        "Infoln",
+        "logrus",
+        "mware",
+        "Opensearch",
+        "psql",
+        "rabbitmq",
+        "serviceconn",
+        "sirupsen",
+        "SQLDB",
+        "sslmode",
+        "streadway"
     ]
 }

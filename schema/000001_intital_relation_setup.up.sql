@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS user_account (
     address VARCHAR(255),
     contact_number VARCHAR(20), -- Changed data type
     user_status INTEGER NOT NULL,
+    linkedin VARCHAR(255),
+    github VARCHAR(255),
+    twitter VARCHAR(255),
+    instagram VARCHAR(255),
     view_permission VARCHAR(50) DEFAULT 'public', -- 'public', 'private', 'friends', etc.
     FOREIGN KEY (user_status) REFERENCES user_status(id)
 );

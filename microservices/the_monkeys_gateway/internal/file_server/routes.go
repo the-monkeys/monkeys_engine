@@ -14,10 +14,11 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/errors"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type FileServiceClient struct {
@@ -128,8 +129,16 @@ func (asc *FileServiceClient) GetBlogFile(ctx *gin.Context) {
 		logrus.Info("received the complete stream")
 	}
 	if err != nil {
-		errors.RestError(ctx, err, "file_service")
-		logrus.Errorf("cannot get the stream data, error: %+v", err)
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			if status.Code() == codes.NotFound {
+				// Handle "profile picture not found" error
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "Profile picture for user is not found"})
+				return
+			}
+		}
+		// Fallback for other errors
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
 		return
 	}
 
@@ -211,14 +220,22 @@ func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 	})
 	if err != nil {
 		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
-		_ = ctx.AbortWithError(http.StatusBadGateway, err)
+		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": "cannot connect to user rpc server"})
 		return
 	}
 
 	resp, err := stream.Recv()
 	if err != nil {
-		errors.RestError(ctx, err, "file_service")
-		logrus.Errorf("cannot get the stream data, error: %+v", err)
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			if status.Code() == codes.NotFound {
+				// Handle "profile picture not found" error
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "Profile picture for user is not found"})
+				return
+			}
+		}
+		// Fallback for other errors
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
 		return
 	}
 

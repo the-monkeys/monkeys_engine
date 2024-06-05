@@ -10,6 +10,8 @@ message RegisterUserRequest {
   string email = 3;
   string password = 4;
   LoginMethod login_method = 5;
+  string ip_address = 6;
+  string client = 7;
 
   enum LoginMethod {
     The_MONKEYS = 0;
@@ -57,6 +59,8 @@ message ValidateResponse {
 message LoginUserRequest {
   string email = 1;
   string password = 2;
+  string ip_address = 3;
+  string client = 4;
 }
 
 message LoginUserResponse {
@@ -75,6 +79,8 @@ message LoginUserResponse {
 
 message ForgotPasswordReq {
   string email = 1;
+  string ip_address = 2;
+  string client = 3;
 }
 
 message ForgotPasswordRes {
@@ -88,6 +94,8 @@ message ResetPasswordReq {
   string token = 2;
   string email = 3;
   string username = 4;
+  string ip_address = 5;
+  string client = 6;
 }
 
 message ResetPasswordRes {
@@ -107,6 +115,8 @@ message UpdatePasswordReq {
   string password = 1;
   string username = 2;
   string email = 3;
+  string ip_address = 4;
+  string client = 5;
 }
 
 message UpdatePasswordRes {
@@ -116,6 +126,8 @@ message UpdatePasswordRes {
 
 message EmailVerificationReq {
   string email = 1;
+  string ip_address = 2;
+  string client = 3;
 }
 
 message EmailVerificationRes {
@@ -127,6 +139,8 @@ message VerifyEmailReq {
   string email = 1;
   string username = 2;
   string token = 3;
+  string ip_address = 4;
+  string client = 5;
 }
 
 message VerifyEmailRes {

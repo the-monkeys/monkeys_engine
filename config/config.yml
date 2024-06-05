@@ -38,13 +38,20 @@ authentication:
   # provide the domain name or the gateway addr
   email_verification_addr: http://127.0.0.1:8081
 
+google:
+  API_KEY: ""
+
 rabbitMQ:
   protocol: "amqp"
-  host: "rabbitMQ"
-  port: ""
-  username: ""
-  password: "secure_username"
-  virtualHost: "strong_password"
-  exchange: ""
-  queue: ""
-  routing_key: ""
+  host: "rabbitmq"
+  port: "5672"
+  username: "guest"
+  password: "guest"
+  virtualHost: ""
+  exchange: smart_monkey
+  queues:
+    - "queue1"
+    - "queue2"
+  routingKeys:
+    - "key1"
+    - "key2"

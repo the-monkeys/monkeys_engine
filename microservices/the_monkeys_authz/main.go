@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/queue"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/services"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/utils"
@@ -35,7 +38,22 @@ func main() {
 		logrus.Fatalf("auth service cannot listen at address %s, error: %v", cfg.Microservices.TheMonkeysAuthz, err)
 	}
 
-	authServer := services.NewAuthzSvc(dbHandler, jwt, cfg)
+	var qConn queue.Conn
+	for {
+		qConn, err = queue.GetConn(cfg.RabbitMQ)
+		if err != nil {
+			logrus.Errorf("auth service cannot connect to rabbitMq service: %v", err)
+			time.Sleep(time.Second)
+			continue
+		} else {
+			logrus.Errorf("✅ auth service connected to rabbitMQ!")
+			break
+		}
+	}
+
+	fmt.Printf("Successfully connected to rabbitMq services")
+
+	authServer := services.NewAuthzSvc(dbHandler, jwt, cfg, qConn)
 
 	grpcServer := grpc.NewServer()
 
