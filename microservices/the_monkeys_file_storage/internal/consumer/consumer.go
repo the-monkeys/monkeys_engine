@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,12 +13,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
-	"github.com/the-monkeys/the_monkeys/microservices/queue"
+	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/models"
 )
 
-func ConsumeFromQueue(conn queue.Conn, conf config.RabbitMQ, log *logrus.Logger) {
+func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger) {
 
 	// conn, err := queue.GetConn(conf)
 	// if err != nil {
@@ -52,28 +54,23 @@ func ConsumeFromQueue(conn queue.Conn, conf config.RabbitMQ, log *logrus.Logger)
 	}
 
 	for d := range msgs {
-		user := models.TheMonkeysUser{}
+		user := models.TheMonkeysMessage{}
 		if err = json.Unmarshal(d.Body, &user); err != nil {
 			logrus.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
 			return
 		}
-		CreateUserFolder(user.Username)
+
+		switch user.Action {
+		case constants.USER_PROFILE_DIRECTORY_CREATE:
+			CreateUserFolder(user.Username)
+		case constants.USER_PROFILE_DIRECTORY_UPDATE:
+			UpdateUserFolder(user.Username, user.NewUsername)
+		default:
+			logrus.Errorf("Unknown action: %s", user.Action)
+		}
+
 	}
 }
-
-// func createUserFolder(userName string) {
-// 	// Create a folder/directory based on the username
-// 	// You can customize the folder path and permissions as needed
-// 	folderPath := fmt.Sprintf("/path/to/your/folder/%s", userName)
-
-// 	err := os.MkdirAll(folderPath, 0755)
-// 	if err != nil {
-// 		logrus.Errorf("Error creating folder for user %s: %v", userName, err)
-// 		return
-// 	}
-
-// 	logrus.Infof("Folder created for user %s: %s", userName, folderPath)
-// }
 
 func CreateUserFolder(userName string) error {
 	dirPath, filePath := ConstructPath(constant.ProfileDir, userName, "profile.png")
@@ -131,4 +128,32 @@ func ConstructPath(baseDir, userName, fileName string) (string, string) {
 	dirPath := filepath.Join(baseDir, userName)
 	filePath := filepath.Join(dirPath, fileName)
 	return dirPath, filePath
+}
+
+// UpdateUserFolder renames a folder to a new name
+func UpdateUserFolder(currentName, newName string) error {
+	from, err := os.Stat(currentName)
+	if err != nil {
+		return errors.New("could not stat current directory: " + err.Error())
+	}
+
+	if !from.IsDir() {
+		return errors.New(currentName + " is not a directory")
+	}
+
+	to := currentName + "_temp" // Create temporary name
+
+	// Rename the directory
+	err = os.Rename(currentName, to)
+	if err != nil {
+		return errors.New("failed to rename directory: " + err.Error())
+	}
+
+	// Rename back to the desired name
+	err = os.Rename(to, newName)
+	if err != nil {
+		return errors.New("failed to rename directory to new name: " + err.Error())
+	}
+
+	return nil
 }

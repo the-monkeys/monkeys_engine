@@ -10,11 +10,12 @@ import (
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/errors"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type ServiceClient struct {
@@ -179,11 +180,20 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		errors.RestError(ctx, err, "user")
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusOK, gin.H{"message": "If the account is registered with this email, you’ll receive an email verification link to reset your password."})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
 	}
 
-	ctx.JSON(http.StatusOK, &res)
+	ctx.JSON(http.StatusOK, gin.H{"message": "sent password reset link to the email", "status": res.StatusCode})
 }
 
 // TODO: Rename it to Password Reset Email Verification
@@ -202,24 +212,23 @@ func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		asc.Log.Errorf("rpc auth server returned error: %v", err)
-		_ = ctx.AbortWithError(http.StatusForbidden, err)
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "User not found"})
+				return
+			case codes.Unauthenticated:
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Token expired/incorrect"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
+				return
+			}
+		}
 	}
 
-	if res.StatusCode == http.StatusNotFound {
-		asc.Log.Infof("user containing email: %s, doesn't exists", userAny)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
-		return
-	}
-
-	if res.StatusCode == http.StatusBadRequest {
-		asc.Log.Infof("incorrect password given for the user containing email: %s", userAny)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, &res)
+	ctx.JSON(http.StatusOK, gin.H{"response": res})
 }
 
 func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
@@ -255,7 +264,7 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 	ipAddress := ctx.Request.Header.Get("ip")
 	client := ctx.Request.Header.Get("client")
 
-	passResp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
+	resp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
 		Password:  pass.Password,
 		Username:  res.UserName,
 		Email:     res.Email,
@@ -263,11 +272,23 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		Client:    client,
 	})
 	if err != nil {
-		errors.RestError(ctx, err, "user")
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "User not found"})
+				return
+			case codes.Unauthenticated:
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Token expired/incorrect"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
+				return
+			}
+		}
 	}
 
-	ctx.JSON(http.StatusOK, passResp)
+	ctx.JSON(http.StatusOK, resp)
 }
 
 func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
@@ -296,17 +317,17 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 
 	if res.StatusCode == http.StatusNotFound || res.Error != nil {
 		asc.Log.Infof("user containing email: %s, doesn't exists", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "email not found"})
 		return
 	}
 
 	if res.StatusCode == http.StatusBadRequest || res.Error != nil {
 		asc.Log.Infof("incorrect password given for the user containing email: %s", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "email not found"})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, &res)
+	ctx.JSON(http.StatusOK, gin.H{"message": "An email verification link has been sent to your registered email"})
 }
 
 // To verify email
@@ -326,25 +347,24 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		asc.Log.Errorf("rpc auth server returned error: %v", err)
-		_ = ctx.AbortWithError(http.StatusForbidden, err)
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "User not found"})
+				return
+			case codes.Unauthenticated:
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Token expired/incorrect"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
+				return
+			}
+		}
 	}
 
-	// TODO: COrrect the errors
-	if res.StatusCode == http.StatusNotFound || res.Error != nil {
-		asc.Log.Infof("user containing username: %s, doesn't exists", username)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrNotFound)
-		return
-	}
-
-	if res.StatusCode == http.StatusBadRequest || res.Error != nil {
-		// asc.Log.Infof("incorrect password given for the user containing email: %s", vrEmail.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, &res)
+	// Return success response
+	ctx.JSON(http.StatusOK, gin.H{"message": "email verified", "status": res.StatusCode})
 }
 
 func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {

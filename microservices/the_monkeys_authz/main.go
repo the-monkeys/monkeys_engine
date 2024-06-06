@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/config"
-	"github.com/the-monkeys/the_monkeys/microservices/queue"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/services"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/utils"
@@ -38,9 +38,9 @@ func main() {
 		logrus.Fatalf("auth service cannot listen at address %s, error: %v", cfg.Microservices.TheMonkeysAuthz, err)
 	}
 
-	var qConn queue.Conn
+	var qConn rabbitmq.Conn
 	for {
-		qConn, err = queue.GetConn(cfg.RabbitMQ)
+		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
 		if err != nil {
 			logrus.Errorf("auth service cannot connect to rabbitMq service: %v", err)
 			time.Sleep(time.Second)

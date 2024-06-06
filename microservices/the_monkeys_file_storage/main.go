@@ -9,7 +9,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/constants"
 
 	"github.com/the-monkeys/the_monkeys/config"
-	"github.com/the-monkeys/the_monkeys/microservices/queue"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/server"
@@ -55,9 +55,9 @@ func main() {
 	log := logrus.New()
 
 	// Connect to rabbitmq server
-	var qConn queue.Conn
+	var qConn rabbitmq.Conn
 	for {
-		qConn, err = queue.GetConn(cfg.RabbitMQ)
+		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
 		if err != nil {
 			log.Errorf("storage service cannot connect to rabbitMq service: %v", err)
 			time.Sleep(time.Second)

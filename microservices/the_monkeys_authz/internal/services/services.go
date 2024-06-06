@@ -4,14 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"log"
 	"math/rand"
 	"net/http"
 	"time"
 
-	"github.com/the-monkeys/the_monkeys/microservices/queue"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
@@ -32,11 +31,11 @@ type AuthzSvc struct {
 	jwt    utils.JwtWrapper
 	config *config.Config
 	logger *logrus.Logger
-	qConn  queue.Conn
+	qConn  rabbitmq.Conn
 	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn queue.Conn) *AuthzSvc {
+func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn rabbitmq.Conn) *AuthzSvc {
 	return &AuthzSvc{
 		dbConn: dbCli,
 		jwt:    jwt,
@@ -139,7 +138,11 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		}, nil
 	}
 
-	bx, err := json.Marshal(user)
+	bx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.USER_PROFILE_DIRECTORY_CREATE,
+	})
 	if err != nil {
 		return &pb.RegisterUserResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -276,21 +279,19 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 }
 
 func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordReq) (*pb.ForgotPasswordRes, error) {
-	logrus.Infof("user %s has forgotten their password", req.Email)
+	logrus.Infof("User %s has forgotten their password", req.Email)
 
-	// Check if the user is existing the db or not
+	// Check if the user exists in the database
 	user, err := as.dbConn.CheckIfEmailExist(req.Email)
 	if err != nil {
-		return &pb.ForgotPasswordRes{
-			Error: &pb.Error{
-				Status:  http.StatusNotFound,
-				Message: service_types.IfEmailExists,
-				Error:   service_types.ErrIfEmailExists,
-			},
-		}, err
+		as.logger.Errorf("Error checking if username exists in the database: %v", err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, "If the account is registered with this email, you’ll receive an email verification link to reset your password.")
+		}
+		return nil, status.Errorf(codes.Internal, "Something went wrong while getting user")
 	}
 
-	var alphaNumRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+	var alphaNumRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_")
 	randomHash := make([]rune, 64)
 	for i := 0; i < 64; i++ {
 		// Intn() returns, as an int, a non-negative pseudo-random number in [0,n).
@@ -300,16 +301,15 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 	emailVerifyHash := utils.HashPassword(string(randomHash))
 
 	if err = as.dbConn.UpdatePasswordRecoveryToken(emailVerifyHash, user); err != nil {
-		logrus.Errorf("error occurred while updating email verification token for %s, error: %v", req.Email, err)
-		return nil, err
+		logrus.Errorf("Error occurred while updating email verification token for %s, error: %v", req.Email, err)
+		return nil, status.Errorf(codes.Internal, "Something went wrong while updating verification token")
 	}
 
 	emailBody := utils.ResetPasswordTemplate(user.FirstName, user.LastName, string(randomHash), user.Username)
 	go func() {
 		err := as.SendMail(req.Email, emailBody)
 		if err != nil {
-			// Handle error
-			log.Printf("Failed to send mail for password recovery: %v", err)
+			logrus.Errorf("Failed to send mail for password recovery: %v", err)
 		}
 	}()
 
@@ -336,19 +336,18 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		return &pb.ResetPasswordRes{
-			Error: &pb.Error{
-				Status:  http.StatusNotFound,
-				Message: service_types.EmailNotRegistered,
-				Error:   "An account is not registered with this email",
-			},
-		}, err
+		as.logger.Errorf("Error checking if username exists in the database: %v", err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, "username not found")
+		}
+		return nil, status.Errorf(codes.Internal, "Something went wrong while getting user")
 	}
 
-	timeTill, err := time.Parse("2006-01-02 15:04:05.999999 -0700 +0000", user.PasswordVerificationTimeout.Time.String())
+	// timeTill, err := time.Parse(time.RFC3339, user.PasswordVerificationTimeout.Time.String())
+	timeTill, err := time.Parse(time.RFC3339, user.PasswordVerificationTimeout.Time.Format(time.RFC3339))
 	if err != nil {
-		logrus.Error(err)
-		return nil, nil
+		logrus.Errorf("timeout couldn't be verified: %v", err)
+		return nil, status.Errorf(codes.Internal, "timeout couldn't be verified")
 	}
 
 	if timeTill.Before(time.Now()) {
@@ -367,13 +366,7 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		logrus.Errorf(service_types.CannotCreateToken(req.Email, err))
-		return &pb.ResetPasswordRes{
-			Error: &pb.Error{
-				Status:  http.StatusInternalServerError,
-				Message: "You are successfully registered",
-				Error:   service_types.LoginMsg,
-			},
-		}, nil
+		return nil, status.Errorf(codes.Internal, "could not create token")
 	}
 
 	if req.IpAddress == "" {
@@ -392,37 +385,39 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 		StatusCode: http.StatusOK,
 		Token:      token,
 		// EmailVerified: false,
-		// UserName:      user.Username,
-		// Email:         user.Email,
-		// UserId:        user.Id,
-		// FirstName:     user.FirstName,
-		// LastName:      user.LastName,
+		UserName:  user.Username,
+		Email:     user.Email,
+		UserId:    user.Id,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
 	}, nil
 }
 
 func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordReq) (*pb.UpdatePasswordRes, error) {
 	logrus.Infof("updating password for: %+v", req)
 
+	// Check if the username exists in the database
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		return &pb.UpdatePasswordRes{
-			Error: &pb.Error{
-				Status:  http.StatusNotFound,
-				Message: service_types.EmailNotRegistered,
-				Error:   "An account is not registered with this email",
-			},
-		}, err
+		as.logger.Errorf("Error checking if username exists in the database: %v", err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, "User doesn't exist")
+		}
+		return nil, status.Errorf(codes.Internal, "Something went wrong while verifying user")
 	}
 
 	encHash := utils.HashPassword(req.Password)
+
 	if err := as.dbConn.UpdatePassword(encHash, &models.TheMonkeysUser{
 		Id:       user.Id,
 		Email:    req.Email,
 		Username: req.Username,
 	}); err != nil {
-		return nil, err
+		as.logger.Errorf("could not update password for user %v, err: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "could not update the password")
 	}
-	logrus.Infof("updated password for: %+v", req.Email)
+
+	as.logger.Infof("updated password for: %+v", req.Email)
 
 	if req.IpAddress == "" {
 		req.IpAddress = "127.0.0.1"
@@ -448,17 +443,15 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 	logrus.Infof("user %v has requested for email verification", req.Email)
 
 	user, err := as.dbConn.CheckIfEmailExist(req.Email)
-	// fmt.Printf("user: %+v\n", user)
 	if err != nil {
-		logrus.Infof("user %v is gettig error", req.Email)
-
+		logrus.Infof("user %v is getting error", req.Email)
 		return &pb.EmailVerificationRes{
 			Error: &pb.Error{
 				Status:  http.StatusNotFound,
 				Message: service_types.EmailNotRegistered,
 				Error:   service_types.ErrEmailNotRegistered,
 			},
-		}, err
+		}, nil
 	}
 
 	logrus.Infof("generating verification email token for: %s", req.GetEmail())
@@ -509,56 +502,55 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	// Check if the username exists in the database
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
+		as.logger.Errorf("Error checking if username exists in the database: %v", err)
 		if err == sql.ErrNoRows {
-			return &pb.VerifyEmailRes{
-				Error: &pb.Error{
-					Status:  http.StatusNotFound,
-					Message: service_types.EmailNotRegistered,
-					Error:   service_types.ErrEmailNotRegistered,
-				},
-			}, nil
+			return nil, status.Errorf(codes.NotFound, "User doesn't exist")
 		}
-		return nil, fmt.Errorf("failed to check username: %w", err)
+		return nil, status.Errorf(codes.Internal, "Something went wrong while verifying user")
 	}
 
 	// Parse the email verification timeout from the user
 	timeTill, err := time.Parse(time.RFC3339, user.EmailVerificationTimeout.Time.Format(time.RFC3339))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse email verification timeout: %w", err)
+		as.logger.Errorf("Failed to parse email verification timeout: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "Failed to parse email verification timeout: %v", err)
 	}
 
 	// Check if the email verification timeout has expired
 	if timeTill.Before(time.Now()) {
-		return nil, status.Errorf(codes.Unauthenticated, "token expired already")
+		as.logger.Errorf("Email verification token expired already for %s, error: %v", req.Email, err)
+		return nil, status.Errorf(codes.Unauthenticated, "Email verification token expired already or incorrect token")
 	}
 
 	// Verify reset token
 	if ok := utils.CheckPasswordHash(req.Token, user.EmailVerificationToken); !ok {
-		logrus.Errorf("the token didn't match, error: %+v", err)
-		return nil, status.Errorf(codes.Unauthenticated, "token didn't match")
+		as.logger.Errorf("The token didn't match, error: %+v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "Email verification token expired already or incorrect token")
 	}
 
+	// Update email verification status
 	err = as.dbConn.UpdateEmailVerificationStatus(user)
 	if err != nil {
-		logrus.Errorf("cannot update the verification details for %s, error: %v", req.Email, err)
-		return nil, err
+		as.logger.Errorf("Cannot update the verification details for %s, error: %v", req.Email, err)
+		return nil, status.Errorf(codes.Internal, "Couldn't update email verification token")
 	}
 
-	logrus.Infof("verified email: %s", user.Email)
+	as.logger.Infof("Verified email: %s", user.Email)
 
+	// Set default IP address and client if not provided
 	if req.IpAddress == "" {
 		req.IpAddress = "127.0.0.1"
 	}
-
 	if req.Client == "" {
 		req.Client = "Others"
 	}
 	user.IpAddress = req.IpAddress
 	user.Client = req.Client
 
+	// Add user log asynchronously
 	go cache.AddUserLog(as.dbConn, user, constants.VerifyEmail, constants.ServiceAuth, constants.EventVerifiedEmail, as.logger)
 
-	// Return a success response with the status code 200
+	// Return a success response with status code 200
 	return &pb.VerifyEmailRes{
 		StatusCode: 200,
 	}, nil
