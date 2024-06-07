@@ -9,6 +9,8 @@ const (
 	EventUpdatedPassword             = "event-updated-password"
 	EventRequestForEmailVerification = "event-request-for-email-verification"
 	EventVerifiedEmail               = "event-verified-email"
+
+	EventUpdateProfileInfo = "event-update-profile-info"
 )
 
 const (

@@ -5,15 +5,17 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserSvc struct {
@@ -30,12 +32,15 @@ func NewUserSvc(dbConn database.UserDb, log *logrus.Logger) *UserSvc {
 }
 
 func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (*pb.UserProfileRes, error) {
-	us.log.Infof("user %v has requested profile info.", req.Username)
+	us.log.Infof("profile info has been requested for user: %s.", req.Username)
 	if !req.IsPrivate {
 		userProfile, err := us.dbConn.GetUserProfile(req.Username)
 		if err != nil {
-			us.log.Errorf("the user doesn't exists: %v", err)
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist: %v", req.Username, err))
+			us.log.Errorf("error while fetching the public profile for user %s, err: %v", req.Username, err)
+			if err == sql.ErrNoRows {
+				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			}
+			return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 		}
 		return &pb.UserProfileRes{
 			Username:  userProfile.UserName,
@@ -43,36 +48,50 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 			LastName:  userProfile.LastName,
 			Bio:       userProfile.Bio.String,
 			AvatarUrl: userProfile.AvatarUrl.String,
+			CreatedAt: timestamp.New(userProfile.CreatedAt.Time),
+			Linkedin:  userProfile.LinkedIn.String,
+			Instagram: userProfile.Instagram.String,
+			Twitter:   userProfile.Twitter.String,
+			Github:    userProfile.Github.String,
 		}, nil
 
 	}
 
 	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		us.log.Errorf("the user doesn't exists: %v", err)
-		return nil, err
+		us.log.Errorf("error while fetching the private profile for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
 	userDetails, err := us.dbConn.GetMyProfile(req.Username)
 	if err != nil {
-		us.log.Errorf("error while finding the user profile: %v", err)
-		return nil, err
+		us.log.Errorf("error while fetching the profile for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("profile for user: %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
-	// us.log.Infof("get profile: userDetails, %+v", userDetails)
 	return &pb.UserProfileRes{
-		AccountId:   userDetails.AccountId,
-		Username:    userDetails.Username,
-		FirstName:   userDetails.FirstName,
-		LastName:    userDetails.LastName,
-		DateOfBirth: userDetails.DateOfBirth.Time.String(),
-		Bio:         userDetails.Bio.String,
-		AvatarUrl:   userDetails.AvatarUrl.String,
-		// CreatedAt:     userDetails.CreatedAt.,
-		// UpdatedAt:     userDetails.UpdatedAt,
-		Address: userDetails.Address.String,
-		// ContactNumber: userDetails.ContactNumber.String,
-		UserStatus: userDetails.UserStatus,
+		AccountId:     userDetails.AccountId,
+		Username:      userDetails.Username,
+		FirstName:     userDetails.FirstName,
+		LastName:      userDetails.LastName,
+		DateOfBirth:   userDetails.DateOfBirth.Time.String(),
+		Bio:           userDetails.Bio.String,
+		AvatarUrl:     userDetails.AvatarUrl.String,
+		CreatedAt:     timestamp.New(userDetails.CreatedAt.Time),
+		UpdatedAt:     timestamp.New(userDetails.UpdatedAt.Time),
+		Address:       userDetails.Address.String,
+		ContactNumber: userDetails.ContactNumber.String,
+		UserStatus:    userDetails.UserStatus,
+		Linkedin:      userDetails.LinkedIn.String,
+		Instagram:     userDetails.Instagram.String,
+		Twitter:       userDetails.Twitter.String,
+		Github:        userDetails.Github.String,
 	}, err
 }
 
@@ -87,8 +106,11 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	// Check if the user exists
 	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		us.log.Errorf("the user doesn't exists: %v", err)
-		return nil, err
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
 	// Check if the method isPartial true
@@ -97,56 +119,49 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 		// If isPartial is true fetch the remaining data from the db
 		dbUserInfo, err = us.dbConn.GetMyProfile(req.Username)
 		if err != nil {
-			us.log.Errorf("error while finding the user profile: %v", err)
-			return nil, err
+			us.log.Errorf("error while fetching the profile for user %s, err: %v", req.Username, err)
+			if err == sql.ErrNoRows {
+				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			}
+			return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 		}
 	}
 
 	// Map the user
-	mappedDBUser := MapUserUpdateData(req, dbUserInfo)
+	mappedDBUser := utils.MapUserUpdateData(req, dbUserInfo)
 	if err != nil {
 		return nil, err
 	}
 
-	us.log.Infof("mappedDBUser: %+v\n", mappedDBUser)
 	// Update the user
 	err = us.dbConn.UpdateUserProfile(req.Username, mappedDBUser)
 	if err != nil {
-		return nil, err
+		us.log.Errorf("error while updating the profile for user %s, err: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "cannot update the user profile")
 	}
+
+	// Update the user log
+	if req.Ip == "" {
+		req.Ip = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: dbUserInfo.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
+	}
+
+	go cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
 
 	return &pb.UpdateUserProfileRes{
 		Username: mappedDBUser.Username,
 	}, err
 }
 
-// MapUserUpdateData maps the user update request data to the database model.
-func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
-	if req.Username != "" {
-		dbUserInfo.Username = req.Username
-	}
-	if req.FirstName != "" {
-		dbUserInfo.FirstName = req.FirstName
-	}
-	if req.LastName != "" {
-		dbUserInfo.LastName = req.LastName
-	}
-	if req.Bio != "" {
-		dbUserInfo.Bio.String = req.Bio
-	}
-	if req.DateOfBirth != "" {
-		time, _ := time.Parse(constants.DateTimeFormat, req.DateOfBirth)
-		dbUserInfo.DateOfBirth.Time = time
-	}
-	if req.Address != "" {
-		dbUserInfo.Address.String = req.Address
-	}
-	if req.ContactNumber != "0" {
-		dbUserInfo.ContactNumber.String = req.ContactNumber
-	}
-
-	return dbUserInfo
-}
 func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
@@ -180,8 +195,8 @@ func (us *UserSvc) GetAllTopics(context.Context, *pb.GetTopicsRequests) (*pb.Get
 		if errors.Is(err, sql.ErrNoRows) {
 			us.log.Errorf("cannot find the topics in the database: %v", err)
 		}
-		us.log.Errorf("error while querrying the topics: %v", err)
-		return nil, errors.New("error while querrying the topics")
+		us.log.Errorf("error while querying the topics: %v", err)
+		return nil, errors.New("error while querying the topics")
 	}
 
 	return res, err

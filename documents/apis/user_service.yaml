@@ -15,6 +15,48 @@ paths:
       responses:
         '200':
           description: A successful response.
+          schema:
+            type: object
+            properties:
+              account_id:
+                type: string
+                example: nnJ2zlT0RDJB
+              username:
+                type: string
+                example: example
+              first_name:
+                type: string
+                example: example
+              last_name:
+                type: string
+                example: "2006-01-02 00:00:00 +0000 +0000"
+              bio:
+                type: string
+                example: "Student of Science, learning, un-learning, relearning"
+              date_of_birth:
+                type: string
+                example: "https://example.com/avatar/profile.jpg"
+              created_at:
+                type: string
+                example: example
+              updated_at:
+                type: string
+                example: +9876543210
+              user_status:
+                type: string
+                example: active
+              instagram:
+                type: string
+                example: example
+              linkedin:
+                type: string
+                example: example
+              twitter:
+                type: string
+                example: example
+              github:
+                type: string
+                example: example
         default:
           description: An unexpected error response.
           schema: {}
@@ -24,6 +66,16 @@ paths:
           type: string
           required: true
           description: Bearer token for authorization
+        - in: header
+          name: ip
+          type: string
+          required: true
+          description: Ip address of the user
+        - in: header
+          name: client
+          type: string
+          required: true
+          description: Ip address of the user
       tags:
         - User
         
@@ -117,6 +169,9 @@ paths:
               last_name:
                 type: string
                 example: Last
+              date_of_birth:
+                type: string
+                example: "2001-01-26"
               bio:
                 type: string
                 example: Full Name, an American fashion designer, was born on February 12, 1964, in Detroit, Michigan.
@@ -126,12 +181,18 @@ paths:
               contact_number:
                 type: string
                 example: 0987654321
-              ip_address:
+              twitter:
                 type: string
-                example: 127.0.0.1
-              client_id:
+                example: username
+              instagram:
                 type: string
-                example: chrome
+                example: username
+              linkedin:
+                type: string
+                example: username
+              github:
+                type: string
+                example: username
       tags:
         - User
     delete:
@@ -148,6 +209,16 @@ paths:
           type: string
           required: true
           description: Bearer token for authorization
+        - in: header
+          name: ip
+          type: string
+          required: true
+          description: Ip address of the user
+        - in: header
+          name: client
+          type: string
+          required: true
+          description: Ip address of the user
       tags:
         - User
       
@@ -177,5 +248,91 @@ paths:
       tags:
         - Topics
         
-        
+  /user/categories:
+    get:
+      summary: List all categories
+      description: Retrieves a list of all top-level categories in the knowledge base.
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              category:
+                type: object
+                properties:
+                  Art:
+                    type: object
+                    properties:
+                      Topics:
+                        type: array
+                        items:
+                          type: string
+                          example:
+                            - Drawing
+                            - Generative Art
+                            - Portraits
+                            - Comics
+                            - Painting
+                            - Illustration
+                            - Fine Art
+                            - Street Art
+                            - Contemporary Art
+                  "Artificial Intelligence":
+                    type: object
+                    properties:
+                      Topics:
+                        type: array
+                        items:
+                          type: string
+                          example:
+                            - Machine Learning
+                            - ChatGPT
+                            - Deep Learning
+                            - Large Language Models
+                            - NLP
+                            - Voice Assistant
+                            - Conversational AI
+                  Arts:
+                    type: object
+                    properties:
+                      Topics:
+                        type: array
+                        items:
+                          type: string
+                          example:
+                            - Painting
+                            - Design
+                            - Dancing
+                  Beauty:
+                    type: object
+                    properties:
+                      Topics:
+                        type: array
+                        items:
+                          type: string
+                          example:
+                            - Makeup
+                            - Hair
+                            - Skincare
+                            - Beauty Tips
+                            - Body Image
+                  Blockchain:
+                    type: object
+                    properties:
+                      Topics:
+                        type: array
+                        items:
+                          type: string
+                          example:
+                            - Ethereum
+                            - Decentralized Finance
+                            - Web3
+                            - Cryptocurrency
+                            - Bitcoin
+                            - Nft
+
+      tags:
+        - Topics
+                   
   

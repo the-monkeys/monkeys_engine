@@ -46,7 +46,7 @@ func main() {
 			time.Sleep(time.Second)
 			continue
 		} else {
-			logrus.Errorf("✅ auth service connected to rabbitMQ!")
+			logrus.Info("✅ auth service connected to rabbitMQ!")
 			break
 		}
 	}

@@ -29,9 +29,11 @@ type UpdateUserProfile struct {
 	Address       string `json:"address"`
 	ContactNumber string `json:"contact_number"`
 	Email         string `json:"email"`
-	IPAddress     string `json:"ip_address"`
-	Client        string `json:"client_id"`
 	Partial       bool   `json:"partial"`
+	Twitter       string `json:"twitter"`
+	Instagram     string `json:"instagram"`
+	LinkedIn      string `json:"linkedin"`
+	Github        string `json:"github"`
 }
 
 type ReturnMessage struct {

@@ -18,14 +18,22 @@ import (
 )
 
 type UserDb interface {
+	// Create queries
+	CreateUserLog(user *models.UserLogs, description string) error
+
+	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
 	GetMyProfile(username string) (*models.UserProfileRes, error)
 	GetUserProfile(username string) (*models.UserAccount, error)
-	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
-	DeleteUserProfile(username string) error
 	GetAllTopicsFromDb() (*pb.GetTopicsResponse, error)
 	GetAllCategories() (*pb.GetAllCategoriesRes, error)
+
+	// Update queries
+	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
+
+	// Delete queries
+	DeleteUserProfile(username string) error
 }
 
 type uDBHandler struct {
@@ -59,9 +67,10 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, error) {
 	var tmu models.UserAccount
 	if err := uh.db.QueryRow(`
-        SELECT username, first_name, last_name, bio, avatar_url 
+        SELECT username, first_name, last_name, bio, avatar_url, created_at, linkedin, github, twitter, instagram 
         FROM user_account WHERE username = $1;`, username).
-		Scan(&tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl); err != nil {
+		Scan(&tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl, &tmu.CreatedAt,
+			&tmu.LinkedIn, &tmu.Github, &tmu.Twitter, &tmu.Instagram); err != nil {
 		logrus.Errorf("can't find a user existing with this profile id  %s, error: %+v", username, err)
 		return nil, err
 	}
@@ -119,14 +128,15 @@ func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, err
 	if err := uh.db.QueryRow(`
 			SELECT ua.account_id, ua.username, ua.first_name, ua.last_name, ua.email, ua.date_of_birth,
 			ua.bio, ua.avatar_url, ua.created_at, ua.updated_at, ua.address, ua.contact_number, us.status,
-			ua.view_permission
+			ua.view_permission, ua.linkedin, ua.github, ua.twitter, ua.instagram 
 			FROM user_account ua
 			INNER JOIN user_status us ON us.id = ua.user_status
 			WHERE ua.username = $1;
 		`, username).
 		Scan(&profile.AccountId, &profile.Username, &profile.FirstName, &profile.LastName, &profile.Email,
 			&profile.DateOfBirth, &profile.Bio, &profile.AvatarUrl, &profile.CreatedAt, &profile.UpdatedAt,
-			&profile.Address, &profile.ContactNumber, &profile.UserStatus, &profile.ViewPermission); err != nil {
+			&profile.Address, &profile.ContactNumber, &profile.UserStatus, &profile.ViewPermission,
+			&profile.LinkedIn, &profile.Github, &profile.Twitter, &profile.Instagram); err != nil {
 		logrus.Errorf("can't find a user profile existing with username %s, error: %+v", username, err)
 		return nil, err
 	}
@@ -152,8 +162,12 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 		bio = $6,
         updated_at = now(),
 		address = $7,
-		contact_number = $8
-		WHERE username = $9;
+		contact_number = $8,
+		linkedin = $9,
+		github = $10,
+		twitter = $11,
+		instagram = $12 
+		WHERE username = $13;
 	`)
 	if err != nil {
 		logrus.Errorf("cannot prepare the update user query for user %s, error: %v", dbUserInfo.Username, err)
@@ -162,7 +176,9 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 
 	defer stmt.Close()
 	result := stmt.QueryRow(dbUserInfo.Username, dbUserInfo.FirstName, dbUserInfo.LastName, dbUserInfo.Email,
-		dbUserInfo.DateOfBirth.Time, dbUserInfo.Bio.String, dbUserInfo.Address.String, dbUserInfo.ContactNumber.String, username)
+		dbUserInfo.DateOfBirth.Time, dbUserInfo.Bio.String, dbUserInfo.Address.String,
+		dbUserInfo.ContactNumber.String, dbUserInfo.LinkedIn.String, dbUserInfo.Github.String,
+		dbUserInfo.Twitter.String, dbUserInfo.Instagram.String, username)
 	if result.Err() != nil {
 		logrus.Errorf("cannot update user %s, error: %v", dbUserInfo.Username, err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)

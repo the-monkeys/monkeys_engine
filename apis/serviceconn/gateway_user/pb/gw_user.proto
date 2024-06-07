@@ -14,6 +14,8 @@ message UserProfileReq {
     string username = 2;
     string email = 3;
     bool is_private = 4;
+    string ip = 5;
+    string client = 6;
 }
 
 message UserProfileRes {
@@ -28,14 +30,20 @@ message UserProfileRes {
     google.protobuf.Timestamp created_at = 9;
     google.protobuf.Timestamp updated_at = 10; 
     string address = 11;
-    int64 contact_number = 12;
+    string contact_number = 12;
     string user_status = 13;
+    string instagram = 14;
+    string linkedin = 15;
+    string twitter = 16;
+    string github = 17;
 }
 
 message UserActivityReq {
     string user_id = 1;
     string user_name = 2;
     string email = 3;
+    string ip = 4;
+    string client = 5;
 }
 
 message UserActivityRes {
@@ -54,16 +62,19 @@ message UserActivityRes {
 
 message UpdateUserProfileReq {
     string username = 1;
-    string username_to_be_updated = 2; 
-    string first_name = 3;
-    string last_name = 4;
-    string date_of_birth = 5;
-    string bio = 6;
-    string address = 7;
-    string contact_number = 8;
-    string ip_address = 9;
-    string client = 10;
-    bool partial = 11;
+    string first_name = 2;
+    string last_name = 3;
+    string date_of_birth = 4;
+    string bio = 5;
+    string address = 6;
+    string contact_number = 7;
+    string ip = 8;
+    string client = 9;
+    bool partial = 10;
+    string instagram = 11;
+    string linkedin = 12;
+    string twitter = 13;
+    string github = 14;
 }
 
 message UpdateUserProfileRes {
@@ -85,7 +96,7 @@ message DeleteUserProfileReq {
     string username = 2;
     string email    = 3;
     string client   = 4;
-    string ip_address = 5;
+    string ip = 5;
 }
 
 message DeleteUserProfileRes {
