@@ -148,6 +148,26 @@ message VerifyEmailRes {
   Error error = 2;
 }
 
+message UpdateUsernameReq {
+  string current_username = 1;
+  string new_username = 2;
+  string client = 3;
+  string ip = 4;
+}
+
+message UpdateUsernameRes {
+  int64 status_code = 1;
+  string token = 2;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string user_name = 5;
+  string first_name = 6;
+  string last_name = 7;
+  string email = 8;
+  bool email_verification_status = 9;
+  Error error = 10;
+  string account_id = 11;
+}
 
 service AuthService {
   rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse) {}
@@ -158,4 +178,5 @@ service AuthService {
   rpc UpdatePassword(UpdatePasswordReq) returns (UpdatePasswordRes) {}
   rpc RequestForEmailVerification(EmailVerificationReq) returns (EmailVerificationRes) {}
   rpc VerifyEmail(VerifyEmailReq) returns (VerifyEmailRes) {}
+  rpc UpdateUsername(UpdateUsernameReq) returns (UpdateUsernameRes) {}
 }

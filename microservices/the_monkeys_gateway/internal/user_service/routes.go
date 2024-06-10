@@ -172,10 +172,10 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, ReturnMessage{Message: "user not found"})
+			ctx.AbortWithStatusJSON(http.StatusNotFound, ReturnMessage{Message: "user not found"})
 			return
 		} else {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, ReturnMessage{Message: "couldn't update user informations"})
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't update user informations"})
 			return
 		}
 	}

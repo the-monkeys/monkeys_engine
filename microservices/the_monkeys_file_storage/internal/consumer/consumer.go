@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -64,7 +65,10 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 		case constants.USER_PROFILE_DIRECTORY_CREATE:
 			CreateUserFolder(user.Username)
 		case constants.USER_PROFILE_DIRECTORY_UPDATE:
-			UpdateUserFolder(user.Username, user.NewUsername)
+			err = UpdateUserFolder(user.Username, user.NewUsername)
+			if err != nil {
+				logrus.Errorf("Failed to update user folder: %v", err)
+			}
 		default:
 			logrus.Errorf("Unknown action: %s", user.Action)
 		}
@@ -132,25 +136,33 @@ func ConstructPath(baseDir, userName, fileName string) (string, string) {
 
 // UpdateUserFolder renames a folder to a new name
 func UpdateUserFolder(currentName, newName string) error {
-	from, err := os.Stat(currentName)
+	currentPath := filepath.Join(constant.ProfileDir, currentName)
+	newPath := filepath.Join(constant.ProfileDir, newName)
+
+	log.Printf("updating user folder %s to %s", currentName, newName)
+
+	from, err := os.Stat(currentPath)
 	if err != nil {
 		return errors.New("could not stat current directory: " + err.Error())
 	}
 
 	if !from.IsDir() {
-		return errors.New(currentName + " is not a directory")
+		return errors.New(currentPath + " is not a directory")
 	}
 
-	to := currentName + "_temp" // Create temporary name
+	to := currentPath + "_temp" // Create temporary name
 
 	// Rename the directory
-	err = os.Rename(currentName, to)
+	err = os.Rename(currentPath, to)
 	if err != nil {
 		return errors.New("failed to rename directory: " + err.Error())
 	}
 
+	// Wait for a bit to make sure the directory is released
+	// time.Sleep(1 * time.Second)
+
 	// Rename back to the desired name
-	err = os.Rename(to, newName)
+	err = os.Rename(to, newPath)
 	if err != nil {
 		return errors.New("failed to rename directory to new name: " + err.Error())
 	}

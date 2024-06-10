@@ -28,6 +28,7 @@ type AuthDBHandler interface {
 	UpdatePassword(password string, user *models.TheMonkeysUser) error
 	UpdateEmailVerificationToken(req *models.TheMonkeysUser) error
 	UpdateEmailVerificationStatus(req *models.TheMonkeysUser) error
+	UpdateUserName(currentUsername, newUsername string) error
 
 	// Create user logs to track activity
 	CreateUserLog(user *models.TheMonkeysUser, description string) error
@@ -340,5 +341,32 @@ func (adh *authDBHandler) UpdateEmailVerificationStatus(req *models.TheMonkeysUs
 		logrus.Errorf("cannot commit the password recovery token for %s, error: %v", req.Email, err)
 		return err
 	}
+	return nil
+}
+
+func (adh *authDBHandler) UpdateUserName(currentUsername, newUsername string) error {
+	stmt, err := adh.db.Prepare(`UPDATE user_account SET username = $1 WHERE username = $2`)
+	if err != nil {
+		logrus.Errorf("cannot prepare statement to update username, error: %v", err)
+		return err
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(newUsername, currentUsername)
+	if err != nil {
+		logrus.Errorf("cannot execute update username query, error: %v", err)
+		return err
+	}
+
+	row, err := res.RowsAffected()
+	if err != nil {
+		logrus.Errorf("error while checking rows affected for update username query, error: %v", err)
+		return err
+	}
+	if row != 1 {
+		logrus.Errorf("more or less than 1 row is affected for update username query, error: %v", err)
+		return errors.New("more or less than 1 row is affected")
+	}
+
 	return nil
 }

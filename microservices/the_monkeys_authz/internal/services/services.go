@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"log"
 	"math/rand"
@@ -175,7 +176,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 // Is the token belongs to the user
 // Is the user existing in the db or an active user
 func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.ValidateResponse, error) {
-	logrus.Infof("got the request data: %+v", req)
+	logrus.Infof("validating user id %s or email %s", req.UserName, req.Email)
 
 	claims, err := as.jwt.ValidateToken(req.Token)
 	if err != nil {
@@ -265,7 +266,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 
 	go cache.AddUserLog(as.dbConn, user, constants.Login, constants.ServiceAuth, constants.EventLogin, as.logger)
 
-	return &pb.LoginUserResponse{
+	resp := &pb.LoginUserResponse{
 		StatusCode:    http.StatusOK,
 		Token:         token,
 		EmailVerified: false,
@@ -275,7 +276,8 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		AccountId:     user.AccountId,
-	}, nil
+	}
+	return resp, nil
 }
 
 func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordReq) (*pb.ForgotPasswordRes, error) {
@@ -553,5 +555,69 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	// Return a success response with status code 200
 	return &pb.VerifyEmailRes{
 		StatusCode: 200,
+	}, nil
+}
+
+func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameReq) (*pb.UpdateUsernameRes, error) {
+	// Check if the user exists
+	user, err := as.dbConn.CheckIfUsernameExist(req.CurrentUsername)
+	if err != nil {
+		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.CurrentUsername, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.CurrentUsername))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	// Update the username
+	err = as.dbConn.UpdateUserName(req.CurrentUsername, req.NewUsername)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not update the username")
+	}
+
+	bx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:    user.Username,
+		NewUsername: req.NewUsername,
+		AccountId:   user.AccountId,
+		Action:      constants.USER_PROFILE_DIRECTORY_UPDATE,
+	})
+	if err != nil {
+		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	go as.qConn.PublishDefaultProfilePhoto(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
+
+	if req.Ip == "" {
+		req.Ip = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+
+	user.IpAddress = req.Ip
+	user.Client = req.Client
+
+	// Add a user log
+	go cache.AddUserLog(as.dbConn, user, constants.UpdatedUserName, constants.ServiceUser, constants.EventUpdateUsername, as.logger)
+
+	token, err := as.jwt.GenerateToken(user)
+	if err != nil {
+		logrus.Errorf(service_types.CannotCreateToken(req.NewUsername, err))
+		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.UpdateUsernameRes{
+		StatusCode:    http.StatusOK,
+		Token:         token,
+		EmailVerified: false,
+		UserName:      req.NewUsername,
+		Email:         user.Email,
+		UserId:        user.Id,
+		FirstName:     user.FirstName,
+		LastName:      user.LastName,
+		AccountId:     user.AccountId,
 	}, nil
 }

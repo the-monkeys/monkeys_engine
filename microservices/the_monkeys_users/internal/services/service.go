@@ -8,7 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
+	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
@@ -21,13 +23,17 @@ import (
 type UserSvc struct {
 	dbConn database.UserDb
 	log    *logrus.Logger
+	config *config.Config
+	qConn  rabbitmq.Conn
 	pb.UnimplementedUserServiceServer
 }
 
-func NewUserSvc(dbConn database.UserDb, log *logrus.Logger) *UserSvc {
+func NewUserSvc(dbConn database.UserDb, log *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *UserSvc {
 	return &UserSvc{
 		dbConn: dbConn,
 		log:    log,
+		config: config,
+		qConn:  qConn,
 	}
 }
 

@@ -2,10 +2,12 @@ package main
 
 import (
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/services"
 	"google.golang.org/grpc"
@@ -29,6 +31,19 @@ func main() {
 		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysUser, err)
 	}
 
+	var qConn rabbitmq.Conn
+	for {
+		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
+		if err != nil {
+			logrus.Errorf("auth service cannot connect to rabbitMq service: %v", err)
+			time.Sleep(time.Second)
+			continue
+		} else {
+			logrus.Info("✅ the user service connected to rabbitMQ!")
+			break
+		}
+	}
+
 	// conn, err := grpc.Dial(cfg.Microservices.TheMonkeysBlog, grpc.WithInsecure())
 	// if err != nil {
 	// 	log.Errorf("failed to dial to blog service at %v, error: %+v", cfg.Microservices.TheMonkeysBlog, err)
@@ -36,7 +51,7 @@ func main() {
 	// }
 
 	// userService := database.NewUserDbHandler(db, log, isv.NewBlogServiceClient(conn))
-	userService := services.NewUserSvc(db, log)
+	userService := services.NewUserSvc(db, log, cfg, qConn)
 
 	grpcServer := grpc.NewServer()
 

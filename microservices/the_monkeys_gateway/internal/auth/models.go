@@ -33,3 +33,7 @@ type Authorization struct {
 type IncorrectReqBody struct {
 	Error string `json:"error,omitempty"`
 }
+
+type UpdateUsername struct {
+	Username string `json:"username"`
+}

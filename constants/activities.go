@@ -15,7 +15,7 @@ const (
 	UserActivated                = "Activated User"
 	UpdateProfilePic             = "Updated Profile Picture"
 	RemoveProfilePic             = "Removed Profile Picture"
-	UpdatedUserName              = "Updated Username"
+	UpdatedUserName              = "updated username"
 	ChangedEmail                 = "Changed Email"
 	ChangedVisibilityToAnonymous = "Changed Visibility to Anonymous"
 	ChangedVisibilityToPublic    = "Changed Visibility to Public"

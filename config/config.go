@@ -92,7 +92,5 @@ func GetConfig() (*Config, error) {
 		return config, err
 	}
 
-	logrus.Infof("Configuration loaded: %+v", config) // Add this line to print the loaded configuration
-
 	return config, nil
 }

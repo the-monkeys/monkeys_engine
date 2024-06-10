@@ -57,6 +57,8 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.Use(mware.AuthRequired)
 
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
+	routes.PUT("/settings/username/:username", asc.UpdateUserName)
+	routes.PUT("/settings/email/:username", asc.UpdateEmailAddress)
 
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
@@ -333,7 +335,7 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 // To verify email
 func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	username := ctx.Query("user")
-	evsecret := ctx.Query("evpw")
+	evSecret := ctx.Query("evpw")
 
 	ipAddress := ctx.Request.Header.Get("ip")
 	client := ctx.Request.Header.Get("client")
@@ -341,7 +343,7 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
 		Username:  username,
-		Token:     evsecret,
+		Token:     evSecret,
 		IpAddress: ipAddress,
 		Client:    client,
 	})
@@ -406,4 +408,47 @@ func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
 
 func (asc *ServiceClient) GetRoles(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, "administrator")
+}
+
+func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
+	currentUsername := ctx.Param("username")
+
+	if currentUsername != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
+	var updateUsername UpdateUsername
+
+	if err := ctx.BindJSON(&updateUsername); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	resp, err := asc.Client.UpdateUsername(context.Background(), &pb.UpdateUsernameReq{
+		CurrentUsername: currentUsername,
+		NewUsername:     updateUsername.Username,
+		Client:          client,
+		Ip:              ipAddress,
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "user not found"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't update username"})
+			return
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
+}
+
+func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 }

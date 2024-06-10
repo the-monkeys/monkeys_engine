@@ -11,6 +11,7 @@ const (
 	EventVerifiedEmail               = "event-verified-email"
 
 	EventUpdateProfileInfo = "event-update-profile-info"
+	EventUpdateUsername    = "event-update-username"
 )
 
 const (
