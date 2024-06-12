@@ -22,7 +22,8 @@ type VerifyEmail struct {
 }
 
 type UpdatePassword struct {
-	Password string `json:"new_password"`
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
 }
 
 type Authorization struct {

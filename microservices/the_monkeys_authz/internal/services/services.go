@@ -600,7 +600,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 	user.Client = req.Client
 
 	// Add a user log
-	go cache.AddUserLog(as.dbConn, user, constants.UpdatedUserName, constants.ServiceUser, constants.EventUpdateUsername, as.logger)
+	go cache.AddUserLog(as.dbConn, user, constants.UpdatedUserName, constants.ServiceAuth, constants.EventUpdateUsername, as.logger)
 
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
@@ -619,5 +619,53 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		AccountId:     user.AccountId,
+	}, nil
+}
+
+func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.UpdatePasswordWithPasswordReq) (*pb.UpdatePasswordWithPasswordRes, error) {
+	as.logger.Infof("updating password of user: %s", req.Username)
+
+	// Check if the user exists
+	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	// Check if the password match with the password hash
+	if !utils.CheckPasswordHash(req.CurrentPassword, user.Password) {
+		return nil, status.Errorf(codes.Unauthenticated, "password didn't match, cannot update password")
+	}
+
+	// Hash the new password
+	hash := utils.HashPassword(req.NewPassword)
+
+	// update the password
+	err = as.dbConn.UpdatePassword(hash, user)
+	if err != nil {
+		as.logger.Errorf("error while updating the password for user %s, err: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "cannot update the password")
+	}
+
+	if req.IpAddress == "" {
+		req.IpAddress = "127.0.0.1"
+	}
+
+	if req.Client == "" {
+		req.Client = "Others"
+	}
+
+	user.IpAddress = req.IpAddress
+	user.Client = req.Client
+
+	// Add a user log
+	go cache.AddUserLog(as.dbConn, user, constants.UpdatedPassword, constants.ServiceAuth, constants.EventUpdatedPassword, as.logger)
+
+	// Return
+	return &pb.UpdatePasswordWithPasswordRes{
+		StatusCode: http.StatusOK,
 	}, nil
 }

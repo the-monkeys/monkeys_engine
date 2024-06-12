@@ -13,6 +13,7 @@
         "sirupsen",
         "SQLDB",
         "sslmode",
-        "streadway"
+        "streadway",
+        "Warnf"
     ]
 }

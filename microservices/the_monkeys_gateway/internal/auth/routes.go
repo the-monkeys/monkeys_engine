@@ -59,7 +59,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
 	routes.PUT("/settings/username/:username", asc.UpdateUserName)
 	routes.PUT("/settings/email/:username", asc.UpdateEmailAddress)
-
+	routes.PUT("/settings/password/:username", asc.ChangePasswordWithCurrentPassword)
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
 	routes.GET("/role/:id", asc.GetRoles)
@@ -267,7 +267,7 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 	client := ctx.Request.Header.Get("client")
 
 	resp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
-		Password:  pass.Password,
+		Password:  pass.NewPassword,
 		Username:  res.UserName,
 		Email:     res.Email,
 		IpAddress: ipAddress,
@@ -448,6 +448,44 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 }
 
 func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	ipAddress := ctx.Request.Header.Get("ip")
+	client := ctx.Request.Header.Get("client")
+
+	var updatePass UpdatePassword
+
+	if err := ctx.BindJSON(&updatePass); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	resp, err := asc.Client.UpdatePasswordWithPassword(context.Background(), &pb.UpdatePasswordWithPasswordReq{
+		Username:        username,
+		CurrentPassword: updatePass.CurrentPassword,
+		NewPassword:     updatePass.NewPassword,
+		Client:          client,
+		IpAddress:       ipAddress,
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "user not found"})
+			return
+		} else if status.Code(err) == codes.Unauthenticated {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "password incorrect"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't update password"})
+			return
+		}
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "successfully updated password", "status": resp.StatusCode})
 }
 
 func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {

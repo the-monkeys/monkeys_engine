@@ -169,6 +169,18 @@ message UpdateUsernameRes {
   string account_id = 11;
 }
 
+message UpdatePasswordWithPasswordReq {
+  string current_password = 1;
+  string username = 2;
+  string new_password = 3;
+  string ip_address = 4;
+  string client = 5;
+}
+
+message UpdatePasswordWithPasswordRes {
+  int64 status_code = 1;
+  Error error = 2;
+}
 service AuthService {
   rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse) {}
   rpc Validate(ValidateRequest) returns (ValidateResponse) {}
@@ -179,4 +191,5 @@ service AuthService {
   rpc RequestForEmailVerification(EmailVerificationReq) returns (EmailVerificationRes) {}
   rpc VerifyEmail(VerifyEmailReq) returns (VerifyEmailRes) {}
   rpc UpdateUsername(UpdateUsernameReq) returns (UpdateUsernameRes) {}
+  rpc UpdatePasswordWithPassword(UpdatePasswordWithPasswordReq) returns (UpdatePasswordWithPasswordRes) {}
 }
