@@ -12,6 +12,8 @@ const (
 
 	EventUpdateProfileInfo = "event-update-profile-info"
 	EventUpdateUsername    = "event-update-username"
+
+	EventCreatedBlog = "event-created-blog"
 )
 
 const (

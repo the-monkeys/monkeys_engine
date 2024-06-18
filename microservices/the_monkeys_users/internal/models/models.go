@@ -88,14 +88,14 @@ type UserLogs struct {
 }
 
 type TheMonkeysMessage struct {
-	Id          int64  `json:"id"`
-	AccountId   string `json:"profile_id"`
-	Username    string `json:"username"`
-	NewUsername string `json:"new_username"`
-	Email       string `json:"email"`
-	LoginMethod string `json:"login_method"`
-	ClientId    string `json:"client_id"`
-	Client      string `json:"client"`
-	IpAddress   string `json:"ip"`
-	Action      string `json:"action"`
+	Id            int64  `json:"id"`
+	UserAccountId string `json:"user_account_id"`
+	Username      string `json:"username"`
+	Email         string `json:"email"`
+	ClientId      string `json:"client_id"`
+	Client        string `json:"client"`
+	IpAddress     string `json:"ip"`
+	Action        string `json:"action"`
+	BlogId        string `json:"blog_id"`
+	Status        string `json:"status"`
 }

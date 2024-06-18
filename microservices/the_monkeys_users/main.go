@@ -8,6 +8,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/services"
 	"google.golang.org/grpc"
@@ -40,6 +41,7 @@ func main() {
 			continue
 		} else {
 			logrus.Info("✅ the user service connected to rabbitMQ!")
+			go consumer.ConsumeFromQueue(qConn, cfg, log, db)
 			break
 		}
 	}

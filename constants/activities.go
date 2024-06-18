@@ -23,7 +23,7 @@ const (
 	AddedInstagram = "Added Instagram"
 	AddedTwitter   = "Added Twitter"
 
-	DraftBlog                = "Drafted a Blog"
+	CreateBlog               = "created a Blog"
 	UpdateDraftedBlog        = "Updated the Drafted Blog"
 	UpdateBlog               = "Updated the Blog"
 	DeleteBlog               = "Deleted the Blog"

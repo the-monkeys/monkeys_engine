@@ -14,10 +14,10 @@ const (
 )
 
 const (
-	PermissionRead     = "read"
-	PermissionEdit     = "edit"
-	PermissionDelete   = "delete"
-	PermissionArchieve = "archive"
+	PermissionRead    = "read"
+	PermissionEdit    = "edit"
+	PermissionDelete  = "delete"
+	PermissionAchieve = "archive"
 )
 
 const (

@@ -55,6 +55,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 			Bio:       userProfile.Bio.String,
 			AvatarUrl: userProfile.AvatarUrl.String,
 			CreatedAt: timestamp.New(userProfile.CreatedAt.Time),
+			Address:   userProfile.Address.String,
 			Linkedin:  userProfile.LinkedIn.String,
 			Instagram: userProfile.Instagram.String,
 			Twitter:   userProfile.Twitter.String,

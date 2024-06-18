@@ -2,26 +2,40 @@ package services
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
+	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/models"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type BlogService struct {
 	osClient database.OpensearchStorage
 	logger   *logrus.Logger
+	config   *config.Config
+	qConn    rabbitmq.Conn
 	pb.UnimplementedBlogServiceServer
 }
 
-func NewBlogService(client database.OpensearchStorage, logger *logrus.Logger) *BlogService {
-	return &BlogService{osClient: client, logger: logger}
+func NewBlogService(client database.OpensearchStorage, logger *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
+	return &BlogService{
+		osClient: client,
+		logger:   logger,
+		config:   config,
+		qConn:    qConn,
+	}
 }
 
 func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
+	blog.logger.Infof("Content: %+v", req)
 	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
 	req.IsDraft = true
 
@@ -32,15 +46,27 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 
 		if err != nil {
 			blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
-			return nil, fmt.Errorf("cannot find the blog with id: %s", req.BlogId)
+			return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
 		}
 
 		if req.OwnerAccountId != owner {
-			blog.logger.Errorf("user %s is trying to take the ownershipt of the containt, original owner is: %s", req.OwnerAccountId, owner)
-			return nil, errors.New("you don't have permission to change the owner id")
+			blog.logger.Errorf("user %s is trying to take the ownership of the content, original owner is: %s", req.OwnerAccountId, owner)
+			return nil, status.Errorf(codes.Unauthenticated, "you don't have permission to change the owner id")
 		}
 	} else {
-		blog.logger.Infof("creating the blog with id: %s", req.BlogId)
+		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
+		bx, err := json.Marshal(models.MessageToUserSvc{
+			UserAccountId: req.OwnerAccountId,
+			BlogId:        req.BlogId,
+			Action:        constants.BLOG_CREATE,
+			Status:        constants.BlogStatusDraft,
+		})
+		if err != nil {
+			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
+			return nil, status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
+		}
+
+		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 	}
 
 	_, err := blog.osClient.DraftABlog(ctx, req)
@@ -87,7 +113,7 @@ func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBl
 		return nil, err
 	}
 
-	updateResp, err := blog.osClient.ArchieveBlogById(ctx, req.BlogId)
+	updateResp, err := blog.osClient.AchieveBlogById(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("cannot archive the blog: %v", err)
 		return nil, err

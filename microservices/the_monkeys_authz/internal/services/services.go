@@ -155,7 +155,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		}, nil
 	}
 
-	go as.qConn.PublishDefaultProfilePhoto(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
+	go as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 
 	return &pb.RegisterUserResponse{
 		StatusCode:    http.StatusCreated,
@@ -586,7 +586,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
-	go as.qConn.PublishDefaultProfilePhoto(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
+	go as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 
 	if req.Ip == "" {
 		req.Ip = "127.0.0.1"

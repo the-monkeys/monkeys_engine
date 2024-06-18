@@ -41,40 +41,41 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  opensearch_node1: # This is also the hostname of the container within the Docker network (i.e. https://opensearch-node1/)
-    image: opensearchproject/opensearch:latest # Specifying the latest available image - modify if you want a specific version
+  opensearch-node1:
+    image: opensearchproject/opensearch:latest
     container_name: opensearch-node1
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - plugins.security.disabled=true
-      - cluster.name=opensearch-cluster # Name the cluster
-      - node.name=opensearch-node1 # Name the node that will run in this container
-      - discovery.seed_hosts=opensearch-node1,opensearch-node2 # Nodes to look for when discovering the cluster
-      - cluster.initial_cluster_manager_nodes=opensearch-node1,opensearch-node2 # Nodes eligible to serve as cluster manager
-      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set min and max JVM heap sizes to at least 50% of system RAM
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=a!Too5hortPassword    # Sets the demo admin user password when using demo configuration, required for OpenSearch 2.12 and later
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.seed_hosts=opensearch-node1
+      - cluster.initial_cluster_manager_nodes=opensearch-node1
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=a!Too5hortPassword
     ulimits:
       memlock:
-        soft: -1 # Set memlock to unlimited (no soft or hard limit)
+        soft: -1
         hard: -1
       nofile:
-        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        soft: 65536
         hard: 65536
     volumes:
-      - /usr/share/opensearch/data # Creates volume called opensearch-data1 and mounts it to the container
+      - opensearch-data1:/usr/share/opensearch/data
     ports:
-      - 9200:9200 # REST API
-      - 9600:9600 # Performance Analyzer
+      - 9200:9200
+      - 9600:9600
     networks:
-      - monkeys-network # All of the containers will join the same Docker bridge network
-    depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
+      - monkeys-network
     healthcheck:
       test: ["CMD", "curl", "-f", "-k", "http://localhost:9200"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -87,11 +88,13 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq  # Mount the volume for RabbitMQ data
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 2
+      timeout: 10s
+      retries: 5
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
@@ -99,12 +102,9 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
-      db-migrations:
-        condition: service_completed_successfully  
-      the_monkeys_db:
-        condition: service_healthy
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
     ports:
@@ -118,13 +118,10 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
-      db-migrations:
-        condition: service_completed_successfully  
-      the_monkeys_db:
-        condition: service_healthy
-      # - opensearch_node1
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      # - opensearch-node1
     volumes:
       - .:/go/src/app
     ports:
@@ -138,12 +135,9 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
-      db-migrations:
-        condition: service_completed_successfully  
-      the_monkeys_db:
-        condition: service_healthy
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -159,12 +153,9 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
-      db-migrations:
-        condition: service_completed_successfully  
-      the_monkeys_db:
-        condition: service_healthy
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
     ports:
@@ -178,14 +169,10 @@ services:
     networks:
       - monkeys-network
     depends_on:
-      rabbitmq:
-        condition: service_healthy  # Wait for RabbitMQ to be healthy
-      db-migrations:
-        condition: service_completed_successfully  
-      the_monkeys_db:
-        condition: service_healthy
-      opensearch_node1:
-        condition: service_healthy
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - opensearch-node1
     volumes:
       - .:/go/src/app
     ports:
@@ -201,7 +188,9 @@ volumes:
   postgres_data:
   the_monkeys_profile:
   blogs_volume:
-  rabbitmq-data:  # Named volume for better organization
+  rabbitmq_data:  # Named volume for better organization
+  opensearch-data1:
+    driver: local
 
 
 

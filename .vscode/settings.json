@@ -4,6 +4,7 @@
         "evpw",
         "Infof",
         "Infoln",
+        "Insta",
         "logrus",
         "mware",
         "Opensearch",

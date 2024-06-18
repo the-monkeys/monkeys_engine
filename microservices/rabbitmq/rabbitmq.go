@@ -64,7 +64,7 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 }
 
 // PublishDefaultProfilePhoto sends a message to the specified exchange with the given routing key.
-func (c Conn) PublishDefaultProfilePhoto(exchangeName string, routingKey string, message []byte) {
+func (c Conn) PublishMessage(exchangeName string, routingKey string, message []byte) {
 	err := c.Channel.Publish(exchangeName, routingKey, false, false, amqp.Publishing{
 		ContentType: "application/octet-stream",
 		Body:        message,

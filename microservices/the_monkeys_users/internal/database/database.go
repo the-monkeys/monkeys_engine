@@ -20,6 +20,8 @@ import (
 type UserDb interface {
 	// Create queries
 	CreateUserLog(user *models.UserLogs, description string) error
+	AddBlogWithId(models.TheMonkeysMessage) error
+	AddBlogPermission(models.TheMonkeysMessage) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -67,10 +69,10 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, error) {
 	var tmu models.UserAccount
 	if err := uh.db.QueryRow(`
-        SELECT username, first_name, last_name, bio, avatar_url, created_at, linkedin, github, twitter, instagram 
+        SELECT username, first_name, last_name, bio, avatar_url, created_at, address, linkedin, github, twitter, instagram 
         FROM user_account WHERE username = $1;`, username).
 		Scan(&tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl, &tmu.CreatedAt,
-			&tmu.LinkedIn, &tmu.Github, &tmu.Twitter, &tmu.Instagram); err != nil {
+			&tmu.Address, &tmu.LinkedIn, &tmu.Github, &tmu.Twitter, &tmu.Instagram); err != nil {
 		logrus.Errorf("can't find a user existing with this profile id  %s, error: %+v", username, err)
 		return nil, err
 	}
@@ -189,91 +191,6 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 		logrus.Errorf("cannot commit the update profile for user %s, error: %v", dbUserInfo.Username, err)
 		return err
 	}
-	return nil
-}
-
-// TODO: If the record doesn't exist throw 404 error
-// func (uh *uDBHandler) UpdateMyProfile(info *pb.SetMyProfileReq) error {
-// 	stmt, err := uh.db.Prepare(`UPDATE the_monkeys_user SET first_name=$1, last_name=$2,
-// 	country_code=$3, mobile_no=$4, about=$5, instagram=$6, twitter=$7, update_time=$8 WHERE id=$9`)
-// 	if err != nil {
-// 		uh.log.Errorf("cannot prepare update profile statement, error: %v", err)
-// 		return err
-// 	}
-// 	defer stmt.Close()
-// 	time := time.Now().Format(common.DATE_TIME_FORMAT)
-// 	res, err := stmt.Exec(info.FirstName, info.LastName, info.CountryCode, info.MobileNo,
-// 		info.About, info.Instagram, info.Twitter, time, info.Id)
-// 	if err != nil {
-// 		uh.log.Errorf("cannot execute update profile statement, error: %v", err)
-// 		return err
-// 	}
-
-// 	row, err := res.RowsAffected()
-// 	if err != nil {
-// 		logrus.Errorf("error while checking rows affected for %s, error: %v", info.Email, err)
-// 		return err
-// 	}
-// 	if row > 1 {
-// 		logrus.Errorf("more or less than 1 row is affected for %s, error: %v", info.Email, err)
-// 		return errors.New("more or less than 1 row is affected")
-// 	}
-
-// 	return nil
-// }
-
-// TODO: If the record doesn't exist throw 404 error
-func (uh *uDBHandler) UploadProfilePic(pic []byte, id int64) error {
-	stmt, err := uh.db.Prepare(`UPDATE the_monkeys_user SET profile_pic=$1 WHERE id=$2`)
-	if err != nil {
-		uh.log.Errorf("cannot prepare upload profile pic statement, error: %v", err)
-		return err
-	}
-	defer stmt.Close()
-
-	res, err := stmt.Exec(pic, id)
-	if err != nil {
-		uh.log.Errorf("cannot execute update profile pic statement, error: %v", err)
-		return err
-	}
-
-	row, err := res.RowsAffected()
-	if err != nil {
-		logrus.Errorf("error while checking rows affected for %d, error: %v", id, err)
-		return err
-	}
-	if row != 1 {
-		logrus.Errorf("more or less than 1 row is affected for %d, error: %v", id, err)
-		return errors.New("more or less than 1 row is affected")
-	}
-
-	return nil
-}
-
-func (uh *uDBHandler) DeactivateMyAccount(id int64) error {
-	stmt, err := uh.db.Prepare(`UPDATE the_monkeys_user SET deactivated=true WHERE id=$1`)
-	if err != nil {
-		uh.log.Errorf("cannot prepare deactivate profile statement, error: %v", err)
-		return err
-	}
-	defer stmt.Close()
-
-	res, err := stmt.Exec(id)
-	if err != nil {
-		uh.log.Errorf("cannot execute deactivate profile statement, error: %v", err)
-		return err
-	}
-
-	row, err := res.RowsAffected()
-	if err != nil {
-		logrus.Errorf("error while checking rows affected for %d, error: %v", id, err)
-		return err
-	}
-	if row != 1 {
-		logrus.Errorf("more or less than 1 row is affected for %d, error: %v", id, err)
-		return errors.New("more or less than 1 row is affected")
-	}
-
 	return nil
 }
 
@@ -404,4 +321,57 @@ func (uh *uDBHandler) GetAllCategories() (*pb.GetAllCategoriesRes, error) {
 	// Assign the map to resp.Categories
 	resp.Category = categories
 	return resp, nil
+}
+
+func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	var userId int64
+	//From account_id find user_id
+	if err := tx.QueryRow(`
+			SELECT id FROM user_account WHERE account_id = $1;`, msg.UserAccountId).Scan(&userId); err != nil {
+		logrus.Errorf("can't get id by using user_account %s, error: %+v", msg.UserAccountId, err)
+		return nil
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO blog (user_id, blog_id, status) VALUES ($1, $2, $3) RETURNING id;`)
+	if err != nil {
+		uh.log.Errorf("cannot prepare statement to add blog into the blog: %v", err)
+		return err
+	}
+	defer stmt.Close()
+
+	var blogId int64
+	err = stmt.QueryRow(userId, msg.BlogId, msg.Status).Scan(&blogId)
+	if err != nil {
+		logrus.Errorf("cannot execute query to add blog into the blog: %v", err)
+		return err
+	}
+
+	stmt2, err := tx.Prepare(`INSERT INTO blog_permissions (blog_id, user_id, permission_type) VALUES ($1, $2, $3);`)
+	if err != nil {
+		uh.log.Errorf("cannot prepare statement to add permission into the blog_permissions: %v", err)
+		return err
+	}
+
+	row := stmt2.QueryRow(blogId, userId, constants.RoleOwner)
+	if row.Err() != nil {
+		logrus.Errorf("cannot execute query to add permission into the blog_permissions: %v", row.Err())
+		return row.Err()
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("cannot commit the add blog for user %s, error: %v", msg.UserAccountId, err)
+		return err
+	}
+
+	return nil
+}
+
+func (uh *uDBHandler) AddBlogPermission(models.TheMonkeysMessage) error {
+	return nil
 }

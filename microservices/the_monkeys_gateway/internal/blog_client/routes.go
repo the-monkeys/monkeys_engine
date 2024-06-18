@@ -66,15 +66,15 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			logrus.Errorf("error reading the message: %v", err)
-			continue
+			return
 		}
 
 		// Unmarshal the received message into the Blog struct
 		var draftBlog *pb.DraftBlogRequest
 		err = json.Unmarshal(msg, &draftBlog)
 		if err != nil {
-			logrus.Errorf("Error unmarshalling message: %v", err)
-			continue
+			logrus.Errorf("Error un marshalling message: %v", err)
+			return
 		}
 
 		draftBlog.BlogId = id
@@ -82,20 +82,20 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		resp, err := asc.Client.DraftBlog(context.Background(), draftBlog)
 		if err != nil {
 			logrus.Errorf("error while creating draft blog: %v", err)
-			continue
+			return
 		}
 
 		response, err := json.Marshal(resp)
 		if err != nil {
-			logrus.Println("Error unmarshalling response message:", err)
-			continue
+			logrus.Println("Error un marshalling response message:", err)
+			return
 		}
 
 		// Send a response message to the client (optional)
 		err = conn.WriteMessage(websocket.TextMessage, response)
 		if err != nil {
 			logrus.Errorf("error returning the response message: %v", err)
-			continue
+			return
 		}
 	}
 }

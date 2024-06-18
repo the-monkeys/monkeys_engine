@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS topics (
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
--- Creating user interestd in topics table
+-- Creating user interested in topics table
 CREATE TABLE IF NOT EXISTS user_interest (
     user_id BIGINT NOT NULL,
     topics_id INTEGER NOT NULL,
@@ -167,29 +167,30 @@ CREATE TABLE IF NOT EXISTS user_account_log (
 
 CREATE TABLE IF NOT EXISTS blog (
     id BIGSERIAL PRIMARY KEY,
-    owner_id BIGINT NOT NULL,
-    title VARCHAR(255) NOT NULL,
+    user_id BIGINT NOT NULL,
+    blog_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50), -- e.g., 'draft', 'published', 'archived'
-    FOREIGN KEY (owner_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
 );
 
 CREATE TABLE IF NOT EXISTS blog_permissions (
+    id BIGSERIAL,
     blog_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     permission_type VARCHAR(50) NOT NULL, -- 'owner', 'editor', 'viewer'
-    PRIMARY KEY (blog_id, user_id),
+    PRIMARY KEY (id),
     FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
 
 -- Inserting predefined roles
-INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer');
+INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer'), ('Support');
 
 -- Inserting predefined permissions
-INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive');
+INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive'), ('Transfer-Ownership'), ('Publish'), ('Draft')  ;
 
 -- Inserting predefined clients
 INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'), ('Opera'), ('Android'), ('iOS'), ('Brave'), ('Others');
@@ -203,12 +204,19 @@ INSERT INTO auth_provider (provider_name) VALUES ('The Monkeys'), ('Google Oauth
 -- Inserting predefined user statuses
 INSERT INTO user_status (status) VALUES ('Active'), ('Inactive'), ('Hidden');
 
--- Inserting data into permissions granted for all roles
+-- Inserting data into permissions granted for all roles with varying levels of permission
 INSERT INTO permissions_granted (role_id, permission_id)
 SELECT r.id, p.permission_id
 FROM user_role r
-JOIN permissions p ON r.role_desc IN ('Admin', 'Owner', 'Editor', 'Viewer')
-AND p.permission_desc IN ('Read', 'Write', 'Edit', 'Delete', 'Archive');
+JOIN permissions p ON 
+    CASE 
+        WHEN r.role_desc = 'Admin' THEN p.permission_desc IN ('Read', 'Edit', 'Delete', 'Archive', 'Transfer-Ownership', 'Publish', 'Draft')
+        WHEN r.role_desc = 'Owner' THEN p.permission_desc IN ('Read', 'Edit', 'Delete', 'Archive', 'Transfer-Ownership', 'Publish', 'Draft')
+        WHEN r.role_desc = 'Support' THEN p.permission_desc IN ('Read', 'Edit', 'Delete', 'Archive', 'Transfer-Ownership', 'Publish', 'Draft')
+        WHEN r.role_desc = 'Editor' THEN p.permission_desc IN ('Read', 'Edit', 'Publish', 'Draft')
+        WHEN r.role_desc = 'Viewer' THEN p.permission_desc IN ('Read')
+    END;
+
 
 -- Insert some default topics
 INSERT INTO topics (description, category) VALUES

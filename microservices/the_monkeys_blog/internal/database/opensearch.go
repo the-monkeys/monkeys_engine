@@ -22,7 +22,7 @@ type OpensearchStorage interface {
 	PublishBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
 	// GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error)
 	GetBlogDetailsById(ctx context.Context, blogId string) (string, []string, error)
-	ArchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
+	AchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.GetBlogByIdRes, error)
 	GetPublishedBlogByTagsName(ctx context.Context, id ...string) (*pb.GetBlogsByTagsNameRes, error)
 }
@@ -211,7 +211,7 @@ func (storage *opensearchStorage) GetPublishedBlogById(ctx context.Context, id s
 	return blogRes, nil
 }
 
-func (os *opensearchStorage) ArchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error) {
+func (os *opensearchStorage) AchieveBlogById(ctx context.Context, blogId string) (*opensearchapi.Response, error) {
 	os.log.Infof("archiving blog with id: %s", blogId)
 
 	// Define the update script
