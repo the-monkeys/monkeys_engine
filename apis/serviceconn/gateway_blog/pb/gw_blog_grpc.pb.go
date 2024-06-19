@@ -25,7 +25,7 @@ type BlogServiceClient interface {
 	DraftBlog(ctx context.Context, in *DraftBlogRequest, opts ...grpc.CallOption) (*BlogResponse, error)
 	PublishBlog(ctx context.Context, in *PublishBlogReq, opts ...grpc.CallOption) (*PublishBlogResp, error)
 	GetBlogById(ctx context.Context, in *GetBlogByIdReq, opts ...grpc.CallOption) (*GetBlogByIdRes, error)
-	ArchivehBlogById(ctx context.Context, in *ArchiveBlogReq, opts ...grpc.CallOption) (*ArchiveBlogResp, error)
+	ArchiveBlogById(ctx context.Context, in *ArchiveBlogReq, opts ...grpc.CallOption) (*ArchiveBlogResp, error)
 	GetBlogsByTagsName(ctx context.Context, in *GetBlogsByTagsNameReq, opts ...grpc.CallOption) (*GetBlogsByTagsNameRes, error)
 }
 
@@ -64,9 +64,9 @@ func (c *blogServiceClient) GetBlogById(ctx context.Context, in *GetBlogByIdReq,
 	return out, nil
 }
 
-func (c *blogServiceClient) ArchivehBlogById(ctx context.Context, in *ArchiveBlogReq, opts ...grpc.CallOption) (*ArchiveBlogResp, error) {
+func (c *blogServiceClient) ArchiveBlogById(ctx context.Context, in *ArchiveBlogReq, opts ...grpc.CallOption) (*ArchiveBlogResp, error) {
 	out := new(ArchiveBlogResp)
-	err := c.cc.Invoke(ctx, "/blog_svc.BlogService/ArchivehBlogById", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/blog_svc.BlogService/ArchiveBlogById", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ type BlogServiceServer interface {
 	DraftBlog(context.Context, *DraftBlogRequest) (*BlogResponse, error)
 	PublishBlog(context.Context, *PublishBlogReq) (*PublishBlogResp, error)
 	GetBlogById(context.Context, *GetBlogByIdReq) (*GetBlogByIdRes, error)
-	ArchivehBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error)
+	ArchiveBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error)
 	GetBlogsByTagsName(context.Context, *GetBlogsByTagsNameReq) (*GetBlogsByTagsNameRes, error)
 	mustEmbedUnimplementedBlogServiceServer()
 }
@@ -107,8 +107,8 @@ func (UnimplementedBlogServiceServer) PublishBlog(context.Context, *PublishBlogR
 func (UnimplementedBlogServiceServer) GetBlogById(context.Context, *GetBlogByIdReq) (*GetBlogByIdRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlogById not implemented")
 }
-func (UnimplementedBlogServiceServer) ArchivehBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ArchivehBlogById not implemented")
+func (UnimplementedBlogServiceServer) ArchiveBlogById(context.Context, *ArchiveBlogReq) (*ArchiveBlogResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveBlogById not implemented")
 }
 func (UnimplementedBlogServiceServer) GetBlogsByTagsName(context.Context, *GetBlogsByTagsNameReq) (*GetBlogsByTagsNameRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlogsByTagsName not implemented")
@@ -180,20 +180,20 @@ func _BlogService_GetBlogById_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BlogService_ArchivehBlogById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BlogService_ArchiveBlogById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ArchiveBlogReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BlogServiceServer).ArchivehBlogById(ctx, in)
+		return srv.(BlogServiceServer).ArchiveBlogById(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/blog_svc.BlogService/ArchivehBlogById",
+		FullMethod: "/blog_svc.BlogService/ArchiveBlogById",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServiceServer).ArchivehBlogById(ctx, req.(*ArchiveBlogReq))
+		return srv.(BlogServiceServer).ArchiveBlogById(ctx, req.(*ArchiveBlogReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -236,8 +236,8 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BlogService_GetBlogById_Handler,
 		},
 		{
-			MethodName: "ArchivehBlogById",
-			Handler:    _BlogService_ArchivehBlogById_Handler,
+			MethodName: "ArchiveBlogById",
+			Handler:    _BlogService_ArchiveBlogById_Handler,
 		},
 		{
 			MethodName: "GetBlogsByTagsName",

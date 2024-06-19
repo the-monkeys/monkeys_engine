@@ -40,7 +40,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	}
 	routes := router.Group("/api/v1/blog")
 	// routes.GET("/", blogCli.Get100Blogs)
-	routes.GET("/:id", blogClient.GetBlogeById)
+	routes.GET("/:id", blogClient.GetBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
 
 	routes.Use(mware.AuthRequired)
@@ -117,7 +117,7 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 
 func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 	id := ctx.Param("id")
-	resp, err := asc.Client.ArchivehBlogById(context.Background(), &pb.ArchiveBlogReq{
+	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
 		BlogId: id,
 	})
 
@@ -208,7 +208,7 @@ func (asc *BlogServiceClient) GetBlogsByTagsName(ctx *gin.Context) {
 // 	ctx.JSON(http.StatusCreated, response)
 // }
 
-func (svc *BlogServiceClient) GetBlogeById(ctx *gin.Context) {
+func (svc *BlogServiceClient) GetBlogById(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	res, err := svc.Client.GetBlogById(context.Background(), &pb.GetBlogByIdReq{BlogId: id})

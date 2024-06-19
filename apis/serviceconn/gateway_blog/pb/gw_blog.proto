@@ -92,9 +92,9 @@ message GetBlogsByTagsNameRes {
 }
 
 service BlogService {
-    rpc DraftBlog (DraftBlogRequest) returns (BlogResponse);
-    rpc PublishBlog (PublishBlogReq) returns (PublishBlogResp);
-    rpc GetBlogById (GetBlogByIdReq) returns (GetBlogByIdRes);
-    rpc ArchivehBlogById (ArchiveBlogReq) returns (ArchiveBlogResp);
-    rpc GetBlogsByTagsName (GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
+    rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
+    rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp);
+    rpc GetBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
+    rpc ArchiveBlogById(ArchiveBlogReq) returns (ArchiveBlogResp);
+    rpc GetBlogsByTagsName(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
 }

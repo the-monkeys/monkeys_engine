@@ -112,7 +112,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	}
 
 	// Send email verification mail as a routine else the register api gets slower
-	emailBody := utils.EmailVerificationHTML(user.Username, hash)
+	emailBody := utils.EmailVerificationHTML(user.FirstName, user.LastName, user.Username, hash)
 	go func() {
 		err := as.SendMail(user.Email, emailBody)
 		if err != nil {
@@ -470,7 +470,7 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 		return nil, err
 	}
 
-	emailBody := utils.EmailVerificationHTML(user.Username, hash)
+	emailBody := utils.EmailVerificationHTML(user.FirstName, user.LastName, user.Username, hash)
 	logrus.Infof("Sending verification email to: %s", req.GetEmail())
 
 	// TODO: Handle error of the go routine

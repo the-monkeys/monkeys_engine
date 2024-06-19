@@ -513,116 +513,219 @@ func ResetPasswordTemplate(firstName, LastName, secret string, username string) 
 
 }
 
-func EmailVerificationHTML(username, secret string) string {
+func EmailVerificationHTML(firstName, lastName, username, secret string) string {
 	return `<!DOCTYPE html>
-	<html>
-	<head>
-	
-	  <meta charset="utf-8">
-	  <meta http-equiv="x-ua-compatible" content="ie=edge">
-	  <title>The Monkeys</title>
-	  <meta name="viewport" content="width=device-width, initial-scale=1">
-	  <style type="text/css">
-	  
-	  </style>
-	
-	</head>
-	<body style="background-color: #e9ecef;">
-	
-		<div style="display: none; font-size: 1px; color: #fefefe; line-height: 1px; font-family: 'Lato', Helvetica, Arial, sans-serif; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;"> We're thrilled to have you here! Get ready to dive into your new account. </div>
-		<table border="0" cellpadding="0" cellspacing="0" width="100%">
-			<!-- LOGO -->
-			<tr>
-				<td bgcolor="#FFA73B" align="center">
-					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
-						<tr>
-							<td align="center" valign="top" style="padding: 40px 10px 40px 10px;"> </td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td bgcolor="#FFA73B" align="center" style="padding: 0px 10px 0px 10px;">
-					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
-						<tr>
-							<td bgcolor="#ffffff" align="center" valign="top" style="padding: 40px 20px 20px 20px; border-radius: 4px 4px 0px 0px; color: #111111; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 48px; font-weight: 400; letter-spacing: 4px; line-height: 48px;">
-								<h1 style="font-size: 48px; font-weight: 400; margin: 2;">The Monkeys</h1> <img src=" https://img.icons8.com/clouds/100/000000/handshake.png" width="125" height="120" style="display: block; border: 0px;" />
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td bgcolor="#f4f4f4" align="center" style="padding: 0px 10px 0px 10px;">
-					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
-						<tr>
-							<td bgcolor="#ffffff" align="left" style="padding: 20px 30px 40px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;">We're excited to have you get started. First, you need to confirm your account. Just press the button below.</p>
-							</td>
-						</tr>
-						<tr>
-							<td bgcolor="#ffffff" align="left">
-								<table width="100%" border="0" cellspacing="0" cellpadding="0">
-									<tr>
-										<td bgcolor="#ffffff" align="center" style="padding: 20px 30px 60px 30px;">
-											<table border="0" cellspacing="0" cellpadding="0">
-												<tr>
-													<td align="center" style="border-radius: 3px;" bgcolor="#FFA73B"><a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="font-size: 20px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; color: #ffffff; text-decoration: none; padding: 15px 25px; border-radius: 2px; border: 1px solid #FFA73B; display: inline-block;">Confirm Account</a></td>
-												</tr>
-											</table>
-										</td>
-									</tr>
-								</table>
-							</td>
-						</tr> <!-- COPY -->
-						<tr>
-							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 0px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;">If that doesn't work, copy and paste the following link in your browser:</p>
-							</td>
-						</tr> <!-- COPY -->
-						<tr>
-							<td bgcolor="#ffffff" align="left" style="padding: 20px 30px 20px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;"><a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="color: #FFA73B;">` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `</a></p>
-							</td>
-						</tr>
-						<tr>
-							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 20px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;">If you have any questions, just reply to this email—we're always happy to help out.</p>
-							</td>
-						</tr>
-						<tr>
-							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 40px 30px; border-radius: 0px 0px 4px 4px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<p style="margin: 0;">Cheers,<br>The Monkeys Team</p>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td bgcolor="#f4f4f4" align="center" style="padding: 30px 10px 0px 10px;">
-					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
-						<tr>
-							<td bgcolor="#FFECD1" align="center" style="padding: 30px 30px 30px 30px; border-radius: 4px 4px 4px 4px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
-								<h2 style="font-size: 20px; font-weight: 400; color: #111111; margin: 0;">Need more help?</h2>
-								<p style="margin: 0;"><a href="themonkeys.life" target="_blank" style="color: #FFA73B;">We&rsquo;re here to help you out</a></p>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-			<tr>
-				<td bgcolor="#f4f4f4" align="center" style="padding: 0px 10px 0px 10px;">
-					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
-						<tr>
-							<td bgcolor="#f4f4f4" align="left" style="padding: 0px 30px 30px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;"> <br>
-								<p style="margin: 0;">If these emails get annoying, please feel free to <a href="#" target="_blank" style="color: #111111; font-weight: 700;">unsubscribe</a>.</p>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
-	
-	</body>
-	</html>`
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <title>Welcome to Monkeys</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f3f3;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .logo {
+      color: #ff5252;
+      display: inline-block;
+    }
+
+    p {
+      color: #000000;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      background-color: #ff5252;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      text-transform: uppercase;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin-top: 40px;
+    }
+
+    a {
+      /* Add your styles here */
+      text-decoration: none;
+      color: #ff5252;
+      display: inline-block;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Welcome to <div class="logo">Monkeys</div>
+    </h1>
+
+    <p>Hello ` + firstName + ` ` + lastName + `,</p>
+
+    <p>Thanks for joining The Monkeys! We're excited to have you on board.</p>
+
+    <p>To complete your registration and start exploring everything The Monkeys has to offer, please verify your email address. This helps ensure your account security and keeps you informed about important updates.</p>
+
+    <p>It's easy! Just click the button below to confirm your email:</p>
+
+	<a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank"><button class="btn">Verify Email Address</button></a>
+    
+	<p><b>Alternatively</b>, you can copy and paste this link into your web browser:</p>
+    <a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank">` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `</a>
+
+    <p>This link will expire in 24 hours for your security. If you don't verify your email within that time frame, you can request a new link anytime.</p>
+    <p>Once you verify your email, you'll be ready to dive in and start using The Monkeys!</p>
+    <p>If you have any trouble verifying your email, please feel free to contact The Monkeys support team at [support email address]. We're happy to help!</p>
+    <p>Welcome to the community,</p>
+
+    <p>Thanks,</p>
+    <p>The Monkeys Team</p>
+
+    <div class="footer">
+      <a href="https://github.com/the-monkeys" target="_blank"><i style="font-size:24px" class="fa">&#xf09b;</i></a>
+      <a href="https://www.instagram.com/_the__monkeys_" target="_blank"><i style="font-size:24px" class="fa">&#xf16d;</i></a>
+      <a href="https://x.com/TheMonkeysLife" target="_blank"><i style="font-size:24px" class="fa">&#xf099;</i></a>
+    </div>
+
+  </div>
+</body>
+
+</html>`
 }
+
+// func EmailVerificationHTMLa(username, secret string) string {
+// 	return `<!DOCTYPE html>
+// 	<html>
+// 	<head>
+
+// 	  <meta charset="utf-8">
+// 	  <meta http-equiv="x-ua-compatible" content="ie=edge">
+// 	  <title>The Monkeys</title>
+// 	  <meta name="viewport" content="width=device-width, initial-scale=1">
+// 	  <style type="text/css">
+
+// 	  </style>
+
+// 	</head>
+// 	<body style="background-color: #e9ecef;">
+
+// 		<div style="display: none; font-size: 1px; color: #fefefe; line-height: 1px; font-family: 'Lato', Helvetica, Arial, sans-serif; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;"> We're thrilled to have you here! Get ready to dive into your new account. </div>
+// 		<table border="0" cellpadding="0" cellspacing="0" width="100%">
+// 			<!-- LOGO -->
+// 			<tr>
+// 				<td bgcolor="#FFA73B" align="center">
+// 					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+// 						<tr>
+// 							<td align="center" valign="top" style="padding: 40px 10px 40px 10px;"> </td>
+// 						</tr>
+// 					</table>
+// 				</td>
+// 			</tr>
+// 			<tr>
+// 				<td bgcolor="#FFA73B" align="center" style="padding: 0px 10px 0px 10px;">
+// 					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="center" valign="top" style="padding: 40px 20px 20px 20px; border-radius: 4px 4px 0px 0px; color: #111111; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 48px; font-weight: 400; letter-spacing: 4px; line-height: 48px;">
+// 								<h1 style="font-size: 48px; font-weight: 400; margin: 2;">The Monkeys</h1> <img src=" https://img.icons8.com/clouds/100/000000/handshake.png" width="125" height="120" style="display: block; border: 0px;" />
+// 							</td>
+// 						</tr>
+// 					</table>
+// 				</td>
+// 			</tr>
+// 			<tr>
+// 				<td bgcolor="#f4f4f4" align="center" style="padding: 0px 10px 0px 10px;">
+// 					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left" style="padding: 20px 30px 40px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<p style="margin: 0;">We're excited to have you get started. First, you need to confirm your account. Just press the button below.</p>
+// 							</td>
+// 						</tr>
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left">
+// 								<table width="100%" border="0" cellspacing="0" cellpadding="0">
+// 									<tr>
+// 										<td bgcolor="#ffffff" align="center" style="padding: 20px 30px 60px 30px;">
+// 											<table border="0" cellspacing="0" cellpadding="0">
+// 												<tr>
+// 													<td align="center" style="border-radius: 3px;" bgcolor="#FFA73B"><a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="font-size: 20px; font-family: Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; color: #ffffff; text-decoration: none; padding: 15px 25px; border-radius: 2px; border: 1px solid #FFA73B; display: inline-block;">Confirm Account</a></td>
+// 												</tr>
+// 											</table>
+// 										</td>
+// 									</tr>
+// 								</table>
+// 							</td>
+// 						</tr> <!-- COPY -->
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 0px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<p style="margin: 0;">If that doesn't work, copy and paste the following link in your browser:</p>
+// 							</td>
+// 						</tr> <!-- COPY -->
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left" style="padding: 20px 30px 20px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<p style="margin: 0;"><a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank" style="color: #FFA73B;">` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `</a></p>
+// 							</td>
+// 						</tr>
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 20px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<p style="margin: 0;">If you have any questions, just reply to this email—we're always happy to help out.</p>
+// 							</td>
+// 						</tr>
+// 						<tr>
+// 							<td bgcolor="#ffffff" align="left" style="padding: 0px 30px 40px 30px; border-radius: 0px 0px 4px 4px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<p style="margin: 0;">Cheers,<br>The Monkeys Team</p>
+// 							</td>
+// 						</tr>
+// 					</table>
+// 				</td>
+// 			</tr>
+// 			<tr>
+// 				<td bgcolor="#f4f4f4" align="center" style="padding: 30px 10px 0px 10px;">
+// 					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+// 						<tr>
+// 							<td bgcolor="#FFECD1" align="center" style="padding: 30px 30px 30px 30px; border-radius: 4px 4px 4px 4px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;">
+// 								<h2 style="font-size: 20px; font-weight: 400; color: #111111; margin: 0;">Need more help?</h2>
+// 								<p style="margin: 0;"><a href="themonkeys.life" target="_blank" style="color: #FFA73B;">We&rsquo;re here to help you out</a></p>
+// 							</td>
+// 						</tr>
+// 					</table>
+// 				</td>
+// 			</tr>
+// 			<tr>
+// 				<td bgcolor="#f4f4f4" align="center" style="padding: 0px 10px 0px 10px;">
+// 					<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+// 						<tr>
+// 							<td bgcolor="#f4f4f4" align="left" style="padding: 0px 30px 30px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;"> <br>
+// 								<p style="margin: 0;">If these emails get annoying, please feel free to <a href="#" target="_blank" style="color: #111111; font-weight: 700;">unsubscribe</a>.</p>
+// 							</td>
+// 						</tr>
+// 					</table>
+// 				</td>
+// 			</tr>
+// 		</table>
+
+// 	</body>
+// 	</html>`
+// }
