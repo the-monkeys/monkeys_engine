@@ -35,7 +35,7 @@ email:
   smtp_host: ""
 
 authentication:
-  # provide the domain name or the gateway addr
+  # provide the domain name or UI: https://themonkeys.live
   email_verification_addr: http://127.0.0.1:8081
 
 google:
