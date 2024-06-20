@@ -46,7 +46,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/:id", usc.GetUserProfile)
 	routes.POST("/activities/:user_name", usc.GetUserActivities)
 	routes.PATCH("/:username", usc.UpdateUserProfile)
-	// routes.PUT("/:username", usc.UpdateUserProfile)
+	routes.PUT("/:username", usc.UpdateUserProfile)
 	routes.DELETE("/:username", usc.DeleteUserProfile)
 
 	return usc
@@ -150,9 +150,11 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	if ctx.Request.Method == "PATCH" {
+	if ctx.Request.Method == http.MethodPatch || ctx.Request.Method == http.MethodPut {
 		isPartial = true
 	}
+
+	// TODO: Remove the following line
 	logrus.Infof("req body: %+v", body)
 	res, err := asc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
 		Username:      username,

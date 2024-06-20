@@ -109,6 +109,7 @@ func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityRe
 }
 func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProfileReq) (*pb.UpdateUserProfileRes, error) {
 	us.log.Infof("user %s is updating the profile.", req.Username)
+	us.log.Infof("req: %+v", req)
 
 	// Check if the user exists
 	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
