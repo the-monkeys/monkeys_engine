@@ -153,7 +153,7 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	if ctx.Request.Method == "PATCH" {
 		isPartial = true
 	}
-
+	logrus.Infof("req body: %+v", body)
 	res, err := asc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
 		Username:      username,
 		FirstName:     body.FirstName,

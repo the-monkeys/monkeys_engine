@@ -50,8 +50,10 @@ func main() {
 		ContentSecurityPolicy: "default-src 'self'",
 	}))
 
+	// Log req body
+	server.router.Use(middleware.LogRequestBody())
 	// enable CORS
-	server.router.Use(middleware.CORSMiddleware())
+	server.router.Use(middleware.NewCorsMiddleware())
 
 	// Register REST routes for all the microservice
 	authClient := auth.RegisterAuthRouter(server.router, cfg)
