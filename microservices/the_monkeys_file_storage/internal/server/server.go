@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -206,8 +207,25 @@ func (fs *FileService) DeleteProfilePic(ctx context.Context, req *pb.DeleteProfi
 	logrus.Infof("there is a request to delete the profile pic for user, %s", req.UserId)
 
 	if err := os.Remove(filePath); err != nil {
-		return nil, err
+		logrus.Errorf("Error while removing profile image for user: %s, error: %v", req.UserId, err)
+		return nil, status.Errorf(codes.Internal, "Something went wrong while removing file")
 	}
+
+	// Add the default profile pic there
+	imageByte, err := utils.ReadImageFromURL(constant.DefaultProfilePhoto)
+	if err != nil {
+		logrus.Errorf("Error fetching default profile image for user: %s, error: %v", req.UserId, err)
+		return nil, status.Errorf(codes.Internal, "error fetching image")
+	}
+
+	// Write image data to file
+	err = os.WriteFile(filePath, imageByte, 0644)
+	if err != nil {
+		logrus.Errorf("Cannot write default profile image file for user: %s, error: %v", req.UserId, err)
+		return nil, status.Errorf(codes.Internal, "error writing default profile image")
+	}
+
+	logrus.Infof("Done resetting default profile pic: %s", filePath)
 
 	return &pb.DeleteProfilePicRes{
 		Message: "successfully deleted",
