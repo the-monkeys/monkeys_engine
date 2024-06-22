@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -53,14 +52,7 @@ func main() {
 	}))
 
 	// Enable CORS
-	server.router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"}, // Allow all origins
-		AllowMethods:     []string{"PUT", "PATCH", "GET", "POST", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "IP", "Client", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "accept", "Cache-Control", "X-Requested-With"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	server.router.Use(middleware.CORSMiddleware())
 
 	// Log request body
 	server.router.Use(middleware.LogRequestBody())

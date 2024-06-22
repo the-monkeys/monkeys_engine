@@ -2,8 +2,6 @@ package user_service
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -139,8 +137,6 @@ func (asc *UserServiceClient) GetUserActivities(ctx *gin.Context) {
 }
 
 func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
-	var isPartial bool
-
 	username := ctx.Param("id")
 	if username != ctx.GetString("userName") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are unauthorized to perform this action"})
@@ -150,24 +146,16 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	ipAddress := ctx.Request.Header.Get("ip")
 	client := ctx.Request.Header.Get("client")
 
-	reqBody, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unable to read body"})
-		return
-	}
-	logrus.Infof("Received body: %s", string(reqBody))
+	var body UpdateUserProfile
 
-	body := UpdateUserProfile{}
-	if err := json.Unmarshal(reqBody, &body); err != nil {
+	if err := ctx.ShouldBindJSON(&body); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	logrus.Infof("body: %+v\n", body)
-
-	if ctx.Request.Method == http.MethodPatch || ctx.Request.Method == http.MethodPut {
-		isPartial = true
-	}
+	// if ctx.Request.Method == http.MethodPatch || ctx.Request.Method == http.MethodPut {
+	// 	isPartial = true
+	// }
 
 	logrus.Infof("req body: %+v", body)
 	res, err := usc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
@@ -184,7 +172,7 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		Github:        body.Github,
 		Ip:            ipAddress,
 		Client:        client,
-		Partial:       isPartial,
+		Partial:       false,
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {

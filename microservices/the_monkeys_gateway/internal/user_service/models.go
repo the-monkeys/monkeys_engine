@@ -21,15 +21,12 @@ type GetProfile struct {
 }
 
 type UpdateUserProfile struct {
-	UserName      string `json:"username"`
 	FirstName     string `json:"first_name"`
 	LastName      string `json:"last_name"`
 	DateOfBirth   string `json:"date_of_birth"`
 	Bio           string `json:"bio"`
 	Address       string `json:"address"`
 	ContactNumber string `json:"contact_number"`
-	Email         string `json:"email"`
-	Partial       bool   `json:"partial"`
 	Twitter       string `json:"twitter"`
 	Instagram     string `json:"instagram"`
 	LinkedIn      string `json:"linkedin"`
