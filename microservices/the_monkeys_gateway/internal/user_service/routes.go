@@ -2,6 +2,8 @@ package user_service
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -43,11 +45,18 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	routes.Use(mware.AuthRequired)
 
-	routes.GET("/:id", usc.GetUserProfile)
+	{
+		routes.PUT("/:id", usc.UpdateUserProfile)
+		routes.PATCH("/:id", usc.UpdateUserProfile)
+		routes.GET("/:id", usc.GetUserProfile)
+		routes.DELETE("/:id", usc.DeleteUserProfile)
+	}
+
+	// routes.GET("/:id", usc.GetUserProfile)
 	routes.POST("/activities/:user_name", usc.GetUserActivities)
-	routes.PATCH("/:username", usc.UpdateUserProfile)
-	routes.PUT("/:username", usc.UpdateUserProfile)
-	routes.DELETE("/:username", usc.DeleteUserProfile)
+	// routes.PATCH("/:username", usc.UpdateUserProfile)
+	// routes.PUT("/:username", usc.UpdateUserProfile)
+	// routes.DELETE("/:username", usc.DeleteUserProfile)
 
 	return usc
 }
@@ -135,7 +144,7 @@ func (asc *UserServiceClient) GetUserActivities(ctx *gin.Context) {
 func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	var isPartial bool
 
-	username := ctx.Param("username")
+	username := ctx.Param("id")
 	if username != ctx.GetString("userName") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are unauthorized to perform this action"})
 		return
@@ -144,8 +153,15 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	ipAddress := ctx.Request.Header.Get("ip")
 	client := ctx.Request.Header.Get("client")
 
+	reqBody, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unable to read body"})
+		return
+	}
+	logrus.Infof("Received body: %s", string(reqBody))
+
 	body := UpdateUserProfile{}
-	if err := ctx.BindJSON(&body); err != nil {
+	if err := json.Unmarshal(reqBody, &body); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}

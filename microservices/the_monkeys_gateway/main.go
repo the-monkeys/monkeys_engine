@@ -43,6 +43,7 @@ func main() {
 	server.router.Use(gin.Logger())
 	server.router.MaxMultipartMemory = 8 << 20
 
+	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{
 		FrameDeny:             true,
 		ContentTypeNosniff:    true,
@@ -50,12 +51,13 @@ func main() {
 		ContentSecurityPolicy: "default-src 'self'",
 	}))
 
-	// Log req body
-	server.router.Use(middleware.LogRequestBody())
-	// enable CORS
+	// Enable CORS
 	server.router.Use(middleware.NewCorsMiddleware())
 
-	// Register REST routes for all the microservice
+	// Log request body
+	server.router.Use(middleware.LogRequestBody())
+
+	// Register REST routes for all the microservices
 	authClient := auth.RegisterAuthRouter(server.router, cfg)
 	authClient.Log.SetReportCaller(true)
 	authClient.Log.SetFormatter(&logrus.TextFormatter{
@@ -64,8 +66,6 @@ func main() {
 	})
 
 	user_service.RegisterUserRouter(server.router, cfg, authClient)
-	// article.RegisterArticleRoutes(server.router, cfg, authClient)
-
 	blog_client.RegisterBlogRouter(server.router, cfg, authClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 
