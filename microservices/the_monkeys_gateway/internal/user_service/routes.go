@@ -52,14 +52,11 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.DELETE("/:id", usc.DeleteUserProfile)
 	}
 
-	// routes.GET("/:id", usc.GetUserProfile)
 	routes.POST("/activities/:user_name", usc.GetUserActivities)
-	// routes.PATCH("/:username", usc.UpdateUserProfile)
-	// routes.PUT("/:username", usc.UpdateUserProfile)
-	// routes.DELETE("/:username", usc.DeleteUserProfile)
 
 	return usc
 }
+
 func (asc *UserServiceClient) GetUserProfile(ctx *gin.Context) {
 	username := ctx.Param("id")
 	var isPrivate bool
@@ -141,7 +138,7 @@ func (asc *UserServiceClient) GetUserActivities(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
+func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	var isPartial bool
 
 	username := ctx.Param("id")
@@ -166,13 +163,14 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		return
 	}
 
+	logrus.Infof("body: %+v\n", body)
+
 	if ctx.Request.Method == http.MethodPatch || ctx.Request.Method == http.MethodPut {
 		isPartial = true
 	}
 
-	// TODO: Remove the following line
 	logrus.Infof("req body: %+v", body)
-	res, err := asc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
+	res, err := usc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
 		Username:      username,
 		FirstName:     body.FirstName,
 		LastName:      body.LastName,
@@ -198,8 +196,8 @@ func (asc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, res)
-
 }
+
 func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context) {
 	username := ctx.Param("username")
 	tokenUsername := ctx.GetString("userName")

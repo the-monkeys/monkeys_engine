@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -52,7 +53,14 @@ func main() {
 	}))
 
 	// Enable CORS
-	server.router.Use(middleware.NewCorsMiddleware())
+	server.router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // Allow all origins
+		AllowMethods:     []string{"PUT", "PATCH", "GET", "POST", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "IP", "Client", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "accept", "Cache-Control", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Log request body
 	server.router.Use(middleware.LogRequestBody())
@@ -70,7 +78,6 @@ func main() {
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 
 	server.start(context.Background(), cfg)
-
 }
 
 func (s *Server) start(ctx context.Context, config *config.Config) {
