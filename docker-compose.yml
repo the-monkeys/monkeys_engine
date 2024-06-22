@@ -56,7 +56,7 @@ services:
       - cluster.initial_cluster_manager_nodes=opensearch-node1
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=a!Too5hortPassword
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=a!Too5hortPassword@1
     ulimits:
       memlock:
         soft: -1

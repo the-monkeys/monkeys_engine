@@ -146,16 +146,18 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	ipAddress := ctx.Request.Header.Get("ip")
 	client := ctx.Request.Header.Get("client")
 
-	var body UpdateUserProfile
+	var req UpdateUserProfileRequest
 
-	if err := ctx.ShouldBindJSON(&body); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
-	// if ctx.Request.Method == http.MethodPatch || ctx.Request.Method == http.MethodPut {
-	// 	isPartial = true
-	// }
+	body := req.Values
+	var isPartial bool
+	if ctx.Request.Method == http.MethodPatch {
+		isPartial = true
+	}
 
 	logrus.Infof("req body: %+v", body)
 	res, err := usc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
@@ -172,7 +174,7 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		Github:        body.Github,
 		Ip:            ipAddress,
 		Client:        client,
-		Partial:       false,
+		Partial:       isPartial,
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {

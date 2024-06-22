@@ -27,7 +27,7 @@ opensearch:
   address: http://localhost:9200
   os_host: http://opensearch-node1:9200
   os_username: admin
-  os_password: a!Too5hortPassword
+  os_password: a!Too5hortPassword@1
 email:
   smtp_address: ""
   smtp_mail: ""
@@ -36,7 +36,7 @@ email:
 
 authentication:
   # provide the domain name or UI: https://themonkeys.live
-  email_verification_addr: http://127.0.0.1:8081
+  email_verification_addr: https://themonkeys.live
 
 google:
   API_KEY: ""
