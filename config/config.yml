@@ -36,7 +36,7 @@ email:
 
 authentication:
   # provide the domain name or UI: https://themonkeys.live
-  email_verification_addr: https://themonkeys.live
+  email_verification_addr: http://127.0.0.1:8081
 
 google:
   API_KEY: ""

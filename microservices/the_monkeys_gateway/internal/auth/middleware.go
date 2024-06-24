@@ -36,7 +36,7 @@ func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
 		Token: token[1],
 	})
 
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}

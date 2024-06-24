@@ -143,8 +143,8 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	var req UpdateUserProfileRequest
 
@@ -159,7 +159,6 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		isPartial = true
 	}
 
-	logrus.Infof("req body: %+v", body)
 	res, err := usc.Client.UpdateUserProfile(context.Background(), &pb.UpdateUserProfileReq{
 		Username:      username,
 		FirstName:     body.FirstName,

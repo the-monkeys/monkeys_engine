@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/the-monkeys/the_monkeys/config"
-	"github.com/the-monkeys/the_monkeys/constants"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"google.golang.org/grpc"
@@ -92,8 +91,8 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
 		FirstName:   body.FirstName,
@@ -106,16 +105,27 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		asc.Log.Errorf("rpc auth server returned error, error: %v", err)
-		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide first name, last name, email and password"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"message": "user with this email already exists"})
+				return
+			case codes.Aborted:
+				ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{"message": "Registration done but token is not created, try logging in"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot register the user, something went wrong"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
 	}
-
-	if res.StatusCode == http.StatusConflict {
-		ctx.JSON(http.StatusConflict, res)
-		return
-	}
-
 	ctx.JSON(int(res.StatusCode), &res)
 }
 
@@ -132,8 +142,8 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	body.Email = strings.TrimSpace(body.Email)
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.Login(context.Background(), &pb.LoginUserRequest{
 		Email:     body.Email,
@@ -143,23 +153,24 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		asc.Log.Errorf("internal server error, user containing email: %s cannot login", body.Email)
-		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
+		// Check for gRPC error code
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "email/password is incorrect"})
+				return
+			case codes.Unauthenticated:
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "email/password is incorrect"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot generate the token"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
 	}
-
-	if res.StatusCode == http.StatusNotFound {
-		asc.Log.Errorf("user containing email: %s, doesn't exists", body.Email)
-		ctx.AbortWithStatusJSON(http.StatusNotFound, res)
-		return
-	}
-
-	if res.StatusCode == http.StatusBadRequest {
-		asc.Log.Errorf("incorrect password given for the user containing email: %s", body.Email)
-		_ = ctx.AbortWithError(http.StatusNotFound, constants.ErrBadRequest)
-		return
-	}
-
 	ctx.JSON(http.StatusOK, &res)
 }
 
@@ -172,8 +183,8 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.ForgotPassword(context.Background(), &pb.ForgotPasswordReq{
 		Email:     body.Email,
@@ -203,8 +214,8 @@ func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 	userAny := ctx.Query("user")
 	secretAny := ctx.Query("evpw")
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.ResetPassword(context.Background(), &pb.ResetPasswordReq{
 		Username:  userAny,
@@ -263,8 +274,8 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	resp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
 		Password:  pass.NewPassword,
@@ -274,7 +285,6 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		Client:    client,
 	})
 	if err != nil {
-		// Check for gRPC error code
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -302,8 +312,8 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.RequestForEmailVerification(context.Background(), &pb.EmailVerificationReq{
 		Email:     vrEmail.Email,
@@ -312,24 +322,25 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		asc.Log.Errorf("rpc auth server returned error: %v", err)
-		_ = ctx.AbortWithError(http.StatusForbidden, err)
-		return
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "user not found"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "error occurred while updating email verification token"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "internal server error"})
+				return
+			}
+		}
 	}
 
-	if res.StatusCode == http.StatusNotFound || res.Error != nil {
-		asc.Log.Infof("user containing email: %s, doesn't exists", vrEmail.Email)
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "email not found"})
-		return
-	}
-
-	if res.StatusCode == http.StatusBadRequest || res.Error != nil {
-		asc.Log.Infof("incorrect password given for the user containing email: %s", vrEmail.Email)
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "email not found"})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, gin.H{"message": "An email verification link has been sent to your registered email"})
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "An email verification link has been sent to your registered email",
+		"status":  res.StatusCode,
+	})
 }
 
 // To verify email
@@ -337,8 +348,8 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	username := ctx.Query("user")
 	evSecret := ctx.Query("evpw")
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
@@ -370,7 +381,7 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 }
 
 func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
-	authorization := ctx.Request.Header.Get("authorization")
+	authorization := ctx.Request.Header.Get("Authorization")
 
 	if authorization == "" {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
@@ -383,7 +394,7 @@ func (asc *ServiceClient) IsUserAuthenticated(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
-	user := ctx.Request.Header.Get("user")
+	user := ctx.Request.Header.Get("Username")
 	if user == "" {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
@@ -418,8 +429,8 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	var updateUsername UpdateUsername
 
@@ -455,8 +466,8 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("ip")
-	client := ctx.Request.Header.Get("client")
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
 
 	var updatePass UpdatePassword
 

@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
+	"github.com/the-monkeys/the_monkeys/constants"
 )
 
 func PublicIP() string {
@@ -43,4 +45,27 @@ func RandomString(n int) string {
 	}
 
 	return string(s)
+}
+
+func ValidateRegisterUserRequest(req *pb.RegisterUserRequest) error {
+	if req.Email == "" || req.FirstName == "" || req.LastName == "" || req.Password == "" {
+		return fmt.Errorf("incomplete information: email, first name, last name and password are required")
+	}
+	return nil
+}
+
+func IpClientConvert(ip, client string) (string, string) {
+	if ip == "" {
+		ip = "127.0.0.1"
+	}
+
+	for _, cli := range constants.Clients {
+		if client == cli {
+			return ip, client
+		}
+	}
+
+	client = "Others"
+
+	return ip, client
 }
