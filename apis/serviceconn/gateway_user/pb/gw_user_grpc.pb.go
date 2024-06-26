@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
-	GetUserActivities(ctx context.Context, in *UserActivityReq, opts ...grpc.CallOption) (*UserActivityRes, error)
+	GetUserActivities(ctx context.Context, in *UserActivityReq, opts ...grpc.CallOption) (*UserActivityResp, error)
 	GetUserProfile(ctx context.Context, in *UserProfileReq, opts ...grpc.CallOption) (*UserProfileRes, error)
 	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileReq, opts ...grpc.CallOption) (*UpdateUserProfileRes, error)
 	DeleteUserProfile(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error)
@@ -38,8 +38,8 @@ func NewUserServiceClient(cc grpc.ClientConnInterface) UserServiceClient {
 	return &userServiceClient{cc}
 }
 
-func (c *userServiceClient) GetUserActivities(ctx context.Context, in *UserActivityReq, opts ...grpc.CallOption) (*UserActivityRes, error) {
-	out := new(UserActivityRes)
+func (c *userServiceClient) GetUserActivities(ctx context.Context, in *UserActivityReq, opts ...grpc.CallOption) (*UserActivityResp, error) {
+	out := new(UserActivityResp)
 	err := c.cc.Invoke(ctx, "/auth_svc.UserService/GetUserActivities", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (c *userServiceClient) GetAllCategories(ctx context.Context, in *GetAllCate
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility
 type UserServiceServer interface {
-	GetUserActivities(context.Context, *UserActivityReq) (*UserActivityRes, error)
+	GetUserActivities(context.Context, *UserActivityReq) (*UserActivityResp, error)
 	GetUserProfile(context.Context, *UserProfileReq) (*UserProfileRes, error)
 	UpdateUserProfile(context.Context, *UpdateUserProfileReq) (*UpdateUserProfileRes, error)
 	DeleteUserProfile(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error)
@@ -109,7 +109,7 @@ type UserServiceServer interface {
 type UnimplementedUserServiceServer struct {
 }
 
-func (UnimplementedUserServiceServer) GetUserActivities(context.Context, *UserActivityReq) (*UserActivityRes, error) {
+func (UnimplementedUserServiceServer) GetUserActivities(context.Context, *UserActivityReq) (*UserActivityResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserActivities not implemented")
 }
 func (UnimplementedUserServiceServer) GetUserProfile(context.Context, *UserProfileReq) (*UserProfileRes, error) {

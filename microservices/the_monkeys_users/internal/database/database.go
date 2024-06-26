@@ -30,6 +30,7 @@ type UserDb interface {
 	GetUserProfile(username string) (*models.UserAccount, error)
 	GetAllTopicsFromDb() (*pb.GetTopicsResponse, error)
 	GetAllCategories() (*pb.GetAllCategoriesRes, error)
+	GetUserActivities(userId int64) (*pb.UserActivityResp, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
@@ -370,6 +371,43 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 	}
 
 	return nil
+}
+
+func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, error) {
+	uh.log.Infof("Retrieving user activity for: %v", userId)
+	activities := []*pb.UserActiviy{}
+	rows, err := uh.db.Query("SELECT description, timestamp FROM user_account_log WHERE user_id = $1 ORDER BY timestamp DESC;", userId)
+	if err != nil {
+		uh.log.Errorf("error retrieving user activities for user id %v, err: %v", userId, err)
+		return nil, status.Errorf(codes.Internal, "cannot get the user activity")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var desc, timestamp string
+		err := rows.Scan(&desc, &timestamp)
+		if err != nil {
+			uh.log.Errorf("cannot scan the user activity, err: %v", err)
+			return nil, status.Errorf(codes.Internal, "cannot scan the user activity")
+		}
+		activities = append(activities, &pb.UserActiviy{
+			Description: desc,
+			Timestamp:   timestamp,
+		})
+	}
+
+	if err = rows.Err(); err != nil {
+		uh.log.Errorf("error iterating over rows, err: %v", err)
+		return nil, status.Errorf(codes.Internal, "error iterating over rows")
+	}
+
+	if len(activities) == 0 {
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("activity for user id %v doesn't exist", userId))
+	}
+
+	return &pb.UserActivityResp{
+		Response: activities,
+	}, nil
 }
 
 func (uh *uDBHandler) AddBlogPermission(models.TheMonkeysMessage) error {

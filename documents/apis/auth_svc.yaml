@@ -287,4 +287,132 @@ paths:
           type: string
       tags:
         - Email Verification
+  /auth/settings/username/{userId}:
+    put:
+      operationId: AuthService.updateUsername
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              status_code:
+                type: integer
+                example: 200
+              token:
+                type: string
+                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ"
+              user_id:
+                type: integer
+                example: 7
+              user_name:
+                type: string
+                example: "piyush_codes"
+              first_name:
+                type: string
+                example: "Piyush"
+              last_name:
+                type: string
+                example: "Sharma"
+              email:
+                type: string
+                example: "piyush@example.com"
+              account_id:
+                type: string
+                example: "f4XZVdbRfHXH8PjH"
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+                example: 500
+              message:
+                type: string
+                example: "Internal Server Error"
+      parameters:
+        - in: path
+          name: userId
+          type: string
+          required: true
+          description: The ID of the user whose username is being updated
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Bearer token for authentication
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              username:
+                type: string
+                example: "piyush"
+      tags:
+        - Settings
+  /auth/settings/password/{username}:
+    put:
+      operationId: AuthService.updatePassword
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "successfully updated password"
+              status:
+                type: integer
+                example: 200
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+                example: 500
+              message:
+                type: string
+                example: "Internal Server Error"
+      parameters:
+        - in: path
+          name: username
+          type: string
+          required: true
+          description: The username of the user whose password is being updated
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Bearer token for authentication
+        - in: header
+          name: Ip
+          type: string
+          required: true
+          description: IP address of the client
+        - in: header
+          name: Client
+          type: string
+          required: true
+          description: Client application name
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              current_password:
+                type: string
+                example: "pasword1"
+              new_password:
+                type: string
+                example: "pasword2"
+      tags:
+        - Settings
+
 definitions: {}

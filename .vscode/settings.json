@@ -15,6 +15,7 @@
         "SQLDB",
         "sslmode",
         "streadway",
+        "themonkeys",
         "upgrader",
         "Warnf"
     ]

@@ -102,11 +102,21 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 	}, err
 }
 
-func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityReq) (*pb.UserActivityRes, error) {
-	logrus.Infof("Trying to fetch user activities for: %v", req.Email)
+func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityReq) (*pb.UserActivityResp, error) {
+	logrus.Infof("Retrieving activities for: %v", req.UserName)
+	// Check if username exits or not
+	user, err := us.dbConn.CheckIfUsernameExist(req.UserName)
+	if err != nil {
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.UserName, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.UserName))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
 
-	return &pb.UserActivityRes{}, nil
+	return us.dbConn.GetUserActivities(user.Id)
 }
+
 func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProfileReq) (*pb.UpdateUserProfileRes, error) {
 	us.log.Infof("user %s is updating the profile.", req.Username)
 	us.log.Infof("req: %+v", req)

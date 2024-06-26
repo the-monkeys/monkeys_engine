@@ -67,14 +67,13 @@ func (w *JwtWrapper) ValidateToken(signedToken string) (claims *jwtClaims, err e
 	claims, ok := token.Claims.(*jwtClaims)
 	if !ok {
 		logrus.Errorf("cannot parse jwt claims, error: %v", err)
-		return nil, errors.New("Couldn't parse claims")
+		return nil, errors.New("couldn't parse the claims")
 	}
 
 	if claims.ExpiresAt < time.Now().Local().Unix() {
-		logrus.Errorf("token expired already, error: %v", err)
-		return nil, errors.New("JWT is expired")
+		logrus.Errorf("the token expired already, error: %v", err)
+		return nil, errors.New("the token is expired")
 	}
 
 	return claims, nil
-
 }

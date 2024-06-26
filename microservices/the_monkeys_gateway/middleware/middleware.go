@@ -47,7 +47,7 @@ func LogRequestBody() gin.HandlerFunc {
 		var bodyBuffer bytes.Buffer
 		// Copy the request body to the buffer
 		if _, err := io.Copy(&bodyBuffer, c.Request.Body); err != nil {
-			logrus.Errorf("Error copying request body: %v", err)
+			logrus.Errorf("error copying request body: %v", err)
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -56,7 +56,7 @@ func LogRequestBody() gin.HandlerFunc {
 
 		// Restore the request body for downstream handlers
 		c.Request.Body = io.NopCloser(&bodyBuffer)
-		logrus.Infof("Raw request body: %s", string(bodyBuffer.Bytes()))
+		// logrus.Infof("Raw request body: %s", string(bodyBuffer.Bytes()))
 		c.Next()
 	}
 }

@@ -335,4 +335,49 @@ paths:
       tags:
         - Topics
                    
-  
+  /user/activities/{username}:
+    # Endpoint to get the activity log of a user
+    get:
+      operationId: UserService.getUserActivities
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              response:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2024-06-26T17:39:52.472339Z"
+                    description:
+                      type: string
+                      example: "logged in"
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+                example: 500
+              message:
+                type: string
+                example: "Internal Server Error"
+      parameters:
+        - in: path
+          name: username
+          type: string
+          required: true
+          description: The username of the user whose activities are being retrieved
+        - in: header
+          name: Authorization
+          type: string
+          required: true
+          description: Bearer token for authentication
+      tags:
+        - Get User Activity

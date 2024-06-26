@@ -1,156 +1,4 @@
-package utils
-
-import (
-	"github.com/sirupsen/logrus"
-	"github.com/the-monkeys/the_monkeys/config"
-)
-
-var Address string
-
-func init() {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		logrus.Errorf("cannot load the config: %v", err)
-	}
-	Address = cfg.Authentication.EmailVerificationAddr
-	logrus.Infof("✅ the email verification address is: %v", Address)
-}
-
-func ResetPasswordTemplate(firstName, lastName, secret string, username string) string {
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Welcome to Monkeys</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #fff4ed;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        h1 {
-            color: #101010;
-            margin-bottom: 20px;
-            text-align: center;
-            font-family: serif;
-            font-size: 36px;
-        }
-
-        p {
-            color: #000;
-            line-height: 1.6;
-            margin-bottom: 20px;
-            font-weight: 500;
-            font-size: 16px;
-        }
-
-        a {
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn {
-            background-color: #ff462e;
-            color: #f2f2f3;
-            border: none;
-            padding: 15px 30px;
-            text-transform: uppercase;
-            font-weight: 600;
-            font-size: 16px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .btn:hover {
-            background-color: #f7381f;
-        }
-
-        .footer {
-            margin-top: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .footer_icon {
-            opacity: 0.75;
-        }
-
-        .footer_icon:hover {
-            opacity: 1;
-        }
-    </style>
-</head>
-
-<body>
-    <main class="container">
-
-        <h1 style="margin-bottom: 100px; cursor: default">
-            Welcome to <span style="color: #ff462e">Monkeys</span>
-        </h1>
-
-        <p>Hello ` + firstName + ` ` + lastName + `,</p>
-
-        <p>
-            We noticed you requested a password reset for your The Monkeys account. No worries, we've got you covered!
-        </p>
-
-        <p>To create a new, secure password, simply click the button below:</p>
-
-        <div style="margin: 20px 0; display: flex; justify-content: center">
-            <a href="` + Address + `/auth/reset-password?user=` + username + `&evpw=` + secret + `" target="_blank">
-                <button class="btn">Verify Email Address</button>
-            </a>
-        </div>
-
-        <p>
-            <b>Alternatively</b>, you can copy and paste the link below into your web browser:
-        </p>
-
-        <a href="` + Address + `/auth/reset-password?user=` + username + `&evpw=` + secret + `" target="_blank">
-            ` + Address + `/auth/reset-password?user=` + username + `&evpw=` + secret + `
-        </a>
-
-        <p style="color: #ed3232">
-            This link will expire in 1 hours for your security. If you don't reset your password within that time, you can request a new link anytime.
-        </p>
-
-        <p>
-            Once your password is reset, you can dive in and start using <span style="font-weight: bold">The Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our support team at <b>mail.themonkeys.life@gmail.com</b>. We're happy to help.
-        </p>
-
-        <p>We always welcome to the community,</p>
-
-        <p>Thanks,<br />The Monkeys Team</p>
-
-        <footer class="footer">
-            <div style="display: flex; gap: 10px">
-                <a href="https://github.com/the-monkeys" target="_blank" aria-label="GitHub">
-                    <div style="height: 24px; width: 24px" class="footer_icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#101010">
-                            <!-- SVG Path Here -->
-                        </svg>
-                    </div>
-                </a>
-                <!-- Add other social media links similarly -->
-            </div>
-        </footer>
-    </main>
-</body>
-</html>
-`
-}
-
-func EmailVerificationHTML(firstName, lastName, username, secret string) string {
-	return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
@@ -278,7 +126,7 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 				Welcome to <span style="color: #ff462e">Monkeys</span>
 			</h1>
 
-      <p>Hello ` + firstName + ` ` + lastName + `,</p>
+      <p>Hello first_name last_name,</p>
 
 			<p>
 				Thanks for joining <b>The Monkeys</b>. We're excited to have you
@@ -294,7 +142,7 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 			</p>
 
 			<div style="margin: 20px 0; display: flex; justify-content: center">
-				<a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank"><button class="btn">Verify Email Address</button></a>
+				<a href="https:themonkeys.live/auth/verify-email?user=username&evpw=token" target="_blank"><button class="btn">Verify Email Address</button></a>
 			</div>
 
 			<p>
@@ -302,7 +150,7 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 				your web browser:
 			</p>
 
-      		<a href="` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `" target="_blank">` + Address + `/auth/verify-email?user=` + username + `&evpw=` + secret + `</a>
+      		<a href="https:themonkeys.live/auth/verify-email?user=username&evpw=token" target="_blank">https:themonkeys.live/auth/verify-email?user=username&evpw=token</a>
 
 			<p style="color: #ed3232">
 				This link will expire in 24 hours for your security. If you
@@ -394,5 +242,4 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 			</footer>
 		</main>
 	</body>
-</html>`
-}
+</html>

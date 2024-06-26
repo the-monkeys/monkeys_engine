@@ -9,7 +9,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/errors"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,7 +49,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.DELETE("/:id", usc.DeleteUserProfile)
 	}
 
-	routes.POST("/activities/:user_name", usc.GetUserActivities)
+	routes.GET("/activities/:user_name", usc.GetUserActivities)
 
 	return usc
 }
@@ -126,11 +125,23 @@ func (asc *UserServiceClient) GetUserPublicProfile(ctx *gin.Context) {
 // }
 
 func (asc *UserServiceClient) GetUserActivities(ctx *gin.Context) {
-	res, err := asc.Client.GetUserActivities(ctx, &pb.UserActivityReq{})
-	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
-		errors.RestError(ctx, err, "user_service")
+	username := ctx.Param("user_name")
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are unauthorized to perform this action"})
 		return
+	}
+
+	res, err := asc.Client.GetUserActivities(ctx, &pb.UserActivityReq{
+		UserName: username,
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, ReturnMessage{Message: "no user/activity found"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't get the user's activities"})
+			return
+		}
 	}
 
 	ctx.JSON(http.StatusOK, res)

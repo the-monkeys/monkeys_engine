@@ -46,10 +46,13 @@ message UserActivityReq {
     string client = 5;
 }
 
-message UserActivityRes {
+message UserActivityResp {
+    repeated UserActiviy response = 1;
+}
+message UserActiviy {
     string event_type = 1;
     string service_type = 2;
-    google.protobuf.Timestamp timestamp = 3;
+    string timestamp = 3;
     string ip_address = 4;
     string description = 5;
 }
@@ -129,7 +132,7 @@ message GetAllCategoriesRes {
 }
 
 service UserService {
-    rpc GetUserActivities(UserActivityReq) returns (UserActivityRes) {}
+    rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
     rpc UpdateUserProfile(UpdateUserProfileReq) returns (UpdateUserProfileRes) {}
     rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
