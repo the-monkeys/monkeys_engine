@@ -18,7 +18,7 @@ func InitAuthMiddleware(svc *ServiceClient) AuthMiddlewareConfig {
 }
 
 func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
-	authorization := ctx.Request.Header.Get("authorization")
+	authorization := ctx.Request.Header.Get("Authorization")
 
 	if authorization == "" {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})

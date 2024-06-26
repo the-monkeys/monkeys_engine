@@ -149,6 +149,7 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	var req UpdateUserProfileRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		logrus.Errorf("error while getting the update data: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
