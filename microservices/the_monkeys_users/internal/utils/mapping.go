@@ -9,7 +9,7 @@ import (
 )
 
 // MapUserUpdateData maps the user update request data to the database model.
-func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
+func MapUserUpdateDataPatch(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
 	if req.Username != "" {
 		dbUserInfo.Username = req.Username
 	}
@@ -47,6 +47,28 @@ func MapUserUpdateData(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProf
 	if req.Github != "" {
 		dbUserInfo.Github.String = req.Github
 	}
+
+	return dbUserInfo
+}
+
+func MapUserUpdateDataPut(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
+	dbUserInfo.Username = req.Username
+	dbUserInfo.FirstName = req.FirstName
+	dbUserInfo.LastName = req.LastName
+	dbUserInfo.Bio.String = req.Bio
+	parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
+	if err != nil {
+		logrus.Errorf("couldn't parse date of birth to time.Time: %v", err)
+	} else {
+		logrus.Infof("Parsed date of birth: %v", parsedTime)
+		dbUserInfo.DateOfBirth.Time = parsedTime
+	}
+	dbUserInfo.Address.String = req.Address
+	dbUserInfo.ContactNumber.String = req.ContactNumber
+	dbUserInfo.LinkedIn.String = req.Linkedin
+	dbUserInfo.Twitter.String = req.Twitter
+	dbUserInfo.Instagram.String = req.Instagram
+	dbUserInfo.Github.String = req.Github
 
 	return dbUserInfo
 }

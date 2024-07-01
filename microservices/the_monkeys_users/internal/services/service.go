@@ -132,7 +132,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}
 
 	// Check if the method isPartial true
-	var dbUserInfo *models.UserProfileRes
+	var dbUserInfo = &models.UserProfileRes{}
 	if req.Partial {
 		// If isPartial is true fetch the remaining data from the db
 		dbUserInfo, err = us.dbConn.GetMyProfile(req.Username)
@@ -143,40 +143,29 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 			}
 			return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 		}
-	}
-
-	// Map the user
-	mappedDBUser := utils.MapUserUpdateData(req, dbUserInfo)
-	if err != nil {
-		return nil, err
+		// Map the user
+		dbUserInfo = utils.MapUserUpdateDataPatch(req, dbUserInfo)
+	} else {
+		dbUserInfo = utils.MapUserUpdateDataPut(req, dbUserInfo)
 	}
 
 	// Update the user
-	err = us.dbConn.UpdateUserProfile(req.Username, mappedDBUser)
+	err = us.dbConn.UpdateUserProfile(req.Username, dbUserInfo)
 	if err != nil {
 		us.log.Errorf("error while updating the profile for user %s, err: %v", req.Username, err)
 		return nil, status.Errorf(codes.Internal, "cannot update the user profile")
 	}
 
-	// Update the user log
-	if req.Ip == "" {
-		req.Ip = "127.0.0.1"
-	}
-
-	if req.Client == "" {
-		req.Client = "Others"
-	}
-
 	userLog := &models.UserLogs{
 		AccountId: dbUserInfo.AccountId,
-		IpAddress: req.Ip,
-		Client:    req.Client,
 	}
+
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 
 	go cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
 
 	return &pb.UpdateUserProfileRes{
-		Username: mappedDBUser.Username,
+		Username: dbUserInfo.Username,
 	}, err
 }
 
@@ -184,18 +173,28 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
 	// Check if username exits or not
-	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		us.log.Errorf("the user doesn't exists: %v", err)
-		return nil, err
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
 	// Run delete user query
 	err = us.dbConn.DeleteUserProfile(req.Username)
 	if err != nil {
 		us.log.Errorf("could not delete the user profile: %v", err)
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "cannot delete the user")
 	}
+
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+
+	go cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
 
 	// Return the response
 	return &pb.DeleteUserProfileRes{

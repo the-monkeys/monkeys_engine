@@ -45,8 +45,8 @@ rabbitMQ:
   protocol: "amqp"
   host: "rabbitmq"
   port: "5672"
-  username: "guest"
-  password: "guest"
+  username: "myuser"
+  password: "mypassword"
   virtualHost: ""
   exchange: smart_monkey
   queues:

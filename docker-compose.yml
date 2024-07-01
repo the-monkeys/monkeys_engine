@@ -8,12 +8,44 @@ services:
       POSTGRES_PASSWORD: Secret
       POSTGRES_USER: root
       POSTGRES_DB: the_monkeys_user_dev
+      POSTGRES_REPLICATION_MODE: master
+      POSTGRES_REPLICATION_USER: repl_user
+      POSTGRES_REPLICATION_PASSWORD: repl_password
+      POSTGRES_NUM_SYNCHRONOUS_REPLICAS: 1
+      POSTGRES_SYNCHRONOUS_COMMIT_MODE: on
     ports:
       - 1234:5432
     networks:
       - monkeys-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  the_monkeys_db_replica:
+    container_name: "the-monkeys-psql-replica"
+    image: bitnami/postgresql:latest
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: Secret
+      POSTGRES_USER: root
+      POSTGRES_DB: the_monkeys_user_dev
+      POSTGRES_REPLICATION_MODE: slave
+      POSTGRES_MASTER_HOST: the_monkeys_db
+      POSTGRES_MASTER_PORT_NUMBER: 5432
+      POSTGRES_REPLICATION_USER: repl_user
+      POSTGRES_REPLICATION_PASSWORD: repl_password
+      POSTGRES_PRIMARY_HOST: the_monkeys_db
+      POSTGRES_PRIMARY_PORT_NUMBER: 5432
+    ports:
+      - 1235:5432
+    networks:
+      - monkeys-network
+    volumes:
+      - postgres_data_replica:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U root"]
       interval: 5s
@@ -81,20 +113,31 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: the-monkeys-rabbitmq
     ports:
-      - "5672:5672"  # RabbitMQ default port
-      - "15672:15672"  # RabbitMQ Management UI port
+      - "5672:5672"
+      - "15672:15672"
     networks:
       - monkeys-network
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: myuser
+      RABBITMQ_DEFAULT_PASS: mypassword
+      RABBITMQ_DISK_FREE_LIMIT: "50MB"
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq  # Mount the volume for RabbitMQ data
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
+      interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '512M'
+        reservations:
+          cpus: '0.5'
+          memory: '256M'
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
@@ -121,7 +164,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      # - opensearch-node1
     volumes:
       - .:/go/src/app
     ports:
@@ -186,12 +228,9 @@ networks:
 
 volumes:
   postgres_data:
+  postgres_data_replica:
   the_monkeys_profile:
   blogs_volume:
-  rabbitmq_data:  # Named volume for better organization
+  rabbitmq_data:
   opensearch-data1:
     driver: local
-
-
-
-

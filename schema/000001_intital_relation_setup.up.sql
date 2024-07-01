@@ -1,19 +1,19 @@
 -- Creating user status table
 CREATE TABLE IF NOT EXISTS user_status (
     id SERIAL PRIMARY KEY,
-    status VARCHAR(100) NOT NULL
+    status VARCHAR(100) NOT NULL UNIQUE
 );
 
 -- Creating user role table
 CREATE TABLE IF NOT EXISTS user_role (
     id SERIAL PRIMARY KEY,
-    role_desc VARCHAR(50) NOT NULL
+    role_desc VARCHAR(50) NOT NULL UNIQUE
 );
 
 -- Creating user account table
 CREATE TABLE IF NOT EXISTS user_account (
     id BIGSERIAL PRIMARY KEY,
-    account_id VARCHAR(64) NOT NULL,
+    account_id VARCHAR(64) NOT NULL UNIQUE,
     username VARCHAR(32) NOT NULL,
     first_name VARCHAR(32),
     last_name VARCHAR(32),
@@ -35,10 +35,9 @@ CREATE TABLE IF NOT EXISTS user_account (
     FOREIGN KEY (user_status) REFERENCES user_status(id)
 );
 
--- Adding unique constraint on user_id in user_account table
-ALTER TABLE user_account
-ADD CONSTRAINT user_id_unique UNIQUE (id);
-
+-- Adding indexes to user_account table
+CREATE INDEX idx_user_account_email ON user_account(email);
+CREATE INDEX idx_user_account_username ON user_account(username);
 
 -- Creating email validation status table
 CREATE TABLE IF NOT EXISTS email_validation_status (
@@ -74,7 +73,7 @@ CREATE TABLE IF NOT EXISTS user_auth_info (
 -- Creating permissions table
 CREATE TABLE IF NOT EXISTS permissions (
     permission_id SERIAL PRIMARY KEY,
-    permission_desc VARCHAR(50) NOT NULL
+    permission_desc VARCHAR(50) NOT NULL UNIQUE
 );
 
 -- Creating permissions granted table
@@ -82,7 +81,8 @@ CREATE TABLE IF NOT EXISTS permissions_granted (
     role_id BIGINT NOT NULL,
     permission_id INTEGER NOT NULL,
     FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    PRIMARY KEY (role_id, permission_id)
 );
 
 -- Creating user account status table workflow
@@ -103,7 +103,8 @@ CREATE TABLE IF NOT EXISTS user_external_login (
     auth_provider_id INTEGER NOT NULL,
     auth_token VARCHAR(100) NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    PRIMARY KEY (user_id, auth_provider_id)
 );
 
 -- Creating payment info table
@@ -137,7 +138,7 @@ CREATE TABLE IF NOT EXISTS user_interest (
 -- Creating clients table
 CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
-    c_name VARCHAR(32)
+    c_name VARCHAR(32) UNIQUE
 );
 
 -- Creating logged in devices table
@@ -165,44 +166,71 @@ CREATE TABLE IF NOT EXISTS user_account_log (
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
+-- Creating blog table
 CREATE TABLE IF NOT EXISTS blog (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    blog_id VARCHAR(255) NOT NULL,
+    blog_id VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50), -- e.g., 'draft', 'published', 'archived'
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
 );
 
+-- Creating blog permissions table
 CREATE TABLE IF NOT EXISTS blog_permissions (
-    id BIGSERIAL,
+    id BIGSERIAL PRIMARY KEY,
     blog_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     permission_type VARCHAR(50) NOT NULL, -- 'owner', 'editor', 'viewer'
-    PRIMARY KEY (id),
     FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
+-- Creating blog bookmarks table
+CREATE TABLE IF NOT EXISTS blog_bookmarks (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    blog_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+-- Creating credentials table (note: in a production environment, sensitive data should be stored securely using encryption)
+CREATE TABLE IF NOT EXISTS user_credentials (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    credential_name VARCHAR(100) NOT NULL,
+    credential_value TEXT NOT NULL, -- Ensure this data is encrypted in a real production setup
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
 
 -- Inserting predefined roles
-INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer'), ('Support');
+INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer'), ('Support')
+ON CONFLICT DO NOTHING;
 
 -- Inserting predefined permissions
-INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive'), ('Transfer-Ownership'), ('Publish'), ('Draft')  ;
+INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive'), ('Transfer-Ownership'), ('Publish'), ('Draft')
+ON CONFLICT DO NOTHING;
 
 -- Inserting predefined clients
-INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'), ('Opera'), ('Android'), ('iOS'), ('Brave'), ('Others');
+INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'), ('Opera'), ('Android'), ('iOS'), ('Brave'), ('Others')
+ON CONFLICT DO NOTHING;
 
 -- Inserting predefined email validation statuses
-INSERT INTO email_validation_status (status) VALUES ('Unverified'), ('Verification link sent'), ('verified');
+INSERT INTO email_validation_status (status) VALUES ('Unverified'), ('Verification link sent'), ('verified')
+ON CONFLICT DO NOTHING;
 
 -- Inserting predefined auth providers
-INSERT INTO auth_provider (provider_name) VALUES ('The Monkeys'), ('Google Oauth2'), ('Instagram Oauth2');
+INSERT INTO auth_provider (provider_name) VALUES ('The Monkeys'), ('Google Oauth2'), ('Instagram Oauth2')
+ON CONFLICT DO NOTHING;
 
 -- Inserting predefined user statuses
-INSERT INTO user_status (status) VALUES ('Active'), ('Inactive'), ('Hidden');
+INSERT INTO user_status (status) VALUES ('Active'), ('Inactive'), ('Hidden')
+ON CONFLICT DO NOTHING;
 
 -- Inserting data into permissions granted for all roles with varying levels of permission
 INSERT INTO permissions_granted (role_id, permission_id)
@@ -215,8 +243,8 @@ JOIN permissions p ON
         WHEN r.role_desc = 'Support' THEN p.permission_desc IN ('Read', 'Edit', 'Delete', 'Archive', 'Transfer-Ownership', 'Publish', 'Draft')
         WHEN r.role_desc = 'Editor' THEN p.permission_desc IN ('Read', 'Edit', 'Publish', 'Draft')
         WHEN r.role_desc = 'Viewer' THEN p.permission_desc IN ('Read')
-    END;
-
+    END
+ON CONFLICT DO NOTHING;
 
 -- Insert some default topics
 INSERT INTO topics (description, category) VALUES

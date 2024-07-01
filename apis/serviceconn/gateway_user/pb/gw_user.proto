@@ -47,9 +47,9 @@ message UserActivityReq {
 }
 
 message UserActivityResp {
-    repeated UserActiviy response = 1;
+    repeated UserActivity response = 1;
 }
-message UserActiviy {
+message UserActivity {
     string event_type = 1;
     string service_type = 2;
     string timestamp = 3;

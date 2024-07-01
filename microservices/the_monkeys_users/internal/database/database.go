@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
+	// _ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -148,50 +149,55 @@ func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, err
 }
 
 func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error {
-	// TODO: start a database transaction from here till all the process are complete
+	uh.log.Infof("Starting profile update for user: %s", username)
+
 	tx, err := uh.db.Begin()
 	if err != nil {
-		return err
+		uh.log.Errorf("cannot begin transaction for user %s, error: %v", username, err)
+		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	stmt, err := tx.Prepare(`
-	UPDATE user_account
+		UPDATE user_account
 		SET 
-		username = $1,
-		first_name = $2,
-		last_name = $3,
-		email = $4,
-		date_of_birth = $5,
-		bio = $6,
-        updated_at = now(),
-		address = $7,
-		contact_number = $8,
-		linkedin = $9,
-		github = $10,
-		twitter = $11,
-		instagram = $12 
-		WHERE username = $13;
+			first_name = $1,
+			last_name = $2,
+			date_of_birth = $3,
+			bio = $4,
+			updated_at = now(),
+			address = $5,
+			contact_number = $6,
+			linkedin = $7,
+			github = $8,
+			twitter = $9,
+			instagram = $10 
+		WHERE username = $11;
 	`)
 	if err != nil {
-		logrus.Errorf("cannot prepare the update user query for user %s, error: %v", dbUserInfo.Username, err)
+		uh.log.Errorf("cannot prepare the update user query for user %s, error: %v", username, err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
-
 	defer stmt.Close()
-	result := stmt.QueryRow(dbUserInfo.Username, dbUserInfo.FirstName, dbUserInfo.LastName, dbUserInfo.Email,
-		dbUserInfo.DateOfBirth.Time, dbUserInfo.Bio.String, dbUserInfo.Address.String,
-		dbUserInfo.ContactNumber.String, dbUserInfo.LinkedIn.String, dbUserInfo.Github.String,
-		dbUserInfo.Twitter.String, dbUserInfo.Instagram.String, username)
+
+	result := stmt.QueryRow(dbUserInfo.FirstName, dbUserInfo.LastName, dbUserInfo.DateOfBirth.Time,
+		dbUserInfo.Bio.String, dbUserInfo.Address.String, dbUserInfo.ContactNumber.String,
+		dbUserInfo.LinkedIn.String, dbUserInfo.Github.String, dbUserInfo.Twitter.String,
+		dbUserInfo.Instagram.String, username)
 	if result.Err() != nil {
-		logrus.Errorf("cannot update user %s, error: %v", dbUserInfo.Username, err)
-		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
+		uh.log.Errorf("cannot update user %s, error: %v", username, result.Err())
+		if pqErr, ok := result.Err().(*pq.Error); ok && pqErr.Code == "23505" {
+			return status.Errorf(codes.AlreadyExists, "email already exists")
+		}
+		return status.Errorf(codes.Internal, "internal server error, error: %v", result.Err())
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the update profile for user %s, error: %v", dbUserInfo.Username, err)
-		return err
+		uh.log.Errorf("cannot commit the update profile for user %s, error: %v", username, err)
+		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
+
+	uh.log.Infof("Successfully updated profile for user: %s", username)
 	return nil
 }
 
@@ -203,20 +209,20 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	defer tx.Rollback()
 
 	var id int64
-	//using this username get id field from useraccount table
+	//using this username get id field from user account table
 	if err := tx.QueryRow(`
 			SELECT id FROM user_account where username = $1;`, username).Scan(&id); err != nil {
 		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
 		return nil
 	}
 
-	//using that id delete the row in userauthinfo table
+	//using that id delete the row in user auth info table
 	_, err = tx.Exec(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
 	if err != nil {
 		return err
 	}
 
-	//using that id delete the row from useraccount table
+	//using that id delete the row from user account table
 	_, err = tx.Exec(`DELETE FROM user_account WHERE id = $1`, id)
 	if err != nil {
 		return err
@@ -375,7 +381,7 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 
 func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, error) {
 	uh.log.Infof("Retrieving user activity for: %v", userId)
-	activities := []*pb.UserActiviy{}
+	activities := []*pb.UserActivity{}
 	rows, err := uh.db.Query("SELECT description, timestamp FROM user_account_log WHERE user_id = $1 ORDER BY timestamp DESC;", userId)
 	if err != nil {
 		uh.log.Errorf("error retrieving user activities for user id %v, err: %v", userId, err)
@@ -390,7 +396,7 @@ func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, err
 			uh.log.Errorf("cannot scan the user activity, err: %v", err)
 			return nil, status.Errorf(codes.Internal, "cannot scan the user activity")
 		}
-		activities = append(activities, &pb.UserActiviy{
+		activities = append(activities, &pb.UserActivity{
 			Description: desc,
 			Timestamp:   timestamp,
 		})
