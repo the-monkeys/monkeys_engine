@@ -175,7 +175,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 }
 
 func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
-	body := ForgetPass{}
+	body := GetEmail{}
 
 	if err := ctx.BindJSON(&body); err != nil {
 		asc.Log.Errorf("json body is not correct, error: %v", err)
@@ -500,4 +500,42 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 }
 
 func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	ipAddress := ctx.Request.Header.Get("Ip")
+	client := ctx.Request.Header.Get("Client")
+
+	var emailBody GetEmail
+
+	if err := ctx.BindJSON(&emailBody); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	resp, err := asc.Client.UpdateEmailId(context.Background(), &pb.UpdateEmailIdReq{
+		Username:  username,
+		NewEmail:  emailBody.Email,
+		Client:    client,
+		IpAddress: ipAddress,
+	})
+
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "user not found"})
+			return
+		} else if status.Code(err) == codes.AlreadyExists {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "the email is already in use"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't update email"})
+			return
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }

@@ -48,7 +48,7 @@ func RandomString(n int) string {
 }
 
 func ValidateRegisterUserRequest(req *pb.RegisterUserRequest) error {
-	if req.Email == "" || req.FirstName == "" || req.LastName == "" || req.Password == "" {
+	if req.Email == "" || req.FirstName == "" || req.Password == "" {
 		return fmt.Errorf("incomplete information: email, first name, last name and password are required")
 	}
 	return nil

@@ -78,7 +78,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
 	user.EmailVerificationTimeout = sql.NullTime{
-		Time:  time.Now().Add(time.Hour * 24),
+		Time:  time.Now().Add(time.Hour * 1),
 		Valid: true,
 	}
 	if req.LoginMethod.String() == pb.RegisterUserRequest_LoginMethod_name[0] {
@@ -532,5 +532,77 @@ func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.Upda
 	// Return
 	return &pb.UpdatePasswordWithPasswordRes{
 		StatusCode: http.StatusOK,
+	}, nil
+}
+
+func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq) (*pb.UpdateEmailIdRes, error) {
+	as.logger.Infof("updating email of user: %s", req.Username)
+
+	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	// check if the email is already in use
+	_, err = as.dbConn.CheckIfEmailExist(req.NewEmail)
+	if err == nil {
+		if err == sql.ErrNoRows {
+			as.logger.Infof("updating a new email: %v", req.NewEmail)
+		} else {
+			return nil, status.Errorf(codes.AlreadyExists, "The user with email %s already in use", req.NewEmail)
+		}
+	}
+
+	hash := string(utils.GenHash())
+	encHash := utils.HashPassword(hash)
+
+	user.EmailVerificationToken = encHash
+	user.EmailVerificationTimeout = sql.NullTime{
+		Time:  time.Now().Add(time.Hour * 1),
+		Valid: true,
+	}
+
+	// else update the email address
+	err = as.dbConn.UpdateEmailId(req.NewEmail, user)
+	if err != nil {
+		as.logger.Errorf("error while updating the email for user %s, err: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "cannot update the email")
+	}
+
+	// Send email verification mail as a routine else the register api gets slower
+	emailBody := utils.EmailVerificationHTML(user.FirstName, user.LastName, user.Username, hash)
+	go func() {
+		err := as.SendMail(user.Email, emailBody)
+		if err != nil {
+			log.Printf("Failed to send mail post registration: %v", err)
+		}
+		as.logger.Info("Email Sent!")
+	}()
+
+	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
+	// Add a user log
+	go cache.AddUserLog(as.dbConn, user, constants.ChangedEmail, constants.ServiceAuth, constants.EventUpdateEmail, as.logger)
+
+	token, err := as.jwt.GenerateToken(user)
+	if err != nil {
+		as.logger.Errorf(service_types.CannotCreateToken(user.Username, err))
+		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.UpdateEmailIdRes{
+		StatusCode:    http.StatusOK,
+		Token:         token,
+		EmailVerified: false,
+		UserName:      user.Username,
+		Email:         user.Email,
+		UserId:        user.Id,
+		FirstName:     user.FirstName,
+		LastName:      user.LastName,
+		AccountId:     user.AccountId,
 	}, nil
 }

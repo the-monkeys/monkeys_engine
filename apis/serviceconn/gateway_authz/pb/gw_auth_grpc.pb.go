@@ -32,6 +32,7 @@ type AuthServiceClient interface {
 	VerifyEmail(ctx context.Context, in *VerifyEmailReq, opts ...grpc.CallOption) (*VerifyEmailRes, error)
 	UpdateUsername(ctx context.Context, in *UpdateUsernameReq, opts ...grpc.CallOption) (*UpdateUsernameRes, error)
 	UpdatePasswordWithPassword(ctx context.Context, in *UpdatePasswordWithPasswordReq, opts ...grpc.CallOption) (*UpdatePasswordWithPasswordRes, error)
+	UpdateEmailId(ctx context.Context, in *UpdateEmailIdReq, opts ...grpc.CallOption) (*UpdateEmailIdRes, error)
 }
 
 type authServiceClient struct {
@@ -132,6 +133,15 @@ func (c *authServiceClient) UpdatePasswordWithPassword(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *authServiceClient) UpdateEmailId(ctx context.Context, in *UpdateEmailIdReq, opts ...grpc.CallOption) (*UpdateEmailIdRes, error) {
+	out := new(UpdateEmailIdRes)
+	err := c.cc.Invoke(ctx, "/auth_svc.AuthService/UpdateEmailId", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility
@@ -146,6 +156,7 @@ type AuthServiceServer interface {
 	VerifyEmail(context.Context, *VerifyEmailReq) (*VerifyEmailRes, error)
 	UpdateUsername(context.Context, *UpdateUsernameReq) (*UpdateUsernameRes, error)
 	UpdatePasswordWithPassword(context.Context, *UpdatePasswordWithPasswordReq) (*UpdatePasswordWithPasswordRes, error)
+	UpdateEmailId(context.Context, *UpdateEmailIdReq) (*UpdateEmailIdRes, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -182,6 +193,9 @@ func (UnimplementedAuthServiceServer) UpdateUsername(context.Context, *UpdateUse
 }
 func (UnimplementedAuthServiceServer) UpdatePasswordWithPassword(context.Context, *UpdatePasswordWithPasswordReq) (*UpdatePasswordWithPasswordRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePasswordWithPassword not implemented")
+}
+func (UnimplementedAuthServiceServer) UpdateEmailId(context.Context, *UpdateEmailIdReq) (*UpdateEmailIdRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateEmailId not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 
@@ -376,6 +390,24 @@ func _AuthService_UpdatePasswordWithPassword_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_UpdateEmailId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateEmailIdReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UpdateEmailId(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/auth_svc.AuthService/UpdateEmailId",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UpdateEmailId(ctx, req.(*UpdateEmailIdReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -422,6 +454,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePasswordWithPassword",
 			Handler:    _AuthService_UpdatePasswordWithPassword_Handler,
+		},
+		{
+			MethodName: "UpdateEmailId",
+			Handler:    _AuthService_UpdateEmailId_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -29,6 +29,7 @@ type AuthDBHandler interface {
 	UpdateEmailVerificationToken(req *models.TheMonkeysUser) error
 	UpdateEmailVerificationStatus(req *models.TheMonkeysUser) error
 	UpdateUserName(currentUsername, newUsername string) error
+	UpdateEmailId(emailId string, user *models.TheMonkeysUser) error
 
 	// Create user logs to track activity
 	CreateUserLog(user *models.TheMonkeysUser, description string) error
@@ -366,6 +367,67 @@ func (adh *authDBHandler) UpdateUserName(currentUsername, newUsername string) er
 	if row != 1 {
 		logrus.Errorf("more or less than 1 row is affected for update username query, error: %v", err)
 		return errors.New("more or less than 1 row is affected")
+	}
+
+	return nil
+}
+
+func (adh *authDBHandler) UpdateEmailId(emailId string, user *models.TheMonkeysUser) error {
+	if emailId == "" || user.Username == "" {
+		return errors.New("both emailId and username are required")
+	}
+
+	logrus.Infof("emailId: %v, username: %v", emailId, user.Username)
+
+	// Begin a transaction
+	tx, err := adh.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	// Update the email and set email_validation_status to 1
+	updateEmailQuery := `
+		UPDATE user_account
+		SET email = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE username = $2
+		RETURNING id
+	`
+	var userID int64
+	err = tx.QueryRow(updateEmailQuery, emailId, user.Username).Scan(&userID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update email: %w", err)
+	}
+
+	// Update the email_validation_status in user_auth_info
+	updateStatusQuery := `
+		UPDATE user_auth_info
+		SET email_validation_status = 1, email_validation_token = $1, 
+		email_verification_timeout = $2
+		WHERE user_id = $3
+	`
+	result, err := tx.Exec(updateStatusQuery, user.EmailVerificationToken, user.EmailVerificationTimeout.Time, userID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update email validation status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		tx.Rollback()
+		return fmt.Errorf("no user_auth_info record found for user_id %d", userID)
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

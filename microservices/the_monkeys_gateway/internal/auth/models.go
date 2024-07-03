@@ -13,7 +13,7 @@ type RegisterRequestBody struct {
 	LoginMethod string `json:"login_method"`
 }
 
-type ForgetPass struct {
+type GetEmail struct {
 	Email string `json:"email"`
 }
 

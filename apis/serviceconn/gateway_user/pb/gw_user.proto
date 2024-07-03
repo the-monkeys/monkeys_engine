@@ -138,5 +138,11 @@ service UserService {
     rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
     rpc GetAllTopics(GetTopicsRequests) returns (GetTopicsResponse) {}
     rpc GetAllCategories(GetAllCategoriesReq) returns (GetAllCategoriesRes) {}
+    // Bookmark blog
+    // Get Bookmarks
+    // Invite as co author
+    // Accept co author invitation
+    // Reject co author invitation
+    // Revoke co author invitation access
 }
 
