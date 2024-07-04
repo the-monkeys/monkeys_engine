@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"net"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
@@ -38,20 +36,7 @@ func main() {
 		logrus.Fatalf("auth service cannot listen at address %s, error: %v", cfg.Microservices.TheMonkeysAuthz, err)
 	}
 
-	var qConn rabbitmq.Conn
-	for {
-		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
-		if err != nil {
-			logrus.Errorf("auth service cannot connect to rabbitMq service: %v", err)
-			time.Sleep(time.Second)
-			continue
-		} else {
-			logrus.Info("✅ auth service connected to rabbitMQ!")
-			break
-		}
-	}
-
-	fmt.Printf("Successfully connected to rabbitMq services")
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
 
 	authServer := services.NewAuthzSvc(dbHandler, jwt, cfg, qConn)
 

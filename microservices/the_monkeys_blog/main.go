@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -37,18 +36,7 @@ func main() {
 		return
 	}
 
-	var qConn rabbitmq.Conn
-	for {
-		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
-		if err != nil {
-			logrus.Errorf("blog service cannot connect to rabbitMq service: %v", err)
-			time.Sleep(time.Second)
-			continue
-		} else {
-			logrus.Info("✅ blog service connected to rabbitMQ!")
-			break
-		}
-	}
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
 
 	blogService := services.NewBlogService(osClient, logger, cfg, qConn)
 	// interservice := services.NewInterservice(*osClient, logger)

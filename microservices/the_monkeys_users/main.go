@@ -2,7 +2,6 @@ package main
 
 import (
 	"net"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
@@ -32,19 +31,9 @@ func main() {
 		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysUser, err)
 	}
 
-	var qConn rabbitmq.Conn
-	for {
-		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
-		if err != nil {
-			logrus.Errorf("auth service cannot connect to rabbitMq service: %v", err)
-			time.Sleep(time.Second)
-			continue
-		} else {
-			logrus.Info("✅ the user service connected to rabbitMQ!")
-			go consumer.ConsumeFromQueue(qConn, cfg, log, db)
-			break
-		}
-	}
+	// Connect to rabbitmq server
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	go consumer.ConsumeFromQueue(qConn, cfg, log, db)
 
 	// conn, err := grpc.Dial(cfg.Microservices.TheMonkeysBlog, grpc.WithInsecure())
 	// if err != nil {

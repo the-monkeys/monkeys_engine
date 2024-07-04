@@ -3,7 +3,6 @@ package main
 import (
 	"net"
 	"os"
-	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -55,20 +54,8 @@ func main() {
 	log := logrus.New()
 
 	// Connect to rabbitmq server
-	var qConn rabbitmq.Conn
-	for {
-		qConn, err = rabbitmq.GetConn(cfg.RabbitMQ)
-		if err != nil {
-			log.Errorf("storage service cannot connect to rabbitMq service: %v", err)
-			time.Sleep(time.Second)
-			continue
-		} else {
-			log.Info("✅ the storage service connected to rabbitMQ!")
-			// Run the consumer service
-			go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
-			break
-		}
-	}
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
 
 	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysFileStore)
 	if err != nil {

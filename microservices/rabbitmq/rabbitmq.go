@@ -5,13 +5,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 	"github.com/the-monkeys/the_monkeys/config"
 )
 
-// Conn represents a RabbitMQ connection with a channel.
+// / Conn represents a RabbitMQ connection with a channel.
 type Conn struct {
 	Connection *amqp.Connection
 	Channel    *amqp.Channel
@@ -21,7 +22,9 @@ type Conn struct {
 func GetConn(conf config.RabbitMQ) (Conn, error) {
 	connString := fmt.Sprintf("amqp://%s:%s@%s:%s/%s", conf.Username, conf.Password, conf.Host, conf.Port, conf.VirtualHost)
 
-	conn, err := amqp.Dial(connString)
+	conn, err := amqp.DialConfig(connString, amqp.Config{
+		Heartbeat: 10 * time.Second, // Set the heartbeat interval to 10 seconds
+	})
 	if err != nil {
 		return Conn{}, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
@@ -65,6 +68,23 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 	}
 
 	return connection, nil
+}
+
+// Reconnect attempts to re-establish the RabbitMQ connection
+func Reconnect(conf config.RabbitMQ) Conn {
+	var qConn Conn
+	var err error
+	for {
+		qConn, err = GetConn(conf)
+		if err != nil {
+			logrus.Errorf("cannot connect to RabbitMQ, retrying in 1 second: %v", err)
+			time.Sleep(time.Second)
+			continue
+		}
+		logrus.Info("Reconnected to RabbitMQ")
+		break
+	}
+	return qConn
 }
 
 // PublishMessage sends a message to the specified exchange with the given routing key.
