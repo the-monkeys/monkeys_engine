@@ -587,6 +587,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	// Add a user log
 	go cache.AddUserLog(as.dbConn, user, constants.ChangedEmail, constants.ServiceAuth, constants.EventUpdateEmail, as.logger)
 
+	user.Email = req.NewEmail
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Errorf(service_types.CannotCreateToken(user.Username, err))
@@ -599,7 +600,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 		Token:         token,
 		EmailVerified: false,
 		UserName:      user.Username,
-		Email:         user.Email,
+		Email:         req.NewEmail,
 		UserId:        user.Id,
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,

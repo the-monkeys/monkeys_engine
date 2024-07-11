@@ -43,7 +43,6 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	if exists {
 		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
 		owner, _, err := blog.osClient.GetBlogDetailsById(ctx, req.BlogId)
-
 		if err != nil {
 			blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
 			return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
@@ -65,7 +64,9 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
 			return nil, status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
 		}
-
+		if len(req.Tags) == 0 {
+			req.Tags = []string{"untagged"}
+		}
 		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 	}
 
