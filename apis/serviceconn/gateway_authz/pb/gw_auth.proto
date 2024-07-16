@@ -30,7 +30,7 @@ message RegisterUserResponse {
   string first_name = 6;
   string last_name = 7;
   string email = 8;
-  bool email_verification_status = 9;
+  string email_verification_status = 9;
   Error error = 10;
   string account_id = 11;
 }
@@ -72,7 +72,7 @@ message LoginUserResponse {
   string first_name = 6;
   string last_name = 7;
   string email = 8;
-  bool email_verification_status = 9;
+  string email_verification_status = 9;
   Error error = 10;
   string account_id = 11;
 }

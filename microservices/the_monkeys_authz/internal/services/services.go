@@ -194,15 +194,15 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 	go cache.AddUserLog(as.dbConn, user, constants.Login, constants.ServiceAuth, constants.EventLogin, as.logger)
 
 	resp := &pb.LoginUserResponse{
-		StatusCode:    http.StatusOK,
-		Token:         token,
-		EmailVerified: false,
-		Username:      user.Username,
-		Email:         user.Email,
-		UserId:        user.Id,
-		FirstName:     user.FirstName,
-		LastName:      user.LastName,
-		AccountId:     user.AccountId,
+		StatusCode:              http.StatusOK,
+		Token:                   token,
+		EmailVerificationStatus: user.EmailVerificationStatus,
+		Username:                user.Username,
+		Email:                   user.Email,
+		UserId:                  user.Id,
+		FirstName:               user.FirstName,
+		LastName:                user.LastName,
+		AccountId:               user.AccountId,
 	}
 	return resp, nil
 }
