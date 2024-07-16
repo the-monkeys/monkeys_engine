@@ -130,7 +130,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		StatusCode:    http.StatusCreated,
 		Token:         token,
 		EmailVerified: false,
-		Username:      user.Username,
+		UserName:      user.Username,
 		Email:         user.Email,
 		UserId:        userId,
 		FirstName:     user.FirstName,
@@ -584,6 +584,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	}()
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
+
 	// Add a user log
 	go cache.AddUserLog(as.dbConn, user, constants.ChangedEmail, constants.ServiceAuth, constants.EventUpdateEmail, as.logger)
 
