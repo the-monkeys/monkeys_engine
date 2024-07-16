@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -19,7 +22,10 @@ import (
 var upgrader = websocket.Upgrader{}
 
 type BlogServiceClient struct {
-	Client pb.BlogServiceClient
+	Client     pb.BlogServiceClient
+	cacheMutex sync.Mutex
+	cacheTime  time.Time
+	cache      string
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
@@ -42,6 +48,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// routes.GET("/", blogCli.Get100Blogs)
 	routes.GET("/:id", blogClient.GetBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
+	routes.GET("/news1", blogClient.GetNews1)
+	routes.GET("/news2", blogClient.GetNews2)
 
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
@@ -219,6 +227,76 @@ func (svc *BlogServiceClient) GetBlogById(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, res)
+}
+
+type NewsResponse struct {
+	Data interface{} `json:"data"`
+}
+
+const apiURL = "http://api.mediastack.com/v1/news?access_key=0eb15d25302a5df61462633e05c3cc0f&language=en&categories=business,entertainment,sports,science,technology&limit=100"
+
+func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
+	svc.cacheMutex.Lock()
+	defer svc.cacheMutex.Unlock()
+
+	// Check if cache is valid
+	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache != "" {
+		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache))
+		return
+	}
+
+	// Call the API
+	resp, err := http.Get(apiURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+		return
+	}
+
+	// Cache the response
+	svc.cache = string(body)
+	svc.cacheTime = time.Now()
+
+	ctx.Data(http.StatusOK, "application/json", body)
+}
+
+const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=1e59062cc9314effacf2e37e2fcaaab8&language=en"
+
+func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
+	// svc.cacheMutex.Lock()
+	// defer svc.cacheMutex.Unlock()
+
+	// // Check if cache is valid
+	// if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache != "" {
+	// 	ctx.Data(http.StatusOK, "application/json", []byte(svc.cache))
+	// 	return
+	// }
+
+	// Call the API
+	resp, err := http.Get(apiURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+		return
+	}
+
+	// Cache the response
+	svc.cache = string(body)
+	svc.cacheTime = time.Now()
+
+	ctx.Data(http.StatusOK, "application/json", body)
 }
 
 // func (blog *BlogServiceClient) EditArticles(ctx *gin.Context) {

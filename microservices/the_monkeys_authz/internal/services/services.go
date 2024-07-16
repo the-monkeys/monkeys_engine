@@ -127,15 +127,16 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	go as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 
 	return &pb.RegisterUserResponse{
-		StatusCode:    http.StatusCreated,
-		Token:         token,
-		EmailVerified: false,
-		Username:      user.Username,
-		Email:         user.Email,
-		UserId:        userId,
-		FirstName:     user.FirstName,
-		LastName:      user.LastName,
-		AccountId:     user.AccountId,
+		StatusCode:              http.StatusCreated,
+		Token:                   token,
+		EmailVerified:           false,
+		Username:                user.Username,
+		Email:                   user.Email,
+		UserId:                  userId,
+		FirstName:               user.FirstName,
+		LastName:                user.LastName,
+		AccountId:               user.AccountId,
+		EmailVerificationStatus: user.EmailVerificationStatus,
 	}, nil
 }
 
