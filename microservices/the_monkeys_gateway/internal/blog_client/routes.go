@@ -50,6 +50,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
 	routes.GET("/news1", blogClient.GetNews1)
 	routes.GET("/news2", blogClient.GetNews2)
+	routes.GET("/news3", blogClient.GetNews3)
 
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
@@ -292,9 +293,28 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 		return
 	}
 
-	// Cache the response
-	svc.cache = string(body)
-	svc.cacheTime = time.Now()
+	// // Cache the response
+	// svc.cache = string(body)
+	// svc.cacheTime = time.Now()
+
+	ctx.Data(http.StatusOK, "application/json", body)
+}
+
+func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
+
+	// Call the API
+	resp, err := http.Get("https://hindustantimes-1-t3366110.deta.app/top-world-news")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+		return
+	}
 
 	ctx.Data(http.StatusOK, "application/json", body)
 }
