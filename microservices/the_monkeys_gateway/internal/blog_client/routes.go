@@ -279,7 +279,7 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 	// }
 
 	// Call the API
-	resp, err := http.Get(apiURL)
+	resp, err := http.Get(apiURL2)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
 		return
