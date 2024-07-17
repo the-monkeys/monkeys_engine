@@ -26,6 +26,7 @@ type BlogServiceClient struct {
 	cacheMutex sync.Mutex
 	cacheTime  time.Time
 	cache      string
+	cache1     string
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
@@ -270,14 +271,14 @@ func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
 const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=1e59062cc9314effacf2e37e2fcaaab8&language=en"
 
 func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
-	// svc.cacheMutex.Lock()
-	// defer svc.cacheMutex.Unlock()
+	svc.cacheMutex.Lock()
+	defer svc.cacheMutex.Unlock()
 
-	// // Check if cache is valid
-	// if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache != "" {
-	// 	ctx.Data(http.StatusOK, "application/json", []byte(svc.cache))
-	// 	return
-	// }
+	// Check if cache1 is valid
+	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache1 != "" {
+		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache1))
+		return
+	}
 
 	// Call the API
 	resp, err := http.Get(apiURL2)
@@ -293,9 +294,9 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 		return
 	}
 
-	// // Cache the response
-	// svc.cache = string(body)
-	// svc.cacheTime = time.Now()
+	// Cache the response
+	svc.cache1 = string(body)
+	svc.cacheTime = time.Now()
 
 	ctx.Data(http.StatusOK, "application/json", body)
 }
