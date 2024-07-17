@@ -1,5 +1,5 @@
 {
-    "owner_account_id": "xD6Xp0RJHj2X6TJP",
+    "owner_account_id": "t2RHBJLRVxRr84jR",
     "blog": {
         "time": 1710737158827,
         "blocks": [
@@ -9,7 +9,7 @@
                 "data": {
                     "text": "Hey. Meet the new Editor. On this picture you can see it in action. Then, try a demo 🤓"
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -19,7 +19,7 @@
                     "text": "Key features",
                     "level": 3
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -33,7 +33,7 @@
                         "Designed to be extendable and pluggable with a <a href='https: //editorjs.io/creating-a-block-tool"
                     ]
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -43,7 +43,7 @@
                     "text": "What does it mean «block-styled editor»",
                     "level": 3
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -57,7 +57,7 @@
                         "It works more stable then in other WYSIWYG editors. Same time it has smooth and well-known arrow navigation behavior like classic editors."
                     ]
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -67,7 +67,7 @@
                     "text": "What does it mean clean data output?",
                     "level": 3
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -81,7 +81,7 @@
                         "Just take a look at our Creating Block Tool guide. You'll be surprised."
                     ]
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -90,7 +90,7 @@
                 "data": {
                     "text": "Classic WYSIWYG editors produce raw HTML-markup with both content data and content appearance. On the contrary, <mark class=cdx-marker>Editor.js outputs JSON object</mark> with data of each Block."
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -105,7 +105,7 @@
                     },
                     "title": "My file"
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -114,7 +114,7 @@
                 "data": {
                     "text": "Given data can be used as you want: render with HTML for Web clients, render natively for mobile apps, create the markup for Facebook Instant Articles or Google AMP, generate an audio version, and so on."
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -123,7 +123,7 @@
                 "data": {
                     "text": "Clean data is useful to sanitize, validate and process on the backend."
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             },
             {
@@ -138,7 +138,7 @@
                     "stretched": true,
                     "caption": "CodeX Code Camp 2019"
                 },
-                "author": ["John"],
+                "author": ["t2RHBJLRVxRr84jR"],
                 "time": 17107371588
             }
         ]

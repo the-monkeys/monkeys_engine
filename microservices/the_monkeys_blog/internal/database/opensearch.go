@@ -251,17 +251,19 @@ func (os *opensearchStorage) GetBlogDetailsById(ctx context.Context, blogId stri
 	os.log.Infof("Fetching blog with id: %s", blogId)
 
 	// Define the search request
-	searchRequest := `{
+	searchRequest := fmt.Sprintf(`{
 		"query": {
 			"term": {
-				"blog_id": "%s"
+				"blog_id": {
+					"value": "%s"
+				}
 			}
 		}
-	}`
+	}`, blogId)
 
 	osReq := opensearchapi.SearchRequest{
 		Index: []string{constants.OpensearchArticleIndex},
-		Body:  strings.NewReader(fmt.Sprintf(searchRequest, blogId)),
+		Body:  strings.NewReader(searchRequest),
 	}
 
 	searchResponse, err := osReq.Do(ctx, os.client)
@@ -281,18 +283,29 @@ func (os *opensearchStorage) GetBlogDetailsById(ctx context.Context, blogId stri
 		return "", nil, err
 	}
 
-	for _, hit := range r["hits"].(map[string]interface{})["hits"].([]interface{}) {
-		source := hit.(map[string]interface{})["_source"].(map[string]interface{})
-		ownerAccountId := source["owner_account_id"].(string)
-		tagsInterface := source["tags"].([]interface{})
-		tags := make([]string, len(tagsInterface))
-		for i, tag := range tagsInterface {
-			tags[i] = tag.(string)
-		}
-		return ownerAccountId, tags, nil
+	// Log the entire response for debugging
+	os.log.Infof("Search response: %+v", r)
+
+	hitsData, ok := r["hits"].(map[string]interface{})
+	if !ok {
+		return "", nil, fmt.Errorf("No matching blog found: missing hits in response")
 	}
 
-	return "", nil, fmt.Errorf("No matching blog found")
+	hits, ok := hitsData["hits"].([]interface{})
+	if !ok || len(hits) == 0 {
+		return "", nil, fmt.Errorf("No matching blog found: empty hits array")
+	}
+
+	hit := hits[0].(map[string]interface{})
+	source := hit["_source"].(map[string]interface{})
+	ownerAccountId := source["owner_account_id"].(string)
+	tagsInterface := source["tags"].([]interface{})
+	tags := make([]string, len(tagsInterface))
+	for i, tag := range tagsInterface {
+		tags[i] = tag.(string)
+	}
+
+	return ownerAccountId, tags, nil
 }
 
 func (os *opensearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error) {

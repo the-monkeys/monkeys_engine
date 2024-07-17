@@ -42,16 +42,16 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	exists, _ := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if exists {
 		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
-		owner, _, err := blog.osClient.GetBlogDetailsById(ctx, req.BlogId)
-		if err != nil {
-			blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
-			return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
-		}
+		// owner, _, err := blog.osClient.GetBlogDetailsById(ctx, req.BlogId)
+		// if err != nil {
+		// 	blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
+		// 	return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
+		// }
 
-		if req.OwnerAccountId != owner {
-			blog.logger.Errorf("user %s is trying to take the ownership of the content, original owner is: %s", req.OwnerAccountId, owner)
-			return nil, status.Errorf(codes.Unauthenticated, "you don't have permission to change the owner id")
-		}
+		// if req.OwnerAccountId != owner {
+		// 	blog.logger.Errorf("user %s is trying to take the ownership of the content, original owner is: %s", req.OwnerAccountId, owner)
+		// 	return nil, status.Errorf(codes.Unauthenticated, "you don't have permission to change the owner id")
+		// }
 	} else {
 		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
 		bx, err := json.Marshal(models.MessageToUserSvc{
