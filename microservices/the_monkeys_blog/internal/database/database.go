@@ -1,10 +1,13 @@
 package database
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 
 	"github.com/opensearch-project/opensearch-go"
+	"github.com/opensearch-project/opensearch-go/opensearchapi"
+	"github.com/sirupsen/logrus"
 )
 
 func NewOSClient(url, username, password string) (*opensearch.Client, error) {
@@ -21,14 +24,13 @@ func NewOSClient(url, username, password string) (*opensearch.Client, error) {
 		return nil, err
 	}
 
-	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// defer cancel()
+	// Perform a simple operation to check the connection
+	req := opensearchapi.PingRequest{}
+	res, err := req.Do(context.Background(), client)
+	if err != nil || res.IsError() {
+		return nil, err
+	}
 
-	// // Perform a simple operation to check the connection
-	// res, err := client.Ping(ctx, nil)
-	// if err != nil || res.IsError() {
-	// 	return nil, err
-	// }
-
+	logrus.Infof("✅ Opensearch connection established successfully")
 	return client, nil
 }
