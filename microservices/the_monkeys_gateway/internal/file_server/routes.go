@@ -73,7 +73,7 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 	// Get file from the form file section
 	file, fileHeader, err := ctx.Request.FormFile("file")
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "error while getting the file"})
 		return
 	}
 	defer file.Close()
@@ -86,7 +86,7 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 
 	stream, err := asc.Client.UploadBlogFile(context.Background())
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot stream file to the storage server"})
 		return
 	}
 
@@ -102,7 +102,7 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 
 	resp, err := stream.CloseAndRecv()
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong while closing the stream"})
 		return
 	}
 
@@ -161,7 +161,7 @@ func (asc *FileServiceClient) DeleteBlogFile(ctx *gin.Context) {
 
 	if err != nil {
 		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
-		_ = ctx.AbortWithError(http.StatusBadGateway, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error while deleting the file"})
 		return
 	}
 
@@ -175,7 +175,7 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 	// Get file from the form file section
 	file, fileHeader, err := ctx.Request.FormFile("profile_pic")
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "error while getting the profile pic"})
 		return
 	}
 	defer file.Close()
@@ -188,7 +188,7 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 
 	stream, err := asc.Client.UploadProfilePic(context.Background())
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot stream profile pic to the storage server"})
 		return
 	}
 
@@ -204,7 +204,7 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 
 	resp, err := stream.CloseAndRecv()
 	if err != nil {
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong while closing the profile pic stream"})
 		return
 	}
 
@@ -252,7 +252,7 @@ func (asc *FileServiceClient) DeleteProfilePic(ctx *gin.Context) {
 
 	if err != nil {
 		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
-		_ = ctx.AbortWithError(http.StatusBadGateway, err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error while deleting the profile pic"})
 		return
 	}
 

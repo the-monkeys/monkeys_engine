@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -26,13 +27,12 @@ func main() {
 			defer file.Close()
 
 			_, err = io.Copy(w, file)
-			if err != nil {
-				return false
-			}
+			return err == nil
 
-			return true
 		})
 	})
 
-	router.Run(":8080")
+	if err := router.Run(":8080"); err != nil {
+		log.Fatalf("Cannot start the stream server: %v", err)
+	}
 }

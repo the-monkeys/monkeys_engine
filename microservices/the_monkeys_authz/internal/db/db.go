@@ -395,7 +395,10 @@ func (adh *authDBHandler) UpdateEmailId(emailId string, user *models.TheMonkeysU
 	var userID int64
 	err = tx.QueryRow(updateEmailQuery, emailId, user.Username).Scan(&userID)
 	if err != nil {
-		tx.Rollback()
+		if err = tx.Rollback(); err != nil {
+			logrus.Errorf("Rollback failed: %v", err)
+			return err
+		}
 		return fmt.Errorf("failed to update email: %w", err)
 	}
 
@@ -408,25 +411,37 @@ func (adh *authDBHandler) UpdateEmailId(emailId string, user *models.TheMonkeysU
 	`
 	result, err := tx.Exec(updateStatusQuery, user.EmailVerificationToken, user.EmailVerificationTimeout.Time, userID)
 	if err != nil {
-		tx.Rollback()
+		if err = tx.Rollback(); err != nil {
+			logrus.Errorf("Rollback failed: %v", err)
+			return err
+		}
 		return fmt.Errorf("failed to update email validation status: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		tx.Rollback()
+		if err = tx.Rollback(); err != nil {
+			logrus.Errorf("Rollback failed: %v", err)
+			return err
+		}
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
-		tx.Rollback()
+		if err = tx.Rollback(); err != nil {
+			logrus.Errorf("Rollback failed: %v", err)
+			return err
+		}
 		return fmt.Errorf("no user_auth_info record found for user_id %d", userID)
 	}
 
 	// Commit the transaction
 	err = tx.Commit()
 	if err != nil {
-		tx.Rollback()
+		if err = tx.Rollback(); err != nil {
+			logrus.Errorf("Rollback failed: %v", err)
+			return err
+		}
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 

@@ -228,7 +228,10 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
