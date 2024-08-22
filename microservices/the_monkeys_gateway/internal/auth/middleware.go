@@ -21,8 +21,13 @@ func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
 	authorization := ctx.Request.Header.Get("Authorization")
 
 	if authorization == "" {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-		return
+		// Check if the token is provided as a query parameter
+		tokenQuery := ctx.Query("token")
+		if tokenQuery == "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+			return
+		}
+		authorization = "Bearer " + tokenQuery
 	}
 
 	token := strings.Split(authorization, "Bearer ")
