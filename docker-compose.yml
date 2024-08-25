@@ -74,22 +74,16 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  opensearch-node1:
-    image: opensearchproject/opensearch:latest
-    container_name: opensearch-node1
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+  elasticsearch-node1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.1
+    container_name: elasticsearch-node1
     environment:
-      - plugins.security.disabled=true
-      - cluster.name=opensearch-cluster
-      - node.name=opensearch-node1
-      - discovery.seed_hosts=opensearch-node1
-      - cluster.initial_cluster_manager_nodes=opensearch-node1
+      - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=a!Too5hortPassword@1
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - ELASTIC_PASSWORD=a!Too5hortPassword@1
+      - xpack.security.enabled=false  # Disable security features including SSL/TLS
+      - xpack.security.transport.ssl.enabled=false  # Disable transport layer security
     ulimits:
       memlock:
         soft: -1
@@ -98,18 +92,19 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      - opensearch-data1:/usr/share/opensearch/data
+      - elasticsearch-data1:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
-      - 9600:9600
+      - 9300:9300
     networks:
       - monkeys-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "http://localhost:9200"]
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
       interval: 30s
       timeout: 10s
       retries: 5
     restart: always
+
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -150,6 +145,11 @@ services:
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_gateway/main.go
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   the_monkeys_authz:
     container_name: "the-monkeys-auth"
@@ -213,7 +213,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - opensearch-node1
+      - elasticsearch-node1
     volumes:
       - .:/go/src/app
     ports:
@@ -232,5 +232,5 @@ volumes:
   the_monkeys_profile:
   blogs_volume:
   rabbitmq_data:
-  opensearch-data1:
+  elasticsearch-data1:
     driver: local

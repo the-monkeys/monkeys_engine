@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 )
 
@@ -31,7 +32,6 @@ func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
 	}
 
 	token := strings.Split(authorization, "Bearer ")
-
 	if len(token) < 2 {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
@@ -79,4 +79,16 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 
 	ctx.Next()
 
+}
+
+func (c *AuthMiddlewareConfig) CanPublish(ctx *gin.Context) {
+	// TODO: Check if the user can publish access
+	logrus.Infof("The user has published access to the blog!")
+	ctx.Next()
+}
+
+func (c *AuthMiddlewareConfig) CheckWriteAccess(ctx *gin.Context) {
+	// TODO: Check if the user can publish access
+	logrus.Infof("The user has write/edit access to the blog!")
+	ctx.Next()
 }

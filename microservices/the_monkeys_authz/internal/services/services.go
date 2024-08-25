@@ -151,8 +151,6 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 // Is the token belongs to the user
 // Is the user existing in the db or an active user
 func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.ValidateResponse, error) {
-	as.logger.Infof("validating user id %s or email %s", req.UserName, req.Email)
-
 	claims, err := as.jwt.ValidateToken(req.Token)
 	if err != nil {
 		as.logger.Errorf("cannot validate the auth token, error: %v", err)
@@ -166,6 +164,7 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 		return nil, status.Errorf(codes.NotFound, "email does not exist")
 	}
 
+	as.logger.Infof("User with email %s successfully verified!", claims.Email)
 	return &pb.ValidateResponse{
 		StatusCode: http.StatusOK,
 		UserId:     user.Id,

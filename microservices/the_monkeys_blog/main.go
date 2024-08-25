@@ -30,7 +30,7 @@ func main() {
 
 	logger := logrus.New()
 
-	osClient, err := database.NewOpenSearchClient(cfg.Opensearch.Host, cfg.Opensearch.Username, cfg.Opensearch.Password, logger)
+	osClient, err := database.NewElasticsearchClient(cfg.Opensearch.Host, cfg.Opensearch.Username, cfg.Opensearch.Password, logger)
 	if err != nil {
 		logger.Fatalf("cannot get the opensearch client, error: %v", err)
 		return

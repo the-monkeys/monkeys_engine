@@ -69,6 +69,13 @@ func main() {
 	blog_client.RegisterBlogRouter(server.router, cfg, authClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 
+	// Health check endpoint
+	server.router.GET("/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+		})
+	})
+
 	server.start(context.Background(), cfg)
 }
 

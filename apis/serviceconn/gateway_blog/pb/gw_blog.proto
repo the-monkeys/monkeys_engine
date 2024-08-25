@@ -23,25 +23,40 @@ message BlogResponse {
 }
 
 message Blog {
-    int64 Time = 1;
-    repeated Block Blocks = 2;
+    int64 time = 1;
+    repeated Block blocks = 2;
 }
 
 message Block {
-    string ID = 1;
-    string Type = 2;
-    Data Data = 3;
-    repeated string Author = 4;
-    int64 Time = 5;
-    Tunes Tunes = 6;
+    string id = 1;
+    string type = 2;
+    Data data = 3;
+    repeated string author = 4;
+    int64 time = 5;
+    Tunes tunes = 6;
 }
 
 message Data {
-    string Text = 1;
+    string text = 1;
+    int32 level = 2;  // For headers
+    File file = 3;    // For files in attaches and images
+    repeated string items = 4; // For lists
+    string list_type = 5; // For list type (unordered, ordered)
+    bool withBorder = 6;  // For images
+    bool withBackground = 7; // For images
+    bool stretched = 8;  // For images
+    string caption = 9;  // For images
+}
+
+message File {
+    string url = 1;
+    int32 size = 2;
+    string name = 3;
+    string extension = 4;
 }
 
 message Tunes {
-    repeated string Footnotes = 1;
+    repeated string footnotes = 1;
 }
 
 message PublishBlogReq {
@@ -91,10 +106,30 @@ message GetBlogsByTagsNameRes {
     string error = 2;
 }
 
+message GetDraftBlogsReq {
+    string account_id = 1;
+    string email = 2;
+    string username = 3;
+}
+
+message GetBlogs {
+    string blog_id = 1;
+    string owner_account_id = 2;
+    Blog blog = 3;
+    repeated string tags = 6;
+}
+
+message GetDraftBlogsRes {
+    repeated GetBlogs blogs = 1;
+    string error = 2;
+}
+
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp);
-    rpc GetBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
+    rpc GetPublishedBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
+    rpc GetDraftBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
     rpc ArchiveBlogById(ArchiveBlogReq) returns (ArchiveBlogResp);
-    rpc GetBlogsByTagsName(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
+    rpc GetPublishedBlogsByTagsName(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
+    rpc GetDraftBlogs(GetDraftBlogsReq) returns (GetDraftBlogsRes);
 }

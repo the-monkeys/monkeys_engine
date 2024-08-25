@@ -18,14 +18,14 @@ import (
 )
 
 type BlogService struct {
-	osClient database.OpensearchStorage
+	osClient database.ElasticsearchStorage
 	logger   *logrus.Logger
 	config   *config.Config
 	qConn    rabbitmq.Conn
 	pb.UnimplementedBlogServiceServer
 }
 
-func NewBlogService(client database.OpensearchStorage, logger *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
+func NewBlogService(client database.ElasticsearchStorage, logger *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
 	return &BlogService{
 		osClient: client,
 		logger:   logger,
@@ -81,30 +81,63 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	}, nil
 }
 
+func (blog *BlogService) GetDraftBlogs(ctx context.Context, req *pb.GetDraftBlogsReq) (*pb.GetDraftBlogsRes, error) {
+	blog.logger.Infof("fetching draft blogs for account id %s", req.AccountId)
+	if req.AccountId == "" {
+		logrus.Error("account id cannot be empty")
+		return nil, status.Errorf(codes.InvalidArgument, "Account id cannot be empty")
+	}
+
+	res, err := blog.osClient.GetDraftBlogsByOwnerAccountID(ctx, req.AccountId)
+	if err != nil {
+		logrus.Errorf("error occurred while getting draft blogs for account id: %s, error: %v", req.AccountId, err)
+		return nil, status.Errorf(codes.Internal, "cannot get the draft blogs for account id: %s", req.AccountId)
+	}
+
+	return res, nil
+}
+
 func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
-	blog.logger.Infof("publishing the blog %s", req.BlogId)
+	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
 
 	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
-	if err != nil && !exists {
-		blog.logger.Errorf("cannot find the blog %s, error: %v", req.BlogId, err)
-		return nil, err
+	if err != nil {
+		blog.logger.Errorf("Error checking blog existence: %v", err)
+		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.BlogId)
 	}
 
-	updateResp, err := blog.osClient.PublishBlogById(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("cannot publish blog: %v", err)
-		return nil, err
+	if !exists {
+		blog.logger.Errorf("The blog with ID: %s doesn't exist", req.BlogId)
+		return nil, status.Errorf(codes.NotFound, "cannot find the blog for id: %s", req.BlogId)
 	}
+
+	_, err = blog.osClient.PublishBlogById(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("Error Publishing the blog: %s, error: %v", req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.BlogId)
+	}
+
 	return &pb.PublishBlogResp{
-		Message: fmt.Sprintf("the blog %s has been published, status: %d", req.BlogId, updateResp.StatusCode),
+		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
 	}, nil
 }
 
-func (blog *BlogService) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+func (blog *BlogService) GetPublishedBlogsByTagsName(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
+	blog.logger.Infof("fetching blogs with the tags: %s", req.TagNames)
+
+	for i := 0; i < len(req.TagNames); i++ {
+		req.TagNames[i] = strings.TrimSpace(req.TagNames[i])
+	}
+
+	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
+}
+
+func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
 	return blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
 }
 
+// ********************************************************  Below function need to be re-written ********************************************************
 func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
 	blog.logger.Infof("archiving the blog %s", req.BlogId)
 
@@ -122,15 +155,6 @@ func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBl
 	return &pb.ArchiveBlogResp{
 		Message: fmt.Sprintf("the blog %s has been archived, status: %d", req.BlogId, updateResp.StatusCode),
 	}, nil
-}
-func (blog *BlogService) GetBlogsByTagsName(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
-	blog.logger.Infof("fetching blog with tag: %s", req.TagNames)
-
-	for i := 0; i < len(req.TagNames); i++ {
-		req.TagNames[i] = strings.TrimSpace(req.TagNames[i])
-	}
-
-	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
 }
 
 // func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {
