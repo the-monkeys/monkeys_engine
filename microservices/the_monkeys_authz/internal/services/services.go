@@ -173,6 +173,17 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 	}, nil
 }
 
+func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq) (*pb.AccessCheckRes, error) {
+	as.logger.Infof("checking access of user %s for blog %s", req.AccountId, req.BlogId)
+
+	// TODO: Check if the user has the required access level for the blog
+
+	// Return the access level
+	return &pb.AccessCheckRes{
+		Access: []string{"Read", "Edit", "Delete", "Archive", "Transfer-Ownership", "Publish", "Draft"},
+	}, nil
+}
+
 func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
 	as.logger.Infof("user has requested to login with email: %s", req.Email)
 	// Check if the user is existing the db or not

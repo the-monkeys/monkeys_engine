@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,67 +19,82 @@ func InitAuthMiddleware(svc *ServiceClient) AuthMiddlewareConfig {
 	return AuthMiddlewareConfig{svc}
 }
 
-func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
+// Extracts the token from the Authorization header or query parameter
+func (c *AuthMiddlewareConfig) extractToken(ctx *gin.Context) (string, error) {
 	authorization := ctx.Request.Header.Get("Authorization")
 
 	if authorization == "" {
-		// Check if the token is provided as a query parameter
 		tokenQuery := ctx.Query("token")
 		if tokenQuery == "" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-			return
+			return "", fmt.Errorf("unauthorized")
 		}
 		authorization = "Bearer " + tokenQuery
 	}
 
-	token := strings.Split(authorization, "Bearer ")
-	if len(token) < 2 {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-		return
+	tokenParts := strings.Split(authorization, "Bearer ")
+	if len(tokenParts) < 2 {
+		return "", fmt.Errorf("unauthorized")
 	}
 
-	res, err := c.svc.Client.Validate(context.Background(), &pb.ValidateRequest{
-		Token: token[1],
-	})
+	return tokenParts[1], nil
+}
 
+// Validate the token and retrieve user information
+func (c *AuthMiddlewareConfig) validateToken(ctx *gin.Context) (*pb.ValidateResponse, error) {
+	token, err := c.extractToken(ctx)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-		return
+		return nil, err
+	}
+
+	res, err := c.svc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: token})
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+		return nil, err
 	}
 
 	ctx.Set("userName", res.UserName)
+	return res, nil
+}
+
+// Middleware to check basic authorization
+func (c *AuthMiddlewareConfig) AuthRequired(ctx *gin.Context) {
+	if _, err := c.validateToken(ctx); err != nil {
+		return
+	}
 
 	ctx.Next()
 }
 
+// Middleware to check authorization with specific access level
 func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
-	authorization := ctx.Request.Header.Get("authorization")
-
-	if authorization == "" {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+	res, err := c.validateToken(ctx)
+	if err != nil {
 		return
 	}
 
-	token := strings.Split(authorization, "Bearer ")
+	blogID := ctx.Param("blog_id")
+	userName := res.UserName
+	email := ctx.Param("email")
+	accountID := ctx.Param("account_id")
+	// userID := ctx.Param("user_id")
 
-	if len(token) < 2 {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	res, err := c.svc.Client.Validate(context.Background(), &pb.ValidateRequest{
-		Token: token[1],
+	accessResp, err := c.svc.Client.CheckAccessLevel(context.Background(), &pb.AccessCheckReq{
+		// Token:     res,
+		Email:     email,
+		AccountId: accountID,
+		UserName:  userName,
+		BlogId:    blogID,
 	})
 
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil || accessResp.StatusCode != http.StatusOK {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	ctx.Set("userId", res.UserId)
+	ctx.Set("user_access_level", accessResp.Access)
 
 	ctx.Next()
-
 }
 
 func (c *AuthMiddlewareConfig) CanPublish(ctx *gin.Context) {

@@ -59,7 +59,7 @@ message ValidateResponse {
 message AccessCheckReq { 
   string token = 1;
   string email = 2;
-  int64 user_id = 3;
+  string account_id = 3;
   string user_name = 4;
   string blog_id = 5;
   string file_name = 6;
@@ -68,7 +68,7 @@ message AccessCheckReq {
 message AccessCheckRes {
   int64 status_code = 1;
   string email = 2;
-  int64 user_id = 3;
+  string account_id = 3;
   string user_name = 4;
   repeated string access = 5;
   string blog_id = 6;

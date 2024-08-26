@@ -53,24 +53,27 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	}
 	routes := router.Group("/api/v1/blog")
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
-	routes.GET("/:id", blogClient.GetPublishedBlogById)
+	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
 	routes.GET("/news1", blogClient.GetNews1)
 	routes.GET("/news2", blogClient.GetNews2)
 	routes.GET("/news3", blogClient.GetNews3)
 
+	// Use AuthRequired for basic authorization
 	routes.Use(mware.AuthRequired)
-	routes.GET("/draft/:id", blogClient.DraftABlog)
-	routes.POST("/publish/:blog_id", mware.CanPublish, blogClient.PublishBlogById)
-	routes.POST("/archive/:id", blogClient.ArchiveBlogById)
+	routes.GET("/draft/:blog_id", blogClient.DraftABlog)
+
+	// Use AuthzRequired for routes needing access control
+	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
+	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
 	// routes.DELETE("/delete/:id", blogClient.DeleteBlogById)
-	routes.GET("/all/drafts/:acc_id", mware.CheckWriteAccess, blogClient.AllDrafts)
+	routes.GET("/all/drafts/:acc_id", mware.AuthzRequired, blogClient.AllDrafts)
 
 	return blogClient
 }
 
 func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
-	id := ctx.Param("id")
+	id := ctx.Param("blog_id")
 
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
@@ -192,7 +195,7 @@ func (asc *BlogServiceClient) GetBlogsByTagsName(ctx *gin.Context) {
 }
 
 func (svc *BlogServiceClient) GetPublishedBlogById(ctx *gin.Context) {
-	id := ctx.Param("id")
+	id := ctx.Param("blog_id")
 
 	res, err := svc.Client.GetPublishedBlogById(context.Background(), &pb.GetBlogByIdReq{BlogId: id})
 	if err != nil {
@@ -205,7 +208,7 @@ func (svc *BlogServiceClient) GetPublishedBlogById(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
-	id := ctx.Param("id")
+	id := ctx.Param("blog_id")
 	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
 		BlogId: id,
 	})
