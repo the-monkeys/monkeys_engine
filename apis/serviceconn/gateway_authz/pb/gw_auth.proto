@@ -56,6 +56,25 @@ message ValidateResponse {
   Error error = 5;
 }
 
+message AccessCheckReq { 
+  string token = 1;
+  string email = 2;
+  int64 user_id = 3;
+  string user_name = 4;
+  string blog_id = 5;
+  string file_name = 6;
+}
+
+message AccessCheckRes {
+  int64 status_code = 1;
+  string email = 2;
+  int64 user_id = 3;
+  string user_name = 4;
+  repeated string access = 5;
+  string blog_id = 6;
+  Error error = 7;
+}
+
 message LoginUserRequest {
   string email = 1;
   string password = 2;
@@ -206,6 +225,7 @@ message UpdateEmailIdRes {
 service AuthService {
   rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse) {}
   rpc Validate(ValidateRequest) returns (ValidateResponse) {}
+  rpc CheckAccessLevel(AccessCheckReq) returns (AccessCheckRes) {}
   rpc Login(LoginUserRequest) returns (LoginUserResponse) {}
   rpc ForgotPassword(ForgotPasswordReq) returns (ForgotPasswordRes) {}
   rpc ResetPassword(ResetPasswordReq) returns (ResetPasswordRes) {}

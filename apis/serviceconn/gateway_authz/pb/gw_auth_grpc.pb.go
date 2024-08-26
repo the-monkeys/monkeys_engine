@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type AuthServiceClient interface {
 	RegisterUser(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
 	Validate(ctx context.Context, in *ValidateRequest, opts ...grpc.CallOption) (*ValidateResponse, error)
+	CheckAccessLevel(ctx context.Context, in *AccessCheckReq, opts ...grpc.CallOption) (*AccessCheckRes, error)
 	Login(ctx context.Context, in *LoginUserRequest, opts ...grpc.CallOption) (*LoginUserResponse, error)
 	ForgotPassword(ctx context.Context, in *ForgotPasswordReq, opts ...grpc.CallOption) (*ForgotPasswordRes, error)
 	ResetPassword(ctx context.Context, in *ResetPasswordReq, opts ...grpc.CallOption) (*ResetPasswordRes, error)
@@ -55,6 +56,15 @@ func (c *authServiceClient) RegisterUser(ctx context.Context, in *RegisterUserRe
 func (c *authServiceClient) Validate(ctx context.Context, in *ValidateRequest, opts ...grpc.CallOption) (*ValidateResponse, error) {
 	out := new(ValidateResponse)
 	err := c.cc.Invoke(ctx, "/auth_svc.AuthService/Validate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CheckAccessLevel(ctx context.Context, in *AccessCheckReq, opts ...grpc.CallOption) (*AccessCheckRes, error) {
+	out := new(AccessCheckRes)
+	err := c.cc.Invoke(ctx, "/auth_svc.AuthService/CheckAccessLevel", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +158,7 @@ func (c *authServiceClient) UpdateEmailId(ctx context.Context, in *UpdateEmailId
 type AuthServiceServer interface {
 	RegisterUser(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
 	Validate(context.Context, *ValidateRequest) (*ValidateResponse, error)
+	CheckAccessLevel(context.Context, *AccessCheckReq) (*AccessCheckRes, error)
 	Login(context.Context, *LoginUserRequest) (*LoginUserResponse, error)
 	ForgotPassword(context.Context, *ForgotPasswordReq) (*ForgotPasswordRes, error)
 	ResetPassword(context.Context, *ResetPasswordReq) (*ResetPasswordRes, error)
@@ -169,6 +180,9 @@ func (UnimplementedAuthServiceServer) RegisterUser(context.Context, *RegisterUse
 }
 func (UnimplementedAuthServiceServer) Validate(context.Context, *ValidateRequest) (*ValidateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Validate not implemented")
+}
+func (UnimplementedAuthServiceServer) CheckAccessLevel(context.Context, *AccessCheckReq) (*AccessCheckRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckAccessLevel not implemented")
 }
 func (UnimplementedAuthServiceServer) Login(context.Context, *LoginUserRequest) (*LoginUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Login not implemented")
@@ -242,6 +256,24 @@ func _AuthService_Validate_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).Validate(ctx, req.(*ValidateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CheckAccessLevel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AccessCheckReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CheckAccessLevel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/auth_svc.AuthService/CheckAccessLevel",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CheckAccessLevel(ctx, req.(*AccessCheckReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -422,6 +454,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Validate",
 			Handler:    _AuthService_Validate_Handler,
+		},
+		{
+			MethodName: "CheckAccessLevel",
+			Handler:    _AuthService_CheckAccessLevel_Handler,
 		},
 		{
 			MethodName: "Login",
