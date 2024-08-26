@@ -47,7 +47,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		Client: NewBlogServiceClient(cfg),
 	}
 	routes := router.Group("/api/v1/blog")
-	// routes.GET("/latest", blogClient.Get100Blogs)
+	routes.GET("/latest", blogClient.GetLatest100Blogs)
 	routes.GET("/:id", blogClient.GetPublishedBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
 	routes.GET("/news1", blogClient.GetNews1)
@@ -224,67 +224,32 @@ func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-// func (asc *BlogServiceClient) Get100Blogs(ctx *gin.Context) {
-// 	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})
-// }
+func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
+	res, err := asc.Client.GetLatest100Blogs(context.Background(), &pb.GetBlogsByTagsNameReq{})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blogs do not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the latest blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
 
 // func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 // 	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})
 // }
 
-// func (asc *BlogServiceClient) CreateABlog(ctx *gin.Context) {
-
-// 	body := CreatePostRequestBody{}
-// 	if err := ctx.BindJSON(&body); err != nil {
-// 		logrus.Errorf("cannot bind json to struct, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
-
-// 	res, err := asc.Client.CreateABlog(context.Background(), &pb.CreateBlogRequest{
-// 		Id:         uuid.NewString(),
-// 		Title:      body.Title,
-// 		Content:    body.Content,
-// 		AuthorName: body.Author,
-// 		AuthorId:   body.AuthorId,
-// 		Published:  body.Published,
-// 		Tags:       body.Tags,
-// 	})
-
-// 	if err != nil {
-// 		_ = ctx.AbortWithError(http.StatusBadGateway, err)
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusAccepted, &res)
-
-// }
-
-// func (svc *BlogServiceClient) Get100Blogs(ctx *gin.Context) {
-// 	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
-
-// 	stream, err := svc.Client.Get100Blogs(context.Background(), &emptypb.Empty{})
-// 	if err != nil {
-// 		logrus.Errorf("cannot connect to article stream rpc server, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusBadGateway, err)
-// 		return
-// 	}
-
-// 	response := []*pb.GetBlogsResponse{}
-// 	for {
-// 		resp, err := stream.Recv()
-// 		if err == io.EOF {
-// 			break
-// 		}
-// 		if err != nil {
-// 			logrus.Errorf("cannot get the stream data, error: %+v", err)
-// 		}
-
-// 		response = append(response, resp)
-// 	}
-
-// 	ctx.JSON(http.StatusCreated, response)
-// }
+// ******************************************************* Third Party API ************************************************
 
 type NewsResponse struct {
 	Data interface{} `json:"data"`
@@ -374,38 +339,6 @@ func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
 
 	ctx.Data(http.StatusOK, "application/json", body)
 }
-
-// func (blog *BlogServiceClient) EditArticles(ctx *gin.Context) {
-// 	id := ctx.Param("id")
-
-// 	reqObj := EditArticleRequestBody{}
-
-// 	if err := ctx.BindJSON(&reqObj); err != nil {
-// 		logrus.Errorf("invalid body, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
-// 	var isPartial bool
-// 	if ctx.Request.Method == http.MethodPatch {
-// 		isPartial = true
-// 	}
-
-// 	res, err := blog.Client.EditBlogById(context.Background(), &pb.EditBlogRequest{
-// 		Id:        id,
-// 		Title:     reqObj.Title,
-// 		Content:   reqObj.Content,
-// 		Tags:      reqObj.Tags,
-// 		IsPartial: isPartial,
-// 	})
-
-// 	if err != nil {
-// 		logrus.Errorf("cannot connect to article rpc server, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusCreated, res)
-// }
 
 // func (svc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 // 	id := ctx.Param("id")

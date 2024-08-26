@@ -266,6 +266,7 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 	return updateResponse, nil
 }
 
+// TODO: Fetch a finite no of blogs like 100 latest blogs based on the tag names
 func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error) {
 	// Ensure at least one tag is provided
 	if len(tags) == 0 {
@@ -550,19 +551,49 @@ func (es *elasticsearchStorage) DeleteABlogById(ctx context.Context, blogId stri
 
 // GetLast100BlogsLatestFirst retrieves the last 100 blogs sorted by the latest first
 func (es *elasticsearchStorage) GetLast100BlogsLatestFirst(ctx context.Context) (*pb.GetBlogsByTagsNameRes, error) {
-	// Build the query to retrieve the last 100 blogs, sorted by a timestamp field in descending order
+	// Build the query to retrieve the last 100 blogs, sorted by the time field in descending order
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"timestamp": map[string]string{
+				"blog.time": map[string]string{
 					"order": "desc",
 				},
 			},
 		},
 		"size": 100,
 		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"is_draft": false,
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_draft": false,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": false,
+						},
+					},
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "is_archived",
+								},
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
 			},
 		},
 	}

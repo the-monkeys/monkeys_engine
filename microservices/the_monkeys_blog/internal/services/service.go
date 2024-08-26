@@ -122,6 +122,7 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	}, nil
 }
 
+// TODO: Fetch a finite no of blogs like 100 latest blogs based on the tag names
 func (blog *BlogService) GetPublishedBlogsByTagsName(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
 	blog.logger.Infof("fetching blogs with the tags: %s", req.TagNames)
 
@@ -161,6 +162,10 @@ func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlo
 	return &pb.ArchiveBlogResp{
 		Message: fmt.Sprintf("Blog %s has been archived!", req.BlogId),
 	}, nil
+}
+
+func (blog *BlogService) GetLatest100Blogs(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
+	return blog.osClient.GetLast100BlogsLatestFirst(ctx)
 }
 
 // ********************************************************  Below function need to be re-written ********************************************************
