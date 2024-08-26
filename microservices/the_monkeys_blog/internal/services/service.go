@@ -137,79 +137,33 @@ func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.GetBl
 	return blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
 }
 
-// ********************************************************  Below function need to be re-written ********************************************************
-func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
-	blog.logger.Infof("archiving the blog %s", req.BlogId)
+func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
+	blog.logger.Infof("Archiving blog %s", req.BlogId)
 
 	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
-	if err != nil && !exists {
-		blog.logger.Errorf("cannot find the blog %s, error: %v", req.BlogId, err)
-		return nil, err
+	if err != nil {
+		blog.logger.Errorf("Error checking blog existence: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to check existence for blog with ID: %s", req.BlogId)
 	}
 
-	updateResp, err := blog.osClient.AchieveBlogById(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("cannot archive the blog: %v", err)
-		return nil, err
+	if !exists {
+		blog.logger.Errorf("Blog with ID %s does not exist", req.BlogId)
+		return nil, status.Errorf(codes.NotFound, "blog with ID %s does not exist", req.BlogId)
 	}
+
+	updateResp, err := blog.osClient.AchieveAPublishedBlogById(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("failed to archive blog with ID: %s, error: %v", req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "failed to archive blog with ID: %s", req.BlogId)
+	}
+
+	blog.logger.Infof("Blog with ID: %s archived successfully, status code: %v", req.BlogId, updateResp.StatusCode)
 	return &pb.ArchiveBlogResp{
-		Message: fmt.Sprintf("the blog %s has been archived, status: %d", req.BlogId, updateResp.StatusCode),
+		Message: fmt.Sprintf("Blog %s has been archived!", req.BlogId),
 	}, nil
 }
 
-// func (blog *BlogService) CreateABlog(ctx context.Context, req *pb.CreateBlogRequest) (*pb.CreateBlogResponse, error) {
-// 	blog.logger.Infof("received a create blog request from user: %v", req.AuthorId)
-
-// 	// Lower cased tags and trim spaces
-// 	for i, v := range req.Tags {
-// 		req.Tags[i] = strings.ToLower(strings.TrimSpace(v))
-// 	}
-
-// 	// Trim spaces from fields
-// 	req.Title = strings.TrimSpace(req.Title)
-// 	req.AuthorName = strings.TrimSpace(req.AuthorName)
-// 	req.Content = strings.TrimSpace(req.Content)
-// 	req.AuthorId = strings.TrimSpace(req.AuthorId)
-
-// 	req.CanEdit = true
-// 	req.Ownership = pb.CreateBlogRequest_THE_USER
-
-// 	// Assign to models struct
-// 	post := models.Blogs{
-// 		Id:               req.Id,
-// 		Title:            req.Title,
-// 		ContentFormatted: req.Content,
-// 		ContentRaw:       formattedToRawContent(req.Content),
-// 		AuthorName:       req.AuthorName,
-// 		AuthorId:         req.AuthorId,
-// 		Published:        &req.Published,
-// 		Tags:             req.Tags,
-// 		CreateTime:       time.Now().Format("2006-01-02T15:04:05Z07:00"),
-// 		UpdateTime:       time.Now().Format("2006-01-02T15:04:05Z07:00"),
-// 		CanEdit:          &req.CanEdit,
-// 		OwnerShip:        req.Ownership,
-// 		FolderPath:       "",
-// 	}
-
-// 	// Create the articles
-// 	resp, err := blog.osClient.CreateAnArticle(post)
-// 	if err != nil {
-// 		blog.logger.Errorf("cannot save the blog, error: %+v", err)
-// 		return nil, err
-// 	}
-
-// 	if resp.StatusCode == http.StatusBadRequest {
-// 		blog.logger.Errorf("cannot save the blog bad request, error: %+v", err)
-// 		return nil, common.ErrBadRequest
-// 	}
-
-// 	blog.logger.Infof("user %v created a blog successfully: %v", req.GetAuthorId(), req.GetId())
-
-// 	return &pb.CreateBlogResponse{
-// 		Status: int64(resp.StatusCode),
-// 		Id:     int64(resp.StatusCode),
-// 	}, nil
-// }
+// ********************************************************  Below function need to be re-written ********************************************************
 
 // func (blog *BlogService) Get100Blogs(req *emptypb.Empty, stream pb.BlogsAndPostService_Get100BlogsServer) error {
 // 	searchResponse, err := blog.osClient.GetLast100Articles()
@@ -378,105 +332,4 @@ func (blog *BlogService) ArchivehBlogById(ctx context.Context, req *pb.ArchiveBl
 // 	}
 
 // 	return &pb.DeleteBlogByIdResponse{Status: int64(deleteResponse.StatusCode)}, nil
-// }
-
-// func (blog *BlogService) GetBlogsByTag(req *pb.GetBlogsByTagReq, stream pb.BlogsAndPostService_GetBlogsByTagServer) error {
-// 	searchResponse, err := blog.osClient.GetLast100ArticlesByTag(req.GetTagName())
-// 	if err != nil {
-// 		blog.logger.Errorf("cannot get the blogs by tag name %s, error: %v", req.TagName, err)
-// 		return err
-// 	}
-
-// 	var result map[string]interface{}
-
-// 	// logrus.Infof("Response: %+v", searchResponse)
-// 	decoder := json.NewDecoder(searchResponse.Body)
-// 	if err := decoder.Decode(&result); err != nil {
-// 		blog.logger.Error("error while decoding, error", err)
-// 	}
-
-// 	bx, err := json.MarshalIndent(result, "", "    ")
-// 	if err != nil {
-// 		blog.logger.Errorf("cannot marshal map[string]interface{}, error: %+v", err)
-// 		return err
-// 	}
-
-// 	arts := models.Last100Articles{}
-// 	if err := json.Unmarshal(bx, &arts); err != nil {
-// 		blog.logger.Errorf("cannot unmarshal byte slice, error: %+v", err)
-// 		return err
-// 	}
-
-// 	articles := parseToStruct(arts)
-// 	for _, article := range articles {
-// 		if err := stream.Send(&article); err != nil {
-// 			blog.logger.Errorf("error while sending stream, error %+v", err)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-// // TODO: Needs to be edited based on the Quill or editor.js integration
-// func (blog *BlogService) DraftAndPublish(ctx context.Context, req *pb.BlogRequest) (*pb.BlogResponse, error) {
-// 	blog.logger.Infof("the document %s is being accessed", req.GetId())
-// 	exists, err := blog.osClient.client.Exists(utils.OpensearchArticleIndex, req.GetId())
-// 	if err != nil {
-// 		fmt.Println("Error checking if document exists: ", err)
-// 		return nil, err
-// 	}
-
-// 	if exists.StatusCode == http.StatusNotFound {
-// 		blog.logger.Infof("cannot find the existing document, creating a document with id %v", req.GetId())
-// 		// Lower cased tags and trim spaces
-// 		for i, v := range req.Tags {
-// 			req.Tags[i] = strings.ToLower(strings.TrimSpace(v))
-// 		}
-
-// 		req.CanEdit = true
-// 		req.Ownership = pb.BlogRequest_THE_USER
-
-// 		// Assign to models struct
-// 		newBlog := models.BlogsService{
-// 			Id:                 req.Id,
-// 			HTMLContent:        req.HTMLContent,
-// 			RawContent:         formattedToRawContent(req.HTMLContent), // TODO: get correct raw content
-// 			CreateTime:         time.Now().Format("2006-01-02T15:04:05Z07:00"),
-// 			UpdateTime:         time.Now().Format("2006-01-02T15:04:05Z07:00"),
-// 			AuthorName:         req.AuthorName,
-// 			AuthorEmail:        req.AuthorEmail,
-// 			AuthorStatus:       "active",
-// 			Published:          &req.Published,
-// 			NoOfViews:          0,
-// 			Tags:               req.Tags,
-// 			CanEdit:            &req.CanEdit,
-// 			OwnerShip:          pb.BlogRequest_Ownership_name[0],
-// 			Category:           "general", // TODO: Changes category based on sentiment analysis
-// 			FirstPublishedTime: "",
-// 			LastEditedTime:     time.Now().Format("2006-01-02T15:04:05Z07:00"),
-// 		}
-
-// 		// Create the articles
-// 		resp, err := blog.osClient.CreateABlog(newBlog)
-// 		if err != nil {
-// 			blog.logger.Infof("cannot save the blog, error: %+v", err)
-// 			return nil, err
-// 		}
-
-// 		if resp.StatusCode == http.StatusBadRequest {
-// 			blog.logger.Errorf("cannot save the blog bad request, error: %+v", err)
-// 			return nil, common.ErrBadRequest
-// 		}
-
-// 		blog.logger.Infof("user %v created a blog successfully: %v", req.GetId(), req.GetId())
-
-// 		return &pb.BlogResponse{
-// 			DocId:   req.GetId(),
-// 			Message: "created a new blog",
-// 		}, nil
-// 	}
-
-// 	blog.logger.Infof("found the existing document, updating the document with id %v", req.GetId())
-// 	// TODO: Update the blog document
-// 	return &pb.BlogResponse{}, nil
 // }

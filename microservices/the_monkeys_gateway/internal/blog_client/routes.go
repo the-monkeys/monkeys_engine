@@ -57,7 +57,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.Use(mware.AuthRequired)
 	routes.GET("/draft/:id", blogClient.DraftABlog)
 	routes.POST("/publish/:blog_id", mware.CanPublish, blogClient.PublishBlogById)
-	// routes.POST("/archive/:id", blogClient.ArchiveBlogById)
+	routes.POST("/archive/:id", blogClient.ArchiveBlogById)
 	// routes.DELETE("/delete/:id", blogClient.DeleteBlogById)
 	routes.GET("/all/drafts/:acc_id", mware.CheckWriteAccess, blogClient.AllDrafts)
 
@@ -199,20 +199,30 @@ func (svc *BlogServiceClient) GetPublishedBlogById(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, res)
 }
 
-// func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
-// 	id := ctx.Param("id")
-// 	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
-// 		BlogId: id,
-// 	})
+func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
+	id := ctx.Param("id")
+	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
+		BlogId: id,
+	})
 
-// 	if err != nil {
-// 		logrus.Errorf("error while creating draft blog: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-// 		return
-// 	}
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot archive the blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
 
-// 	ctx.JSON(http.StatusOK, resp)
-// }
+	ctx.JSON(http.StatusOK, resp)
+}
 
 // func (asc *BlogServiceClient) Get100Blogs(ctx *gin.Context) {
 // 	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})

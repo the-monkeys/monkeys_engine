@@ -10,7 +10,6 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/opensearch-project/opensearch-go/opensearchapi"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/constants"
@@ -23,10 +22,9 @@ type ElasticsearchStorage interface {
 	PublishBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
 	GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.GetBlogByIdRes, error)
-
-	// GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error)
-	GetBlogDetailsById(ctx context.Context, blogId string) (string, []string, error)
-	AchieveBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
+	AchieveAPublishedBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
+	DeleteABlogById(ctx context.Context, blogId string) (*esapi.Response, error)
+	GetLast100BlogsLatestFirst(ctx context.Context) (*pb.GetBlogsByTagsNameRes, error)
 }
 
 type elasticsearchStorage struct {
@@ -469,225 +467,176 @@ func (es *elasticsearchStorage) GetPublishedBlogById(ctx context.Context, id str
 	return &blog, nil
 }
 
-// ********************************************************  Below function need to be re-written ********************************************************
-// func (storage *elasticsearchStorage) GetPublishedBlogById(ctx context.Context, id string) (*pb.GetBlogByIdRes, error) {
-// 	res, err := storage.client.Search(
-// 		storage.client.Search.WithContext(context.Background()),
-// 		storage.client.Search.WithIndex(constants.ElasticsearchBlogIndex),
-// 		storage.client.Search.WithBody(strings.NewReader(fmt.Sprintf(`{
-// 			"query": {
-// 				"bool": {
-// 					"must": [
-// 						{ "term": { "blog_id": "%s" } },
-// 						{ "term": { "is_draft": false } }
-// 					],
-// 					"should": [
-// 						{ "bool": { "must_not": { "exists": { "field": "is_archive" } } } },
-// 						{ "term": { "is_archive": false } }
-// 					],
-// 					"minimum_should_match": 1
-// 				}
-// 			}
-// 		}`, id))),
-// 		storage.client.Search.WithPretty(),
-// 	)
-
-// 	// storage.log.Infof("Response: %+v", res)
-// 	if err != nil {
-// 		log.Fatalf("fetching the blog: %s", err)
-// 		return nil, err
-// 	}
-// 	defer res.Body.Close()
-
-// 	bodyBytes, err := io.ReadAll(res.Body)
-// 	if err != nil {
-// 		storage.log.Errorf("error reading response body, error: %+v", err)
-// 		return nil, err
-// 	}
-
-// 	var source map[string]interface{}
-// 	err = json.Unmarshal(bodyBytes, &source)
-// 	if err != nil {
-// 		storage.log.Errorf("error unmarshalling blog, error: %+v", err)
-// 		return nil, err
-// 	}
-
-// 	if len(source["hits"].(map[string]interface{})["hits"].([]interface{})) == 0 {
-// 		storage.log.Errorf("no blog found with id: %s", id)
-// 		return nil, fmt.Errorf("no blog found with id: %s", id)
-// 	}
-
-// 	firstHit := source["hits"].(map[string]interface{})["hits"].([]interface{})[0]
-// 	firstHitMap, ok := firstHit.(map[string]interface{})
-// 	if !ok {
-// 		log.Fatalf("error converting first hit to map[string]interface{}")
-// 		return nil, fmt.Errorf("error converting first hit to map[string]interface{}")
-// 	}
-
-// 	bx, err := json.MarshalIndent(firstHitMap["_source"], "", "\t")
-// 	if err != nil {
-// 		storage.log.Errorf("error marshalling the _source, error: %+v", err)
-// 		return nil, err
-// 	}
-// 	blogRes := &pb.GetBlogByIdRes{}
-
-// 	if err = json.Unmarshal(bx, blogRes); err != nil {
-// 		storage.log.Errorf("error un-marshalling the bytes into struct, error: %+v", err)
-// 		return nil, err
-// 	}
-
-// 	storage.log.Infof("successfully fetched blog with id: %s", id)
-// 	return blogRes, nil
-// }
-
-func (os *elasticsearchStorage) AchieveBlogById(ctx context.Context, blogId string) (*esapi.Response, error) {
-	os.log.Infof("archiving blog with id: %s", blogId)
-
-	// // Define the update script
-	// updateScript := `{
-	// 	"script" : {
-	// 		"source": "ctx._source.is_archive = params.is_archive",
-	// 		"lang": "painless",
-	// 		"params" : {
-	// 			"is_archive" : true
-	// 		}
-	// 	}
-	// }`
-
-	// osReq := opensearchapi.UpdateRequest{
-	// 	Index:      constants.OpensearchArticleIndex,
-	// 	DocumentID: blogId,
-	// 	Body:       strings.NewReader(updateScript),
-	// }
-
-	// updateResponse, err := osReq.Do(ctx, os.client)
-	// if err != nil {
-	// 	os.log.Errorf("Error while archiving blog, error: %+v", err)
-	// 	return updateResponse, err
-	// }
-
-	// if updateResponse.IsError() {
-	// 	err = fmt.Errorf("error archiving blog, update response: %+v", updateResponse)
-	// 	os.log.Error(err)
-	// 	return updateResponse, err
-	// }
-
-	// os.log.Infof("Successfully archiving blog with id: %s", blogId)
-	// return updateResponse, nil
-	return nil, nil
-}
-
-func (os *elasticsearchStorage) GetBlogDetailsById(ctx context.Context, blogId string) (string, []string, error) {
-	os.log.Infof("Fetching blog with id: %s", blogId)
-
-	// Define the search request
-	searchRequest := fmt.Sprintf(`{
-		"query": {
-			"term": {
-				"blog_id": {
-					"value": "%s"
-				}
-			}
-		}
-	}`, blogId)
-
-	osReq := opensearchapi.SearchRequest{
-		Index: []string{constants.ElasticsearchBlogIndex},
-		Body:  strings.NewReader(searchRequest),
+// AchieveAPublishedBlogById archives a published blog by setting an "is_archived" field to true
+func (es *elasticsearchStorage) AchieveAPublishedBlogById(ctx context.Context, blogId string) (*esapi.Response, error) {
+	// Ensure blogId is not empty
+	if blogId == "" {
+		es.log.Error("AchieveAPublishedBlogById: blogId is empty")
+		return nil, fmt.Errorf("blogId cannot be empty")
 	}
 
-	searchResponse, err := osReq.Do(ctx, os.client)
+	// Build the update query to set is_archived to true
+	updateScript := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": "ctx._source.is_archived = true",
+		},
+	}
+
+	// Marshal the update script to JSON
+	bs, err := json.Marshal(updateScript)
 	if err != nil {
-		os.log.Errorf("Error while fetching blog, error: %+v", err)
-		return "", nil, err
+		es.log.Errorf("AchieveAPublishedBlogById: cannot marshal the update script, error: %v", err)
+		return nil, err
 	}
 
-	if searchResponse.IsError() {
-		err = fmt.Errorf("error fetching blog, search response: %+v", searchResponse)
-		os.log.Error(err)
-		return "", nil, err
+	// Create an update request
+	req := esapi.UpdateRequest{
+		Index:      constants.ElasticsearchBlogIndex,
+		DocumentID: blogId,
+		Body:       strings.NewReader(string(bs)),
 	}
 
-	var r map[string]interface{}
-	if err := json.NewDecoder(searchResponse.Body).Decode(&r); err != nil {
-		return "", nil, err
+	// Execute the update request
+	updateResponse, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("AchieveAPublishedBlogById: error executing update request, error: %+v", err)
+		return updateResponse, err
+	}
+	defer updateResponse.Body.Close()
+
+	// Check if the response indicates an error
+	if updateResponse.IsError() {
+		err = fmt.Errorf("AchieveAPublishedBlogById: update query failed, response: %+v", updateResponse)
+		es.log.Error(err)
+		return updateResponse, err
 	}
 
-	// Log the entire response for debugging
-	os.log.Infof("Search response: %+v", r)
-
-	hitsData, ok := r["hits"].(map[string]interface{})
-	if !ok {
-		return "", nil, fmt.Errorf("No matching blog found: missing hits in response")
-	}
-
-	hits, ok := hitsData["hits"].([]interface{})
-	if !ok || len(hits) == 0 {
-		return "", nil, fmt.Errorf("No matching blog found: empty hits array")
-	}
-
-	hit := hits[0].(map[string]interface{})
-	source := hit["_source"].(map[string]interface{})
-	ownerAccountId := source["owner_account_id"].(string)
-	tagsInterface := source["tags"].([]interface{})
-	tags := make([]string, len(tagsInterface))
-	for i, tag := range tagsInterface {
-		tags[i] = tag.(string)
-	}
-
-	return ownerAccountId, tags, nil
+	es.log.Infof("AchieveAPublishedBlogById: successfully archived blog with id: %s", blogId)
+	return updateResponse, nil
 }
 
-// func (storage *opensearchStorage) GetBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
-// 	storage.log.Infof("fetching blog with id: %s", req.BlogId)
+// DeleteABlogById deletes a blog by its ID
+func (es *elasticsearchStorage) DeleteABlogById(ctx context.Context, blogId string) (*esapi.Response, error) {
+	// Ensure blogId is not empty
+	if blogId == "" {
+		es.log.Error("DeleteABlogById: blogId is empty")
+		return nil, fmt.Errorf("blogId cannot be empty")
+	}
 
-// 	osReq := opensearchapi.GetRequest{
-// 		Index:      constants.OpensearchArticleIndex,
-// 		DocumentID: req.BlogId,
-// 	}
+	// Create a Delete request
+	req := esapi.DeleteRequest{
+		Index:      constants.ElasticsearchBlogIndex,
+		DocumentID: blogId,
+	}
 
-// 	getResponse, err := osReq.Do(ctx, storage.client)
-// 	if err != nil {
-// 		storage.log.Errorf("error while fetching blog, error: %+v", err)
-// 		return nil, err
-// 	}
+	// Execute the delete request
+	deleteResponse, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("DeleteABlogById: error executing delete request, error: %+v", err)
+		return deleteResponse, err
+	}
+	defer deleteResponse.Body.Close()
 
-// 	if getResponse.IsError() {
-// 		if getResponse.StatusCode == http.StatusNotFound {
-// 			storage.log.Errorf("blog with id: %s does not exist", req.BlogId)
-// 			return nil, fmt.Errorf("blog with id: %s does not exist", req.BlogId)
-// 		}
-// 		err = fmt.Errorf("error fetching blog, get response: %+v", getResponse)
-// 		storage.log.Error(err)
-// 		return nil, err
-// 	}
+	// Check if the response indicates an error
+	if deleteResponse.IsError() {
+		err = fmt.Errorf("DeleteABlogById: delete query failed, response: %+v", deleteResponse)
+		es.log.Error(err)
+		return deleteResponse, err
+	}
 
-// 	// Read the body into a byte slice
-// 	bodyBytes, err := io.ReadAll(getResponse.Body)
-// 	if err != nil {
-// 		storage.log.Errorf("error reading response body, error: %+v", err)
-// 		return nil, err
-// 	}
+	es.log.Infof("DeleteABlogById: successfully deleted blog with id: %s", blogId)
+	return deleteResponse, nil
+}
 
-// 	var source map[string]interface{}
-// 	err = json.Unmarshal(bodyBytes, &source)
-// 	if err != nil {
-// 		storage.log.Errorf("error unmarshalling blog, error: %+v", err)
-// 		return nil, err
-// 	}
+// GetLast100BlogsLatestFirst retrieves the last 100 blogs sorted by the latest first
+func (es *elasticsearchStorage) GetLast100BlogsLatestFirst(ctx context.Context) (*pb.GetBlogsByTagsNameRes, error) {
+	// Build the query to retrieve the last 100 blogs, sorted by a timestamp field in descending order
+	query := map[string]interface{}{
+		"sort": []map[string]interface{}{
+			{
+				"timestamp": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+		"size": 100,
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"is_draft": false,
+			},
+		},
+	}
 
-// 	bx, err := json.MarshalIndent(source["_source"].(map[string]interface{}), "", "\t")
-// 	if err != nil {
-// 		storage.log.Errorf("error marshalling the _source, error: %+v", err)
-// 		return nil, err
-// 	}
-// 	blogRes := &pb.GetBlogByIdRes{}
+	// Marshal the query to JSON
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetLast100BlogsLatestFirst: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
 
-// 	if err = json.Unmarshal(bx, blogRes); err != nil {
-// 		storage.log.Errorf("error un-marshalling the bytes into struct, error: %+v", err)
-// 		return nil, err
-// 	}
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
 
-// 	storage.log.Infof("successfully fetched blog with id: %s", req.BlogId)
-// 	return blogRes, nil
-// }
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetLast100BlogsLatestFirst: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetLast100BlogsLatestFirst: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetLast100BlogsLatestFirst: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetLast100BlogsLatestFirst: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		err := fmt.Errorf("GetLast100BlogsLatestFirst: failed to parse hits from response")
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Convert the hits to a slice of GetBlogs
+	var blogs = &pb.GetBlogsByTagsNameRes{
+		TheBlogs: make([]*pb.GetBlogsByTags, 0, len(hits)),
+	}
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"]
+		hitBytes, err := json.Marshal(hitSource)
+		if err != nil {
+			es.log.Errorf("GetLast100BlogsLatestFirst: error marshaling hit source, error: %v", err)
+			continue
+		}
+
+		var blog pb.GetBlogsByTags
+		if err := json.Unmarshal(hitBytes, &blog); err != nil {
+			es.log.Errorf("GetLast100BlogsLatestFirst: error unmarshaling hit to GetBlogsByTags, error: %v", err)
+			continue
+		}
+		blogs.TheBlogs = append(blogs.TheBlogs, &blog)
+	}
+
+	es.log.Infof("GetLast100BlogsLatestFirst: successfully fetched last 100 blogs sorted by latest first")
+	return blogs, nil
+}
