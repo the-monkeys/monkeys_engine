@@ -274,7 +274,7 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 		return nil, fmt.Errorf("at least one tag must be provided")
 	}
 
-	// Build the query to search for published blogs by tags
+	// Build the query to search for published blogs by tags with the `is_archived` filtering
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
@@ -290,6 +290,30 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 						},
 					},
 				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": false,
+						},
+					},
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "is_archived",
+								},
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
 			},
 		},
 	}
