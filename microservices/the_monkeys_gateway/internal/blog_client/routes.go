@@ -20,7 +20,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all origins
+		return true
+	},
+}
 
 type BlogServiceClient struct {
 	Client     pb.BlogServiceClient

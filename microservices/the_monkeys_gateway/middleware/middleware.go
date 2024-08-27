@@ -31,6 +31,16 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
+func TmpCORSMiddleware() gin.HandlerFunc {
+	config := cors.Config{
+		AllowOrigins:     []string{"*"},                                                // Allow all origins
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"}, // Allow all methods
+		AllowHeaders:     []string{"*"},                                                // Allow all headers
+		AllowCredentials: true,
+	}
+	return cors.New(config)
+}
+
 func NewCorsMiddleware() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowOrigins:     []string{"*"}, // Allow all origins
