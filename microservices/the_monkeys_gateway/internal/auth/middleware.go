@@ -88,7 +88,8 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 	})
 
 	if err != nil || accessResp.StatusCode != http.StatusOK {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		logrus.Errorf("Error in authorization: %v\n", err)
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
 		return
 	}
 

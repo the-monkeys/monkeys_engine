@@ -180,7 +180,8 @@ func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq
 
 	// Return the access level
 	return &pb.AccessCheckRes{
-		Access: []string{"Read", "Edit", "Delete", "Archive", "Transfer-Ownership", "Publish", "Draft"},
+		Access:     []string{"Read", "Edit", "Delete", "Archive", "Transfer-Ownership", "Publish", "Draft"},
+		StatusCode: http.StatusOK,
 	}, nil
 }
 

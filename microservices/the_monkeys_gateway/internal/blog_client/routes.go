@@ -68,6 +68,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
 	// routes.DELETE("/delete/:id", blogClient.DeleteBlogById)
 	routes.GET("/all/drafts/:acc_id", mware.AuthzRequired, blogClient.AllDrafts)
+	routes.GET("/all/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
+	routes.GET("/all/published/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetPublishedBlogByAccId)
 
 	return blogClient
 }
@@ -146,6 +148,69 @@ func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
+	// Extract account_id and blog_id from URL parameters
+	accID := ctx.Param("acc_id")
+	blogID := ctx.Param("blog_id")
+
+	// Ensure acc_id and blog_id are not empty
+	if accID == "" || blogID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "account id and blog id are required"})
+		return
+	}
+
+	// Fetch the drafted blog by blog_id and owner_account_id
+	blog, err := asc.Client.GetDraftBlogById(ctx, &pb.GetBlogByIdReq{
+		BlogId:         blogID,
+		OwnerAccountId: accID,
+	})
+	if err != nil {
+		// asc.Client.log.Errorf("GetDraftBlogByAccId: error fetching drafted blog, error: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch drafted blog"})
+		return
+	}
+
+	// If no blog is found, return a 404
+	if blog == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "drafted blog not found"})
+		return
+	}
+
+	// Return the drafted blog as a JSON response
+	ctx.JSON(http.StatusOK, blog)
+}
+
+func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
+	// Extract account_id and blog_id from URL parameters
+	accID := ctx.Param("acc_id")
+	blogID := ctx.Param("blog_id")
+
+	// Ensure acc_id and blog_id are not empty
+	if accID == "" || blogID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "account id and blog id are required"})
+		return
+	}
+
+	// Fetch the published blog by blog_id and owner_account_id
+	blog, err := asc.Client.GetPublishedBlogByIdAndOwnerId(ctx, &pb.GetBlogByIdReq{
+		BlogId:         blogID,
+		OwnerAccountId: accID,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch published blog"})
+		return
+	}
+
+	// If no blog is found, return a 404
+	if blog == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "published blog not found"})
+		return
+	}
+
+	// Return the published blog as a JSON response
+	ctx.JSON(http.StatusOK, blog)
 }
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {

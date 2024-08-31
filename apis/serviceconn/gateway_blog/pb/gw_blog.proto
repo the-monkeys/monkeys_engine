@@ -70,6 +70,7 @@ message PublishBlogResp {
 
 message GetBlogByIdReq {
     string blog_id = 1;
+    string owner_account_id = 2;
 }
 
 message GetBlogByIdRes {
@@ -128,9 +129,10 @@ service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp);
     rpc GetPublishedBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
-    // rpc GetDraftBlogById(GetBlogByIdReq) returns (GetBlogByIdRes); // Unimplemented
+    rpc GetDraftBlogById(GetBlogByIdReq) returns (GetBlogByIdRes);
     rpc ArchiveBlogById(ArchiveBlogReq) returns (ArchiveBlogResp);
     rpc GetPublishedBlogsByTagsName(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
     rpc GetDraftBlogs(GetDraftBlogsReq) returns (GetDraftBlogsRes);
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
+    rpc GetPublishedBlogByIdAndOwnerId(GetBlogByIdReq) returns (GetBlogByIdRes);
 }

@@ -25,6 +25,8 @@ type ElasticsearchStorage interface {
 	AchieveAPublishedBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
 	DeleteABlogById(ctx context.Context, blogId string) (*esapi.Response, error)
 	GetLast100BlogsLatestFirst(ctx context.Context) (*pb.GetBlogsByTagsNameRes, error)
+	GetDraftedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
+	GetPublishedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
 }
 
 type elasticsearchStorage struct {
@@ -694,4 +696,256 @@ func (es *elasticsearchStorage) GetLast100BlogsLatestFirst(ctx context.Context) 
 
 	es.log.Infof("GetLast100BlogsLatestFirst: successfully fetched last 100 blogs sorted by latest first")
 	return blogs, nil
+}
+
+func (es *elasticsearchStorage) GetDraftedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error) {
+	// Ensure blogId and ownerAccountId are not empty
+	if blogId == "" || ownerAccountId == "" {
+		es.log.Error("GetDraftedBlogByIdAndOwner: blogId or ownerAccountId is empty")
+		return nil, fmt.Errorf("blog id and owner account id cannot be empty")
+	}
+
+	// Build the query to search for a drafted blog by blog_id and owner_account_id
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"blog_id.keyword": blogId,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"owner_account_id.keyword": ownerAccountId,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_draft": true,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": false,
+						},
+					},
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "is_archived",
+								},
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		},
+	}
+
+	// Marshal the query to JSON
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	// Print the query for debugging
+	es.log.Infof("Executing query: %s", string(bs))
+
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetDraftedBlogByIdAndOwner: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok || len(hits) == 0 {
+		es.log.Infof("GetDraftedBlogByIdAndOwner: no drafted blog found with blogId: %s and ownerAccountId: %s", blogId, ownerAccountId)
+		return nil, nil
+	}
+
+	// Convert the first hit to GetBlogByIdRes
+	hitSource := hits[0].(map[string]interface{})["_source"]
+	hitBytes, err := json.Marshal(hitSource)
+	if err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: error marshaling hit source, error: %v", err)
+		return nil, err
+	}
+
+	var blog pb.GetBlogByIdRes
+	if err := json.Unmarshal(hitBytes, &blog); err != nil {
+		es.log.Errorf("GetDraftedBlogByIdAndOwner: error unmarshaling hit to GetBlogByIdRes, error: %v", err)
+		return nil, err
+	}
+
+	es.log.Infof("GetDraftedBlogByIdAndOwner: successfully fetched drafted blog with blogId: %s and ownerAccountId: %s", blogId, ownerAccountId)
+	return &blog, nil
+}
+
+func (es *elasticsearchStorage) GetPublishedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error) {
+	// Ensure blogId and ownerAccountId are not empty
+	if blogId == "" || ownerAccountId == "" {
+		es.log.Error("GetPublishedBlogByIdAndOwner: blogId or ownerAccountId is empty")
+		return nil, fmt.Errorf("blog id and owner account id cannot be empty")
+	}
+
+	// Build the query to search for a published blog by blog_id and owner_account_id
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"blog_id.keyword": blogId,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"owner_account_id.keyword": ownerAccountId,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_draft": false,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": false,
+						},
+					},
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "is_archived",
+								},
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		},
+	}
+
+	// Marshal the query to JSON
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	// Print the query for debugging
+	es.log.Infof("Executing query: %s", string(bs))
+
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetPublishedBlogByIdAndOwner: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok || len(hits) == 0 {
+		es.log.Infof("GetPublishedBlogByIdAndOwner: no published blog found with blogId: %s and ownerAccountId: %s", blogId, ownerAccountId)
+		return nil, nil
+	}
+
+	// Convert the first hit to GetBlogByIdRes
+	hitSource := hits[0].(map[string]interface{})["_source"]
+	hitBytes, err := json.Marshal(hitSource)
+	if err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: error marshaling hit source, error: %v", err)
+		return nil, err
+	}
+
+	var blog pb.GetBlogByIdRes
+	if err := json.Unmarshal(hitBytes, &blog); err != nil {
+		es.log.Errorf("GetPublishedBlogByIdAndOwner: error unmarshaling hit to GetBlogByIdRes, error: %v", err)
+		return nil, err
+	}
+
+	es.log.Infof("GetPublishedBlogByIdAndOwner: successfully fetched published blog with blogId: %s and ownerAccountId: %s", blogId, ownerAccountId)
+	return &blog, nil
 }

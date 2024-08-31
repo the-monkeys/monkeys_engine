@@ -97,6 +97,16 @@ func (blog *BlogService) GetDraftBlogs(ctx context.Context, req *pb.GetDraftBlog
 	return res, nil
 }
 
+func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	return blog.osClient.GetDraftedBlogByIdAndOwner(ctx, req.BlogId, req.OwnerAccountId)
+}
+
+func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	return blog.osClient.GetPublishedBlogByIdAndOwner(ctx, req.BlogId, req.OwnerAccountId)
+}
+
 func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
 
