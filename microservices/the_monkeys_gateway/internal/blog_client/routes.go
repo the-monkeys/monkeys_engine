@@ -167,15 +167,19 @@ func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 		OwnerAccountId: accID,
 	})
 	if err != nil {
-		// asc.Client.log.Errorf("GetDraftBlogByAccId: error fetching drafted blog, error: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch drafted blog"})
-		return
-	}
-
-	// If no blog is found, return a 404
-	if blog == nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "drafted blog not found"})
-		return
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "drafted blog not found"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch drafted blog"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
 	}
 
 	// Return the drafted blog as a JSON response
@@ -199,8 +203,19 @@ func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
 		OwnerAccountId: accID,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch published blog"})
-		return
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "published blog not found"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "failed to fetch published blog"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
 	}
 
 	// If no blog is found, return a 404
@@ -223,7 +238,7 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blog does not exist"})
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
 				return
 			case codes.Internal:
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the draft blogs"})
