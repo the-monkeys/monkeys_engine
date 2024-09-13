@@ -1,0 +1,10 @@
+ id |    account_id    |   username   | first_name | last_name |           email           | date_of_birth | role_id | bio | avatar_url |         created_at         |         updated_at         | address | contact_number | user_status | linkedin | github | twitter | instagram | view_permission
+----+------------------+--------------+------------+-----------+---------------------------+---------------+---------+-----+------------+----------------------------+----------------------------+---------+----------------+-------------+----------+--------+---------+-----------+-----------------
+  1 | ZBNl8XhHDt6Jddnp | tdrBP4HxVBf6 | Dave       | Lee       | dave_lee@example.com      |               |       4 |     |            | 2024-09-07 15:23:26.05785  | 2024-09-07 15:23:26.05785  |         |                |           1 |          |        |         |           | public
+  2 | xN0XvVRdbv6XfZJT | HTdX2zbNtHpD | Margaret   | Jones     | m_jones@example.com       |               |       4 |     |            | 2024-09-07 15:23:54.866504 | 2024-09-07 15:23:54.866504 |         |                |           1 |          |        |         |           | public
+  3 | fjlBvJHb0tjZ8Zxx | 2lpBPN6TfRlz | Richard    | Hernandez | richard_h@example.com     |               |       4 |     |            | 2024-09-07 15:24:22.43746  | 2024-09-07 15:24:22.43746  |         |                |           1 |          |        |         |           | public
+  4 | TxPdz2Lv6nL6dZbh | NBJxbrp4xnzV | John       | Williams  | john_williams@example.com |               |       4 |     |            | 2024-09-07 15:24:46.228112 | 2024-09-07 15:24:46.228112 |         |                |           1 |          |        |         |           | public
+  5 | LBXJzJ4xVRpdRb22 | zjtxRNRz86zz | Thomas     | Garcia    | garcia_t@example.com      |               |       4 |     |            | 2024-09-07 15:25:09.955915 | 2024-09-07 15:25:09.955915 |         |                |           1 |          |        |         |           | public
+(5 rows)
+
+John_Williams

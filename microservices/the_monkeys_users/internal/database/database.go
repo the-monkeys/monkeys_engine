@@ -35,7 +35,7 @@ type UserDb interface {
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
-
+	UpdateBlogStatusToPublish(blogId string, status string) error
 	// Delete queries
 	DeleteUserProfile(username string) error
 }
@@ -420,5 +420,17 @@ func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, err
 }
 
 func (uh *uDBHandler) AddBlogPermission(models.TheMonkeysMessage) error {
+	return nil
+}
+
+func (uh *uDBHandler) UpdateBlogStatusToPublish(blogId string, status string) error {
+	uh.log.Infof("the blog %v is being published", blogId)
+
+	row := uh.db.QueryRow("UPDATE blog SET status = $1 WHERE blog_id = $2", status, blogId)
+	if row.Err() != nil {
+		return row.Err()
+	}
+
+	uh.log.Infof("the blog %v is successfully published", blogId)
 	return nil
 }

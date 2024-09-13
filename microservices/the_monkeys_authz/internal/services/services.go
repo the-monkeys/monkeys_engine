@@ -170,17 +170,32 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 		UserId:     user.Id,
 		Email:      claims.Email,
 		UserName:   user.Username,
+		AccountId:  claims.AccountId,
 	}, nil
 }
 
 func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq) (*pb.AccessCheckRes, error) {
 	as.logger.Infof("checking access of user %s for blog %s", req.AccountId, req.BlogId)
+	if req.AccountId == "" || req.BlogId == "" {
+		return nil, status.Errorf(codes.Unauthenticated, "unauthorized to perform this action")
+	}
 
-	// TODO: Check if the user has the required access level for the blog
+	resp, err := as.dbConn.GetUserAccessForABlog(req.AccountId, req.BlogId)
+	if err == sql.ErrNoRows {
+		as.logger.Errorf("blog with id %s not found", req.BlogId)
+		return &pb.AccessCheckRes{
+			Access:     []string{constants.PermissionCreate},
+			StatusCode: http.StatusOK,
+		}, nil
+	} else if err != nil {
+		as.logger.Errorf("error in access level: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "unauthorized to perform this action")
+	}
 
+	as.logger.Infof("user %s has the following permissions: %v", req.AccountId, resp)
 	// Return the access level
 	return &pb.AccessCheckRes{
-		Access:     []string{"Read", "Edit", "Delete", "Archive", "Transfer-Ownership", "Publish", "Draft"},
+		Access:     resp,
 		StatusCode: http.StatusOK,
 	}, nil
 }

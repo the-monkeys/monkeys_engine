@@ -54,6 +54,7 @@ func (c *AuthMiddlewareConfig) validateToken(ctx *gin.Context) (*pb.ValidateResp
 	}
 
 	ctx.Set("userName", res.UserName)
+	ctx.Set("accountId", res.AccountId)
 	return res, nil
 }
 
@@ -76,13 +77,11 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 	blogID := ctx.Param("blog_id")
 	userName := res.UserName
 	email := ctx.Param("email")
-	accountID := ctx.Param("account_id")
-	// userID := ctx.Param("user_id")
 
 	accessResp, err := c.svc.Client.CheckAccessLevel(context.Background(), &pb.AccessCheckReq{
 		// Token:     res,
 		Email:     email,
-		AccountId: accountID,
+		AccountId: res.AccountId,
 		UserName:  userName,
 		BlogId:    blogID,
 	})
@@ -93,6 +92,7 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 		return
 	}
 
+	ctx.Set("accountId", res.AccountId)
 	ctx.Set("user_access_level", accessResp.Access)
 
 	ctx.Next()

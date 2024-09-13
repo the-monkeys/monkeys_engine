@@ -53,6 +53,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.GET("/activities/:user_name", usc.GetUserActivities)
 	}
 
+	// Invite and un invite as coauthor
+	// routes.GET("/activities/:user_name", usc.GetUserActivities)
 	return usc
 }
 

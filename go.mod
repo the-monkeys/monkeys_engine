@@ -1,12 +1,11 @@
 module github.com/the-monkeys/the_monkeys
 
-go 1.21
-
-toolchain go1.21.6
+go 1.21.7
 
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/good-binary/utility v0.0.0-20240408070828-27ce10f450fd
 	github.com/google/uuid v1.5.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/lib/pq v1.10.9

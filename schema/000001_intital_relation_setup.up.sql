@@ -187,6 +187,46 @@ CREATE TABLE IF NOT EXISTS blog_permissions (
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
 );
 
+-- Table to store co-author invites
+CREATE TABLE IF NOT EXISTS co_author_invites (
+    id SERIAL PRIMARY KEY,
+    blog_id BIGINT NOT NULL, -- Reference to the blog
+    inviter_id BIGINT NOT NULL, -- Reference to the user (owner or admin) sending the invite
+    invitee_id BIGINT NOT NULL, -- Reference to the user being invited as a co-author
+    invite_status VARCHAR(50) NOT NULL DEFAULT 'pending', -- Can be 'pending', 'accepted', or 'rejected'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (inviter_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (invitee_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+-- Table to store accepted co-author permissions
+CREATE TABLE IF NOT EXISTS co_author_permissions (
+    id SERIAL PRIMARY KEY,
+    blog_id BIGINT NOT NULL, -- Reference to the blog
+    co_author_id BIGINT NOT NULL, -- The invited user who accepted the invitation
+    role_id BIGINT NOT NULL, -- Reference to the user role ('Editor', 'Viewer', etc.)
+    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+
+-- Table to track actions related to co-author invitations and permissions
+CREATE TABLE IF NOT EXISTS co_author_activity_log (
+    id SERIAL PRIMARY KEY,
+    blog_id BIGINT NOT NULL, -- Reference to the blog
+    co_author_id BIGINT, -- Reference to the invited user (nullable in case of deletion logs)
+    action VARCHAR(50) NOT NULL, -- 'invited', 'accepted', 'rejected', 'removed'
+    performed_by BIGINT NOT NULL, -- Reference to the user who performed the action (inviter or owner/admin)
+    action_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION,
+    FOREIGN KEY (performed_by) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
 -- Creating blog bookmarks table
 CREATE TABLE IF NOT EXISTS blog_bookmarks (
     id SERIAL PRIMARY KEY,
@@ -195,6 +235,29 @@ CREATE TABLE IF NOT EXISTS blog_bookmarks (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
     FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION
+);
+
+-- Table to store notification types
+CREATE TABLE IF NOT EXISTS notification_type (
+    id SERIAL PRIMARY KEY,
+    notification_name VARCHAR(100) NOT NULL UNIQUE,  -- E.g., 'Co-author invite', 'Blog liked', 'Comment on blog'
+    description TEXT -- Optional description of the notification type
+);
+
+-- Table to store notifications for users
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL, -- The user receiving the notification
+    notification_type_id INTEGER NOT NULL, -- Type of notification (e.g., co-author invite, blog liked, etc.)
+    message TEXT NOT NULL, -- Customizable message for the notification
+    related_blog_id BIGINT, -- Optional reference to a related blog, if applicable
+    related_user_id BIGINT, -- Optional reference to a related user (e.g., the one who liked or commented)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- When the notification was created
+    seen BOOLEAN DEFAULT FALSE, -- Whether the user has seen the notification
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (notification_type_id) REFERENCES notification_type(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (related_blog_id) REFERENCES blog(id) ON DELETE SET NULL ON UPDATE NO ACTION,
+    FOREIGN KEY (related_user_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
 );
 
 -- Creating credentials table (note: in a production environment, sensitive data should be stored securely using encryption)

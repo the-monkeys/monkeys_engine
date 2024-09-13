@@ -13,6 +13,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/utils"
 )
 
 type UserDbConn struct {
@@ -65,29 +66,29 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 		logrus.Infof("user: %+v\n", user)
 
+		userLog := &models.UserLogs{
+			AccountId: user.UserAccountId,
+			IpAddress: user.IpAddress,
+			Client:    user.Client,
+		}
+		userLog.IpAddress, userLog.Client = utils.IpClientConvert(userLog.IpAddress, userLog.Client)
+
 		switch user.Action {
 		case constants.BLOG_CREATE:
 			if err := userCon.dbConn.AddBlogWithId(user); err != nil {
 				userCon.log.Errorf("Error creating blog: %v", err)
 			}
 
-			// Update the user log
-			if user.IpAddress == "" {
-				user.IpAddress = "127.0.0.1"
-			}
-
-			if user.Client == "" {
-				user.Client = "Others"
-			}
-
-			userLog := &models.UserLogs{
-				AccountId: user.UserAccountId,
-				IpAddress: user.IpAddress,
-				Client:    user.Client,
-			}
 			go cache.AddUserLog(userCon.dbConn, userLog, constants.CreateBlog, constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
 		case constants.BLOG_EDIT:
 			// TODO: Add blog id and user id
+		case constants.BLOG_PUBLISH:
+			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.Status); err != nil {
+				logrus.Errorf("Can't update blog status to publish: %v", err)
+			}
+
+			go cache.AddUserLog(userCon.dbConn, userLog, constants.PublishBlog, constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
+
 		default:
 			logrus.Errorf("Unknown action: %s", user.Action)
 		}

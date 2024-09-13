@@ -13,7 +13,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -55,21 +57,23 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
 	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
+	routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
+	routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId)
 	routes.GET("/news1", blogClient.GetNews1)
 	routes.GET("/news2", blogClient.GetNews2)
 	routes.GET("/news3", blogClient.GetNews3)
 
 	// Use AuthRequired for basic authorization
 	routes.Use(mware.AuthRequired)
-	routes.GET("/draft/:blog_id", blogClient.DraftABlog)
 
 	// Use AuthzRequired for routes needing access control
+	routes.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.DraftABlog)
+
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
-	// routes.DELETE("/delete/:id", blogClient.DeleteBlogById)
-	routes.GET("/all/drafts/:acc_id", mware.AuthzRequired, blogClient.AllDrafts)
-	routes.GET("/all/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
-	routes.GET("/all/published/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetPublishedBlogByAccId)
+	routes.DELETE("/:id", blogClient.DeleteBlogById)
+	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
+	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
 
 	return blogClient
 }
@@ -77,9 +81,44 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 	id := ctx.Param("blog_id")
 
+	// Check if blog exists
+	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.GetBlogByIdReq{
+		BlogId: id,
+	})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	if resp.BlogExists {
+		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+			return
+		}
+	}
+
+	// Upgrade the connection to WebSocket
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		logrus.Errorf("error upgrading connection: %v", err)
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	if asc.Client == nil {
+		logrus.Errorf("BlogServiceClient is not initialized")
+		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -93,9 +132,10 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 
 		// Unmarshal the received message into the Blog struct
 		var draftBlog *pb.DraftBlogRequest
+
 		err = json.Unmarshal(msg, &draftBlog)
 		if err != nil {
-			logrus.Errorf("Error un marshalling message: %v", err)
+			logrus.Errorf("Error unmarshalling message: %v", err)
 			return
 		}
 
@@ -109,7 +149,7 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 
 		response, err := json.Marshal(resp)
 		if err != nil {
-			logrus.Println("Error un marshalling response message:", err)
+			logrus.Println("Error marshalling response message:", err)
 			return
 		}
 
@@ -123,12 +163,49 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
+	// Check permissions:
+	// if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+	// 	ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+	// 	return
+	// }
+
+	tokenAccountId := ctx.GetString("accountId")
 	accId := ctx.Param("acc_id")
 
-	res, err := asc.Client.GetDraftBlogs(context.Background(), &pb.GetDraftBlogsReq{
-		AccountId: accId,
-		Email:     "",
-		Username:  "",
+	if tokenAccountId != accId {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+	res, err := asc.Client.GetDraftBlogsByAccId(context.Background(), &pb.GetBlogByIdReq{
+		OwnerAccountId: accId,
+		// Email:          "",
+		// Username:       "",
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *BlogServiceClient) AllPublishesByAccountId(ctx *gin.Context) {
+	accId := ctx.Param("acc_id")
+
+	res, err := asc.Client.GetPublishedBlogsByAccID(context.Background(), &pb.GetBlogByIdReq{
+		OwnerAccountId: accId,
 	})
 
 	if err != nil {
@@ -151,6 +228,12 @@ func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
 	// Extract account_id and blog_id from URL parameters
 	accID := ctx.Param("acc_id")
 	blogID := ctx.Param("blog_id")
@@ -229,9 +312,17 @@ func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, "Publish") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+	accId := ctx.GetString("accountId")
+
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
-		BlogId: id,
+		BlogId:    id,
+		AccountId: accId,
 	})
 
 	if err != nil {
@@ -288,6 +379,12 @@ func (svc *BlogServiceClient) GetPublishedBlogById(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, "Archive") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
 		BlogId: id,
@@ -333,9 +430,14 @@ func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-// func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
-// 	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})
-// }
+func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
+	// Check permissions to Delete
+	if !utils.CheckUserAccessInContext(ctx, "Delete") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})
+}
 
 // ******************************************************* Third Party API ************************************************
 

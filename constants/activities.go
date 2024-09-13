@@ -27,7 +27,7 @@ const (
 	UpdateDraftedBlog        = "Updated the Drafted Blog"
 	UpdateBlog               = "Updated the Blog"
 	DeleteBlog               = "Deleted the Blog"
-	PublishBlog              = "Published the Blog"
+	PublishBlog              = "published the Blog"
 	ArchiveBlog              = "Archived the Blog"
 	LikeBlog                 = "Liked a Blog"
 	UnlikeBlog               = "Disliked a Blog"

@@ -81,17 +81,45 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	}, nil
 }
 
-func (blog *BlogService) GetDraftBlogs(ctx context.Context, req *pb.GetDraftBlogsReq) (*pb.GetDraftBlogsRes, error) {
-	blog.logger.Infof("fetching draft blogs for account id %s", req.AccountId)
-	if req.AccountId == "" {
+func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.BlogExistsRes, error) {
+	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
+		return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
+	}
+
+	return &pb.BlogExistsRes{
+		BlogExists: exists,
+	}, nil
+}
+
+func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetDraftBlogsRes, error) {
+	blog.logger.Infof("fetching draft blogs for account id %s", req.OwnerAccountId)
+	if req.OwnerAccountId == "" {
 		logrus.Error("account id cannot be empty")
 		return nil, status.Errorf(codes.InvalidArgument, "Account id cannot be empty")
 	}
 
-	res, err := blog.osClient.GetDraftBlogsByOwnerAccountID(ctx, req.AccountId)
+	res, err := blog.osClient.GetDraftBlogsByOwnerAccountID(ctx, req.OwnerAccountId)
 	if err != nil {
-		logrus.Errorf("error occurred while getting draft blogs for account id: %s, error: %v", req.AccountId, err)
-		return nil, status.Errorf(codes.Internal, "cannot get the draft blogs for account id: %s", req.AccountId)
+		logrus.Errorf("error occurred while getting draft blogs for account id: %s, error: %v", req.OwnerAccountId, err)
+		return nil, status.Errorf(codes.Internal, "cannot get the draft blogs for account id: %s", req.OwnerAccountId)
+	}
+
+	return res, nil
+}
+
+func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetPublishedBlogsRes, error) {
+	blog.logger.Infof("fetching published blogs for account id %s", req.OwnerAccountId)
+	if req.OwnerAccountId == "" {
+		logrus.Error("account id cannot be empty")
+		return nil, status.Errorf(codes.InvalidArgument, "Account id cannot be empty")
+	}
+
+	res, err := blog.osClient.GetPublishedBlogsByOwnerAccountID(ctx, req.OwnerAccountId)
+	if err != nil {
+		logrus.Errorf("error occurred while getting published blogs for account id: %s, error: %v", req.OwnerAccountId, err)
+		return nil, status.Errorf(codes.Internal, "cannot get the published blogs for account id: %s", req.OwnerAccountId)
 	}
 
 	return res, nil
@@ -134,6 +162,7 @@ func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req
 func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
 
+	// TODO: Check if blog exists and published
 	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("Error checking blog existence: %v", err)
@@ -150,6 +179,26 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		blog.logger.Errorf("Error Publishing the blog: %s, error: %v", req.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.BlogId)
 	}
+
+	bx, err := json.Marshal(models.MessageToUserSvc{
+		UserAccountId: req.AccountId,
+		BlogId:        req.BlogId,
+		Action:        constants.BLOG_PUBLISH,
+		Status:        constants.BlogStatusPublished,
+	})
+
+	if err != nil {
+		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
+	}
+
+	// Enqueue publish message to user service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+	}()
 
 	return &pb.PublishBlogResp{
 		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
