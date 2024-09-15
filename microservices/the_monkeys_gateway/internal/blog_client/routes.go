@@ -71,9 +71,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
-	routes.DELETE("/:id", blogClient.DeleteBlogById)
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
+
+	routes.DELETE("/:blog_id", mware.AuthzRequired, blogClient.DeleteBlogById)
 
 	return blogClient
 }
@@ -415,7 +416,7 @@ func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blogs do not exist"})
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blogs do not exist"})
 				return
 			case codes.Internal:
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the latest blogs"})
@@ -436,7 +437,27 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
 		return
 	}
-	ctx.JSON(http.StatusOK, map[string]string{"message": "This api is not implemented!"})
+
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.DeleteABlogByBlogId(context.Background(), &pb.DeleteBlogReq{BlogId: blogId})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't delete the blog due to some internal error"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
 }
 
 // ******************************************************* Third Party API ************************************************

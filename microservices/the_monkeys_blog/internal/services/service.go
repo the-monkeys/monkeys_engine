@@ -237,7 +237,7 @@ func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlo
 
 	updateResp, err := blog.osClient.AchieveAPublishedBlogById(ctx, req.BlogId)
 	if err != nil {
-		blog.logger.Errorf("failed to archive blog with ID: %s, error: %v", req.BlogId, err)
+		blog.logger.Errorf("failed to archive the blog with ID: %s, error: %v", req.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "failed to archive blog with ID: %s", req.BlogId)
 	}
 
@@ -249,6 +249,21 @@ func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlo
 
 func (blog *BlogService) GetLatest100Blogs(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
 	return blog.osClient.GetLast100BlogsLatestFirst(ctx)
+}
+
+// TODO: Incase of blog doesn't exists, do return 404
+func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.DeleteBlogReq) (*pb.DeleteBlogResp, error) {
+	resp, err := blog.osClient.DeleteABlogById(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("failed to delete the blog with ID: %s, error: %v", req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "failed to delete the blog with ID: %s", req.BlogId)
+	}
+
+	fmt.Printf("resp: %v\n", resp.StatusCode)
+
+	return &pb.DeleteBlogResp{
+		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
+	}, nil
 }
 
 // ********************************************************  Below function need to be re-written ********************************************************

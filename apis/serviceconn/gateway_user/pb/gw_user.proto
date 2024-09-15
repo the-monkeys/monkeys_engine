@@ -131,6 +131,19 @@ message GetAllCategoriesRes {
     map<string, Category> category = 1;
 }
 
+message UserDetailsByAccIdReq {
+    string account_id = 1;
+}
+
+message UserDetailsByAccIdResp {
+    string account_id = 1;
+    string username = 2; 
+    string first_name = 3;
+    string last_name = 4;
+    string bio = 5;
+    string error = 6;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -138,6 +151,7 @@ service UserService {
     rpc DeleteUserProfile(DeleteUserProfileReq) returns (DeleteUserProfileRes) {}
     rpc GetAllTopics(GetTopicsRequests) returns (GetTopicsResponse) {}
     rpc GetAllCategories(GetAllCategoriesReq) returns (GetAllCategoriesRes) {}
+    rpc GetUserDetailsByAccId(UserDetailsByAccIdReq) returns (UserDetailsByAccIdResp) {}
     // Bookmark blog
     // Get Bookmarks
     // Invite as co author

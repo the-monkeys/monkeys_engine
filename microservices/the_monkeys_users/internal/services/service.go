@@ -234,3 +234,24 @@ func (us *UserSvc) GetAllCategories(ctx context.Context, req *pb.GetAllCategorie
 
 	return res, nil
 }
+
+func (us *UserSvc) GetUserDetailsByAccId(ctx context.Context, req *pb.UserDetailsByAccIdReq) (*pb.UserDetailsByAccIdResp, error) {
+	us.log.Infof("profile info has been requested for user acc id: %s.", req.AccountId)
+
+	userInfo, err := us.dbConn.CheckIfAccIdExist(req.AccountId)
+	if err != nil {
+		us.log.Errorf("error while fetching the private profile for user %s, err: %v", req.AccountId, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.AccountId))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+	return &pb.UserDetailsByAccIdResp{
+		Username:  userInfo.Username,
+		FirstName: userInfo.FirstName,
+		LastName:  userInfo.LastName,
+		AccountId: userInfo.AccountId,
+		// Bio:       userInfo.Bio.String,
+	}, nil
+
+}

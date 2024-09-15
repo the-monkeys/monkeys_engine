@@ -28,6 +28,7 @@ type UserServiceClient interface {
 	DeleteUserProfile(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error)
 	GetAllTopics(ctx context.Context, in *GetTopicsRequests, opts ...grpc.CallOption) (*GetTopicsResponse, error)
 	GetAllCategories(ctx context.Context, in *GetAllCategoriesReq, opts ...grpc.CallOption) (*GetAllCategoriesRes, error)
+	GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error)
 }
 
 type userServiceClient struct {
@@ -92,6 +93,15 @@ func (c *userServiceClient) GetAllCategories(ctx context.Context, in *GetAllCate
 	return out, nil
 }
 
+func (c *userServiceClient) GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error) {
+	out := new(UserDetailsByAccIdResp)
+	err := c.cc.Invoke(ctx, "/auth_svc.UserService/GetUserDetailsByAccId", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility
@@ -102,6 +112,7 @@ type UserServiceServer interface {
 	DeleteUserProfile(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error)
 	GetAllTopics(context.Context, *GetTopicsRequests) (*GetTopicsResponse, error)
 	GetAllCategories(context.Context, *GetAllCategoriesReq) (*GetAllCategoriesRes, error)
+	GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -126,6 +137,9 @@ func (UnimplementedUserServiceServer) GetAllTopics(context.Context, *GetTopicsRe
 }
 func (UnimplementedUserServiceServer) GetAllCategories(context.Context, *GetAllCategoriesReq) (*GetAllCategoriesRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllCategories not implemented")
+}
+func (UnimplementedUserServiceServer) GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserDetailsByAccId not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 
@@ -248,6 +262,24 @@ func _UserService_GetAllCategories_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetUserDetailsByAccId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDetailsByAccIdReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUserDetailsByAccId(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/auth_svc.UserService/GetUserDetailsByAccId",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUserDetailsByAccId(ctx, req.(*UserDetailsByAccIdReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -278,6 +310,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAllCategories",
 			Handler:    _UserService_GetAllCategories_Handler,
+		},
+		{
+			MethodName: "GetUserDetailsByAccId",
+			Handler:    _UserService_GetUserDetailsByAccId_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

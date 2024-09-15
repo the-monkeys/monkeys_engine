@@ -27,6 +27,7 @@ type UserDb interface {
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
+	CheckIfAccIdExist(accountId string) (*models.TheMonkeysUser, error)
 	GetMyProfile(username string) (*models.UserProfileRes, error)
 	GetUserProfile(username string) (*models.UserAccount, error)
 	GetAllTopicsFromDb() (*pb.GetTopicsResponse, error)
@@ -433,4 +434,27 @@ func (uh *uDBHandler) UpdateBlogStatusToPublish(blogId string, status string) er
 
 	uh.log.Infof("the blog %v is successfully published", blogId)
 	return nil
+}
+
+func (uh *uDBHandler) CheckIfAccIdExist(accountId string) (*models.TheMonkeysUser, error) {
+	var tmu models.TheMonkeysUser
+	if err := uh.db.QueryRow(`
+			SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
+			ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
+			evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
+			FROM USER_ACCOUNT ua
+			LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
+			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
+			LEFT JOIN user_status us ON ua.user_status = us.id
+			WHERE ua.account_id = $1;
+		`, accountId).
+		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
+			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
+			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
+			&tmu.EmailVerificationTimeout); err != nil {
+		logrus.Errorf("can't find a user existing with accountId %s, error: %+v", accountId, err)
+		return nil, err
+	}
+
+	return &tmu, nil
 }

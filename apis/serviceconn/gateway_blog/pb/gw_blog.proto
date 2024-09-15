@@ -136,6 +136,15 @@ message BlogExistsRes {
     bool blog_exists = 1;
 }
 
+message DeleteBlogReq{
+    string blog_id = 1;
+}
+
+message DeleteBlogResp{
+    string message = 1;
+    string error = 2;
+}
+
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
@@ -149,4 +158,5 @@ service BlogService {
     rpc GetPublishedBlogByIdAndOwnerId(GetBlogByIdReq) returns (GetBlogByIdRes);
 
     rpc CheckIfBlogsExist(GetBlogByIdReq) returns (BlogExistsRes);
+    rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
 }

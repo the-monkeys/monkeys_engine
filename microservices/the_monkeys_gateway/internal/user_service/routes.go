@@ -39,6 +39,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/topics", usc.GetAllTopics)
 	routes.GET("/category", usc.GetAllCategories)
 	routes.GET("/public/:id", usc.GetUserPublicProfile)
+	routes.GET("/public/account/:acc_id", usc.GetUserDetailsByAccId)
 
 	routes.Use(mware.AuthRequired)
 
@@ -224,6 +225,27 @@ func (asc *UserServiceClient) GetAllCategories(ctx *gin.Context) {
 	res, err := asc.Client.GetAllCategories(context.Background(), &pb.GetAllCategoriesReq{})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get the all the Categories"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) GetUserDetailsByAccId(ctx *gin.Context) {
+	accId := ctx.Param("acc_id")
+
+	res, err := asc.Client.GetUserDetailsByAccId(context.Background(), &pb.UserDetailsByAccIdReq{
+		AccountId: accId,
+	})
+	if err != nil {
+		switch status.Code(err) {
+		case codes.NotFound:
+			ctx.AbortWithStatusJSON(http.StatusNotFound, ReturnMessage{Message: "no user found"})
+		case codes.Internal:
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't get the user info due to internal error"})
+		default:
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "an unexpected error occurred"})
+		}
 		return
 	}
 
