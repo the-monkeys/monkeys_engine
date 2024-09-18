@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package blog_svc;
 
-// import "google/protobuf/timestamp.proto";
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
@@ -145,6 +144,51 @@ message DeleteBlogResp{
     string error = 2;
 }
 
+
+
+
+// ******************************* DraftBlogV2 *******************************
+message DraftBlogV2Req {
+    string blog_id = 1;
+    string owner_account_id = 2;
+    oneof blog{
+        EditorJSContent editor_js_content = 3; // Wrapped Editor.js content
+        PlateData plate_data = 4;             // Plate.js content
+        string content_json = 5;              // Generic JSON content
+    }
+    bool is_draft = 6;
+    bool is_archive = 7;
+    repeated string tags = 8;
+    string content_type = 9;
+}
+message EditorJSContent {
+    int64 time = 1;
+    repeated Block blocks = 2;
+}
+
+// New Plate.js messages
+message PlateData {
+    repeated PlateNode nodes = 1;
+}
+
+message PlateNode {
+    string type = 1;
+    string text = 2;
+    map<string, string> attributes = 3;
+    repeated PlateNode children = 4;
+}
+
+message BlogV2Response {
+    string message = 1;
+    oneof content {
+        EditorJSContent editor_js_content = 2;
+        PlateData plate_data = 3;
+        string content_json = 4;
+    }
+    string error = 5;
+    string content_type = 6; // "editorjs" or "platejs"
+}
+
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
@@ -159,4 +203,7 @@ service BlogService {
 
     rpc CheckIfBlogsExist(GetBlogByIdReq) returns (BlogExistsRes);
     rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
+
+
+    rpc DraftBlogV2(DraftBlogV2Req) returns (BlogV2Response);
 }

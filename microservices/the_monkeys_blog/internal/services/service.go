@@ -436,3 +436,76 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 
 // 	return &pb.DeleteBlogByIdResponse{Status: int64(deleteResponse.StatusCode)}, nil
 // }
+
+func (blog *BlogService) DraftBlogV2(ctx context.Context, req *pb.DraftBlogV2Req) (*pb.BlogV2Response, error) {
+	blog.logger.Infof("Content: %+v", req)
+	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
+	req.IsDraft = true
+
+	// Check if the blog already exists
+	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("error checking if blog exists: %v", err)
+		return nil, status.Errorf(codes.Internal, "error checking blog existence")
+	}
+
+	if exists {
+		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
+	} else {
+		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
+		bx, err := json.Marshal(models.MessageToUserSvc{
+			UserAccountId: req.OwnerAccountId,
+			BlogId:        req.BlogId,
+			Action:        constants.BLOG_CREATE,
+			Status:        constants.BlogStatusDraft,
+		})
+		if err != nil {
+			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
+			return nil, status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
+		}
+		if len(req.Tags) == 0 {
+			req.Tags = []string{"untagged"}
+		}
+		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+	}
+
+	// Send the request to store the draft blog in Elasticsearch (using V2)
+	_, err = blog.osClient.DraftABlogV2(ctx, req)
+	if err != nil {
+		blog.logger.Errorf("cannot store draft into Elasticsearch: %v", err)
+		return nil, status.Errorf(codes.Internal, "error storing draft in Elasticsearch")
+	}
+
+	// Build the BlogV2Response based on the content type in req.Blog
+	var response *pb.BlogV2Response
+	switch blogContent := req.Blog.(type) {
+	case *pb.DraftBlogV2Req_EditorJsContent:
+		response = &pb.BlogV2Response{
+			Message: "Blog draft saved successfully",
+			Content: &pb.BlogV2Response_EditorJsContent{
+				EditorJsContent: blogContent.EditorJsContent,
+			},
+			ContentType: "editorjs",
+		}
+	case *pb.DraftBlogV2Req_PlateData:
+		response = &pb.BlogV2Response{
+			Message: "Blog draft saved successfully",
+			Content: &pb.BlogV2Response_PlateData{
+				PlateData: blogContent.PlateData,
+			},
+			ContentType: "platejs",
+		}
+	case *pb.DraftBlogV2Req_ContentJson:
+		response = &pb.BlogV2Response{
+			Message: "Blog draft saved successfully",
+			Content: &pb.BlogV2Response_ContentJson{
+				ContentJson: blogContent.ContentJson,
+			},
+			ContentType: "json",
+		}
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "unsupported content type")
+	}
+
+	return response, nil
+}

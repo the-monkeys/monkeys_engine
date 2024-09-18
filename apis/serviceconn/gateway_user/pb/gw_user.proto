@@ -36,6 +36,7 @@ message UserProfileRes {
     string linkedin = 15;
     string twitter = 16;
     string github = 17;
+    repeated string topics = 18;
 }
 
 message UserActivityReq {
@@ -144,6 +145,19 @@ message UserDetailsByAccIdResp {
     string error = 6;
 }
 
+message TopicActionReq {
+    repeated string topic = 1;
+    string username = 2;
+    string ip = 3;
+    string client = 4;
+}
+
+message TopicActionRes {
+    int32 status = 1;
+    string message = 2;
+    string error = 3;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -152,6 +166,9 @@ service UserService {
     rpc GetAllTopics(GetTopicsRequests) returns (GetTopicsResponse) {}
     rpc GetAllCategories(GetAllCategoriesReq) returns (GetAllCategoriesRes) {}
     rpc GetUserDetailsByAccId(UserDetailsByAccIdReq) returns (UserDetailsByAccIdResp) {}
+    rpc FollowTopics(TopicActionReq) returns (TopicActionRes) {}
+    rpc UnFollowTopics(TopicActionReq) returns (TopicActionRes) {}
+
     // Bookmark blog
     // Get Bookmarks
     // Invite as co author

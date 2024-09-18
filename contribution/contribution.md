@@ -18,7 +18,7 @@ The following tools are required for local setup:
 
 * Docker
 * Golang v1.18.0+
-* Protoc compiler
+* Protoc compiler using the [link](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os)
 * [migrate](https://github.com/golang-migrate/migrate)
 
 ## Additional Setup

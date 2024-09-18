@@ -23,6 +23,7 @@ type UserDb interface {
 	CreateUserLog(user *models.UserLogs, description string) error
 	AddBlogWithId(models.TheMonkeysMessage) error
 	AddBlogPermission(models.TheMonkeysMessage) error
+	AddUserInterest(interest []string, username string) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -33,12 +34,14 @@ type UserDb interface {
 	GetAllTopicsFromDb() (*pb.GetTopicsResponse, error)
 	GetAllCategories() (*pb.GetAllCategoriesRes, error)
 	GetUserActivities(userId int64) (*pb.UserActivityResp, error)
-
+	GetUserInterest(username string) ([]string, error)
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
 	UpdateBlogStatusToPublish(blogId string, status string) error
+
 	// Delete queries
 	DeleteUserProfile(username string) error
+	RemoveUserInterest(interests []string, username string) error
 }
 
 type uDBHandler struct {
@@ -71,15 +74,47 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 // To get User Profile
 func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, error) {
 	var tmu models.UserAccount
-	if err := uh.db.QueryRow(`
-        SELECT username, first_name, last_name, bio, avatar_url, created_at, address, linkedin, github, twitter, instagram 
-        FROM user_account WHERE username = $1;`, username).
-		Scan(&tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl, &tmu.CreatedAt,
-			&tmu.Address, &tmu.LinkedIn, &tmu.Github, &tmu.Twitter, &tmu.Instagram); err != nil {
-		logrus.Errorf("can't find a user existing with this profile id  %s, error: %+v", username, err)
+
+	// Step 1: Fetch user profile information from the user_account table
+	err := uh.db.QueryRow(`
+		SELECT id, username, first_name, last_name, bio, avatar_url, created_at, address, linkedin, github, twitter, instagram 
+		FROM user_account WHERE username = $1;`, username).
+		Scan(&tmu.Id, &tmu.UserName, &tmu.FirstName, &tmu.LastName, &tmu.Bio, &tmu.AvatarUrl, &tmu.CreatedAt,
+			&tmu.Address, &tmu.LinkedIn, &tmu.Github, &tmu.Twitter, &tmu.Instagram)
+
+	if err != nil {
+		uh.log.Errorf("Can't find a user with username %s, error: %+v", username, err)
 		return nil, err
 	}
 
+	// Step 2: Fetch user's interests by joining user_interest and topics tables
+	rows, err := uh.db.Query(`
+		SELECT t.description 
+		FROM topics t
+		JOIN user_interest ui ON t.id = ui.topics_id
+		WHERE ui.user_id = $1;`, tmu.Id)
+
+	if err != nil {
+		uh.log.Errorf("Error fetching interests for user ID %d, error: %+v", tmu.Id, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the interests into the UserAccount struct
+	var interests []string
+	for rows.Next() {
+		var interest string
+		if err := rows.Scan(&interest); err != nil {
+			uh.log.Errorf("Error scanning interest for user ID %d, error: %+v", tmu.Id, err)
+			return nil, err
+		}
+		interests = append(interests, interest)
+	}
+
+	// Assign interests to the user's profile
+	tmu.Interests = interests
+
+	uh.log.Infof("Successfully fetched profile and interests for user: %s", username)
 	return &tmu, nil
 }
 
@@ -130,22 +165,56 @@ func (uh *uDBHandler) CheckIfUsernameExist(username string) (*models.TheMonkeysU
 
 func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, error) {
 	var profile models.UserProfileRes
-	if err := uh.db.QueryRow(`
-			SELECT ua.account_id, ua.username, ua.first_name, ua.last_name, ua.email, ua.date_of_birth,
-			ua.bio, ua.avatar_url, ua.created_at, ua.updated_at, ua.address, ua.contact_number, us.status,
-			ua.view_permission, ua.linkedin, ua.github, ua.twitter, ua.instagram 
-			FROM user_account ua
-			INNER JOIN user_status us ON us.id = ua.user_status
-			WHERE ua.username = $1;
-		`, username).
+
+	// Step 1: Fetch user profile information
+	err := uh.db.QueryRow(`
+		SELECT ua.account_id, ua.username, ua.first_name, ua.last_name, ua.email, ua.date_of_birth,
+		ua.bio, ua.avatar_url, ua.created_at, ua.updated_at, ua.address, ua.contact_number, us.status,
+		ua.view_permission, ua.linkedin, ua.github, ua.twitter, ua.instagram 
+		FROM user_account ua
+		INNER JOIN user_status us ON us.id = ua.user_status
+		WHERE ua.username = $1;
+	`, username).
 		Scan(&profile.AccountId, &profile.Username, &profile.FirstName, &profile.LastName, &profile.Email,
 			&profile.DateOfBirth, &profile.Bio, &profile.AvatarUrl, &profile.CreatedAt, &profile.UpdatedAt,
 			&profile.Address, &profile.ContactNumber, &profile.UserStatus, &profile.ViewPermission,
-			&profile.LinkedIn, &profile.Github, &profile.Twitter, &profile.Instagram); err != nil {
-		logrus.Errorf("can't find a user profile existing with username %s, error: %+v", username, err)
+			&profile.LinkedIn, &profile.Github, &profile.Twitter, &profile.Instagram)
+
+	if err != nil {
+		logrus.Errorf("can't find a user profile with username %s, error: %+v", username, err)
 		return nil, err
 	}
 
+	// Step 2: Fetch user's interests by joining user_interest and topics tables
+	rows, err := uh.db.Query(`
+		SELECT t.description 
+		FROM topics t
+		JOIN user_interest ui ON t.id = ui.topics_id
+		JOIN user_account ua ON ua.id = ui.user_id
+		WHERE ua.username = $1;
+	`, username)
+
+	if err != nil {
+		logrus.Errorf("Error fetching interests for username %s, error: %+v", username, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the interests into the UserProfileRes struct
+	var interests []string
+	for rows.Next() {
+		var interest string
+		if err := rows.Scan(&interest); err != nil {
+			logrus.Errorf("Error scanning interest for user %s, error: %+v", username, err)
+			return nil, err
+		}
+		interests = append(interests, interest)
+	}
+
+	// Assign the collected interests to the profile
+	profile.Interests = interests
+
+	logrus.Infof("Successfully fetched profile and interests for user: %s", username)
 	return &profile, nil
 }
 
@@ -457,4 +526,139 @@ func (uh *uDBHandler) CheckIfAccIdExist(accountId string) (*models.TheMonkeysUse
 	}
 
 	return &tmu, nil
+}
+
+func (uh *uDBHandler) AddUserInterest(interests []string, username string) error {
+	// Start a transaction
+	tx, err := uh.db.Begin()
+	if err != nil {
+		uh.log.Errorf("Failed to start transaction: %+v", err)
+		return err
+	}
+
+	// Step 1: Fetch the user ID based on username
+	var userId int64
+	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
+		tx.Rollback() // rollback transaction on error
+		return err
+	}
+
+	// Step 2: Iterate over the interests and insert them into the user_interest table
+	for _, interest := range interests {
+		// Fetch the topic ID based on the interest description
+		var topicId int
+		err = tx.QueryRow(`SELECT id FROM topics WHERE description = $1`, interest).Scan(&topicId)
+		if err != nil {
+			uh.log.Errorf("Failed to fetch topic ID for interest: %s, error: %+v", interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+
+		// Insert into user_interest table
+		_, err = tx.Exec(`INSERT INTO user_interest (user_id, topics_id) VALUES ($1, $2)`, userId, topicId)
+		if err != nil {
+			uh.log.Errorf("Failed to insert user interest for username: %s and interest: %s, error: %+v", username, interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+	}
+
+	// Step 3: Commit the transaction
+	if err := tx.Commit(); err != nil {
+		uh.log.Errorf("Failed to commit transaction: %+v", err)
+		return err
+	}
+
+	uh.log.Infof("Successfully added interests for user: %s", username)
+	return nil
+}
+
+func (uh *uDBHandler) GetUserInterest(username string) ([]string, error) {
+	// Step 1: Fetch the user ID based on username
+	var userId int64
+	err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Fetch the user's interests (topics) based on user_id
+	rows, err := uh.db.Query(`
+        SELECT t.description 
+        FROM topics t
+        JOIN user_interest ui ON t.id = ui.topics_id
+        WHERE ui.user_id = $1`, userId)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch user interests for user ID: %d, error: %+v", userId, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the descriptions of the topics
+	var interests []string
+	for rows.Next() {
+		var description string
+		if err := rows.Scan(&description); err != nil {
+			uh.log.Errorf("Failed to scan topic description, error: %+v", err)
+			return nil, err
+		}
+		interests = append(interests, description)
+	}
+
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Error iterating over user interests, error: %+v", err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched interests for user: %s", username)
+	return interests, nil
+}
+
+func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) error {
+	// Start a transaction
+	tx, err := uh.db.Begin()
+	if err != nil {
+		uh.log.Errorf("Failed to start transaction: %+v", err)
+		return err
+	}
+
+	// Step 1: Fetch the user ID based on username
+	var userId int64
+	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
+		tx.Rollback() // rollback transaction on error
+		return err
+	}
+
+	// Step 2: Iterate over the interests and remove them from the user_interest table
+	for _, interest := range interests {
+		// Fetch the topic ID based on the interest description
+		var topicId int
+		err = tx.QueryRow(`SELECT id FROM topics WHERE description = $1`, interest).Scan(&topicId)
+		if err != nil {
+			uh.log.Errorf("Failed to fetch topic ID for interest: %s, error: %+v", interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+
+		// Remove the user's interest from the user_interest table
+		_, err = tx.Exec(`DELETE FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId)
+		if err != nil {
+			uh.log.Errorf("Failed to remove user interest for username: %s and interest: %s, error: %+v", username, interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+	}
+
+	// Step 3: Commit the transaction
+	if err := tx.Commit(); err != nil {
+		uh.log.Errorf("Failed to commit transaction: %+v", err)
+		return err
+	}
+
+	uh.log.Infof("Successfully removed interests for user: %s", username)
+	return nil
 }

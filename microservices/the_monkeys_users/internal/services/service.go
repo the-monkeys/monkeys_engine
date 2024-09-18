@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
@@ -60,6 +62,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 			Instagram: userProfile.Instagram.String,
 			Twitter:   userProfile.Twitter.String,
 			Github:    userProfile.Github.String,
+			Topics:    userProfile.Interests,
 		}, nil
 
 	}
@@ -81,6 +84,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
+	fmt.Printf("userDetails: %+v\n", userDetails)
 
 	return &pb.UserProfileRes{
 		AccountId:     userDetails.AccountId,
@@ -99,6 +103,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		Instagram:     userDetails.Instagram.String,
 		Twitter:       userDetails.Twitter.String,
 		Github:        userDetails.Github.String,
+		Topics:        userDetails.Interests,
 	}, err
 }
 
@@ -254,4 +259,83 @@ func (us *UserSvc) GetUserDetailsByAccId(ctx context.Context, req *pb.UserDetail
 		// Bio:       userInfo.Bio.String,
 	}, nil
 
+}
+func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*pb.TopicActionRes, error) {
+	if len(req.Topic) == 0 {
+		us.log.Errorf("user %s has entered no topic", req.Username)
+		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
+	}
+
+	for i, _ := range req.Topic {
+		req.Topic[i] = strings.TrimSpace(req.Topic[i])
+	}
+
+	err := us.dbConn.AddUserInterest(req.Topic, req.Username)
+	if err != nil {
+		us.log.Errorf("Failed to update user interest for user %s, error: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "Failed to update user interest")
+	}
+
+	// Check if the user exists
+	dbUserInfo, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: dbUserInfo.AccountId,
+	}
+
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.FollowedTopics, req.Topic), constants.ServiceUser, constants.EventFollowTopics, us.log)
+
+	return &pb.TopicActionRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("user's interest in the topics %v is updated successfully", req.Topic),
+	}, nil
+}
+
+func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (*pb.TopicActionRes, error) {
+	if len(req.Topic) == 0 {
+		us.log.Errorf("user %s has entered no topic", req.Username)
+		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
+	}
+
+	for i, _ := range req.Topic {
+		req.Topic[i] = strings.TrimSpace(req.Topic[i])
+	}
+
+	err := us.dbConn.RemoveUserInterest(req.Topic, req.Username)
+	if err != nil {
+		us.log.Errorf("Failed to remove user interest for user %s, error: %v", req.Username, err)
+		return nil, status.Errorf(codes.Internal, "Failed to update user interest")
+	}
+
+	// Check if the user exists
+	dbUserInfo, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: dbUserInfo.AccountId,
+	}
+
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnFollowedTopics, req.Topic), constants.ServiceUser, constants.EventUnFollowTopics, us.log)
+
+	return &pb.TopicActionRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("user's un-followed the topics %v is updated successfully", req.Topic),
+	}, nil
 }

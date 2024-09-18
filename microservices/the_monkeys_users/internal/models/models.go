@@ -23,6 +23,7 @@ type UserAccount struct {
 	Github        sql.NullString `json:"github"`
 	Twitter       sql.NullString `json:"twitter"`
 	Instagram     sql.NullString `json:"instagram"`
+	Interests     []string       `json:"interests"`
 }
 
 type UserAuthInfo struct {
@@ -79,6 +80,7 @@ type UserProfileRes struct {
 	Github         sql.NullString `json:"github"`
 	Twitter        sql.NullString `json:"twitter"`
 	Instagram      sql.NullString `json:"instagram"`
+	Interests      []string       `json:"interests"`
 }
 
 type UserLogs struct {

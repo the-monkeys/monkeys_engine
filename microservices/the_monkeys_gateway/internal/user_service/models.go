@@ -29,3 +29,7 @@ type ReturnMessage struct {
 type UpdateUserProfileRequest struct {
 	Values UpdateUserProfile `json:"values"`
 }
+
+type FollowTopic struct {
+	Topics []string `json:"topics"`
+}
