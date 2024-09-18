@@ -556,7 +556,22 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 			return err
 		}
 
-		// Insert into user_interest table
+		// Step 3: Check if the user is already following this interest
+		var exists int
+		err = tx.QueryRow(`SELECT COUNT(1) FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId).Scan(&exists)
+		if err != nil {
+			uh.log.Errorf("Failed to check if user is already following interest: %s, error: %+v", interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+
+		// If the user is already following the interest, skip the insert and log it
+		if exists > 0 {
+			uh.log.Infof("User %s already follows interest: %s, skipping", username, interest)
+			continue
+		}
+
+		// Insert into user_interest table for interests not already followed
 		_, err = tx.Exec(`INSERT INTO user_interest (user_id, topics_id) VALUES ($1, $2)`, userId, topicId)
 		if err != nil {
 			uh.log.Errorf("Failed to insert user interest for username: %s and interest: %s, error: %+v", username, interest, err)
@@ -565,13 +580,13 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 		}
 	}
 
-	// Step 3: Commit the transaction
+	// Step 4: Commit the transaction
 	if err := tx.Commit(); err != nil {
 		uh.log.Errorf("Failed to commit transaction: %+v", err)
 		return err
 	}
 
-	uh.log.Infof("Successfully added interests for user: %s", username)
+	uh.log.Infof("Successfully added new interests for user: %s", username)
 	return nil
 }
 
@@ -644,6 +659,21 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 			return err
 		}
 
+		// Step 3: Check if the user is actually following this interest
+		var exists int
+		err = tx.QueryRow(`SELECT COUNT(1) FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId).Scan(&exists)
+		if err != nil {
+			uh.log.Errorf("Failed to check if user follows interest: %s, error: %+v", interest, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+
+		// If the user is not following the interest, skip and log it
+		if exists == 0 {
+			uh.log.Infof("User %s does not follow interest: %s, skipping removal", username, interest)
+			continue
+		}
+
 		// Remove the user's interest from the user_interest table
 		_, err = tx.Exec(`DELETE FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId)
 		if err != nil {
@@ -653,12 +683,12 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 		}
 	}
 
-	// Step 3: Commit the transaction
+	// Step 4: Commit the transaction
 	if err := tx.Commit(); err != nil {
 		uh.log.Errorf("Failed to commit transaction: %+v", err)
 		return err
 	}
 
-	uh.log.Infof("Successfully removed interests for user: %s", username)
+	uh.log.Infof("Successfully removed selected interests for user: %s", username)
 	return nil
 }
