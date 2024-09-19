@@ -33,3 +33,11 @@ type UpdateUserProfileRequest struct {
 type FollowTopic struct {
 	Topics []string `json:"topics"`
 }
+
+type CoAuthor struct {
+	AccountId string `json:"account_id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Ip        string `json:"ip"`
+	Client    string `json:"client"`
+}

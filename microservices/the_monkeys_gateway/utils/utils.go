@@ -2,8 +2,10 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 // CheckUserAccessLevel checks if a specific access level is present in the user_access_level []string.
@@ -28,6 +30,7 @@ func CheckUserAccessInContext(ctx *gin.Context, accessToCheck string) bool {
 
 	// Type assert the value to []string (make sure the context actually holds this type)
 	accessLevels, ok := accessValue.([]string)
+	logrus.Info("accessLevels: ", accessLevels)
 	if !ok {
 		fmt.Println("user_access_level is not of type []string")
 		return false
@@ -35,4 +38,9 @@ func CheckUserAccessInContext(ctx *gin.Context, accessToCheck string) bool {
 
 	// Use the helper function to check if the specific access exists
 	return CheckUserAccessLevel(accessLevels, accessToCheck)
+}
+
+func CheckUserRoleInContext(ctx *gin.Context, role string) bool {
+	userRole := ctx.GetString("user_role")
+	return strings.EqualFold(userRole, role)
 }

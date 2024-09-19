@@ -22,8 +22,8 @@ type UserDb interface {
 	// Create queries
 	CreateUserLog(user *models.UserLogs, description string) error
 	AddBlogWithId(models.TheMonkeysMessage) error
-	AddBlogPermission(models.TheMonkeysMessage) error
 	AddUserInterest(interest []string, username string) error
+	AddPermissionToAUser(blogId string, userId int64, inviterID string, permissionType string) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -42,6 +42,7 @@ type UserDb interface {
 	// Delete queries
 	DeleteUserProfile(username string) error
 	RemoveUserInterest(interests []string, username string) error
+	RevokeBlogPermissionFromAUser(blogId string, userId int64, permissionType string) error
 }
 
 type uDBHandler struct {
@@ -118,49 +119,12 @@ func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, erro
 	return &tmu, nil
 }
 
-// TODO: Find all the fields of models.TheMonkeysUser
 func (uh *uDBHandler) CheckIfEmailExist(email string) (*models.TheMonkeysUser, error) {
-	var tmu models.TheMonkeysUser
-	if err := uh.db.QueryRow(`
-            SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
-            ua.email, uai.password_hash, evs.status, us.status, uai.email_validation_token,
-            uai.email_verification_timeout
-            FROM USER_ACCOUNT ua
-            LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
-            LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-            LEFT JOIN user_status us ON ua.user_status = us.id
-            WHERE ua.email = $1;
-        `, email).
-		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email, &tmu.Password,
-			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken, &tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with email %s, error: %+v", email, err)
-		return nil, err
-	}
-
-	return &tmu, nil
+	return uh.fetchUserByIdentifier("email", email)
 }
 
 func (uh *uDBHandler) CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error) {
-	var tmu models.TheMonkeysUser
-	if err := uh.db.QueryRow(`
-			SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
-			ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
-			evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
-			FROM USER_ACCOUNT ua
-			LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
-			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-			LEFT JOIN user_status us ON ua.user_status = us.id
-			WHERE ua.username = $1;
-		`, username).
-		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
-			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
-			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
-			&tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with username %s, error: %+v", username, err)
-		return nil, err
-	}
-
-	return &tmu, nil
+	return uh.fetchUserByIdentifier("username", username)
 }
 
 func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, error) {
@@ -316,7 +280,7 @@ func (uh *uDBHandler) AddUserLog(username string, ip string, description string,
 		return nil
 	}
 
-	//From clientname find client id
+	//From client name find client id
 	if err := uh.db.QueryRow(`
 			SELECT id FROM clients WHERE c_name = $1;`, clientName).Scan(&clientId); err != nil {
 		logrus.Errorf("can't get id by using client name %s, error: %+v", clientName, err)
@@ -489,13 +453,8 @@ func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, err
 	}, nil
 }
 
-func (uh *uDBHandler) AddBlogPermission(models.TheMonkeysMessage) error {
-	return nil
-}
-
 func (uh *uDBHandler) UpdateBlogStatusToPublish(blogId string, status string) error {
 	uh.log.Infof("the blog %v is being published", blogId)
-
 	row := uh.db.QueryRow("UPDATE blog SET status = $1 WHERE blog_id = $2", status, blogId)
 	if row.Err() != nil {
 		return row.Err()
@@ -506,22 +465,29 @@ func (uh *uDBHandler) UpdateBlogStatusToPublish(blogId string, status string) er
 }
 
 func (uh *uDBHandler) CheckIfAccIdExist(accountId string) (*models.TheMonkeysUser, error) {
+	return uh.fetchUserByIdentifier("account_id", accountId)
+}
+
+// TODO: Find all the fields of models.TheMonkeysUser
+func (uh *uDBHandler) fetchUserByIdentifier(identifierType, identifierValue string) (*models.TheMonkeysUser, error) {
 	var tmu models.TheMonkeysUser
-	if err := uh.db.QueryRow(`
-			SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
-			ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
-			evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
-			FROM USER_ACCOUNT ua
-			LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
-			LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
-			LEFT JOIN user_status us ON ua.user_status = us.id
-			WHERE ua.account_id = $1;
-		`, accountId).
+	query := `
+		SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
+		ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
+		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
+		FROM USER_ACCOUNT ua
+		LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
+		LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
+		LEFT JOIN user_status us ON ua.user_status = us.id
+		WHERE ua.` + identifierType + ` = $1;
+	`
+
+	if err := uh.db.QueryRow(query, identifierValue).
 		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
 			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
 			&tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with accountId %s, error: %+v", accountId, err)
+		uh.log.Errorf("Can't find a user with %s: %s, error: %+v", identifierType, identifierValue, err)
 		return nil, err
 	}
 

@@ -339,3 +339,37 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 		Message: fmt.Sprintf("user's un-followed the topics %v is updated successfully", req.Topic),
 	}, nil
 }
+
+func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
+	us.log.Infof("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
+	resp, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	fmt.Printf("resp*****: %+v\n", resp)
+	// Invite the co-author
+	if err := us.dbConn.AddPermissionToAUser(req.BlogId, resp.Id, req.BlogOwnerUsername, constants.RoleEditor); err != nil {
+		logrus.Errorf("error while inviting the co-author: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: resp.AccountId,
+	}
+
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.InvitedAsACoAuthor, req.Username, req.BlogId), constants.ServiceUser, constants.EventInviteCoAuthor, us.log)
+
+	return &pb.CoAuthorAccessRes{
+		Message: fmt.Sprintf("%s has been invited as a co-author", req.Username),
+	}, nil
+}
+func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
+	panic("implement me")
+}

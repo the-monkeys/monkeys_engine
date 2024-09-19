@@ -74,6 +74,7 @@ message AccessCheckRes {
   repeated string access = 5;
   string blog_id = 6;
   Error error = 7;
+  string role = 8;
 }
 
 message LoginUserRequest {

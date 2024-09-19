@@ -8,8 +8,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -57,7 +59,11 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	}
 
 	// Invite and un invite as coauthor
-	// routes.GET("/activities/:user_name", usc.GetUserActivities)
+	{
+		routes.POST("/invite/:blog_id/", mware.AuthzRequired, usc.InviteCoAuthor)
+		routes.POST("/revoke-invite/:blog_id/", usc.RevokeInviteCoAuthor)
+	}
+
 	return usc
 }
 
@@ -278,7 +284,7 @@ func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "invalid request body"})
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request body"})
 				return
 			case codes.NotFound:
 				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
@@ -317,7 +323,7 @@ func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "invalid request body"})
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request body"})
 				return
 			case codes.NotFound:
 				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
@@ -330,4 +336,55 @@ func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, &res)
+}
+
+func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+	userName := ctx.GetString("userName")
+	// Check permissions:
+	if !utils.CheckUserRoleInContext(ctx, constants.RoleOwner) {
+		logrus.Errorf("user does not have the permission to invite a co-author")
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+	// accId := ctx.GetString("accountId")
+
+	var req CoAuthor
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		logrus.Errorf("error while getting the update data: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	res, err := asc.Client.InviteCoAuthor(context.Background(), &pb.CoAuthorAccessReq{
+		AccountId:         req.AccountId,
+		Username:          req.Username,
+		Email:             req.Email,
+		Ip:                req.Ip,
+		Client:            req.Client,
+		BlogOwnerUsername: userName,
+		BlogId:            blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request body"})
+				return
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user/blog does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, &res)
+}
+
+func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
+
 }

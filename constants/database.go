@@ -8,8 +8,8 @@ const (
 
 const (
 	RoleAdmin  = "admin"
-	RoleOwner  = "owner"
-	RoleEditor = "editor"
+	RoleOwner  = "Owner"
+	RoleEditor = "Editor"
 	RoleViewer = "viewer"
 )
 

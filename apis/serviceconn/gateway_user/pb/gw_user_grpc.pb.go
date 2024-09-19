@@ -28,6 +28,8 @@ const (
 	UserService_GetUserDetailsByAccId_FullMethodName = "/auth_svc.UserService/GetUserDetailsByAccId"
 	UserService_FollowTopics_FullMethodName          = "/auth_svc.UserService/FollowTopics"
 	UserService_UnFollowTopics_FullMethodName        = "/auth_svc.UserService/UnFollowTopics"
+	UserService_InviteCoAuthor_FullMethodName        = "/auth_svc.UserService/InviteCoAuthor"
+	UserService_RevokeCoAuthorAccess_FullMethodName  = "/auth_svc.UserService/RevokeCoAuthorAccess"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -43,6 +45,13 @@ type UserServiceClient interface {
 	GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error)
 	FollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
 	UnFollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
+	// Bookmark blog
+	// Get Bookmarks
+	InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
+	// Accept co author invitation
+	// Reject co author invitation
+	// Revoke co author invitation access
+	RevokeCoAuthorAccess(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
 }
 
 type userServiceClient struct {
@@ -143,6 +152,26 @@ func (c *userServiceClient) UnFollowTopics(ctx context.Context, in *TopicActionR
 	return out, nil
 }
 
+func (c *userServiceClient) InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CoAuthorAccessRes)
+	err := c.cc.Invoke(ctx, UserService_InviteCoAuthor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) RevokeCoAuthorAccess(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CoAuthorAccessRes)
+	err := c.cc.Invoke(ctx, UserService_RevokeCoAuthorAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -156,6 +185,13 @@ type UserServiceServer interface {
 	GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error)
 	FollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
 	UnFollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
+	// Bookmark blog
+	// Get Bookmarks
+	InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
+	// Accept co author invitation
+	// Reject co author invitation
+	// Revoke co author invitation access
+	RevokeCoAuthorAccess(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -192,6 +228,12 @@ func (UnimplementedUserServiceServer) FollowTopics(context.Context, *TopicAction
 }
 func (UnimplementedUserServiceServer) UnFollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnFollowTopics not implemented")
+}
+func (UnimplementedUserServiceServer) InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InviteCoAuthor not implemented")
+}
+func (UnimplementedUserServiceServer) RevokeCoAuthorAccess(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeCoAuthorAccess not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -376,6 +418,42 @@ func _UserService_UnFollowTopics_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_InviteCoAuthor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CoAuthorAccessReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).InviteCoAuthor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_InviteCoAuthor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).InviteCoAuthor(ctx, req.(*CoAuthorAccessReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_RevokeCoAuthorAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CoAuthorAccessReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).RevokeCoAuthorAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_RevokeCoAuthorAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).RevokeCoAuthorAccess(ctx, req.(*CoAuthorAccessReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -418,6 +496,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UnFollowTopics",
 			Handler:    _UserService_UnFollowTopics_Handler,
+		},
+		{
+			MethodName: "InviteCoAuthor",
+			Handler:    _UserService_InviteCoAuthor_Handler,
+		},
+		{
+			MethodName: "RevokeCoAuthorAccess",
+			Handler:    _UserService_RevokeCoAuthorAccess_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

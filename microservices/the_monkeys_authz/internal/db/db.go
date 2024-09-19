@@ -19,7 +19,7 @@ type AuthDBHandler interface {
 	// Get Operations
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
-	GetUserAccessForABlog(accountId, blogId string) ([]string, error)
+	GetUserAccessForABlog(accountId, blogId string) ([]string, string, error)
 
 	// Create Operations
 	RegisterUser(user *models.TheMonkeysUser) (int64, error)
@@ -449,9 +449,11 @@ func (adh *authDBHandler) UpdateEmailId(emailId string, user *models.TheMonkeysU
 	return nil
 }
 
-// GetUserAccessForABlog retrieves the permissions for a given user on a specific blog
-func (adh *authDBHandler) GetUserAccessForABlog(accountId, blogId string) ([]string, error) {
+// GetUserAccessForABlog retrieves the permissions and role for a given user on a specific blog
+func (adh *authDBHandler) GetUserAccessForABlog(accountId, blogId string) ([]string, string, error) {
+	// Default permission for all users
 	var permissions = []string{constants.PermissionCreate}
+	var userRole string
 
 	// Get the blog ID and status from the blog table
 	var blogID int64
@@ -459,47 +461,51 @@ func (adh *authDBHandler) GetUserAccessForABlog(accountId, blogId string) ([]str
 	err := adh.db.QueryRow("SELECT id, status FROM blog WHERE blog_id = $1", blogId).Scan(&blogID, &blogStatus)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, sql.ErrNoRows
+			return nil, "", sql.ErrNoRows
 		}
-		return nil, fmt.Errorf("failed to get blog ID and status: %w", err)
+		return nil, "", fmt.Errorf("failed to get blog ID and status: %w", err)
 	}
 
 	// Get the user ID from the user_account table
 	var userID int64
 	err = adh.db.QueryRow("SELECT id FROM user_account WHERE account_id = $1", accountId).Scan(&userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user ID: %w", err)
+		return nil, "", fmt.Errorf("failed to get user ID: %w", err)
 	}
 
 	// Check if there is a specific permission mapping in blog_permissions for the user and blog
 	var permissionType string
 	err = adh.db.QueryRow("SELECT permission_type FROM blog_permissions WHERE blog_id = $1 AND user_id = $2", blogID, userID).Scan(&permissionType)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to query blog_permissions: %w", err)
+		return nil, "", fmt.Errorf("failed to query blog_permissions: %w", err)
 	}
 
 	// If a permission is found, grant the respective permissions based on the permission type
 	if err == nil {
 		switch permissionType {
-		case "owner":
+		case "owner", "Owner":
 			// Grant all permissions if the user is the owner
 			permissions = append(permissions, "Read", "Edit", "Delete", "Archive", "Transfer-Ownership", "Publish", "Draft")
-		case "editor":
+			userRole = "owner"
+		case "editor", "Editor":
 			// Grant editor permissions
 			permissions = append(permissions, "Read", "Edit", "Publish", "Draft")
-		case "viewer":
+			userRole = "editor"
+		case "viewer", "Viewer":
 			// Grant viewer permission
 			permissions = append(permissions, "Read")
+			userRole = "viewer"
 		}
 	} else if blogStatus == constants.BlogStatusPublished {
 		// If no specific mapping exists and the blog is published, give Read access
 		permissions = append(permissions, "Read")
+		userRole = "viewer" // Assuming "viewer" role if the blog is published and the user has no specific role
 	} else {
 		// If no permissions found and blog is not published, return no access
-		return nil, fmt.Errorf("no access available for the blog")
+		return nil, "", fmt.Errorf("no access available for the blog")
 	}
 
-	return permissions, nil
+	return permissions, userRole, nil
 }
 
 // func (adh *authDBHandler) GetUserAccessForABlog(accountId, blogId string) ([]string, error) {

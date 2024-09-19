@@ -158,6 +158,25 @@ message TopicActionRes {
     string error = 3;
 }
 
+message CoAuthorAccessReq {
+    string account_id = 1;
+    string username = 2;
+    string email = 3;
+    string ip = 4;
+    string client = 5;
+    string blog_owner_username = 6;
+    string blog_id = 7;
+}
+
+message CoAuthorAccessRes {
+    string account_id = 1;
+    string username = 2;
+    string email = 3;
+    string status = 4;
+    string error = 5;
+    string message = 6;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -171,9 +190,11 @@ service UserService {
 
     // Bookmark blog
     // Get Bookmarks
-    // Invite as co author
+    rpc InviteCoAuthor(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
+
     // Accept co author invitation
     // Reject co author invitation
     // Revoke co author invitation access
+    rpc RevokeCoAuthorAccess(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
 }
 
