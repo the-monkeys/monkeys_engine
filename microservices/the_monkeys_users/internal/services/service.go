@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -187,6 +188,12 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
+
 	// Run delete user query
 	err = us.dbConn.DeleteUserProfile(req.Username)
 	if err != nil {
@@ -194,19 +201,27 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		return nil, status.Errorf(codes.Internal, "cannot delete the user")
 	}
 
-	userLog := &models.UserLogs{
-		AccountId: user.AccountId,
+	bx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:      user.Username,
+		UserAccountId: user.AccountId,
+		Action:        constants.USER_PROFILE_DIRECTORY_DELETE,
+	})
+	if err != nil {
+		us.log.Errorf("failed to marshal message, error: %v", err)
 	}
-	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 
-	go cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
+	go func() {
+		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[0], bx)
+		if err != nil {
+			us.log.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		}
+	}()
 
 	// Return the response
 	return &pb.DeleteUserProfileRes{
 		Success: "user has been deleted successfully",
 		Status:  "200",
 	}, nil
-
 }
 
 func (us *UserSvc) GetAllTopics(context.Context, *pb.GetTopicsRequests) (*pb.GetTopicsResponse, error) {

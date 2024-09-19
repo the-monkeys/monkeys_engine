@@ -63,11 +63,17 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 
 		switch user.Action {
 		case constants.USER_PROFILE_DIRECTORY_CREATE:
-			CreateUserFolder(user.Username)
+			if err := CreateUserFolder(user.Username); err != nil {
+				logrus.Errorf("Failed to create user folder: %v", err)
+			}
 		case constants.USER_PROFILE_DIRECTORY_UPDATE:
-			err = UpdateUserFolder(user.Username, user.NewUsername)
-			if err != nil {
+			if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
 				logrus.Errorf("Failed to update user folder: %v", err)
+			}
+
+		case constants.USER_PROFILE_DIRECTORY_DELETE:
+			if err := DeleteUserFolder(user.Username); err != nil {
+				logrus.Errorf("Failed to delete user folder: %v", err)
 			}
 		default:
 			logrus.Errorf("Unknown action: %s", user.Action)
@@ -165,6 +171,18 @@ func UpdateUserFolder(currentName, newName string) error {
 	err = os.Rename(to, newPath)
 	if err != nil {
 		return errors.New("failed to rename directory to new name: " + err.Error())
+	}
+
+	return nil
+}
+
+func DeleteUserFolder(userName string) error {
+	dirPath := filepath.Join(constant.ProfileDir, userName)
+
+	// Remove the directory
+	err := os.RemoveAll(dirPath)
+	if err != nil {
+		return errors.New("failed to remove directory: " + err.Error())
 	}
 
 	return nil
