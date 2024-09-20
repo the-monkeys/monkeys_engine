@@ -177,6 +177,22 @@ message CoAuthorAccessRes {
     string message = 6;
 }
 
+message BlogsByUserNameReq{
+    string username = 1;
+}
+
+message Blog{
+    int64 id = 1;
+    string username = 2;
+    string account_id = 3;
+    string blog_id = 4;
+    string permission = 5;
+    string status = 6;
+}
+message BlogsByUserNameRes{
+    repeated Blog blogs = 1;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -196,5 +212,6 @@ service UserService {
     // Reject co author invitation
     // Revoke co author invitation access
     rpc RevokeCoAuthorAccess(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
+    rpc GetBlogsByUserName(BlogsByUserNameReq) returns (BlogsByUserNameRes) {}
 }
 

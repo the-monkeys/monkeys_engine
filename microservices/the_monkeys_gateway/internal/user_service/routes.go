@@ -62,6 +62,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	{
 		routes.POST("/invite/:blog_id/", mware.AuthzRequired, usc.InviteCoAuthor)
 		routes.POST("/revoke-invite/:blog_id/", usc.RevokeInviteCoAuthor)
+		routes.GET("/all-blogs/:username", usc.GetBlogsByUserName)
 	}
 
 	return usc
@@ -387,4 +388,34 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 
 func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
 
+}
+func (asc *UserServiceClient) GetBlogsByUserName(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allow to perform this action"})
+		return
+	}
+
+	res, err := asc.Client.GetBlogsByUserName(context.Background(), &pb.BlogsByUserNameReq{
+		Username: username,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user already has the blog permission"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, &res)
 }

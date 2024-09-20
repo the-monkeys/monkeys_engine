@@ -8,15 +8,16 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		return err
 	}
 
+	// Fetch the inviter ID based on inviter username
 	var inviterId int64
 	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, inviterID).Scan(&inviterId)
 	if err != nil {
-		uh.log.Errorf("Failed to fetch blog ID for blog: %s, error: %+v", blogId, err)
+		uh.log.Errorf("Failed to fetch inviter ID for user: %s, error: %+v", inviterID, err)
 		tx.Rollback()
 		return err
 	}
 
-	// Step 1: Fetch the blog ID based on the blog_id string
+	// Fetch the blog ID based on the blog_id string
 	var blogIdInt int64
 	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
 	if err != nil {
@@ -25,39 +26,83 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		return err
 	}
 
-	// Step 2: Add the permission to the blog_permissions table
-	_, err = tx.Exec(`INSERT INTO blog_permissions (blog_id, user_id, permission_type) VALUES ($1, $2, $3)`,
-		blogIdInt, userId, permissionType)
+	// Step 1: Check if the permission already exists in blog_permissions
+	var exists int
+	err = tx.QueryRow(`
+		SELECT COUNT(1) 
+		FROM blog_permissions 
+		WHERE blog_id = $1 AND user_id = $2 AND permission_type = $3`,
+		blogIdInt, userId, permissionType).Scan(&exists)
 	if err != nil {
-		uh.log.Errorf("Failed to add permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
+		uh.log.Errorf("Error checking permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
 		tx.Rollback()
 		return err
 	}
 
-	// Step 3: Insert into co_author_invites (assuming permissionType involves co-authorship)
-	_, err = tx.Exec(`INSERT INTO co_author_invites (blog_id, inviter_id, invitee_id, invite_status) VALUES ($1, $2, $3, 'pending')`,
-		blogIdInt, inviterId, userId)
+	if exists == 0 {
+		// Step 2: Add the permission to the blog_permissions table if it doesn't exist
+		_, err = tx.Exec(`INSERT INTO blog_permissions (blog_id, user_id, permission_type) VALUES ($1, $2, $3)`,
+			blogIdInt, userId, permissionType)
+		if err != nil {
+			uh.log.Errorf("Failed to add permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// Step 3: Check if the invite already exists in co_author_invites
+	err = tx.QueryRow(`
+		SELECT COUNT(1) 
+		FROM co_author_invites 
+		WHERE blog_id = $1 AND inviter_id = $2 AND invitee_id = $3`,
+		blogIdInt, inviterId, userId).Scan(&exists)
 	if err != nil {
-		uh.log.Errorf("Failed to invite co-author for blog: %s, user: %d, error: %+v", blogId, userId, err)
+		uh.log.Errorf("Error checking invite for blog: %s, user: %d, error: %+v", blogId, userId, err)
 		tx.Rollback()
 		return err
 	}
 
-	// Step 4: Add the user to the co_author_permissions table with the corresponding role
-	var roleId int64
-	err = tx.QueryRow(`SELECT id FROM user_role WHERE role_desc = $1`, permissionType).Scan(&roleId)
+	if exists == 0 {
+		// Step 4: Insert into co_author_invites if it doesn't exist
+		_, err = tx.Exec(`INSERT INTO co_author_invites (blog_id, inviter_id, invitee_id, invite_status) VALUES ($1, $2, $3, 'pending')`,
+			blogIdInt, inviterId, userId)
+		if err != nil {
+			uh.log.Errorf("Failed to invite co-author for blog: %s, user: %d, error: %+v", blogId, userId, err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// Step 5: Check if the user already has the permission in co_author_permissions
+	err = tx.QueryRow(`
+		SELECT COUNT(1) 
+		FROM co_author_permissions 
+		WHERE blog_id = $1 AND co_author_id = $2`,
+		blogIdInt, userId).Scan(&exists)
 	if err != nil {
-		uh.log.Errorf("Failed to fetch role ID for permission type: %s, error: %+v", permissionType, err)
+		uh.log.Errorf("Error checking co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
 		tx.Rollback()
 		return err
 	}
 
-	_, err = tx.Exec(`INSERT INTO co_author_permissions (blog_id, co_author_id, role_id) VALUES ($1, $2, $3)`,
-		blogIdInt, userId, roleId)
-	if err != nil {
-		uh.log.Errorf("Failed to grant co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
-		return err
+	if exists == 0 {
+		// Step 6: Fetch role ID based on the permissionType
+		var roleId int64
+		err = tx.QueryRow(`SELECT id FROM user_role WHERE role_desc = $1`, permissionType).Scan(&roleId)
+		if err != nil {
+			uh.log.Errorf("Failed to fetch role ID for permission type: %s, error: %+v", permissionType, err)
+			tx.Rollback()
+			return err
+		}
+
+		// Step 7: Insert into co_author_permissions if it doesn't exist
+		_, err = tx.Exec(`INSERT INTO co_author_permissions (blog_id, co_author_id, role_id) VALUES ($1, $2, $3)`,
+			blogIdInt, userId, roleId)
+		if err != nil {
+			uh.log.Errorf("Failed to grant co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
+			tx.Rollback()
+			return err
+		}
 	}
 
 	// Commit the transaction

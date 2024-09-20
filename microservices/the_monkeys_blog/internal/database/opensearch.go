@@ -28,6 +28,7 @@ type ElasticsearchStorage interface {
 	GetDraftedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
 	GetPublishedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
 	GetPublishedBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetPublishedBlogsRes, error)
+	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogByIdRes, error)
 
 	DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error)
 }
@@ -1126,4 +1127,8 @@ func (es *elasticsearchStorage) DraftABlogV2(ctx context.Context, blog *pb.Draft
 
 	es.log.Infof("DraftABlogV2: successfully created blog for user: %s, response: %+v", blog.OwnerAccountId, insertResponse)
 	return insertResponse, nil
+}
+
+func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogByIdRes, error) {
+
 }

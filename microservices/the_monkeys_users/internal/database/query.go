@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/sirupsen/logrus"
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 )
 
@@ -51,4 +52,55 @@ func (userDB *uDBHandler) CreateUserLog(user *models.UserLogs, description strin
 	}
 
 	return nil
+}
+
+// GetBlogsByUserName fetches blogs by username with permission and blog status
+func (uh *uDBHandler) GetBlogsByUserName(username string) (*pb.BlogsByUserNameRes, error) {
+	// Step 1: Prepare the query
+	query := `
+		SELECT b.id, b.blog_id, ua.username, ua.account_id, bp.permission_type, b.status
+		FROM blog b
+		JOIN blog_permissions bp ON b.id = bp.blog_id
+		JOIN user_account ua ON bp.user_id = ua.id
+		WHERE ua.username = $1;
+	`
+
+	// Step 2: Execute the query
+	rows, err := uh.db.Query(query, username)
+	if err != nil {
+		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", username, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the results into a slice of Blog structs
+	var blogs []*pb.Blog
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(&blog.Id, &blog.BlogId, &blog.Username, &blog.AccountId, &blog.Permission, &blog.BlogStatus)
+		if err != nil {
+			uh.log.Errorf("Error scanning blog data for username %s, error: %+v", username, err)
+			return nil, err
+		}
+		pbBlog := &pb.Blog{
+			Id:         blog.Id,
+			BlogId:     blog.BlogId,
+			Username:   blog.Username,
+			AccountId:  blog.AccountId,
+			Permission: blog.Permission,
+			Status:     blog.BlogStatus,
+		}
+		blogs = append(blogs, pbBlog)
+	}
+
+	// Step 4: Check for errors after iterating over the rows
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching blogs for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blogs for user: %s", username)
+	return &pb.BlogsByUserNameRes{
+		Blogs: blogs,
+	}, nil
 }

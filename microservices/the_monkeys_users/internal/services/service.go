@@ -388,3 +388,19 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
 	panic("implement me")
 }
+
+func (us *UserSvc) GetBlogsByUserName(ctx context.Context, req *pb.BlogsByUserNameReq) (*pb.BlogsByUserNameRes, error) {
+	us.log.Infof("fetching blogs for user: %s", req.Username)
+
+	resp, err := us.dbConn.GetBlogsByUserName(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return resp, nil
+}

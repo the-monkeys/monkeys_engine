@@ -101,3 +101,12 @@ type TheMonkeysMessage struct {
 	BlogId        string `json:"blog_id"`
 	Status        string `json:"status"`
 }
+
+type Blog struct {
+	Id         int64  `json:"id"`
+	BlogId     string `json:"blog_id"`
+	Username   string `json:"username"`
+	AccountId  string `json:"account_id"`
+	Permission string `json:"permission"`
+	BlogStatus string `json:"blog_status"`
+}
