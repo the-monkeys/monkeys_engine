@@ -28,7 +28,7 @@ type ElasticsearchStorage interface {
 	GetDraftedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
 	GetPublishedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.GetBlogByIdRes, error)
 	GetPublishedBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetPublishedBlogsRes, error)
-	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogByIdRes, error)
+	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error)
 
 	DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error)
 }
@@ -1129,6 +1129,104 @@ func (es *elasticsearchStorage) DraftABlogV2(ctx context.Context, blog *pb.Draft
 	return insertResponse, nil
 }
 
-func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogByIdRes, error) {
+func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error) {
+	// Ensure blogIds is not empty
+	if len(blogIds) == 0 {
+		es.log.Error("GetBlogsByBlogIds: blogIds array is empty")
+		return nil, fmt.Errorf("blogIds array cannot be empty")
+	}
 
+	// Build the query to search for blogs by blog_id and sort by blog time in descending order (latest first)
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"terms": map[string]interface{}{
+				"blog_id.keyword": blogIds,
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"blog.time": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+	}
+
+	// Marshal the query to JSON
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetBlogsByBlogIds: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	// Print the query for debugging
+	es.log.Infof("Executing query: %s", string(bs))
+
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetBlogsByBlogIds: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetBlogsByBlogIds: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetBlogsByBlogIds: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetBlogsByBlogIds: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok || len(hits) == 0 {
+		es.log.Infof("GetBlogsByBlogIds: no blogs found for provided blogIds")
+		return nil, nil
+	}
+
+	// Initialize a response structure to hold multiple blogs
+	var blogs = &pb.GetBlogsRes{
+		Blogs: make([]*pb.GetBlogs, 0, len(hits)),
+	}
+
+	// Iterate over the hits and convert them to GetBlogs
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"]
+		hitBytes, err := json.Marshal(hitSource)
+		if err != nil {
+			es.log.Errorf("GetBlogsByBlogIds: error marshaling hit source, error: %v", err)
+			return nil, err
+		}
+
+		var blog pb.GetBlogs
+		if err := json.Unmarshal(hitBytes, &blog); err != nil {
+			es.log.Errorf("GetBlogsByBlogIds: error unmarshaling hit to GetBlogs, error: %v", err)
+			return nil, err
+		}
+
+		blogs.Blogs = append(blogs.Blogs, &blog)
+	}
+
+	es.log.Infof("GetBlogsByBlogIds: successfully fetched %d blogs for provided blogIds", len(blogs.Blogs))
+	return blogs, nil
 }

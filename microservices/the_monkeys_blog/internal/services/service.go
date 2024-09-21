@@ -266,6 +266,14 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 	}, nil
 }
 
+func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBlogsByBlogIds) (*pb.GetBlogsRes, error) {
+	if len(req.BlogIds) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "blog ids cannot be empty")
+	}
+
+	return blog.osClient.GetBlogsByBlogIds(ctc, req.BlogIds)
+}
+
 // ********************************************************  Below function need to be re-written ********************************************************
 
 // func (blog *BlogService) Get100Blogs(req *emptypb.Empty, stream pb.BlogsAndPostService_Get100BlogsServer) error {

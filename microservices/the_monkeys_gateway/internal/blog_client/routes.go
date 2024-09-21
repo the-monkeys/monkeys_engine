@@ -3,8 +3,10 @@ package blog_client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -74,6 +76,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
+	routes.GET("/ids", blogClient.GetAllBlogsByBlogIds)
 
 	routes.DELETE("/:blog_id", mware.AuthzRequired, blogClient.DeleteBlogById)
 
@@ -459,6 +462,41 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, res)
+}
+
+// TODO: Add access control over this function for all blogs
+func (asc *BlogServiceClient) GetAllBlogsByBlogIds(ctx *gin.Context) {
+	ids := ctx.Query("ids")
+	idSlice := strings.Split(ids, ",")
+	fmt.Printf("ids: %v\n", ids)
+
+	if len(idSlice) == 0 {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "please provide blog ids"})
+		return
+	}
+
+	fmt.Printf("idSlice: %v\n", idSlice)
+
+	resp, err := asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
+		BlogIds: idSlice,
+	})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't delete the blog due to some internal error"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // ******************************************************* Third Party API ************************************************

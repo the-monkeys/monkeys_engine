@@ -144,7 +144,14 @@ message DeleteBlogResp{
     string error = 2;
 }
 
+message GetBlogsByBlogIds {
+    repeated string blog_ids = 1;
+}
 
+message GetBlogsRes {
+    repeated GetBlogs blogs = 1;
+    string error = 2;
+}
 
 
 // ******************************* DraftBlogV2 *******************************
@@ -200,6 +207,11 @@ service BlogService {
     rpc GetPublishedBlogsByAccID(GetBlogByIdReq) returns (GetPublishedBlogsRes);
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
     rpc GetPublishedBlogByIdAndOwnerId(GetBlogByIdReq) returns (GetBlogByIdRes);
+
+    // Get a list of blogs
+    // Last 100 Blogs
+    // Last 100 blogs by tags
+    rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes){};
 
     rpc CheckIfBlogsExist(GetBlogByIdReq) returns (BlogExistsRes);
     rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
