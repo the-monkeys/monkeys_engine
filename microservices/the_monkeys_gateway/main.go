@@ -65,8 +65,8 @@ func main() {
 		FullTimestamp: false,
 	})
 
-	user_service.RegisterUserRouter(server.router, cfg, authClient)
-	blog_client.RegisterBlogRouter(server.router, cfg, authClient)
+	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient)
+	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 
 	// Health check endpoint

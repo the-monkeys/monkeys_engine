@@ -1,121 +1,133 @@
-{
-    "owner_account_id": "TxPdz2Lv6nL6dZbh",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "mhTl6ghSkV",
-                "type": "paragraph",
-                "data": {
-                    "text": "MG Hey. Meet the new Editor. On this picture you can see it in action. Then, try a demo 🤓"
-                },
-                "author": ["TxPdz2Lv6nL6dZbh"],
-                "time": 17107371588
-            }
+[
+    {
+        "owner_account_id": "PNVbHDLRDRPBtNdf",
+        "author_list": ["PNVbHDLRDRPBtNdf", "TxPdz2Lv6n"],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "mhTl6ghSkV",
+                    "type": "paragraph",
+                    "data": {
+                        "text": "MG Hey. Meet the new Editor. On this picture you can see it in action. Then, try a demo 🤓"
+                    },
+                    "author": ["PNVbHDLRDRPBtNdf"],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "first",
+            "last",
+            "middle"
         ]
     },
-    "tags": [
-        "first",
-        "last",
-        "middle"
-    ]
-}
-
-
-{
-    "owner_account_id": "TxPdz2Lv6nL6dZbh",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "l98dyx3yjb",
-                "type": "header",
-                "data": {
-                    "text": "MG Key features",
-                    "level": 3
-                },
-                "author": ["TxPdz2Lv6nL6dZbh"],
-                "time": 17107371588
-            }
+    
+    
+    {
+        "owner_account_id": "PNVbHDLRDRPBtNdf",
+        "author_list": ["PNVbHDLRDRPBtNdf"],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "l98dyx3yjb",
+                    "type": "header",
+                    "data": {
+                        "text": "MG Key features",
+                        "level": 3
+                    },
+                    "author": ["PNVbHDLRDRPBtNdf"],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "one",
+            "two",
+            "three"
         ]
     },
-    "tags": [
-        "one",
-        "two",
-        "three"
-    ]
-}
-
-
-{
-    "owner_account_id": "TxPdz2Lv6nL6dZbh",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "l98dyx3yjb",
-                "type": "header",
-                "data": {
-                    "text": "MG Key features",
-                    "level": 3
-                },
-                "author": ["TxPdz2Lv6nL6dZbh"],
-                "time": 17107371588
-            }
+    
+    
+    {
+        "owner_account_id": "PNVbHDLRDRPBtNdf",
+        "author_list": ["PNVbHDLRDRPBtNdf"],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "l98dyx3yjb",
+                    "type": "header",
+                    "data": {
+                        "text": "MG Key features",
+                        "level": 3
+                    },
+                    "author": ["PNVbHDLRDRPBtNdf"],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "alpha",
+            "MGbeta",
+            "three"
         ]
     },
-    "tags": [
-        "alpha",
-        "MGbeta",
-        "three"
-    ]
-}
-
-
-{
-    "owner_account_id": "TxPdz2Lv6nL6dZbh",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "os_YI4eub4",
-                "type": "list",
-                "data": {
-                    "type": "unordered",
-                    "items": [
-                        "MG It is a block-style editor",
-                        "MG It returns clean data output in JSON",
-                        "MG Designed to be extendable and pluggable with a <a href='https: //editorjs.io/creating-a-block-tool"
-                    ]
-                },
-                "author": ["TxPdz2Lv6nL6dZbh"],
-                "time": 17107371588
-            }
+    
+    
+    {
+        "owner_account_id": "PNVbHDLRDRPBtNdf",
+        "author_list": ["PNVbHDLRDRPBtNdf"],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "os_YI4eub4",
+                    "type": "list",
+                    "data": {
+                        "type": "unordered",
+                        "items": [
+                            "MG It is a block-style editor",
+                            "MG It returns clean data output in JSON",
+                            "MG Designed to be extendable and pluggable with a <a href='https: //editorjs.io/creating-a-block-tool"
+                        ]
+                    },
+                    "author": ["PNVbHDLRDRPBtNdf"],
+                    "time": 17107371588
+                }
+            ]
+        }
+    },
+    
+    
+    {
+        "owner_account_id": "PNVbHDLRDRPBtNdf",
+        "author_list": ["PNVbHDLRDRPBtNdf"],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "1yKeXKxN7-",
+                    "type": "header",
+                    "data": {
+                        "text": "MG What does it mean «block-styled editor»",
+                        "level": 3
+                    },
+                    "author": ["PNVbHDLRDRPBtNdf"],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "MGalpha",
+            "beta",
+            "gama"
         ]
     }
-}
-
-
-{
-    "owner_account_id": "TxPdz2Lv6nL6dZbh",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "1yKeXKxN7-",
-                "type": "header",
-                "data": {
-                    "text": "MG What does it mean «block-styled editor»",
-                    "level": 3
-                },
-                "author": ["TxPdz2Lv6nL6dZbh"],
-                "time": 17107371588
-            }
-        ]
-    },
-    "tags": [
-        "MGalpha",
-        "beta",
-        "gama"
-    ]
-}
+]

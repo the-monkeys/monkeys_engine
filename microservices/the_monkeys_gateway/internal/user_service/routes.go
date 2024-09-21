@@ -389,6 +389,7 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
 
 }
+
 func (asc *UserServiceClient) GetBlogsByUserName(ctx *gin.Context) {
 	username := ctx.Param("username")
 

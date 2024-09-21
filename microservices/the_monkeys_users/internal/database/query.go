@@ -104,3 +104,54 @@ func (uh *uDBHandler) GetBlogsByUserName(username string) (*pb.BlogsByUserNameRe
 		Blogs: blogs,
 	}, nil
 }
+
+// GetBlogsByUserIdWithEditorAccess fetches blogs by user account ID where the user has Editor access
+func (uh *uDBHandler) GetBlogsByUserIdWithEditorAccess(accountId int64) (*pb.BlogsByUserNameRes, error) {
+	// Step 1: Prepare the query
+	query := `
+		SELECT b.id, b.blog_id, ua.username, ua.account_id, bp.permission_type, b.status
+		FROM blog b
+		JOIN blog_permissions bp ON b.id = bp.blog_id
+		JOIN user_account ua ON bp.user_id = ua.id
+		WHERE ua.id = $1 AND bp.permission_type = 'Editor';
+	`
+
+	// Step 2: Execute the query
+	rows, err := uh.db.Query(query, accountId)
+	if err != nil {
+		uh.log.Errorf("Error fetching blogs for user account ID %d, error: %+v", accountId, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the results into a slice of Blog structs
+	var blogs []*pb.Blog
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(&blog.Id, &blog.BlogId, &blog.Username, &blog.AccountId, &blog.Permission, &blog.BlogStatus)
+		if err != nil {
+			uh.log.Errorf("Error scanning blog data for user account ID %d, error: %+v", accountId, err)
+			return nil, err
+		}
+		pbBlog := &pb.Blog{
+			Id:         blog.Id,
+			BlogId:     blog.BlogId,
+			Username:   blog.Username,
+			AccountId:  blog.AccountId,
+			Permission: blog.Permission,
+			Status:     blog.BlogStatus,
+		}
+		blogs = append(blogs, pbBlog)
+	}
+
+	// Step 4: Check for errors after iterating over the rows
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching blogs for user account ID %d, error: %+v", accountId, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blogs with Editor access for user account ID: %d", accountId)
+	return &pb.BlogsByUserNameRes{
+		Blogs: blogs,
+	}, nil
+}

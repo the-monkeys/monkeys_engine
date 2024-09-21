@@ -1,16 +1,16 @@
 package constants
 
 const (
-	UserPubilc  = "public"
+	UserPublic  = "public"
 	UserPrivate = "private"
 	UserFriends = "friends"
 )
 
 const (
-	RoleAdmin  = "admin"
+	RoleAdmin  = "Admin"
 	RoleOwner  = "Owner"
 	RoleEditor = "Editor"
-	RoleViewer = "viewer"
+	RoleViewer = "Viewer"
 )
 
 const (
@@ -52,9 +52,9 @@ const (
 )
 
 const (
-	BlogStatusDraft     = "draft"
-	BlogStatusPublished = "published"
-	BlogStatusArchived  = "archived"
+	BlogStatusDraft     = "Draft"
+	BlogStatusPublished = "Published"
+	BlogStatusArchived  = "Archived"
 )
 
 var Clients = []string{"Chrome", "Firefox", "Safari", "Edge", "Opera", "Android", "iOS", "Brave", "Others"}

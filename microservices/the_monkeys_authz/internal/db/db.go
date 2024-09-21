@@ -129,7 +129,7 @@ func (adh *authDBHandler) insertIntoUserAccount(tx *sql.Tx, user *models.TheMonk
 	defer stmt.Close()
 
 	var userId int64
-	err = stmt.QueryRow(user.AccountId, user.Username, user.FirstName, user.LastName, user.Email, 4, 1, constants.UserPubilc).Scan(&userId)
+	err = stmt.QueryRow(user.AccountId, user.Username, user.FirstName, user.LastName, user.Email, 4, 1, constants.UserPublic).Scan(&userId)
 	if err != nil {
 		logrus.Errorf("cannot execute query to add user to the USER_ACCOUNT: %v", err)
 		return 0, err

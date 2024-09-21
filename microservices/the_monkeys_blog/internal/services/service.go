@@ -81,7 +81,7 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	}, nil
 }
 
-func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.BlogExistsRes, error) {
+func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogExistsRes, error) {
 	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
@@ -93,7 +93,7 @@ func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.GetBlogB
 	}, nil
 }
 
-func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetDraftBlogsRes, error) {
+func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.BlogByIdReq) (*pb.GetDraftBlogsRes, error) {
 	blog.logger.Infof("fetching draft blogs for account id %s", req.OwnerAccountId)
 	if req.OwnerAccountId == "" {
 		logrus.Error("account id cannot be empty")
@@ -109,7 +109,7 @@ func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.GetBl
 	return res, nil
 }
 
-func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetPublishedBlogsRes, error) {
+func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.BlogByIdReq) (*pb.GetPublishedBlogsRes, error) {
 	blog.logger.Infof("fetching published blogs for account id %s", req.OwnerAccountId)
 	if req.OwnerAccountId == "" {
 		logrus.Error("account id cannot be empty")
@@ -125,7 +125,7 @@ func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.G
 	return res, nil
 }
 
-func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
 
 	res, err := blog.osClient.GetDraftedBlogByIdAndOwner(ctx, req.BlogId, req.OwnerAccountId)
@@ -141,7 +141,7 @@ func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.GetBlogBy
 	return res, nil
 }
 
-func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
 
 	// Fetch the published blog by blog_id and owner_account_id
@@ -216,7 +216,7 @@ func (blog *BlogService) GetPublishedBlogsByTagsName(ctx context.Context, req *p
 	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
 }
 
-func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.GetBlogByIdReq) (*pb.GetBlogByIdRes, error) {
+func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
 	return blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
 }
@@ -264,6 +264,11 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 	return &pb.DeleteBlogResp{
 		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
 	}, nil
+}
+
+func (blog *BlogService) GetDraftBlogByBlogId(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
+	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	return blog.osClient.GetDraftBlogByBlogId(ctx, req.BlogId)
 }
 
 func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBlogsByBlogIds) (*pb.GetBlogsRes, error) {

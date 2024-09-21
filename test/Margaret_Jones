@@ -1,125 +1,149 @@
-{
-    "owner_account_id": "xN0XvVRdbv6XfZJT",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "ksCokKAhQw",
-                "type": "paragraph",
-                "data": {
-                    "text": "Classic WYSIWYG editors produce raw HTML-markup with both content data and content appearance. On the contrary, <mark class=cdx-marker>Editor.js outputs JSON object</mark> with data of each Block."
-                },
-                "author": ["xN0XvVRdbv6XfZJT"],
-                "time": 17107371588
-            }
-        ]
-    },
-    "tags": [
-        "first",
-        "last",
-        "middle"
-    ]
-}
-
-
-{
-    "owner_account_id": "xN0XvVRdbv6XfZJT",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "XKNT99-qqS",
-                "type": "attaches",
-                "data": {
-                    "file": {
-                        "url": "https://drive.google.com/user/catalog/my-file.pdf",
-                        "size": 12902,
-                        "name": "file.pdf",
-                        "extension": "pdf"
+[
+    {
+        "owner_account_id": "ZlB2zx0HPRPhZZ6Z",
+        "author_list": [
+            "ZlB2zx0HPRPhZZ6Z"
+        ],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "ksCokKAhQw",
+                    "type": "paragraph",
+                    "data": {
+                        "text": "Classic WYSIWYG editors produce raw HTML-markup with both content data and content appearance. On the contrary, <mark class=cdx-marker>Editor.js outputs JSON object</mark> with data of each Block."
                     },
-                    "title": "My file"
-                },
-                "author": ["xN0XvVRdbv6XfZJT"],
-                "time": 17107371588
-            }
+                    "author": [
+                        "ZlB2zx0HPRPhZZ6Z"
+                    ],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "first",
+            "last",
+            "middle"
         ]
     },
-    "tags": [
-        "attaches",
-        "file",
-        "three"
-    ]
-}
-
-
-{
-    "owner_account_id": "xN0XvVRdbv6XfZJT",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "7RosVX2kcH",
-                "type": "paragraph",
-                "data": {
-                    "text": "Given data can be used as you want: render with HTML for Web clients, render natively for mobile apps, create the markup for Facebook Instant Articles or Google AMP, generate an audio version, and so on."
-                },
-                "author": ["xN0XvVRdbv6XfZJT"],
-                "time": 17107371588
-            }
+    {
+        "owner_account_id": "ZlB2zx0HPRPhZZ6Z",
+        "author_list": [
+            "ZlB2zx0HPRPhZZ6Z"
+        ],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "XKNT99-qqS",
+                    "type": "attaches",
+                    "data": {
+                        "file": {
+                            "url": "https://drive.google.com/user/catalog/my-file.pdf",
+                            "size": 12902,
+                            "name": "file.pdf",
+                            "extension": "pdf"
+                        },
+                        "title": "My file"
+                    },
+                    "author": [
+                        "ZlB2zx0HPRPhZZ6Z"
+                    ],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "attaches",
+            "file",
+            "three"
         ]
     },
-    "tags": [
-        "alpha",
-        "MGbeta",
-        "three"
-    ]
-}
-
-
-{
-    "owner_account_id": "xN0XvVRdbv6XfZJT",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "eq06PsNsab",
-                "type": "paragraph",
-                "data": {
-                    "text": "Clean data is useful to sanitize, validate and process on the backend."
-                },
-                "author": ["xN0XvVRdbv6XfZJT"],
-                "time": 17107371588
-            }
+    {
+        "owner_account_id": "ZlB2zx0HPRPhZZ6Z",
+        "author_list": [
+            "ZlB2zx0HPRPhZZ6Z"
+        ],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "7RosVX2kcH",
+                    "type": "paragraph",
+                    "data": {
+                        "text": "Given data can be used as you want: render with HTML for Web clients, render natively for mobile apps, create the markup for Facebook Instant Articles or Google AMP, generate an audio version, and so on."
+                    },
+                    "author": [
+                        "ZlB2zx0HPRPhZZ6Z"
+                    ],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "alpha",
+            "MGbeta",
+            "three"
+        ]
+    },
+    {
+        "owner_account_id": "ZlB2zx0HPRPhZZ6Z",
+        "author_list": [
+            "ZlB2zx0HPRPhZZ6Z"
+        ],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "eq06PsNsab",
+                    "type": "paragraph",
+                    "data": {
+                        "text": "Clean data is useful to sanitize, validate and process on the backend."
+                    },
+                    "author": [
+                        "ZlB2zx0HPRPhZZ6Z"
+                    ],
+                    "time": 17107371588
+                }
+            ]
+        }
+    },
+    {
+        "owner_account_id": "ZlB2zx0HPRPhZZ6Z",
+        "author_list": [
+            "ZlB2zx0HPRPhZZ6Z"
+        ],
+        "content_type": "editor",
+        "blog": {
+            "time": 1710737158827,
+            "blocks": [
+                {
+                    "id": "hZAjSnqYMX",
+                    "type": "image",
+                    "data": {
+                        "file": {
+                            "url": "assets/codex2x.png"
+                        },
+                        "withBorder": false,
+                        "withBackground": false,
+                        "stretched": true,
+                        "caption": "CodeX Code Camp 2019"
+                    },
+                    "author": [
+                        "ZlB2zx0HPRPhZZ6Z"
+                    ],
+                    "time": 17107371588
+                }
+            ]
+        },
+        "tags": [
+            "MGalpha",
+            "beta",
+            "gama"
         ]
     }
-}
-
-
-{
-    "owner_account_id": "xN0XvVRdbv6XfZJT",
-    "blog": {
-        "time": 1710737158827,
-        "blocks": [
-            {
-                "id": "hZAjSnqYMX",
-                "type": "image",
-                "data": {
-                    "file": {
-                        "url": "assets/codex2x.png"
-                    },
-                    "withBorder": false,
-                    "withBackground": false,
-                    "stretched": true,
-                    "caption": "CodeX Code Camp 2019"
-                },
-                "author": ["xN0XvVRdbv6XfZJT"],
-                "time": 17107371588
-            }
-        ]
-    },
-    "tags": [
-        "MGalpha",
-        "beta",
-        "gama"
-    ]
-}
+]

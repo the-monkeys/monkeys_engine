@@ -5,7 +5,6 @@ package blog_svc;
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
-// TODO: Add isDraft, 
 message DraftBlogRequest {
     string blog_id = 1;
     string owner_account_id = 2;
@@ -13,6 +12,8 @@ message DraftBlogRequest {
     bool is_draft = 4;
     bool is_archive = 5;
     repeated string tags = 6;
+    string content_type = 7;
+    repeated string author_list = 8;
 }
 
 message BlogResponse {
@@ -68,18 +69,20 @@ message PublishBlogResp {
     string error = 2;
 }
 
-message GetBlogByIdReq {
+message BlogByIdReq {
     string blog_id = 1;
     string owner_account_id = 2;
 }
 
-message GetBlogByIdRes {
+message BlogByIdRes {
     string blog_id = 1;
     string owner_account_id = 2;
     Blog blog = 3;
     bool is_draft = 4;
     bool is_archive = 5;
     repeated string tags = 6;
+    string content_type = 7;
+    repeated string author_list = 8;
 }
 
 message ArchiveBlogReq {
@@ -98,9 +101,10 @@ message GetBlogsByTagsNameReq {
 message GetBlogsByTags {
     string blog_id = 1;
     string owner_account_id = 2;
-
     Blog blog = 3;
-    repeated string tags = 6;
+    repeated string tags = 4;
+    string content_type = 5;
+    repeated string author_list = 6;
 }
 
 message GetBlogsByTagsNameRes {
@@ -118,7 +122,9 @@ message GetBlogs {
     string blog_id = 1;
     string owner_account_id = 2;
     Blog blog = 3;
-    repeated string tags = 6;
+    repeated string tags = 4;
+    string content_type = 5;
+    repeated string author_list = 6;
 }
 
 message GetDraftBlogsRes {
@@ -199,23 +205,26 @@ message BlogV2Response {
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
-    rpc GetPublishedBlogById(GetBlogByIdReq) returns (GetBlogByIdRes); // One blog by blog id
-    rpc GetDraftBlogById(GetBlogByIdReq) returns (GetBlogByIdRes); // One blog by blog id
+    rpc GetPublishedBlogById(BlogByIdReq) returns (BlogByIdRes); // One blog by blog id
+    rpc GetDraftBlogById(BlogByIdReq) returns (BlogByIdRes); // One blog by blog id
     rpc ArchiveBlogById(ArchiveBlogReq) returns (ArchiveBlogResp); // One blog by blog id
     rpc GetPublishedBlogsByTagsName(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
-    rpc GetDraftBlogsByAccId(GetBlogByIdReq) returns (GetDraftBlogsRes);
-    rpc GetPublishedBlogsByAccID(GetBlogByIdReq) returns (GetPublishedBlogsRes);
+    rpc GetDraftBlogsByAccId(BlogByIdReq) returns (GetDraftBlogsRes);
+    rpc GetPublishedBlogsByAccID(BlogByIdReq) returns (GetPublishedBlogsRes);
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
-    rpc GetPublishedBlogByIdAndOwnerId(GetBlogByIdReq) returns (GetBlogByIdRes);
+    rpc GetPublishedBlogByIdAndOwnerId(BlogByIdReq) returns (BlogByIdRes);
 
     // Get a list of blogs
     // Last 100 Blogs
     // Last 100 blogs by tags
     rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes){};
 
-    rpc CheckIfBlogsExist(GetBlogByIdReq) returns (BlogExistsRes);
+    rpc CheckIfBlogsExist(BlogByIdReq) returns (BlogExistsRes);
     rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
 
 
     rpc DraftBlogV2(DraftBlogV2Req) returns (BlogV2Response);
+
+    // Corrected APIS
+    rpc GetDraftBlogByBlogId(BlogByIdReq) returns (BlogByIdRes);
 }
