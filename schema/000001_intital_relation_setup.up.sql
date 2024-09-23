@@ -1,3 +1,7 @@
+-- ================================
+-- User-related Tables
+-- ================================
+
 -- Creating user status table
 CREATE TABLE IF NOT EXISTS user_status (
     id SERIAL PRIMARY KEY,
@@ -17,7 +21,7 @@ CREATE TABLE IF NOT EXISTS user_account (
     username VARCHAR(32) NOT NULL,
     first_name VARCHAR(32),
     last_name VARCHAR(32),
-    email VARCHAR(128) NOT NULL UNIQUE, -- Ensuring email uniqueness
+    email VARCHAR(128) NOT NULL UNIQUE,
     date_of_birth DATE,
     role_id INTEGER,
     bio TEXT,
@@ -25,13 +29,13 @@ CREATE TABLE IF NOT EXISTS user_account (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     address VARCHAR(255),
-    contact_number VARCHAR(20), -- Changed data type
+    contact_number VARCHAR(20),
     user_status INTEGER NOT NULL,
     linkedin VARCHAR(255),
     github VARCHAR(255),
     twitter VARCHAR(255),
     instagram VARCHAR(255),
-    view_permission VARCHAR(50) DEFAULT 'public', -- 'public', 'private', 'friends', etc.
+    view_permission VARCHAR(50) DEFAULT 'public',
     FOREIGN KEY (user_status) REFERENCES user_status(id)
 );
 
@@ -65,10 +69,14 @@ CREATE TABLE IF NOT EXISTS user_auth_info (
     email_validation_status INTEGER NOT NULL,
     email_validation_time TIMESTAMP,
     auth_provider_id INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (email_validation_status) REFERENCES email_validation_status(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (email_validation_status) REFERENCES email_validation_status(id),
+    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id)
 );
+
+-- ================================
+-- Permission-related Tables
+-- ================================
 
 -- Creating permissions table
 CREATE TABLE IF NOT EXISTS permissions (
@@ -80,91 +88,14 @@ CREATE TABLE IF NOT EXISTS permissions (
 CREATE TABLE IF NOT EXISTS permissions_granted (
     role_id BIGINT NOT NULL,
     permission_id INTEGER NOT NULL,
-    FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE ON UPDATE NO ACTION,
+    FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE,
     PRIMARY KEY (role_id, permission_id)
 );
 
--- Creating user account status table workflow
-CREATE TABLE IF NOT EXISTS user_account_status (
-    id SERIAL PRIMARY KEY,
-    user_id BIGSERIAL NOT NULL,
-    account_status VARCHAR(20) NOT NULL,
-    last_login TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Added default value
-    creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Added default value
-    modified_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Added default value
-    reason VARCHAR(100),
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
-
--- Creating user external login table
-CREATE TABLE IF NOT EXISTS user_external_login (
-    user_id BIGINT NOT NULL,
-    auth_provider_id INTEGER NOT NULL,
-    auth_token VARCHAR(100) NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    PRIMARY KEY (user_id, auth_provider_id)
-);
-
--- Creating payment info table
-CREATE TABLE IF NOT EXISTS payment_info (
-    subscription_info VARCHAR(50) NOT NULL,
-    payment_info VARCHAR(50) NOT NULL,
-    user_id BIGINT NOT NULL,
-    PRIMARY KEY (user_id), -- Removed profile_id from primary key
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
-
--- Creating topics table
-CREATE TABLE IF NOT EXISTS topics (
-    id SERIAL PRIMARY KEY,
-    description VARCHAR(100) NOT NULL,
-    category VARCHAR(100) NOT NULL,
-    user_id BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
-
--- Creating user interested in topics table
-CREATE TABLE IF NOT EXISTS user_interest (
-    user_id BIGINT NOT NULL,
-    topics_id INTEGER NOT NULL,
-    PRIMARY KEY (user_id, topics_id),
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (topics_id) REFERENCES topics(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
-
--- Creating clients table
-CREATE TABLE IF NOT EXISTS clients (
-    id SERIAL PRIMARY KEY,
-    c_name VARCHAR(32) UNIQUE
-);
-
--- Creating logged in devices table
-CREATE TABLE IF NOT EXISTS logged_in_devices (
-    id SERIAL PRIMARY KEY,
-    device_name VARCHAR(32),
-    ip_address VARCHAR(64),
-    operating_sys VARCHAR(32),
-    login_time TIMESTAMP,
-    user_id BIGINT NOT NULL,
-    client_id INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
-
--- Creating user account log table
-CREATE TABLE IF NOT EXISTS user_account_log (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ip_address VARCHAR(20),
-    description TEXT,
-    client_id INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE ON UPDATE NO ACTION
-);
+-- ================================
+-- Blog-related Tables
+-- ================================
 
 -- Creating blog table
 CREATE TABLE IF NOT EXISTS blog (
@@ -173,8 +104,8 @@ CREATE TABLE IF NOT EXISTS blog (
     blog_id VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50), -- e.g., 'draft', 'published', 'archived'
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
+    status VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE SET NULL
 );
 
 -- Creating blog permissions table
@@ -182,50 +113,98 @@ CREATE TABLE IF NOT EXISTS blog_permissions (
     id BIGSERIAL PRIMARY KEY,
     blog_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    permission_type VARCHAR(50) NOT NULL, -- 'owner', 'editor', 'viewer'
-    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    permission_type VARCHAR(50) NOT NULL,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
 );
 
 -- Table to store co-author invites
 CREATE TABLE IF NOT EXISTS co_author_invites (
     id SERIAL PRIMARY KEY,
-    blog_id BIGINT NOT NULL, -- Reference to the blog
-    inviter_id BIGINT NOT NULL, -- Reference to the user (owner or admin) sending the invite
-    invitee_id BIGINT NOT NULL, -- Reference to the user being invited as a co-author
-    invite_status VARCHAR(50) NOT NULL DEFAULT 'pending', -- Can be 'pending', 'accepted', or 'rejected'
+    blog_id BIGINT NOT NULL,
+    inviter_id BIGINT NOT NULL,
+    invitee_id BIGINT NOT NULL,
+    invite_status VARCHAR(50) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     responded_at TIMESTAMP,
-    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (inviter_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (invitee_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    FOREIGN KEY (inviter_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (invitee_id) REFERENCES user_account(id) ON DELETE CASCADE
 );
 
 -- Table to store accepted co-author permissions
 CREATE TABLE IF NOT EXISTS co_author_permissions (
     id SERIAL PRIMARY KEY,
-    blog_id BIGINT NOT NULL, -- Reference to the blog
-    co_author_id BIGINT NOT NULL, -- The invited user who accepted the invitation
-    role_id BIGINT NOT NULL, -- Reference to the user role ('Editor', 'Viewer', etc.)
+    blog_id BIGINT NOT NULL,
+    co_author_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
     granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE
 );
 
+-- ================================
+-- User Activity-related Tables
+-- ================================
 
--- Table to track actions related to co-author invitations and permissions
-CREATE TABLE IF NOT EXISTS co_author_activity_log (
+-- Create clients table first
+CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
-    blog_id BIGINT NOT NULL, -- Reference to the blog
-    co_author_id BIGINT, -- Reference to the invited user (nullable in case of deletion logs)
-    action VARCHAR(50) NOT NULL, -- 'invited', 'accepted', 'rejected', 'removed'
-    performed_by BIGINT NOT NULL, -- Reference to the user who performed the action (inviter or owner/admin)
-    action_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION,
-    FOREIGN KEY (performed_by) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    c_name VARCHAR(32) UNIQUE
 );
+
+-- Creating user_account_log table (with clients reference)
+CREATE TABLE IF NOT EXISTS user_account_log (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(20),
+    description TEXT,
+    client_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- Creating logged_in_devices table (with clients reference)
+CREATE TABLE IF NOT EXISTS logged_in_devices (
+    id SERIAL PRIMARY KEY,
+    device_name VARCHAR(32),
+    ip_address VARCHAR(64),
+    operating_sys VARCHAR(32),
+    login_time TIMESTAMP,
+    user_id BIGINT NOT NULL,
+    client_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user_account(id),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Topics-related Tables
+-- ================================
+
+-- Creating topics table
+CREATE TABLE IF NOT EXISTS topics (
+    id SERIAL PRIMARY KEY,
+    description VARCHAR(100) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    user_id BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
+);
+
+-- Creating user interest in topics table
+CREATE TABLE IF NOT EXISTS user_interest (
+    user_id BIGINT NOT NULL,
+    topics_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, topics_id),
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (topics_id) REFERENCES topics(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Blog Bookmarks
+-- ================================
 
 -- Creating blog bookmarks table
 CREATE TABLE IF NOT EXISTS blog_bookmarks (
@@ -233,43 +212,145 @@ CREATE TABLE IF NOT EXISTS blog_bookmarks (
     user_id BIGINT NOT NULL,
     blog_id BIGINT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Co-Author Activity Log
+-- ================================
+
+-- Table to track actions related to co-author invitations and permissions
+CREATE TABLE IF NOT EXISTS co_author_activity_log (
+    id SERIAL PRIMARY KEY,
+    blog_id BIGINT NOT NULL,
+    co_author_id BIGINT, -- Nullable in case of deletion logs
+    action VARCHAR(50) NOT NULL, -- 'invited', 'accepted', 'rejected', 'removed'
+    performed_by BIGINT NOT NULL, -- The user who performed the action
+    action_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE SET NULL,
+    FOREIGN KEY (performed_by) REFERENCES user_account(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Notification-related Tables
+-- ================================
+
+-- Table to store notification channels
+CREATE TABLE IF NOT EXISTS notification_channel (
+    id SERIAL PRIMARY KEY,
+    channel_name VARCHAR(50) NOT NULL UNIQUE -- 'Browser', 'Email', 'WhatsApp', 'SMS', 'OTP'
 );
 
 -- Table to store notification types
 CREATE TABLE IF NOT EXISTS notification_type (
     id SERIAL PRIMARY KEY,
-    notification_name VARCHAR(100) NOT NULL UNIQUE,  -- E.g., 'Co-author invite', 'Blog liked', 'Comment on blog'
-    description TEXT -- Optional description of the notification type
+    notification_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT
 );
 
 -- Table to store notifications for users
 CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL, -- The user receiving the notification
-    notification_type_id INTEGER NOT NULL, -- Type of notification (e.g., co-author invite, blog liked, etc.)
-    message TEXT NOT NULL, -- Customizable message for the notification
-    related_blog_id BIGINT, -- Optional reference to a related blog, if applicable
-    related_user_id BIGINT, -- Optional reference to a related user (e.g., the one who liked or commented)
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- When the notification was created
-    seen BOOLEAN DEFAULT FALSE, -- Whether the user has seen the notification
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (notification_type_id) REFERENCES notification_type(id) ON DELETE CASCADE ON UPDATE NO ACTION,
-    FOREIGN KEY (related_blog_id) REFERENCES blog(id) ON DELETE SET NULL ON UPDATE NO ACTION,
-    FOREIGN KEY (related_user_id) REFERENCES user_account(id) ON DELETE SET NULL ON UPDATE NO ACTION
+    user_id BIGINT NOT NULL,
+    notification_type_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    related_blog_id BIGINT,
+    related_user_id BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    seen BOOLEAN DEFAULT FALSE,
+    delivery_status VARCHAR(20) DEFAULT 'pending',
+    channel_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (notification_type_id) REFERENCES notification_type(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_blog_id) REFERENCES blog(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_user_id) REFERENCES user_account(id) ON DELETE SET NULL,
+    FOREIGN KEY (channel_id) REFERENCES notification_channel(id) ON DELETE CASCADE
 );
 
--- Creating credentials table (note: in a production environment, sensitive data should be stored securely using encryption)
-CREATE TABLE IF NOT EXISTS user_credentials (
+-- Table for managing user notification preferences
+CREATE TABLE IF NOT EXISTS user_notification_preferences (
+    user_id BIGINT NOT NULL,
+    channel_id INTEGER NOT NULL,
+    is_enabled BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (user_id, channel_id),
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (channel_id) REFERENCES notification_channel(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Browser Notification-related Tables
+-- ================================
+
+-- Table to store web push tokens
+CREATE TABLE IF NOT EXISTS web_push_tokens (
     id SERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    credential_name VARCHAR(100) NOT NULL,
-    credential_value TEXT NOT NULL, -- Ensure this data is encrypted in a real production setup
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION
+    endpoint TEXT NOT NULL,
+    p256dh_key TEXT NOT NULL,
+    auth_key TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
 );
+
+-- ================================
+-- Email Notification-related Tables
+-- ================================
+
+-- Table to store email templates
+CREATE TABLE IF NOT EXISTS email_templates (
+    id SERIAL PRIMARY KEY,
+    template_name VARCHAR(100) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ================================
+-- WhatsApp Notification-related Tables
+-- ================================
+
+-- Table to store WhatsApp notifications
+CREATE TABLE IF NOT EXISTS whatsapp_notifications (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    message TEXT NOT NULL,
+    message_status VARCHAR(50) DEFAULT 'pending',
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- SMS and OTP-related Tables
+-- ================================
+
+-- Table to store SMS notifications
+CREATE TABLE IF NOT EXISTS sms_notifications (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    message TEXT NOT NULL,
+    phone_number VARCHAR(20) NOT NULL,
+    message_status VARCHAR(50) DEFAULT 'pending',
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
+);
+
+-- Table to store OTP logs
+CREATE TABLE IF NOT EXISTS otp_logs (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    otp_code VARCHAR(6) NOT NULL,
+    sent_via VARCHAR(20) NOT NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    verified_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
+);
+
+-- ================================
+-- Predefined Data Inserts
+-- ================================
 
 -- Inserting predefined roles
 INSERT INTO user_role (role_desc) VALUES ('Admin'), ('Owner'), ('Editor'), ('Viewer'), ('Support')
@@ -284,7 +365,7 @@ INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'
 ON CONFLICT DO NOTHING;
 
 -- Inserting predefined email validation statuses
-INSERT INTO email_validation_status (status) VALUES ('Unverified'), ('Verification link sent'), ('verified')
+INSERT INTO email_validation_status (status) VALUES ('Unverified'), ('Verification link sent'), ('Verified')
 ON CONFLICT DO NOTHING;
 
 -- Inserting predefined auth providers
@@ -295,7 +376,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO user_status (status) VALUES ('Active'), ('Inactive'), ('Hidden')
 ON CONFLICT DO NOTHING;
 
--- Inserting data into permissions granted for all roles with varying levels of permission
+-- Granting predefined permissions to roles
 INSERT INTO permissions_granted (role_id, permission_id)
 SELECT r.id, p.permission_id
 FROM user_role r
@@ -308,6 +389,7 @@ JOIN permissions p ON
         WHEN r.role_desc = 'Viewer' THEN p.permission_desc IN ('Read')
     END
 ON CONFLICT DO NOTHING;
+
 
 -- Insert some default topics
 INSERT INTO topics (description, category) VALUES
