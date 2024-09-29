@@ -23,7 +23,7 @@ type UserServiceClient struct {
 }
 
 func NewUserServiceClient(cfg *config.Config) pb.UserServiceClient {
-	cc, err := grpc.Dial(cfg.Microservices.TheMonkeysUser, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysUser, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to grpc user server: %v", err)
 	}
@@ -61,8 +61,14 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// Invite and un invite as coauthor
 	{
 		routes.POST("/invite/:blog_id/", mware.AuthzRequired, usc.InviteCoAuthor)
-		routes.POST("/revoke-invite/:blog_id/", usc.RevokeInviteCoAuthor)
+		routes.POST("/revoke-invite/:blog_id/", mware.AuthzRequired, usc.RevokeInviteCoAuthor)
 		routes.GET("/all-blogs/:username", usc.GetBlogsByUserName)
+		routes.POST("/bookmark/:blog_id", usc.BookMarkABlog)
+		routes.POST("/remove-bookmark/:blog_id", usc.RemoveBookMarkFromABlog)
+	}
+
+	{
+		routes.POST("/topics", usc.CreateNewTopics)
 	}
 
 	return usc
@@ -387,7 +393,48 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 }
 
 func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+	userName := ctx.GetString("userName")
+	// Check permissions:
+	if !utils.CheckUserRoleInContext(ctx, constants.RoleOwner) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+	// accId := ctx.GetString("accountId")
 
+	var req CoAuthor
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	res, err := asc.Client.RevokeCoAuthorAccess(context.Background(), &pb.CoAuthorAccessReq{
+		AccountId:         req.AccountId,
+		Username:          req.Username,
+		Email:             req.Email,
+		Ip:                req.Ip,
+		Client:            req.Client,
+		BlogOwnerUsername: userName,
+		BlogId:            blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request body"})
+				return
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user/blog does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, &res)
 }
 
 func (asc *UserServiceClient) GetBlogsByUserName(ctx *gin.Context) {
@@ -398,7 +445,7 @@ func (asc *UserServiceClient) GetBlogsByUserName(ctx *gin.Context) {
 		return
 	}
 
-	res, err := asc.Client.GetBlogsByUserName(context.Background(), &pb.BlogsByUserNameReq{
+	res, err := asc.Client.GetBlogsByUserIds(context.Background(), &pb.BlogsByUserIdsReq{
 		Username: username,
 	})
 
@@ -419,4 +466,93 @@ func (asc *UserServiceClient) GetBlogsByUserName(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, &res)
+}
+
+func (asc *UserServiceClient) CreateNewTopics(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+
+	var req Topics
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	res, err := asc.Client.CreateNewTopics(context.Background(), &pb.CreateTopicsReq{
+		Topics:   req.Topics,
+		Category: req.Category,
+		Username: userName,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "invalid request body"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) BookMarkABlog(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.BookMarkBlog(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already bookmarked"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) RemoveBookMarkFromABlog(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.RemoveBookMark(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already removed from bookmarked"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
 }

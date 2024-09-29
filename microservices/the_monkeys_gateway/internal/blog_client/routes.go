@@ -3,6 +3,7 @@ package blog_client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -40,7 +41,7 @@ type BlogServiceClient struct {
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
-	cc, err := grpc.Dial(cfg.Microservices.TheMonkeysBlog, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysBlog, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to blog server: %v", err)
 	}
@@ -76,12 +77,12 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
-	routes.GET("/all-col/drafts/:acc_id", blogClient.AllDrafts)
+	routes.GET("/all-col/:acc_id", blogClient.AllCollabBlogs)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
 
 	routes.GET("/my-drafts/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogId)
 
-	// routes.GET("/ids", blogClient.GetAllBlogsByBlogIds)
+	routes.GET("/all/bookmarks", blogClient.GetBookmarks)
 
 	routes.DELETE("/:blog_id", mware.AuthzRequired, blogClient.DeleteBlogById)
 
@@ -211,7 +212,7 @@ func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-func (asc *BlogServiceClient) AllColDrafts(ctx *gin.Context) {
+func (asc *BlogServiceClient) AllCollabBlogs(ctx *gin.Context) {
 
 	tokenAccountId := ctx.GetString("accountId")
 	accId := ctx.Param("acc_id")
@@ -222,7 +223,7 @@ func (asc *BlogServiceClient) AllColDrafts(ctx *gin.Context) {
 	}
 
 	// Get all the drafted blogs
-	uc, err := asc.userCli.GetColabBlogs(accId)
+	uc, err := asc.userCli.GetBlogsIds(accId, "colab")
 	if err != nil {
 		logrus.Errorf("cannot get the colab blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
@@ -240,39 +241,62 @@ func (asc *BlogServiceClient) AllColDrafts(ctx *gin.Context) {
 		}
 	}
 
-	blogIds := []string{}
+	draftBlogId := []string{}
+	publishedBlogId := []string{}
 	for _, blog := range uc.Blogs {
 		if blog.Status == constants.BlogStatusDraft {
-			blogIds = append(blogIds, blog.BlogId)
+			draftBlogId = append(draftBlogId, blog.BlogId)
+		} else {
+			publishedBlogId = append(publishedBlogId, blog.BlogId)
 		}
 	}
 
-	if len(blogIds) == 0 {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no draft blogs found"})
+	if len(draftBlogId) == 0 && len(publishedBlogId) == 0 {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no draft/published blogs found"})
 		return
 	}
 
-	res, err := asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
-		BlogIds: blogIds,
-	})
+	var drafts, published interface{}
 
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
+	// Fetch drafts if they exist
+	if len(draftBlogId) > 0 {
+		drafts, err = asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
+			BlogIds: draftBlogId,
+		})
+		if err != nil {
+			handleBlogFetchError(ctx, err, "draft")
+			return
 		}
 	}
 
-	ctx.JSON(http.StatusOK, res)
+	// Fetch published blogs if they exist
+	if len(publishedBlogId) > 0 {
+		published, err = asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
+			BlogIds: publishedBlogId,
+		})
+		if err != nil {
+			handleBlogFetchError(ctx, err, "published")
+			return
+		}
+	}
+
+	// Respond with the found drafts and/or published blogs
+	ctx.JSON(http.StatusOK, gin.H{"drafts": drafts, "published": published})
+}
+
+func handleBlogFetchError(ctx *gin.Context, err error, blogType string) {
+	if status, ok := status.FromError(err); ok {
+		switch status.Code() {
+		case codes.InvalidArgument:
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("incomplete request, unable to fetch %s blogs", blogType)})
+		case codes.Internal:
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("cannot fetch the %s blogs", blogType)})
+		default:
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+		}
+	} else {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+	}
 }
 
 func (asc *BlogServiceClient) AllPublishesByAccountId(ctx *gin.Context) {
@@ -533,18 +557,67 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
+func (asc *BlogServiceClient) GetBookmarks(ctx *gin.Context) {
+	tokenAccountId := ctx.GetString("accountId")
+
+	// Get all the drafted blogs
+	uc, err := asc.userCli.GetBlogsIds(tokenAccountId, "bookmark")
+	if err != nil {
+		logrus.Errorf("cannot get the bookmarked blogs, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the bookmarked blogs"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the bookmarked blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	fmt.Printf("uc: %+v\n", uc)
+
+	blogId := []string{}
+
+	for _, blog := range uc.Blogs {
+		blogId = append(blogId, blog.BlogId)
+	}
+
+	resp, err := asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
+		BlogIds: blogId,
+	})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the bookmarks do not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the bookmarks"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
 // TODO: Add access control over this function for all blogs
 // func (asc *BlogServiceClient) GetAllBlogsByBlogIds(ctx *gin.Context) {
 // 	ids := ctx.Query("ids")
 // 	idSlice := strings.Split(ids, ",")
-// 	fmt.Printf("ids: %v\n", ids)
 
 // 	if len(idSlice) == 0 {
 // 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "please provide blog ids"})
 // 		return
 // 	}
-
-// 	fmt.Printf("idSlice: %v\n", idSlice)
 
 // 	resp, err := asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
 // 		BlogIds: idSlice,

@@ -41,3 +41,8 @@ type CoAuthor struct {
 	Ip        string `json:"ip"`
 	Client    string `json:"client"`
 }
+
+type Topics struct {
+	Topics   []string `json:"topics"`
+	Category string   `json:"category"`
+}

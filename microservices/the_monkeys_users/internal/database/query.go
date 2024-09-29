@@ -5,6 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 )
 
@@ -154,4 +155,273 @@ func (uh *uDBHandler) GetBlogsByUserIdWithEditorAccess(accountId int64) (*pb.Blo
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
+}
+
+// GetBlogsByUserName fetches blogs by username with permission and blog status
+func (uh *uDBHandler) GetBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error) {
+	// Step 1: Prepare the query
+	query := `
+		SELECT b.id, b.blog_id, ua.username, ua.account_id, bp.permission_type, b.status
+		FROM blog b
+		JOIN blog_permissions bp ON b.id = bp.blog_id
+		JOIN user_account ua ON bp.user_id = ua.id
+		WHERE ua.account_id = $1;
+	`
+
+	// Step 2: Execute the query
+	rows, err := uh.db.Query(query, accountId)
+	if err != nil {
+		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the results into a slice of Blog structs
+	var blogs []*pb.Blog
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(&blog.Id, &blog.BlogId, &blog.Username, &blog.AccountId, &blog.Permission, &blog.BlogStatus)
+		if err != nil {
+			uh.log.Errorf("Error scanning blog data for username %s, error: %+v", accountId, err)
+			return nil, err
+		}
+		pbBlog := &pb.Blog{
+			Id:         blog.Id,
+			BlogId:     blog.BlogId,
+			Username:   blog.Username,
+			AccountId:  blog.AccountId,
+			Permission: blog.Permission,
+			Status:     blog.BlogStatus,
+		}
+		blogs = append(blogs, pbBlog)
+	}
+
+	// Step 4: Check for errors after iterating over the rows
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	return &pb.BlogsByUserNameRes{
+		Blogs: blogs,
+	}, nil
+}
+
+func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string) error {
+	// Start a transaction
+	tx, err := uh.db.Begin()
+	if err != nil {
+		uh.log.Errorf("Failed to start transaction: %+v", err)
+		return err
+	}
+
+	// Step 1: Fetch the user ID based on username
+	var userId int64
+	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
+		tx.Rollback() // rollback transaction on error
+		return err
+	}
+
+	// Step 2: Iterate over the interests and insert them into the user_interest table
+	for _, topic := range topics {
+		// Check if the user is already following this interest
+		var exists int
+		err = tx.QueryRow(`SELECT COUNT(1) FROM topics WHERE description = $1`, topic).Scan(&exists)
+		if err != nil {
+			uh.log.Errorf("Failed to check if the topic already exists: %s, error: %+v", topic, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+
+		// If the user is already following the interest, skip the insert and log it
+		if exists > 0 {
+			uh.log.Infof("Topic %s already exists", topic)
+			continue
+		}
+
+		// Insert into user_interest table for interests not already followed
+		_, err = tx.Exec(`INSERT INTO topics (description, category, user_id) VALUES ($1, $2, $3)`, topic, category, userId)
+		if err != nil {
+			uh.log.Errorf("Failed to insert topic %s for username: %s, error: %+v", topic, username, err)
+			tx.Rollback() // rollback transaction on error
+			return err
+		}
+	}
+
+	// Step 4: Commit the transaction
+	if err := tx.Commit(); err != nil {
+		uh.log.Errorf("Failed to commit transaction: %+v", err)
+		return err
+	}
+
+	uh.log.Infof("Successfully added new interests for user: %s", username)
+	return nil
+}
+
+func (uh *uDBHandler) GetCoAuthorBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error) {
+	// Step 1: Prepare the query
+	query := `
+	SELECT b.id, b.blog_id, ua.username, ua.account_id, bp.permission_type, b.status
+	FROM blog b
+	JOIN blog_permissions bp ON b.id = bp.blog_id
+	JOIN user_account ua ON bp.user_id = ua.id
+	WHERE ua.account_id = $1 AND bp.permission_type = $2;
+	`
+
+	// Step 2: Execute the query
+	rows, err := uh.db.Query(query, accountId, constants.RoleEditor)
+	if err != nil {
+		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the results into a slice of Blog structs
+	var blogs []*pb.Blog
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(&blog.Id, &blog.BlogId, &blog.Username, &blog.AccountId, &blog.Permission, &blog.BlogStatus)
+		if err != nil {
+			uh.log.Errorf("Error scanning blog data for username %s, error: %+v", accountId, err)
+			return nil, err
+		}
+		pbBlog := &pb.Blog{
+			Id:         blog.Id,
+			BlogId:     blog.BlogId,
+			Username:   blog.Username,
+			AccountId:  blog.AccountId,
+			Permission: blog.Permission,
+			Status:     blog.BlogStatus,
+		}
+		blogs = append(blogs, pbBlog)
+	}
+
+	// Step 4: Check for errors after iterating over the rows
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	return &pb.BlogsByUserNameRes{
+		Blogs: blogs,
+	}, nil
+}
+
+func (uh *uDBHandler) BookMarkABlog(blogId string, userId int64) error {
+	blogIdInt := 0
+	err := uh.db.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch blog ID for blogId: %s, error: %+v", blogId, err)
+		return err
+	}
+
+	var exists int
+	err = uh.db.QueryRow(`SELECT COUNT(1) FROM blog_bookmarks WHERE user_id = $1 AND blog_id = $2`, userId, blogIdInt).Scan(&exists)
+	if err != nil {
+		uh.log.Errorf("Failed to check if the bookmark already exists: %s, error: %+v", blogId, err)
+		return err
+	}
+
+	if exists > 0 {
+		uh.log.Infof("bookmark already exists")
+		return nil
+	}
+
+	query := `
+		INSERT INTO blog_bookmarks (user_id, blog_id) VALUES ($1, $2);
+	`
+
+	_, err = uh.db.Exec(query, userId, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Error bookmarking blog %s for user %d, error: %+v", blogId, userId, err)
+		return err
+	}
+
+	uh.log.Infof("Successfully bookmarked blog %s for user %d", blogId, userId)
+	return nil
+}
+
+func (uh *uDBHandler) RemoveBookmarkFromBlog(blogId string, userId int64) error {
+	blogIdInt := 0
+	err := uh.db.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch blog ID for blogId: %s, error: %+v", blogId, err)
+		return err
+	}
+
+	query := `
+		DELETE FROM blog_bookmarks WHERE user_id = $1 AND blog_id = $2;
+	`
+
+	_, err = uh.db.Exec(query, userId, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Error removing bookmark from blog %s for user %d, error: %+v", blogId, userId, err)
+		return err
+	}
+
+	uh.log.Infof("Successfully removed bookmark from blog %s for user %d", blogId, userId)
+	return nil
+}
+
+// -- Creating blog bookmarks table
+// CREATE TABLE IF NOT EXISTS blog_bookmarks (
+//
+//	id SERIAL PRIMARY KEY,
+//	user_id BIGINT NOT NULL,
+//	blog_id BIGINT NOT NULL,
+//	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+//	FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+//	FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE ON UPDATE NO ACTION
+//
+// );
+func (uh *uDBHandler) GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error) {
+	// Step 1: Prepare the query
+	query := `
+	SELECT b.id, b.blog_id, ua.username
+	FROM blog b
+	JOIN blog_bookmarks bb ON b.id = bb.blog_id  -- Use 'b' here instead of 'blog'
+	JOIN user_account ua ON bb.user_id = ua.id
+	WHERE ua.account_id = $1;
+	`
+
+	// Step 2: Execute the query
+	rows, err := uh.db.Query(query, accountId)
+	if err != nil {
+		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Collect the results into a slice of Blog structs
+	var blogs []*pb.Blog
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(&blog.Id, &blog.BlogId, &blog.Username)
+		if err != nil {
+			uh.log.Errorf("Error scanning blog data for username %s, error: %+v", accountId, err)
+			return nil, err
+		}
+		pbBlog := &pb.Blog{
+			Id:       blog.Id,
+			BlogId:   blog.BlogId,
+			Username: blog.Username,
+		}
+		blogs = append(blogs, pbBlog)
+	}
+
+	// Step 4: Check for errors after iterating over the rows
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching blogs for username %s, error: %+v", accountId, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	return &pb.BlogsByUserNameRes{
+		Blogs: blogs,
+	}, nil
+
 }

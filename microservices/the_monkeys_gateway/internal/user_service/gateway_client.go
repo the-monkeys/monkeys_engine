@@ -6,9 +6,10 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 )
 
-func (asc *UserServiceClient) GetColabBlogs(username string) (*pb.BlogsByUserNameRes, error) {
-	res, err := asc.Client.GetBlogsByUserName(context.Background(), &pb.BlogsByUserNameReq{
-		Username: username,
+func (asc *UserServiceClient) GetBlogsIds(accountId string, blogType string) (*pb.BlogsByUserNameRes, error) {
+	res, err := asc.Client.GetBlogsByUserIds(context.Background(), &pb.BlogsByUserIdsReq{
+		AccountId: accountId,
+		Type:      blogType,
 	})
 
 	return res, err

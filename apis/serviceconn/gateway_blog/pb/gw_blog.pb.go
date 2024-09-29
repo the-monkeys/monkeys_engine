@@ -20,7 +20,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// TODO: Add isDraft,
 type DraftBlogRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

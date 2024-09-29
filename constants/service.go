@@ -15,10 +15,15 @@ const (
 	EventUpdateEmail       = "event-update-email"
 	EventFollowTopics      = "event-follow-topics"
 	EventUnFollowTopics    = "event-un-follow-topics"
+	EventCreateTopics      = "event-create-topics"
+	EventBookMarkBlog      = "event-bookmark-blog"
+	EventRemoveBookMark    = "event-remove-bookmark"
 
 	EventCreatedBlog    = "event-created-blog"
 	EventPublishedBlog  = "event-published-blog"
 	EventInviteCoAuthor = "event-invite-co-author"
+	EventAcceptCoAuthor = "event-accept-co-author"
+	EventRemoveCoAuthor = "event-remove-co-author"
 )
 
 const (

@@ -21,6 +21,7 @@ const (
 	ChangedVisibilityToPublic    = "Changed Visibility to Public"
 	FollowedTopics               = "Followed topics: %v"
 	UnFollowedTopics             = "Un-followed topics: %v"
+	CreatedTopics                = "Created topics: %v"
 
 	AddedInstagram = "Added Instagram"
 	AddedTwitter   = "Added Twitter"
@@ -37,7 +38,7 @@ const (
 	ShareBlog                = "Shared a Blog with %s"
 	TransferredBlogOwnership = "Transferred Blog Ownership to %s"
 	InvitedAsACoAuthor       = "Invited %s as a Co-Author for blog id %s"
-	RevokedCoAuthorRequest   = "Revoked as a Co-Author sent to %s"
+	RevokedCoAuthorRequest   = "Removed %s from Co-Author for blog id %s"
 	RemovedFromCoAuthor      = "Removed %s from Co-Author"
 	GotInvitedAsACoAuthor    = "Invited by %s as a Co-Author"
 	GotRemovedFromCoAuthor   = "Removed by %s form a Co-Author"
@@ -47,4 +48,6 @@ const (
 	PublishedABlogAsCoAuthor = "Published a Blog as a Co-Author"
 	ArchivedABlogAsCoAuthor  = "Archived a Blog as a Co-Author"
 	DraftedABlogAsCoAuthor   = "Drafted a Blog as a Co-Author"
+	BookMarkedBlog           = "Bookmarked a Blog, blog id %s"
+	RemoveBookMark           = "Removed Bookmark from a Blog, blog id %s"
 )

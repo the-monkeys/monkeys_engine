@@ -26,7 +26,7 @@ type FileServiceClient struct {
 }
 
 func NewFileServiceClient(cfg *config.Config) pb.UploadBlogFileClient {
-	cc, err := grpc.Dial(cfg.Microservices.TheMonkeysFileStore,
+	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysFileStore,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(constants.MaxMsgSize),

@@ -24,6 +24,8 @@ type UserDb interface {
 	AddBlogWithId(models.TheMonkeysMessage) error
 	AddUserInterest(interest []string, username string) error
 	AddPermissionToAUser(blogId string, userId int64, inviterID string, permissionType string) error
+	CreateNewTopics(topics []string, category, username string) error
+	BookMarkABlog(blogId string, userId int64) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -36,6 +38,10 @@ type UserDb interface {
 	GetUserActivities(userId int64) (*pb.UserActivityResp, error)
 	GetUserInterest(username string) ([]string, error)
 	GetBlogsByUserName(username string) (*pb.BlogsByUserNameRes, error)
+	GetBlogsByUserIdWithEditorAccess(accountId int64) (*pb.BlogsByUserNameRes, error)
+	GetBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
+	GetCoAuthorBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
+	GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
@@ -45,6 +51,7 @@ type UserDb interface {
 	DeleteUserProfile(username string) error
 	RemoveUserInterest(interests []string, username string) error
 	RevokeBlogPermissionFromAUser(blogId string, userId int64, permissionType string) error
+	RemoveBookmarkFromBlog(blogId string, userId int64) error
 }
 
 type uDBHandler struct {

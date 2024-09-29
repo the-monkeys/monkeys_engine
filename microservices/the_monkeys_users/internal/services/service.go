@@ -175,6 +175,14 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}, err
 }
 
+// TODO: Design a pipeline
+// 1. Delete all the blogs of the user
+// 2. Delete all the comments of the user
+// 3. Delete all the likes of the user
+// 4. Delete all the user interests
+// 5. Delete the topics of the user
+// 6. Send User a mail
+// 8. Delete the user
 func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
@@ -366,15 +374,15 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
-	fmt.Printf("resp*****: %+v\n", resp)
 	// Invite the co-author
 	if err := us.dbConn.AddPermissionToAUser(req.BlogId, resp.Id, req.BlogOwnerUsername, constants.RoleEditor); err != nil {
 		logrus.Errorf("error while inviting the co-author: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
+	usa, _ := us.dbConn.CheckIfUsernameExist(req.BlogOwnerUsername)
 	userLog := &models.UserLogs{
-		AccountId: resp.AccountId,
+		AccountId: usa.AccountId,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -385,22 +393,156 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 		Message: fmt.Sprintf("%s has been invited as a co-author", req.Username),
 	}, nil
 }
+
 func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
-	panic("implement me")
+	us.log.Infof("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
+	resp, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	// Invite the co-author
+	if err := us.dbConn.RevokeBlogPermissionFromAUser(req.BlogId, resp.Id, constants.RoleEditor); err != nil {
+		logrus.Errorf("error while inviting the co-author: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	usa, _ := us.dbConn.CheckIfUsernameExist(req.BlogOwnerUsername)
+
+	userLog := &models.UserLogs{
+		AccountId: usa.AccountId,
+	}
+
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RevokedCoAuthorRequest, req.Username, req.BlogId), constants.ServiceUser, constants.EventRemoveCoAuthor, us.log)
+
+	return &pb.CoAuthorAccessRes{
+		Message: fmt.Sprintf("%s has been removed from co-author", req.Username),
+	}, nil
 }
 
-func (us *UserSvc) GetBlogsByUserName(ctx context.Context, req *pb.BlogsByUserNameReq) (*pb.BlogsByUserNameRes, error) {
-	us.log.Infof("fetching blogs for user: %s", req.Username)
+func (us *UserSvc) GetBlogsByUserIds(ctx context.Context, req *pb.BlogsByUserIdsReq) (*pb.BlogsByUserNameRes, error) {
+	us.log.Infof("fetching blogs for user: %s", req.AccountId)
 
-	resp, err := us.dbConn.GetBlogsByUserName(req.Username)
+	switch req.Type {
+	case "colab":
+		resp, err := us.dbConn.GetCoAuthorBlogsByAccountId(req.AccountId)
+		if err != nil {
+			us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
+			if err == sql.ErrNoRows {
+				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+			}
+
+			return nil, status.Errorf(codes.Internal, "something went wrong")
+		}
+
+		return resp, nil
+
+	case "bookmark":
+		resp, err := us.dbConn.GetBookmarkBlogsByAccountId(req.AccountId)
+		if err != nil {
+			us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
+			if err == sql.ErrNoRows {
+				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+			}
+
+			return nil, status.Errorf(codes.Internal, "something went wrong")
+		}
+
+		return resp, nil
+	default:
+		return nil, status.Errorf(codes.Internal, "We don't support this operation")
+	}
+}
+
+func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq) (*pb.CreateTopicsRes, error) {
+	us.log.Infof("fetching co-authors for user: %s", req.Username)
+	if len(req.Topics) == 0 {
+		us.log.Errorf("user %s has entered no topic", req.Username)
+		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
+	}
+
+	err := us.dbConn.CreateNewTopics(req.Topics, req.Category, req.Username)
 	if err != nil {
-		us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while fetching co-authors for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("co-authors for user %s doesn't exist", req.Username))
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
-	return resp, nil
+	usa, _ := us.dbConn.CheckIfUsernameExist(req.Username)
+
+	userLog := &models.UserLogs{
+		AccountId: usa.AccountId,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.CreatedTopics, req.Topics), constants.ServiceUser, constants.EventCreateTopics, us.log)
+
+	return &pb.CreateTopicsRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("topics %v has been created successfully", req.Topics),
+	}, nil
+}
+
+func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	err = us.dbConn.BookMarkABlog(req.BlogId, user.Id)
+	if err != nil {
+		logrus.Errorf("error while bookmarking the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.BookMarkedBlog, req.BlogId), constants.ServiceUser, constants.EventBookMarkBlog, us.log)
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("blog %v has been bookmarked successfully", req.BlogId),
+	}, nil
+}
+
+func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	err = us.dbConn.RemoveBookmarkFromBlog(req.BlogId, user.Id)
+	if err != nil {
+		logrus.Errorf("error while removing the bookmark from the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RemoveBookMark, req.BlogId), constants.ServiceUser, constants.EventRemoveBookMark, us.log)
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("blog %v has been removed from bookmark successfully", req.BlogId),
+	}, nil
 }
