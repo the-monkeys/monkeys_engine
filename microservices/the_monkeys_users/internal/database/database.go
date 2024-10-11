@@ -253,29 +253,72 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	defer tx.Rollback()
 
 	var id int64
-	//using this username get id field from user account table
-	if err := tx.QueryRow(`
-			SELECT id FROM user_account where username = $1;`, username).Scan(&id); err != nil {
-		logrus.Errorf("can't get id by using username %s, error: %+v", username, err)
-		return nil
+	// Step 1: Fetch the user ID using the username from the user_account table
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&id); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return err
 	}
 
-	//using that id delete the row in user auth info table
+	// Step 2: Delete all blogs the user owns and related data (permissions, invites)
+	_, err = tx.Exec(`DELETE FROM blog_permissions WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete blog permissions for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete co-author invites for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM co_author_permissions WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete co-author permissions for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM blog WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete blogs for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 3: Remove any references where the user is a co-author in someone else's blog
+	_, err = tx.Exec(`DELETE FROM co_author_permissions WHERE co_author_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete co-author references for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE invitee_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete co-author invites for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 4: Delete user authentication information
 	_, err = tx.Exec(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
 	if err != nil {
+		logrus.Errorf("Failed to delete user authentication info for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	//using that id delete the row from user account table
+	// Step 5: Delete the user account itself
 	_, err = tx.Exec(`DELETE FROM user_account WHERE id = $1`, id)
 	if err != nil {
+		logrus.Errorf("Failed to delete user account for user ID %d, error: %+v", id, err)
 		return err
 	}
 
+	// Commit the transaction
 	err = tx.Commit()
 	if err != nil {
+		logrus.Errorf("Failed to commit transaction for deleting user account %d, error: %+v", id, err)
 		return err
 	}
+
+	logrus.Infof("Successfully deleted user profile for user: %s and all related data", username)
 	return nil
 }
 

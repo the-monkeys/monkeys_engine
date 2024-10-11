@@ -183,7 +183,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 // 5. Delete the topics of the user
 // 6. Send User a mail
 // 8. Delete the user
-func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
+func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
 	// Check if username exits or not
@@ -195,12 +195,6 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
-
-	userLog := &models.UserLogs{
-		AccountId: user.AccountId,
-	}
-	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
 
 	// Run delete user query
 	err = us.dbConn.DeleteUserProfile(req.Username)
