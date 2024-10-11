@@ -143,6 +143,9 @@ message BlogExistsRes {
 
 message DeleteBlogReq{
     string blog_id = 1;
+    string owner_account_id = 2;
+    string ip = 3;
+    string client = 4;
 }
 
 message DeleteBlogResp{

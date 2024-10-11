@@ -29,6 +29,8 @@ type MessageToUserSvc struct {
 	BlogId        string `json:"blog_id"`
 	Action        string `json:"action"`
 	Status        string `json:"status"`
+	IpAddress     string `json:"ip_address"`
+	Client        string `json:"client"`
 }
 
 type DraftBlogRequest struct {

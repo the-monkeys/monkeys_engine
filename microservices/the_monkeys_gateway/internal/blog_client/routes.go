@@ -536,8 +536,11 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 	}
 
 	blogId := ctx.Param("blog_id")
-
-	res, err := asc.Client.DeleteABlogByBlogId(context.Background(), &pb.DeleteBlogReq{BlogId: blogId})
+	accId := ctx.GetString("accountId")
+	res, err := asc.Client.DeleteABlogByBlogId(context.Background(), &pb.DeleteBlogReq{
+		BlogId:         blogId,
+		OwnerAccountId: accId,
+	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {

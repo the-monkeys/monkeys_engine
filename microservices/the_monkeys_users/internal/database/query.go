@@ -425,3 +425,71 @@ func (uh *uDBHandler) GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsBy
 	}, nil
 
 }
+
+// DeleteBlogAndReferences deletes a blog and all its references from related tables
+func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
+	// Start a transaction to ensure data consistency
+	tx, err := uh.db.Begin()
+	if err != nil {
+		uh.log.Errorf("Failed to start transaction for deleting blog: %s, error: %+v", blogId, err)
+		return err
+	}
+
+	// Step 1: Fetch the blog ID based on the blog_id string
+	var blogIdInt int64
+	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch blog ID for blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 2: Delete from blog_permissions
+	_, err = tx.Exec(`DELETE FROM blog_permissions WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to delete from blog_permissions for blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 3: Delete from co_author_invites
+	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to delete from co_author_invites for blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 4: Delete from co_author_permissions
+	_, err = tx.Exec(`DELETE FROM co_author_permissions WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to delete from co_author_permissions for blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 5: Delete from blog_bookmarks (if applicable)
+	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to delete from blog_bookmarks for blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 6: Finally, delete the blog from the blog table
+	_, err = tx.Exec(`DELETE FROM blog WHERE id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to delete blog: %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		uh.log.Errorf("Failed to commit transaction for deleting blog: %s, error: %+v", blogId, err)
+		return err
+	}
+
+	uh.log.Infof("Successfully deleted blog: %s and its references", blogId)
+	return nil
+}

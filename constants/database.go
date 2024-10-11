@@ -55,6 +55,7 @@ const (
 	BlogStatusDraft     = "Draft"
 	BlogStatusPublished = "Published"
 	BlogStatusArchived  = "Archived"
+	BlogDeleted         = "Deleted"
 )
 
 var Clients = []string{"Chrome", "Firefox", "Safari", "Edge", "Opera", "Android", "iOS", "Brave", "Others"}

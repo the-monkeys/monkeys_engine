@@ -1,4 +1,3 @@
-version: '3.1'
 services:
   the_monkeys_db:
     container_name: "the-monkeys-psql"

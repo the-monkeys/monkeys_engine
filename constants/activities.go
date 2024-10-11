@@ -29,7 +29,7 @@ const (
 	CreateBlog               = "created a Blog"
 	UpdateDraftedBlog        = "Updated the Drafted Blog"
 	UpdateBlog               = "Updated the Blog"
-	DeleteBlog               = "Deleted the Blog"
+	DeleteBlog               = "Deleted the Blog %s"
 	PublishBlog              = "published the Blog"
 	ArchiveBlog              = "Archived the Blog"
 	LikeBlog                 = "Liked a Blog"

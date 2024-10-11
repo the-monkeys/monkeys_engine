@@ -1,11 +1,11 @@
 # include .env
 # export
 
-PSQLUSER := $(shell yq e '.postgresql.primary_db.db_username' config/config.yml)
-PSQLPASS := $(shell yq e '.postgresql.primary_db.db_password' config/config.yml)
-PSQLHOST := $(shell yq e '.postgresql.primary_db.db_host' config/config.yml)
-PSQLPORT := $(shell yq e '.postgresql.primary_db.db_port' config/config.yml)
-PSQLDB := $(shell yq e '.postgresql.primary_db.db_name' config/config.yml)
+# PSQLUSER := $(shell yq e '.postgresql.primary_db.db_username' config/config.yml)
+# PSQLPASS := $(shell yq e '.postgresql.primary_db.db_password' config/config.yml)
+# PSQLHOST := $(shell yq e '.postgresql.primary_db.db_host' config/config.yml)
+# PSQLPORT := $(shell yq e '.postgresql.primary_db.db_port' config/config.yml)
+# PSQLDB := $(shell yq e '.postgresql.primary_db.db_name' config/config.yml)
 
 proto:
 	protoc microservices/the_monkeys_gateway/internal/**/pb/*.proto --go_out=. --go-grpc_out=.

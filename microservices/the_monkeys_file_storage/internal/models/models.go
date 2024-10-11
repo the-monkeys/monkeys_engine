@@ -11,4 +11,6 @@ type TheMonkeysMessage struct {
 	Client      string `json:"client"`
 	IpAddress   string `json:"ip"`
 	Action      string `json:"action"`
+	BlogId      string `json:"blog_id"`
+	BlogStatus  string `json:"status"`
 }

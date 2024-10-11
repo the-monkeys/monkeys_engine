@@ -52,6 +52,7 @@ type UserDb interface {
 	RemoveUserInterest(interests []string, username string) error
 	RevokeBlogPermissionFromAUser(blogId string, userId int64, permissionType string) error
 	RemoveBookmarkFromBlog(blogId string, userId int64) error
+	DeleteBlogAndReferences(blogId string) error
 }
 
 type uDBHandler struct {
@@ -398,7 +399,7 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 	defer stmt.Close()
 
 	var blogId int64
-	err = stmt.QueryRow(userId, msg.BlogId, msg.Status).Scan(&blogId)
+	err = stmt.QueryRow(userId, msg.BlogId, msg.BlogStatus).Scan(&blogId)
 	if err != nil {
 		logrus.Errorf("cannot execute query to add blog into the blog: %v", err)
 		return err
