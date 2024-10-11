@@ -22,13 +22,6 @@ import (
 
 func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger) {
 
-	// conn, err := queue.GetConn(conf)
-	// if err != nil {
-	// 	log.Fatalf("Error establishing RabbitMQ connection: %v", err)
-	// }
-
-	// defer conn.Channel.Close()
-
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -40,45 +33,65 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 		os.Exit(0)
 	}()
 
+	// Consume from both queue[0] and queue[2] in separate goroutines
+	go consumeQueue(conn, conf.Queues[0], log)
+	go consumeQueue(conn, conf.Queues[2], log)
+
+	// Keep the main function running to allow goroutines to process messages
+	select {}
+}
+
+func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger) {
 	msgs, err := conn.Channel.Consume(
-		conf.Queues[0], // queue
-		"",             // consumer
-		true,           // auto-ack
-		false,          // exclusive
-		false,          // no-local
-		false,          // no-wait
-		nil,            // args
+		queueName, // queue
+		"",        // consumer
+		true,      // auto-ack
+		false,     // exclusive
+		false,     // no-local
+		false,     // no-wait
+		nil,       // args
 	)
 	if err != nil {
-		logrus.Errorf("Failed to register a consumer: %v", err)
+		logrus.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
-		if err = json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
-			return
+		if err := json.Unmarshal(d.Body, &user); err != nil {
+			logrus.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+			continue
 		}
 
-		switch user.Action {
-		case constants.USER_PROFILE_DIRECTORY_CREATE:
-			if err := CreateUserFolder(user.Username); err != nil {
-				logrus.Errorf("Failed to create user folder: %v", err)
-			}
-		case constants.USER_PROFILE_DIRECTORY_UPDATE:
-			if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
-				logrus.Errorf("Failed to update user folder: %v", err)
-			}
+		handleUserAction(user, log)
+	}
+}
 
-		case constants.USER_PROFILE_DIRECTORY_DELETE:
-			if err := DeleteUserFolder(user.Username); err != nil {
-				logrus.Errorf("Failed to delete user folder: %v", err)
-			}
-		default:
-			logrus.Errorf("Unknown action: %s", user.Action)
+func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger) {
+	switch user.Action {
+	case constants.USER_PROFILE_DIRECTORY_CREATE:
+		log.Infof("Creating user folder: %s", user.Username)
+		if err := CreateUserFolder(user.Username); err != nil {
+			log.Errorf("Failed to create user folder: %v", err)
+		}
+	case constants.USER_PROFILE_DIRECTORY_UPDATE:
+		log.Infof("Updating user folder: %s", user.Username)
+		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
+			log.Errorf("Failed to update user folder: %v", err)
+		}
+	case constants.USER_PROFILE_DIRECTORY_DELETE:
+		log.Infof("Deleting user folder: %s", user.Username)
+		if err := DeleteUserFolder(user.Username); err != nil {
+			log.Errorf("Failed to delete user folder: %v", err)
+		}
+	case constants.BLOG_DELETE:
+		log.Infof("Deleting blog folder: %s", user.BlogId)
+		if err := DeleteBlogFolder(user.BlogId); err != nil {
+			log.Errorf("Failed to delete user folder: %v", err)
 		}
 
+	default:
+		log.Errorf("Unknown action: %s", user.Action)
 	}
 }
 
@@ -110,22 +123,18 @@ func CreateUserFolder(userName string) error {
 }
 
 func readImageFromURL(url string) ([]byte, error) {
-	// Create a new HTTP client
 	client := http.Client{}
 
-	// Send a GET request to the URL
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// Check for successful response status code
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP request failed with status code %d", resp.StatusCode)
 	}
 
-	// Read the response body into a byte array
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response body: %v", err)
@@ -140,7 +149,6 @@ func ConstructPath(baseDir, userName, fileName string) (string, string) {
 	return dirPath, filePath
 }
 
-// UpdateUserFolder renames a folder to a new name
 func UpdateUserFolder(currentName, newName string) error {
 	currentPath := filepath.Join(constant.ProfileDir, currentName)
 	newPath := filepath.Join(constant.ProfileDir, newName)
@@ -156,18 +164,13 @@ func UpdateUserFolder(currentName, newName string) error {
 		return errors.New(currentPath + " is not a directory")
 	}
 
-	to := currentPath + "_temp" // Create temporary name
+	to := currentPath + "_temp"
 
-	// Rename the directory
 	err = os.Rename(currentPath, to)
 	if err != nil {
 		return errors.New("failed to rename directory: " + err.Error())
 	}
 
-	// Wait for a bit to make sure the directory is released
-	// time.Sleep(1 * time.Second)
-
-	// Rename back to the desired name
 	err = os.Rename(to, newPath)
 	if err != nil {
 		return errors.New("failed to rename directory to new name: " + err.Error())
@@ -179,7 +182,17 @@ func UpdateUserFolder(currentName, newName string) error {
 func DeleteUserFolder(userName string) error {
 	dirPath := filepath.Join(constant.ProfileDir, userName)
 
-	// Remove the directory
+	err := os.RemoveAll(dirPath)
+	if err != nil {
+		return errors.New("failed to remove directory: " + err.Error())
+	}
+
+	return nil
+}
+
+func DeleteBlogFolder(blogId string) error {
+	dirPath := filepath.Join(constant.BlogDir, blogId)
+
 	err := os.RemoveAll(dirPath)
 	if err != nil {
 		return errors.New("failed to remove directory: " + err.Error())

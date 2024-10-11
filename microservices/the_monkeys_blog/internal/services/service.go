@@ -259,8 +259,37 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 		return nil, status.Errorf(codes.Internal, "failed to delete the blog with ID: %s", req.BlogId)
 	}
 
-	fmt.Printf("resp: %v\n", resp.StatusCode)
+	bx, err := json.Marshal(models.MessageToUserSvc{
+		UserAccountId: req.OwnerAccountId,
+		BlogId:        req.BlogId,
+		Action:        constants.BLOG_DELETE,
+		Status:        constants.BlogDeleted,
+		IpAddress:     req.Ip,
+		Client:        req.Client,
+	})
 
+	if err != nil {
+		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.OwnerAccountId, req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
+	}
+
+	// Enqueue delete message to user service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+	}()
+
+	// Enqueue delete message to storage service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[2], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[2], err)
+		}
+	}()
+
+	fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
 	return &pb.DeleteBlogResp{
 		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
 	}, nil

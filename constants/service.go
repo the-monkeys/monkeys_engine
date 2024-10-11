@@ -21,6 +21,7 @@ const (
 
 	EventCreatedBlog    = "event-created-blog"
 	EventPublishedBlog  = "event-published-blog"
+	EventDeleteBlog     = "event-delete-blog"
 	EventInviteCoAuthor = "event-invite-co-author"
 	EventAcceptCoAuthor = "event-accept-co-author"
 	EventRemoveCoAuthor = "event-remove-co-author"
