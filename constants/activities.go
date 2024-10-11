@@ -26,11 +26,11 @@ const (
 	AddedInstagram = "Added Instagram"
 	AddedTwitter   = "Added Twitter"
 
-	CreateBlog               = "created a Blog"
+	CreateBlog               = "Created a Blog %s"
 	UpdateDraftedBlog        = "Updated the Drafted Blog"
 	UpdateBlog               = "Updated the Blog"
 	DeleteBlog               = "Deleted the Blog %s"
-	PublishBlog              = "published the Blog"
+	PublishBlog              = "Published the Blog %s"
 	ArchiveBlog              = "Archived the Blog"
 	LikeBlog                 = "Liked a Blog"
 	UnlikeBlog               = "Disliked a Blog"

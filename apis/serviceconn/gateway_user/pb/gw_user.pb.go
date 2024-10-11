@@ -2336,7 +2336,7 @@ var file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc = []byte{
 	0x6c, 0x65, 0x52, 0x65, 0x71, 0x1a, 0x1e, 0x2e, 0x61, 0x75, 0x74, 0x68, 0x5f, 0x73, 0x76, 0x63,
 	0x2e, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x55, 0x73, 0x65, 0x72, 0x50, 0x72, 0x6f, 0x66, 0x69,
 	0x6c, 0x65, 0x52, 0x65, 0x73, 0x22, 0x00, 0x12, 0x55, 0x0a, 0x11, 0x44, 0x65, 0x6c, 0x65, 0x74,
-	0x65, 0x55, 0x73, 0x65, 0x72, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x12, 0x1e, 0x2e, 0x61,
+	0x65, 0x55, 0x73, 0x65, 0x72, 0x41, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x1e, 0x2e, 0x61,
 	0x75, 0x74, 0x68, 0x5f, 0x73, 0x76, 0x63, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x55, 0x73,
 	0x65, 0x72, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x52, 0x65, 0x71, 0x1a, 0x1e, 0x2e, 0x61,
 	0x75, 0x74, 0x68, 0x5f, 0x73, 0x76, 0x63, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x55, 0x73,
@@ -2455,7 +2455,7 @@ var file_apis_serviceconn_gateway_user_pb_gw_user_proto_depIdxs = []int32{
 	2,  // 7: auth_svc.UserService.GetUserActivities:input_type -> auth_svc.UserActivityReq
 	0,  // 8: auth_svc.UserService.GetUserProfile:input_type -> auth_svc.UserProfileReq
 	5,  // 9: auth_svc.UserService.UpdateUserProfile:input_type -> auth_svc.UpdateUserProfileReq
-	7,  // 10: auth_svc.UserService.DeleteUserProfile:input_type -> auth_svc.DeleteUserProfileReq
+	7,  // 10: auth_svc.UserService.DeleteUserAccount:input_type -> auth_svc.DeleteUserProfileReq
 	9,  // 11: auth_svc.UserService.GetAllTopics:input_type -> auth_svc.GetTopicsRequests
 	13, // 12: auth_svc.UserService.GetAllCategories:input_type -> auth_svc.GetAllCategoriesReq
 	15, // 13: auth_svc.UserService.GetUserDetailsByAccId:input_type -> auth_svc.UserDetailsByAccIdReq
@@ -2470,7 +2470,7 @@ var file_apis_serviceconn_gateway_user_pb_gw_user_proto_depIdxs = []int32{
 	3,  // 22: auth_svc.UserService.GetUserActivities:output_type -> auth_svc.UserActivityResp
 	1,  // 23: auth_svc.UserService.GetUserProfile:output_type -> auth_svc.UserProfileRes
 	6,  // 24: auth_svc.UserService.UpdateUserProfile:output_type -> auth_svc.UpdateUserProfileRes
-	8,  // 25: auth_svc.UserService.DeleteUserProfile:output_type -> auth_svc.DeleteUserProfileRes
+	8,  // 25: auth_svc.UserService.DeleteUserAccount:output_type -> auth_svc.DeleteUserProfileRes
 	11, // 26: auth_svc.UserService.GetAllTopics:output_type -> auth_svc.GetTopicsResponse
 	14, // 27: auth_svc.UserService.GetAllCategories:output_type -> auth_svc.GetAllCategoriesRes
 	16, // 28: auth_svc.UserService.GetUserDetailsByAccId:output_type -> auth_svc.UserDetailsByAccIdResp
