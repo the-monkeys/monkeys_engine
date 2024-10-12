@@ -79,7 +79,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger) {
 		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
 			log.Errorf("Failed to update user folder: %v", err)
 		}
-	case constants.USER_PROFILE_DIRECTORY_DELETE:
+	case constants.USER_ACCOUNT_DELETE:
 		log.Infof("Deleting user folder: %s", user.Username)
 		if err := DeleteUserFolder(user.Username); err != nil {
 			log.Errorf("Failed to delete user folder: %v", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/services"
 
@@ -37,6 +38,7 @@ func main() {
 	}
 
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, logger, osClient)
 
 	blogService := services.NewBlogService(osClient, logger, cfg, qConn)
 	// interservice := services.NewInterservice(*osClient, logger)

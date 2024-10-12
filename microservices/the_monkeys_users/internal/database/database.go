@@ -297,14 +297,35 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
-	// Step 4: Delete user authentication information
+	// Step 4: Delete all the user's interests
+	_, err = tx.Exec(`DELETE FROM user_interest WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete user interests for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 5: Delete all the topics created by the user
+	_, err = tx.Exec(`DELETE FROM topics WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete topics for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 6: Delete all bookmarks created by the user
+	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete bookmarks for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 7: Delete user authentication information
 	_, err = tx.Exec(`DELETE FROM user_auth_info WHERE user_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete user authentication info for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	// Step 5: Delete the user account itself
+	// Step 8: Delete the user account itself
 	_, err = tx.Exec(`DELETE FROM user_account WHERE id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete user account for user ID %d, error: %+v", id, err)
