@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package blog_svc;
 
-
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
 message DraftBlogRequest {
@@ -40,12 +39,41 @@ message Data {
     string text = 1;
     int32 level = 2;  // For headers
     File file = 3;    // For files in attaches and images
-    repeated string items = 4; // For lists
+    repeated string items = 4; // For lists and checklist items
     string list_type = 5; // For list type (unordered, ordered)
     bool withBorder = 6;  // For images
     bool withBackground = 7; // For images
     bool stretched = 8;  // For images
     string caption = 9;  // For images
+
+    // For tables
+    repeated TableRow table_content = 10;
+
+    // For code blocks
+    string code = 11;
+    string language = 12; // Optional: language of the code block
+
+    // For URLs
+    URLData link = 13;
+
+    // For checklists
+    repeated ChecklistItem checklist = 14;
+}
+
+message TableRow {
+    repeated string cells = 1;  // List of cell contents in the row
+}
+
+message ChecklistItem {
+    string text = 1;
+    bool checked = 2;
+}
+
+message URLData {
+    string url = 1;
+    string title = 2;
+    string description = 3;
+    string image_url = 4;  // Optional: Image URL for link previews
 }
 
 message File {
@@ -112,12 +140,6 @@ message GetBlogsByTagsNameRes {
     string error = 2;
 }
 
-// message GetDraftBlogsReq {
-//     string account_id = 1;
-//     string email = 2;
-//     string username = 3;
-// }
-
 message GetBlogs {
     string blog_id = 1;
     string owner_account_id = 2;
@@ -141,14 +163,14 @@ message BlogExistsRes {
     bool blog_exists = 1;
 }
 
-message DeleteBlogReq{
+message DeleteBlogReq {
     string blog_id = 1;
     string owner_account_id = 2;
     string ip = 3;
     string client = 4;
 }
 
-message DeleteBlogResp{
+message DeleteBlogResp {
     string message = 1;
     string error = 2;
 }
@@ -162,12 +184,11 @@ message GetBlogsRes {
     string error = 2;
 }
 
-
 // ******************************* DraftBlogV2 *******************************
 message DraftBlogV2Req {
     string blog_id = 1;
     string owner_account_id = 2;
-    oneof blog{
+    oneof blog {
         EditorJSContent editor_js_content = 3; // Wrapped Editor.js content
         PlateData plate_data = 4;             // Plate.js content
         string content_json = 5;              // Generic JSON content
@@ -177,6 +198,7 @@ message DraftBlogV2Req {
     repeated string tags = 8;
     string content_type = 9;
 }
+
 message EditorJSContent {
     int64 time = 1;
     repeated Block blocks = 2;
@@ -217,14 +239,10 @@ service BlogService {
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
     rpc GetPublishedBlogByIdAndOwnerId(BlogByIdReq) returns (BlogByIdRes);
 
-    // Get a list of blogs
-    // Last 100 Blogs
-    // Last 100 blogs by tags
-    rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes){};
+    rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes) {};
 
     rpc CheckIfBlogsExist(BlogByIdReq) returns (BlogExistsRes);
     rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
-
 
     rpc DraftBlogV2(DraftBlogV2Req) returns (BlogV2Response);
 
