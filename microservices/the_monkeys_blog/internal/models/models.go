@@ -24,11 +24,12 @@ package models
 // 	Footnotes []string `json:"footnotes"`
 // }
 
-type MessageToUserSvc struct {
+type InterServiceMessage struct {
 	UserAccountId string `json:"user_account_id"`
+	UserStatus    string `json:"user_status"`
 	BlogId        string `json:"blog_id"`
 	Action        string `json:"action"`
-	Status        string `json:"status"`
+	BlogStatus    string `json:"blog_status"`
 	IpAddress     string `json:"ip_address"`
 	Client        string `json:"client"`
 }

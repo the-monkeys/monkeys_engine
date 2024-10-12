@@ -30,6 +30,7 @@ type ElasticsearchStorage interface {
 	GetPublishedBlogByIdAndOwner(ctx context.Context, blogId, ownerAccountId string) (*pb.BlogByIdRes, error)
 	GetPublishedBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetPublishedBlogsRes, error)
 	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error)
+	DeleteBlogsByOwnerAccountID(ctx context.Context, ownerAccountId string) (*esapi.Response, error)
 
 	DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error)
 }
