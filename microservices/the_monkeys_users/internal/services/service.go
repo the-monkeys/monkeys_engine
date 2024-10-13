@@ -182,8 +182,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 // 4. Delete all the user interests
 // 5. Delete the topics of the user
 // 6. Send User a mail
-// 8. Delete the user
-func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
+func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
 	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
 
 	// Check if username exits or not
@@ -196,12 +195,6 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
-	userLog := &models.UserLogs{
-		AccountId: user.AccountId,
-	}
-	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
-
 	// Run delete user query
 	err = us.dbConn.DeleteUserProfile(req.Username)
 	if err != nil {
@@ -212,8 +205,9 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 	bx, err := json.Marshal(models.TheMonkeysMessage{
 		Username:      user.Username,
 		UserAccountId: user.AccountId,
-		Action:        constants.USER_PROFILE_DIRECTORY_DELETE,
+		Action:        constants.USER_ACCOUNT_DELETE,
 	})
+
 	if err != nil {
 		us.log.Errorf("failed to marshal message, error: %v", err)
 	}
@@ -225,6 +219,13 @@ func (us *UserSvc) DeleteUserProfile(ctx context.Context, req *pb.DeleteUserProf
 		}
 	}()
 
+	// TODO: Asynchronously delete the blogs from the blog service
+	go func() {
+		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[3], bx)
+		if err != nil {
+			us.log.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		}
+	}()
 	// Return the response
 	return &pb.DeleteUserProfileRes{
 		Success: "user has been deleted successfully",

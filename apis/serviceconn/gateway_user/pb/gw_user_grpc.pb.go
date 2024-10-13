@@ -22,7 +22,7 @@ const (
 	UserService_GetUserActivities_FullMethodName     = "/auth_svc.UserService/GetUserActivities"
 	UserService_GetUserProfile_FullMethodName        = "/auth_svc.UserService/GetUserProfile"
 	UserService_UpdateUserProfile_FullMethodName     = "/auth_svc.UserService/UpdateUserProfile"
-	UserService_DeleteUserProfile_FullMethodName     = "/auth_svc.UserService/DeleteUserProfile"
+	UserService_DeleteUserAccount_FullMethodName     = "/auth_svc.UserService/DeleteUserAccount"
 	UserService_GetAllTopics_FullMethodName          = "/auth_svc.UserService/GetAllTopics"
 	UserService_GetAllCategories_FullMethodName      = "/auth_svc.UserService/GetAllCategories"
 	UserService_GetUserDetailsByAccId_FullMethodName = "/auth_svc.UserService/GetUserDetailsByAccId"
@@ -43,7 +43,7 @@ type UserServiceClient interface {
 	GetUserActivities(ctx context.Context, in *UserActivityReq, opts ...grpc.CallOption) (*UserActivityResp, error)
 	GetUserProfile(ctx context.Context, in *UserProfileReq, opts ...grpc.CallOption) (*UserProfileRes, error)
 	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileReq, opts ...grpc.CallOption) (*UpdateUserProfileRes, error)
-	DeleteUserProfile(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error)
+	DeleteUserAccount(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error)
 	GetAllTopics(ctx context.Context, in *GetTopicsRequests, opts ...grpc.CallOption) (*GetTopicsResponse, error)
 	GetAllCategories(ctx context.Context, in *GetAllCategoriesReq, opts ...grpc.CallOption) (*GetAllCategoriesRes, error)
 	GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error)
@@ -101,10 +101,10 @@ func (c *userServiceClient) UpdateUserProfile(ctx context.Context, in *UpdateUse
 	return out, nil
 }
 
-func (c *userServiceClient) DeleteUserProfile(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error) {
+func (c *userServiceClient) DeleteUserAccount(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteUserProfileRes)
-	err := c.cc.Invoke(ctx, UserService_DeleteUserProfile_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, UserService_DeleteUserAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ type UserServiceServer interface {
 	GetUserActivities(context.Context, *UserActivityReq) (*UserActivityResp, error)
 	GetUserProfile(context.Context, *UserProfileReq) (*UserProfileRes, error)
 	UpdateUserProfile(context.Context, *UpdateUserProfileReq) (*UpdateUserProfileRes, error)
-	DeleteUserProfile(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error)
+	DeleteUserAccount(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error)
 	GetAllTopics(context.Context, *GetTopicsRequests) (*GetTopicsResponse, error)
 	GetAllCategories(context.Context, *GetAllCategoriesReq) (*GetAllCategoriesRes, error)
 	GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error)
@@ -265,8 +265,8 @@ func (UnimplementedUserServiceServer) GetUserProfile(context.Context, *UserProfi
 func (UnimplementedUserServiceServer) UpdateUserProfile(context.Context, *UpdateUserProfileReq) (*UpdateUserProfileRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateUserProfile not implemented")
 }
-func (UnimplementedUserServiceServer) DeleteUserProfile(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserProfile not implemented")
+func (UnimplementedUserServiceServer) DeleteUserAccount(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserAccount not implemented")
 }
 func (UnimplementedUserServiceServer) GetAllTopics(context.Context, *GetTopicsRequests) (*GetTopicsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllTopics not implemented")
@@ -376,20 +376,20 @@ func _UserService_UpdateUserProfile_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _UserService_DeleteUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _UserService_DeleteUserAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteUserProfileReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(UserServiceServer).DeleteUserProfile(ctx, in)
+		return srv.(UserServiceServer).DeleteUserAccount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: UserService_DeleteUserProfile_FullMethodName,
+		FullMethod: UserService_DeleteUserAccount_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).DeleteUserProfile(ctx, req.(*DeleteUserProfileReq))
+		return srv.(UserServiceServer).DeleteUserAccount(ctx, req.(*DeleteUserProfileReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -612,8 +612,8 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_UpdateUserProfile_Handler,
 		},
 		{
-			MethodName: "DeleteUserProfile",
-			Handler:    _UserService_DeleteUserProfile_Handler,
+			MethodName: "DeleteUserAccount",
+			Handler:    _UserService_DeleteUserAccount_Handler,
 		},
 		{
 			MethodName: "GetAllTopics",

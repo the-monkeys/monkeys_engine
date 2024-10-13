@@ -31,4 +31,3 @@ tracker
 cloud/*
 local/*
 profile/*
-main.go

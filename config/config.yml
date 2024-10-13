@@ -52,6 +52,10 @@ rabbitMQ:
   queues:
     - "queue1"
     - "queue2"
+    - "blog_svc_file_svc_queue"
+    - "to_blog_svc_queue"
   routingKeys:
     - "key1"
     - "key2"
+    - "blog_svc_file_svc_key"
+    - "to_blog_svc_key"

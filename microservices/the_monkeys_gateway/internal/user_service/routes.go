@@ -209,7 +209,7 @@ func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	res, err := asc.Client.DeleteUserProfile(context.Background(), &pb.DeleteUserProfileReq{
+	res, err := asc.Client.DeleteUserAccount(context.Background(), &pb.DeleteUserProfileReq{
 		Username: username,
 	})
 

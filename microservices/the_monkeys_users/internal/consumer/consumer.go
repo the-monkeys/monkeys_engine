@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -79,16 +80,23 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 				userCon.log.Errorf("Error creating blog: %v", err)
 			}
 
-			go cache.AddUserLog(userCon.dbConn, userLog, constants.CreateBlog, constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
-		case constants.BLOG_EDIT:
-			// TODO: Add blog id and user id
+			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
+
 		case constants.BLOG_PUBLISH:
-			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.Status); err != nil {
+			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
 				logrus.Errorf("Can't update blog status to publish: %v", err)
 			}
 
-			go cache.AddUserLog(userCon.dbConn, userLog, constants.PublishBlog, constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
+			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
 
+		case constants.BLOG_DELETE:
+			if err := userCon.dbConn.DeleteBlogAndReferences(user.BlogId); err != nil {
+				logrus.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
+			}
+
+			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
+		case constants.BLOG_EDIT:
+			// TODO: Add blog id and user id
 		default:
 			logrus.Errorf("Unknown action: %s", user.Action)
 		}

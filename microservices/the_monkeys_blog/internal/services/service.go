@@ -54,11 +54,11 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		// }
 	} else {
 		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
-		bx, err := json.Marshal(models.MessageToUserSvc{
+		bx, err := json.Marshal(models.InterServiceMessage{
 			UserAccountId: req.OwnerAccountId,
 			BlogId:        req.BlogId,
 			Action:        constants.BLOG_CREATE,
-			Status:        constants.BlogStatusDraft,
+			BlogStatus:    constants.BlogStatusDraft,
 		})
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
@@ -180,11 +180,11 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.BlogId)
 	}
 
-	bx, err := json.Marshal(models.MessageToUserSvc{
+	bx, err := json.Marshal(models.InterServiceMessage{
 		UserAccountId: req.AccountId,
 		BlogId:        req.BlogId,
 		Action:        constants.BLOG_PUBLISH,
-		Status:        constants.BlogStatusPublished,
+		BlogStatus:    constants.BlogStatusPublished,
 	})
 
 	if err != nil {
@@ -259,8 +259,37 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 		return nil, status.Errorf(codes.Internal, "failed to delete the blog with ID: %s", req.BlogId)
 	}
 
-	fmt.Printf("resp: %v\n", resp.StatusCode)
+	bx, err := json.Marshal(models.InterServiceMessage{
+		UserAccountId: req.OwnerAccountId,
+		BlogId:        req.BlogId,
+		Action:        constants.BLOG_DELETE,
+		BlogStatus:    constants.BlogDeleted,
+		IpAddress:     req.Ip,
+		Client:        req.Client,
+	})
 
+	if err != nil {
+		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.OwnerAccountId, req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
+	}
+
+	// Enqueue delete message to user service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+	}()
+
+	// Enqueue delete message to storage service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[2], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[2], err)
+		}
+	}()
+
+	fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
 	return &pb.DeleteBlogResp{
 		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
 	}, nil
@@ -466,11 +495,11 @@ func (blog *BlogService) DraftBlogV2(ctx context.Context, req *pb.DraftBlogV2Req
 		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
 	} else {
 		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
-		bx, err := json.Marshal(models.MessageToUserSvc{
+		bx, err := json.Marshal(models.InterServiceMessage{
 			UserAccountId: req.OwnerAccountId,
 			BlogId:        req.BlogId,
 			Action:        constants.BLOG_CREATE,
-			Status:        constants.BlogStatusDraft,
+			BlogStatus:    constants.BlogStatusDraft,
 		})
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
