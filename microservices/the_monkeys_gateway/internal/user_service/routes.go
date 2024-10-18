@@ -249,7 +249,7 @@ func (asc *UserServiceClient) GetAllCategories(ctx *gin.Context) {
 func (asc *UserServiceClient) GetUserDetailsByAccId(ctx *gin.Context) {
 	accId := ctx.Param("acc_id")
 
-	res, err := asc.Client.GetUserDetailsByAccId(context.Background(), &pb.UserDetailsByAccIdReq{
+	res, err := asc.Client.GetUserDetails(context.Background(), &pb.UserDetailReq{
 		AccountId: accId,
 	})
 	if err != nil {
