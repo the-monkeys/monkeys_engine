@@ -15,6 +15,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
 )
@@ -68,6 +69,7 @@ func main() {
 	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient)
 	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
+	notification.RegisterNotificationRoute(server.router, cfg, authClient)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {

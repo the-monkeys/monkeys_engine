@@ -6,6 +6,7 @@ microservices:
   the_monkeys_blog: the_monkeys_blog:50052   # To run on the local replace with 0.0.0.0:50052
   the_monkeys_user: the_monkeys_user:50053   # To run on the local replace with 0.0.0.0:50053
   the_monkeys_file_storage: the_monkeys_file_server:50054    # To run on the local replace with 0.0.0.0:50054
+  the_monkeys_notification: the_monkeys_notification:50055   # To run on the local replace with
 postgresql:
   primary_db:
     db_username: root

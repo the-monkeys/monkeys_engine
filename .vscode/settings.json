@@ -7,6 +7,7 @@
         "Infoln",
         "Insta",
         "logrus",
+        "mapstructure",
         "mware",
         "Opensearch",
         "psql",
