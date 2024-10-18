@@ -61,7 +61,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
 	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
 	routes.GET("/tags", blogClient.GetBlogsByTagsName)
-	routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
+	routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName)
 	routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId)
 	routes.GET("/news1", blogClient.GetNews1)
 	routes.GET("/news2", blogClient.GetNews2)
@@ -79,6 +79,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/all-col/:acc_id", blogClient.AllCollabBlogs)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
+	routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
 
 	routes.GET("/my-drafts/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogId)
 
@@ -304,6 +305,50 @@ func (asc *BlogServiceClient) AllPublishesByAccountId(ctx *gin.Context) {
 
 	res, err := asc.Client.GetPublishedBlogsByAccID(context.Background(), &pb.BlogByIdReq{
 		OwnerAccountId: accId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.InvalidArgument:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *BlogServiceClient) AllPublishesByUserName(ctx *gin.Context) {
+	userName := ctx.Param("username")
+
+	// Get the account_id from the username
+	userInfo, err := asc.userCli.GetUserDetails(userName)
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the user details"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	res, err := asc.Client.GetPublishedBlogsByAccID(context.Background(), &pb.BlogByIdReq{
+		OwnerAccountId: userInfo.AccountId,
 	})
 
 	if err != nil {
