@@ -60,3 +60,8 @@ rabbitMQ:
     - "key2"
     - "blog_svc_file_svc_key"
     - "to_blog_svc_key"
+
+keys:
+  mediastack: token
+  newsapi: "token"
+  hindustantimes: token

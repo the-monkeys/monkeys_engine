@@ -38,6 +38,7 @@ type BlogServiceClient struct {
 	cache      string
 	cache1     string
 	userCli    *user_service.UserServiceClient
+	config     *config.Config
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
@@ -56,6 +57,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	blogClient := &BlogServiceClient{
 		Client:  NewBlogServiceClient(cfg),
 		userCli: userClient,
+		config:  cfg,
 	}
 	routes := router.Group("/api/v1/blog")
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
@@ -79,7 +81,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/all-col/:acc_id", blogClient.AllCollabBlogs)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
-	routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
+	// routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
 
 	routes.GET("/my-drafts/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogId)
 
@@ -757,7 +759,7 @@ type NewsResponse struct {
 	Data interface{} `json:"data"`
 }
 
-const apiURL = "http://api.mediastack.com/v1/news?access_key=0eb15d25302a5df61462633e05c3cc0f&language=en&categories=business,entertainment,sports,science,technology&limit=100"
+const apiURL = "http://api.mediastack.com/v1/news?access_key=%s&language=en&categories=business,entertainment,sports,science,technology&limit=100"
 
 func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
 	svc.cacheMutex.Lock()
@@ -769,8 +771,7 @@ func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
 		return
 	}
 
-	// Call the API
-	resp, err := http.Get(apiURL)
+	resp, err := http.Get(fmt.Sprintf(apiURL, svc.config.Keys.MediaStack))
 	if err != nil || resp.StatusCode != http.StatusOK {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
 		return
@@ -790,7 +791,7 @@ func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
 	ctx.Data(http.StatusOK, "application/json", body)
 }
 
-const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=1e59062cc9314effacf2e37e2fcaaab8&language=en"
+const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=%s&language=en"
 
 func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 	svc.cacheMutex.Lock()
@@ -803,7 +804,7 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 	}
 
 	// Call the API
-	resp, err := http.Get(apiURL2)
+	resp, err := http.Get(fmt.Sprintf(apiURL2, svc.config.Keys.NewsApi))
 	if err != nil || resp.StatusCode != http.StatusOK {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
 		return
@@ -824,7 +825,6 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 }
 
 func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
-
 	// Call the API
 	resp, err := http.Get("https://hindustantimes-1-t3366110.deta.app/top-world-news")
 	if err != nil || resp.StatusCode != http.StatusOK {
