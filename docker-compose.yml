@@ -221,6 +221,26 @@ services:
     command: go run microservices/the_monkeys_blog/main.go
     restart: always
 
+  the_monkeys_notification:
+    container_name: "the_monkeys_notification"
+    image: golang:latest
+    networks:
+      - monkeys-network
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - elasticsearch-node1
+      - the_monkeys_blog
+      - the_monkeys_user
+    volumes:
+      - .:/go/src/app
+    ports:
+      - "50055:50055"
+    working_dir: /go/src/app
+    command: go run microservices/the_monkeys_notification/main.go
+    restart: always
+
 networks:
   monkeys-network:
     driver: bridge

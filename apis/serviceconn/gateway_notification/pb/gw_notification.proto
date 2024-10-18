@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package notification_svc;
+
+option go_package = "./apis/serviceconn/gateway_notification/pb";
+
+message SendNotificationReq {
+    string user_id = 1;
+    string message = 2;
+}
+
+message SendNotificationRes {
+    int64 status = 1;
+    string error = 2;
+}
+
+message GetNotificationReq {
+    string user_id = 1;
+}
+
+message GetNotificationRes {
+    repeated string messages = 1;
+    int64 status = 2;
+    string error = 3;
+}
+
+message DeleteNotificationReq {
+    string user_id = 1;
+}
+
+message DeleteNotificationRes {
+    int64 status = 1;
+    string error = 2;
+}
+
+service NotificationService {
+    rpc SendNotification (SendNotificationReq) returns (SendNotificationRes) {}
+    rpc GetNotification (GetNotificationReq) returns (GetNotificationRes) {}
+    rpc DeleteNotification (DeleteNotificationReq) returns (DeleteNotificationRes) {}
+}
+
