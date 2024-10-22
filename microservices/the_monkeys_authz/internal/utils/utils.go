@@ -6,6 +6,9 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
+
+	mathRand "math/rand"
 
 	"github.com/google/uuid"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
@@ -68,4 +71,36 @@ func IpClientConvert(ip, client string) (string, string) {
 	client = "Others"
 
 	return ip, client
+}
+
+// Function to generate a GUID-like username
+func GenerateGUID() string {
+	// Get current time in UnixNano format
+	timestamp := time.Now().UnixNano()
+
+	// Generate a random byte slice
+	randomBytes := make([]byte, 8)
+	_, err := rand.Read(randomBytes) // Uses crypto/rand for secure random bytes
+	if err != nil {
+		panic(err)
+	}
+
+	return shuffleString(fmt.Sprintf("%x%x", timestamp, randomBytes))
+}
+
+// Function to shuffle a string
+func shuffleString(s string) string {
+	// Convert string to a slice of runes (to handle Unicode characters properly)
+	runes := []rune(s)
+
+	// Seed the random number generator
+	r := mathRand.New(mathRand.NewSource(time.Now().UnixNano())) // Uses math/rand for shuffling
+
+	// Shuffle the slice of runes
+	r.Shuffle(len(runes), func(i, j int) {
+		runes[i], runes[j] = runes[j], runes[i]
+	})
+
+	// Convert the runes slice back to a string and return
+	return string(runes)
 }

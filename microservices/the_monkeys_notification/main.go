@@ -6,6 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_notification/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/services"
 	"google.golang.org/grpc"
@@ -28,6 +30,10 @@ func main() {
 	if err != nil {
 		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysNotification, err)
 	}
+
+	// Connect to rabbitmq server
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log, db)
 
 	notificationSvc := services.NewNotificationSvc(db, log, cfg)
 

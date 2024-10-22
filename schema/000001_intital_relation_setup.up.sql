@@ -390,6 +390,21 @@ JOIN permissions p ON
     END
 ON CONFLICT DO NOTHING;
 
+-- Inserting predefined notification channels
+INSERT INTO notification_channel (channel_name) VALUES ('Browser'), ('Email'), ('WhatsApp'), ('SMS'), ('OTP')
+ON CONFLICT DO NOTHING;
+
+-- Inserting predefined notification types
+INSERT INTO notification_type (notification_name, description)
+VALUES 
+    ('Account Created', 'Notification for a newly created user account'),
+    ('Password Reset', 'Notification for a password reset request'),
+    ('Comment Reply', 'Notification for a reply to your blog comment'),
+    ('Co-Author Invitation', 'Invitation to co-author a blog'),
+    ('New Follower', 'Notification when a new user follows your blog')
+ON CONFLICT DO NOTHING;
+
+
 
 -- Insert some default topics
 INSERT INTO topics (description, category) VALUES

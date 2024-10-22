@@ -91,7 +91,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
 	}
 
-	ipAddress := ctx.Request.Header.Get("Ip")
+	ipAddress := ctx.Request.Header.Get("IP")
 	client := ctx.Request.Header.Get("Client")
 
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
