@@ -155,7 +155,7 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 		return
 	}
 
-	ipAddress := ctx.Request.Header.Get("Ip")
+	ipAddress := ctx.Request.Header.Get("IP")
 	client := ctx.Request.Header.Get("Client")
 
 	var req UpdateUserProfileRequest

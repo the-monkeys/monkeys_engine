@@ -22,7 +22,7 @@ const (
 )
 
 const (
-	ClientChrome  = "chrome"
+	ClientChrome  = "Chrome"
 	ClientFirefox = "firefox"
 	ClientSafari  = "safari"
 	ClientEdge    = "edge"

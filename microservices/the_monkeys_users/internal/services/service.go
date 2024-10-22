@@ -128,7 +128,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	us.log.Infof("req: %+v", req)
 
 	// Check if the user exists
-	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	userDetails, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
@@ -163,7 +163,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}
 
 	userLog := &models.UserLogs{
-		AccountId: dbUserInfo.AccountId,
+		AccountId: userDetails.AccountId,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
