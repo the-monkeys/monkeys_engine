@@ -802,7 +802,6 @@ func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
 		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache1))
 		return
 	}
-
 	// Call the API
 	resp, err := http.Get(fmt.Sprintf(apiURL2, svc.config.Keys.NewsApi))
 	if err != nil || resp.StatusCode != http.StatusOK {
