@@ -41,16 +41,23 @@ func TestResetPasswordTemplate(t *testing.T) {
 	fmt.Printf("Base directory: %v\n", baseDir)
 
 	t.Run("get html", func(t *testing.T) {
-		Address = "https:themonkeys.live"
+		Address = "https://themonkeys.live"
 		html := ResetPasswordTemplate(FirstName, LastName, Token, Username)
 		assert.NotEmpty(t, html)
 
 		// Construct the file path dynamically
 		testFilePath := filepath.Join(baseDir, "test_data", "test_files", "reset_password.html")
 		htmlTemplate, err := os.ReadFile(testFilePath)
+
 		assert.NoError(t, err)
 		assert.NotEmpty(t, htmlTemplate)
-		assert.Equal(t, string(htmlTemplate), html)
+
+		// Normalize line endings by replacing "\r\n" with "\n"
+		htmlNormalized := strings.ReplaceAll(html, "\r\n", "\n")
+		htmlTemplateNormalized := strings.ReplaceAll(string(htmlTemplate), "\r\n", "\n")
+
+		// Assert equality after normalization
+		assert.Equal(t, htmlTemplateNormalized, htmlNormalized)
 	})
 }
 
@@ -78,7 +85,6 @@ func TestEmailVerificationHTML(t *testing.T) {
 	t.Run("get html", func(t *testing.T) {
 		Address = "https:themonkeys.live"
 		html := EmailVerificationHTML(FirstName, LastName, Username, Token)
-		// os.WriteFile("email_verification.html", []byte(html), 0777)
 		assert.NotEmpty(t, html)
 
 		// Construct the file path dynamically
@@ -86,6 +92,12 @@ func TestEmailVerificationHTML(t *testing.T) {
 		htmlTemplate, err := os.ReadFile(testFilePath)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, htmlTemplate)
-		assert.Equal(t, string(htmlTemplate), html)
+
+		// Normalize line endings by replacing "\r\n" with "\n"
+		htmlNormalized := strings.ReplaceAll(html, "\r\n", "\n")
+		htmlTemplateNormalized := strings.ReplaceAll(string(htmlTemplate), "\r\n", "\n")
+
+		// Assert equality after normalization
+		assert.Equal(t, htmlTemplateNormalized, htmlNormalized)
 	})
 }
