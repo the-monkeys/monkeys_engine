@@ -1,7 +1,4 @@
--- ================================
--- Drop Predefined Data Inserts
--- ================================
--- Deleting predefined permissions and roles
+-- Drop predefined data inserts
 DELETE FROM permissions_granted;
 DELETE FROM user_status;
 DELETE FROM auth_provider;
@@ -10,75 +7,51 @@ DELETE FROM clients;
 DELETE FROM permissions;
 DELETE FROM user_role;
 
--- ================================
--- Drop SMS and OTP-related Tables
--- ================================
+-- Drop SMS and OTP-related tables
 DROP TABLE IF EXISTS otp_logs;
 DROP TABLE IF EXISTS sms_notifications;
 
--- ================================
--- Drop WhatsApp Notification-related Tables
--- ================================
+-- Drop WhatsApp notification-related tables
 DROP TABLE IF EXISTS whatsapp_notifications;
 
--- ================================
--- Drop Email Notification-related Tables
--- ================================
+-- Drop email notification-related tables
 DROP TABLE IF EXISTS email_templates;
 
--- ================================
--- Drop Browser Notification-related Tables
--- ================================
+-- Drop browser notification-related tables
 DROP TABLE IF EXISTS web_push_tokens;
 
--- ================================
--- Drop Notification-related Tables
--- ================================
+-- Drop notification-related tables
 DROP TABLE IF EXISTS user_notification_preferences;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS notification_type;
 DROP TABLE IF EXISTS notification_channel;
 
--- ================================
--- Drop Co-Author Activity Log Tables
--- ================================
+-- Drop co-author activity log tables
 DROP TABLE IF EXISTS co_author_activity_log;
 
--- ================================
--- Drop Blog Bookmarks Tables
--- ================================
+-- Drop blog bookmarks tables
 DROP TABLE IF EXISTS blog_bookmarks;
 
--- ================================
--- Drop Topics-related Tables
--- ================================
+-- Drop topics-related tables
 DROP TABLE IF EXISTS user_interest;
 DROP TABLE IF EXISTS topics;
 
--- ================================
--- Drop User Activity-related Tables
--- ================================
+-- Drop user activity-related tables
 DROP TABLE IF EXISTS logged_in_devices;
 DROP TABLE IF EXISTS user_account_log;
 DROP TABLE IF EXISTS clients;
 
--- ================================
--- Drop Blog-related Tables
--- ================================
+-- Drop blog-related tables
 DROP TABLE IF EXISTS co_author_permissions;
 DROP TABLE IF EXISTS co_author_invites;
 DROP TABLE IF EXISTS blog_permissions;
 DROP TABLE IF EXISTS blog;
 
--- ================================
--- Drop Permission-related Tables
--- ================================
+-- Drop permission-related tables
 DROP TABLE IF EXISTS permissions_granted;
 DROP TABLE IF EXISTS permissions;
 
--- ================================
--- Drop User-related Tables
--- ================================
+-- Drop user-related tables
 DROP TABLE IF EXISTS user_auth_info;
 DROP TABLE IF EXISTS auth_provider;
 DROP TABLE IF EXISTS email_validation_status;

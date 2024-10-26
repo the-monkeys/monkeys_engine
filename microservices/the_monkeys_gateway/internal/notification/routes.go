@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -80,20 +81,36 @@ func (nsc *NotificationServiceClient) CreateNotification(ctx *gin.Context) {
 
 // GetNotifications retrieves notifications for the user and pushes them via WebSocket if connected
 func (nsc *NotificationServiceClient) GetNotifications(ctx *gin.Context) {
-	// Step 1: Get user ID from the context (assuming middleware injects user ID)
-	userID := ctx.GetString("userID")
+	userName := ctx.GetString("userName")
+	// get params like limit, offset, etc.
+	limit := ctx.Query("limit")
+	offset := ctx.Query("offset")
+
+	// Convert to int64
+	limitInt, err := strconv.ParseInt(limit, 10, 64)
+	if err != nil {
+		limitInt = 10
+	}
+	offsetInt, err := strconv.ParseInt(offset, 10, 64)
+	if err != nil {
+		offsetInt = 0
+	}
 
 	// Step 2: Fetch notifications from the database for the user (e.g., only unread ones)
-	notifications, err := nsc.Client.GetNotification(context.Background(), &pb.GetNotificationReq{})
+	notifications, err := nsc.Client.GetNotification(context.Background(), &pb.GetNotificationReq{
+		Username: userName,
+		Limit:    limitInt,
+		Offset:   offsetInt,
+	})
 	if err != nil {
-		logrus.Errorf("Error fetching notifications for user ID %s: %v", userID, err)
+		logrus.Errorf("Error fetching notifications for user ID %s: %v", userName, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return
 	}
 
 	// Step 3: Send notifications via WebSocket if the user has an active connection
 	if len(notifications.Notification) > 0 {
-		nsc.NotifyUser(userID, notifications.Notification)
+		nsc.NotifyUser(userName, notifications.Notification)
 	}
 
 	// Step 4: Return the notifications via HTTP as well
@@ -102,7 +119,7 @@ func (nsc *NotificationServiceClient) GetNotifications(ctx *gin.Context) {
 
 // handleWebSocket handles WebSocket connections
 func (nsc *NotificationServiceClient) handleWebSocket(ctx *gin.Context) {
-	// Step 1: Extract user information from the context (Assuming middleware injects user ID)
+	// Step 1: Extract user information from the context (Assuming middleware injects userName)
 	userName := ctx.GetString("userName")
 
 	// Step 2: Upgrade the HTTP connection to a WebSocket
@@ -117,16 +134,36 @@ func (nsc *NotificationServiceClient) handleWebSocket(ctx *gin.Context) {
 	nsc.mu.Lock()
 	nsc.connections[userName] = append(nsc.connections[userName], conn)
 	nsc.mu.Unlock()
-	logrus.Infof("New WebSocket connection established for user ID: %s", userName)
+	logrus.Infof("New WebSocket connection established for user: %s", userName)
 
-	// Keep the connection alive (handle pings/pongs or other messages)
+	// Step 4: Send a "logged in" message to the user
+	initialMessage := "You are logged in!"
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(initialMessage)); err != nil {
+		logrus.Errorf("Error sending initial message to user %s: %v", userName, err)
+		return
+	}
+
+	// Keep the connection alive (handle incoming messages)
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		// Wait for incoming messages or ping/pong
+		messageType, _, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				logrus.Errorf("Unexpected WebSocket closure for user %s: %v", userName, err)
+			}
 			break
+		}
+
+		// Respond to pings or other control messages to keep connection alive
+		if messageType == websocket.PingMessage {
+			if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+				logrus.Errorf("Error sending pong to user %s: %v", userName, err)
+				break
+			}
 		}
 	}
 
-	// Step 4: Unregister the connection when closed
+	// Step 5: Unregister the connection when closed
 	nsc.mu.Lock()
 	conns := nsc.connections[userName]
 	for i, c := range conns {
@@ -136,7 +173,7 @@ func (nsc *NotificationServiceClient) handleWebSocket(ctx *gin.Context) {
 		}
 	}
 	nsc.mu.Unlock()
-	logrus.Infof("WebSocket connection closed for user ID: %s", userName)
+	logrus.Infof("WebSocket connection closed for user: %s", userName)
 }
 
 // NotifyUser sends notifications to a specific user via WebSocket

@@ -640,6 +640,8 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
+	// TODO: Add token to the db with status valid
+
 	return &pb.UpdateEmailIdRes{
 		StatusCode:    http.StatusOK,
 		Token:         token,
