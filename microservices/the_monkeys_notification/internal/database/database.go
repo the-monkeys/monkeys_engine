@@ -14,7 +14,7 @@ import (
 type NotificationDB interface {
 	// Create Notification query
 	CreateNotification(accountID string, notificationName string, message string, relatedBlogID, relatedUserAccountID string, channelName string) error
-	GetUserNotifications(userID int64, limit int, offset int) ([]*models.Notification, error)
+	GetUserNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
 	MarkNotificationAsSeen(notificationID int64, userID int64) error
 }
 
@@ -46,7 +46,14 @@ func NewNotificationDb(cfg *config.Config, log *logrus.Logger) (NotificationDB, 
 }
 
 // GetUserNotifications fetches notifications for a user with pagination
-func (uh *notificationDB) GetUserNotifications(userID int64, limit int, offset int) ([]*models.Notification, error) {
+func (uh *notificationDB) GetUserNotifications(username string, limit int64, offset int64) ([]*models.Notification, error) {
+	var userID int64
+	err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID)
+	if err != nil {
+		uh.log.Errorf("Error fetching user ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
 	// Step 1: Prepare the query with pagination
 	query := `
 		SELECT n.id, n.notification_type_id, nt.notification_name, n.message, n.related_blog_id, n.related_user_id, n.created_at, n.seen, n.delivery_status, nc.channel_name
