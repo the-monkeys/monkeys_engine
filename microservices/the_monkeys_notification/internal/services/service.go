@@ -2,7 +2,8 @@ package services
 
 import (
 	"context"
-	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_notification/pb"
@@ -37,17 +38,45 @@ func (ns *NotificationSvc) GetNotification(ctx context.Context, req *pb.GetNotif
 		return nil, err
 	}
 
-	fmt.Printf("res: %+v\n", res)
 	var notifications []*pb.Notification
 	for _, r := range res {
+		s1 := strconv.FormatInt(int64(r.ID), 10)
 		notifications = append(notifications, &pb.Notification{
+			Id:      s1,
 			UserId:  req.Username,
 			Message: r.Message,
 			Status:  r.DeliveryStatus,
+			Seen:    r.Seen,
 		})
 	}
 	return &pb.GetNotificationRes{
 		Notification: notifications,
+	}, nil
+}
+
+func (ns *NotificationSvc) NotificationSeen(ctx context.Context, req *pb.WatchNotificationReq) (*pb.NotificationResponse, error) {
+	ns.log.Infof("NotificationSeen request received for user: %s", req.UserId)
+
+	ids := make([]int64, 0)
+	for _, n := range req.Notification {
+		// Convert req.Id into int64
+		id, err := strconv.ParseInt(n.Id, 10, 64)
+		if err != nil {
+			ns.log.Errorf("Error converting notification ID to int64: %v", err)
+			return nil, err
+		}
+
+		ids = append(ids, id)
+	}
+
+	err := ns.db.MarkNotificationAsSeen(ids, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.NotificationResponse{
+		Status:  http.StatusOK,
+		Message: "Notification seen",
 	}, nil
 }
 

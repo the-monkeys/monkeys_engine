@@ -9,6 +9,7 @@ message Notification {
     string user_id = 2;
     string message = 3;
     string status = 4;
+    bool seen = 5;
 }
 
 message SendNotificationReq {
@@ -41,9 +42,21 @@ message DeleteNotificationRes {
     string error = 2;
 }
 
+message WatchNotificationReq {
+    string user_id = 1;
+    repeated Notification notification = 2;
+}
+
+message NotificationResponse {
+    int64 status = 1;
+    string message = 2;
+    string error = 3;
+}
+
 service NotificationService {
     rpc SendNotification (SendNotificationReq) returns (SendNotificationRes) {}
     rpc GetNotification (GetNotificationReq) returns (GetNotificationRes) {}
     rpc DeleteNotification (DeleteNotificationReq) returns (DeleteNotificationRes) {}
+    rpc NotificationSeen (WatchNotificationReq) returns (NotificationResponse) {}
 }
 

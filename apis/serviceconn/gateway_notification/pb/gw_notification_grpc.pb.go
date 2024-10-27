@@ -22,6 +22,7 @@ const (
 	NotificationService_SendNotification_FullMethodName   = "/notification_svc.NotificationService/SendNotification"
 	NotificationService_GetNotification_FullMethodName    = "/notification_svc.NotificationService/GetNotification"
 	NotificationService_DeleteNotification_FullMethodName = "/notification_svc.NotificationService/DeleteNotification"
+	NotificationService_NotificationSeen_FullMethodName   = "/notification_svc.NotificationService/NotificationSeen"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -31,6 +32,7 @@ type NotificationServiceClient interface {
 	SendNotification(ctx context.Context, in *SendNotificationReq, opts ...grpc.CallOption) (*SendNotificationRes, error)
 	GetNotification(ctx context.Context, in *GetNotificationReq, opts ...grpc.CallOption) (*GetNotificationRes, error)
 	DeleteNotification(ctx context.Context, in *DeleteNotificationReq, opts ...grpc.CallOption) (*DeleteNotificationRes, error)
+	NotificationSeen(ctx context.Context, in *WatchNotificationReq, opts ...grpc.CallOption) (*NotificationResponse, error)
 }
 
 type notificationServiceClient struct {
@@ -71,6 +73,16 @@ func (c *notificationServiceClient) DeleteNotification(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *notificationServiceClient) NotificationSeen(ctx context.Context, in *WatchNotificationReq, opts ...grpc.CallOption) (*NotificationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NotificationResponse)
+	err := c.cc.Invoke(ctx, NotificationService_NotificationSeen_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type NotificationServiceServer interface {
 	SendNotification(context.Context, *SendNotificationReq) (*SendNotificationRes, error)
 	GetNotification(context.Context, *GetNotificationReq) (*GetNotificationRes, error)
 	DeleteNotification(context.Context, *DeleteNotificationReq) (*DeleteNotificationRes, error)
+	NotificationSeen(context.Context, *WatchNotificationReq) (*NotificationResponse, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedNotificationServiceServer) GetNotification(context.Context, *
 }
 func (UnimplementedNotificationServiceServer) DeleteNotification(context.Context, *DeleteNotificationReq) (*DeleteNotificationRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNotification not implemented")
+}
+func (UnimplementedNotificationServiceServer) NotificationSeen(context.Context, *WatchNotificationReq) (*NotificationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotificationSeen not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -172,6 +188,24 @@ func _NotificationService_DeleteNotification_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_NotificationSeen_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WatchNotificationReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).NotificationSeen(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_NotificationSeen_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).NotificationSeen(ctx, req.(*WatchNotificationReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteNotification",
 			Handler:    _NotificationService_DeleteNotification_Handler,
+		},
+		{
+			MethodName: "NotificationSeen",
+			Handler:    _NotificationService_NotificationSeen_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

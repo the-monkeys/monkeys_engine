@@ -61,6 +61,7 @@ func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClien
 	routes.POST("/notifications", nsc.CreateNotification) // Create notifications
 	routes.GET("/notifications", nsc.GetNotifications)    // Get notifications
 	routes.GET("/ws", nsc.handleWebSocket)                // WebSocket endpoint
+	routes.PUT("/notifications", nsc.ViewNotification)    // Get notifications
 
 	return nsc
 }
@@ -207,4 +208,22 @@ func removeConn(conns []*websocket.Conn, conn *websocket.Conn) []*websocket.Conn
 		}
 	}
 	return conns
+}
+
+func (nsc *NotificationServiceClient) ViewNotification(ctx *gin.Context) {
+	var req pb.WatchNotificationReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Step 2: Mark the notification as seen in the database
+	_, err := nsc.Client.NotificationSeen(context.Background(), &req)
+	if err != nil {
+		logrus.Errorf("Error marking notification as seen: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notification as seen"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Notification seen"})
 }

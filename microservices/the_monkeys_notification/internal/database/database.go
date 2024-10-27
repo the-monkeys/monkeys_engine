@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
 	"github.com/the-monkeys/the_monkeys/config"
@@ -15,7 +15,7 @@ type NotificationDB interface {
 	// Create Notification query
 	CreateNotification(accountID string, notificationName string, message string, relatedBlogID, relatedUserAccountID string, channelName string) error
 	GetUserNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
-	MarkNotificationAsSeen(notificationID int64, userID int64) error
+	MarkNotificationAsSeen(notificationIDs []int64, username string) error
 }
 
 type notificationDB struct {
@@ -155,31 +155,40 @@ func (uh *notificationDB) CreateNotification(accountID string, notificationName 
 	return nil
 }
 
-// MarkNotificationAsSeen updates the 'seen' status of a notification for a user
-func (uh *notificationDB) MarkNotificationAsSeen(notificationID int64, userID int64) error {
+// MarkNotificationAsSeen updates the 'seen' status of multiple notifications for a user
+func (uh *notificationDB) MarkNotificationAsSeen(notificationIDs []int64, username string) error {
+	var userID int64
+	err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID)
+	if err != nil {
+		uh.log.Errorf("Error fetching user ID for username %s, error: %+v", username, err)
+		return err
+	}
+
+	// Prepare the IN clause with ANY and use pq.Array to handle the slice
 	query := `
 		UPDATE notifications
 		SET seen = TRUE
-		WHERE id = $1 AND user_id = $2 AND seen = FALSE;
+		WHERE id = ANY($1) AND user_id = $2 AND seen = FALSE;
 	`
 
-	result, err := uh.db.Exec(query, notificationID, userID)
+	// Execute the query with pq.Array to pass the slice correctly
+	result, err := uh.db.Exec(query, pq.Array(notificationIDs), userID)
 	if err != nil {
-		uh.log.Errorf("Error marking notification as seen for notification ID %d, user ID %d, error: %+v", notificationID, userID, err)
+		uh.log.Errorf("Error marking notifications as seen for user ID %d, error: %+v", userID, err)
 		return err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		uh.log.Errorf("Error checking rows affected for notification ID %d, user ID %d, error: %+v", notificationID, userID, err)
+		uh.log.Errorf("Error checking rows affected for user ID %d, error: %+v", userID, err)
 		return err
 	}
 
 	if rowsAffected == 0 {
-		uh.log.Infof("No changes made. Either notification ID %d was already seen or does not exist for user ID %d", notificationID, userID)
+		uh.log.Infof("No changes made. Either notifications were already seen or do not exist for user ID %d", userID)
 		return nil
 	}
 
-	uh.log.Infof("Successfully marked notification ID %d as seen for user ID %d", notificationID, userID)
+	uh.log.Infof("Successfully marked %d notifications as seen for user ID %d", rowsAffected, userID)
 	return nil
 }
