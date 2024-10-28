@@ -128,7 +128,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	us.log.Infof("req: %+v", req)
 
 	// Check if the user exists
-	_, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	userDetails, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
@@ -163,7 +163,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}
 
 	userLog := &models.UserLogs{
-		AccountId: dbUserInfo.AccountId,
+		AccountId: userDetails.AccountId,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -264,26 +264,39 @@ func (us *UserSvc) GetAllCategories(ctx context.Context, req *pb.GetAllCategorie
 	return res, nil
 }
 
-func (us *UserSvc) GetUserDetailsByAccId(ctx context.Context, req *pb.UserDetailsByAccIdReq) (*pb.UserDetailsByAccIdResp, error) {
-	us.log.Infof("profile info has been requested for user acc id: %s.", req.AccountId)
+func (us *UserSvc) GetUserDetails(ctx context.Context, req *pb.UserDetailReq) (*pb.UserDetailsResp, error) {
+	var (
+		userInfo *models.TheMonkeysUser
+		err      error
+	)
 
-	userInfo, err := us.dbConn.CheckIfAccIdExist(req.AccountId)
+	switch {
+	case req.AccountId != "":
+		us.log.Infof("Profile info has been requested for account id: %s.", req.AccountId)
+		userInfo, err = us.dbConn.CheckIfAccIdExist(req.AccountId)
+	case req.Username != "":
+		us.log.Infof("Profile info has been requested for username: %s.", req.Username)
+		userInfo, err = us.dbConn.CheckIfUsernameExist(req.Username)
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "either AccountId or Username must be provided")
+	}
+
 	if err != nil {
-		us.log.Errorf("error while fetching the private profile for user %s, err: %v", req.AccountId, err)
+		us.log.Errorf("Error fetching profile info: %v", err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.AccountId))
+			return nil, status.Errorf(codes.NotFound, "user not found")
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
-	return &pb.UserDetailsByAccIdResp{
+
+	return &pb.UserDetailsResp{
 		Username:  userInfo.Username,
 		FirstName: userInfo.FirstName,
 		LastName:  userInfo.LastName,
 		AccountId: userInfo.AccountId,
-		// Bio:       userInfo.Bio.String,
 	}, nil
-
 }
+
 func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*pb.TopicActionRes, error) {
 	if len(req.Topic) == 0 {
 		us.log.Errorf("user %s has entered no topic", req.Username)

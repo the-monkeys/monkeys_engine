@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_account (
     twitter VARCHAR(255),
     instagram VARCHAR(255),
     view_permission VARCHAR(50) DEFAULT 'public',
-    FOREIGN KEY (user_status) REFERENCES user_status(id)
+    FOREIGN KEY (user_status) REFERENCES user_status(id) ON DELETE CASCADE
 );
 
 -- Adding indexes to user_account table
@@ -70,8 +70,8 @@ CREATE TABLE IF NOT EXISTS user_auth_info (
     email_validation_time TIMESTAMP,
     auth_provider_id INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
-    FOREIGN KEY (email_validation_status) REFERENCES email_validation_status(id),
-    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id)
+    FOREIGN KEY (email_validation_status) REFERENCES email_validation_status(id) ON DELETE CASCADE,
+    FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE CASCADE
 );
 
 -- ================================
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS blog (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE SET NULL
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
 );
 
 -- Creating blog permissions table
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS logged_in_devices (
     login_time TIMESTAMP,
     user_id BIGINT NOT NULL,
     client_id INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES user_account(id),
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS co_author_activity_log (
     performed_by BIGINT NOT NULL, -- The user who performed the action
     action_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
-    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE SET NULL,
+    FOREIGN KEY (co_author_id) REFERENCES user_account(id) ON DELETE CASCADE,
     FOREIGN KEY (performed_by) REFERENCES user_account(id) ON DELETE CASCADE
 );
 
@@ -264,8 +264,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     channel_id INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
     FOREIGN KEY (notification_type_id) REFERENCES notification_type(id) ON DELETE CASCADE,
-    FOREIGN KEY (related_blog_id) REFERENCES blog(id) ON DELETE SET NULL,
-    FOREIGN KEY (related_user_id) REFERENCES user_account(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_user_id) REFERENCES user_account(id) ON DELETE CASCADE,
     FOREIGN KEY (channel_id) REFERENCES notification_channel(id) ON DELETE CASCADE
 );
 
@@ -389,6 +389,21 @@ JOIN permissions p ON
         WHEN r.role_desc = 'Viewer' THEN p.permission_desc IN ('Read')
     END
 ON CONFLICT DO NOTHING;
+
+-- Inserting predefined notification channels
+INSERT INTO notification_channel (channel_name) VALUES ('Browser'), ('Email'), ('WhatsApp'), ('SMS'), ('OTP')
+ON CONFLICT DO NOTHING;
+
+-- Inserting predefined notification types
+INSERT INTO notification_type (notification_name, description)
+VALUES 
+    ('Account Created', 'Notification for a newly created user account'),
+    ('Password Reset', 'Notification for a password reset request'),
+    ('Comment Reply', 'Notification for a reply to your blog comment'),
+    ('Co-Author Invitation', 'Invitation to co-author a blog'),
+    ('New Follower', 'Notification when a new user follows your blog')
+ON CONFLICT DO NOTHING;
+
 
 
 -- Insert some default topics

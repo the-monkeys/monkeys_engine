@@ -11,10 +11,11 @@ type TheMonkeysGateway struct {
 }
 
 type Microservices struct {
-	TheMonkeysAuthz     string `mapstructure:"the_monkeys_authz"`
-	TheMonkeysBlog      string `mapstructure:"the_monkeys_blog"`
-	TheMonkeysUser      string `mapstructure:"the_monkeys_user"`
-	TheMonkeysFileStore string `mapstructure:"the_monkeys_file_storage"`
+	TheMonkeysAuthz        string `mapstructure:"the_monkeys_authz"`
+	TheMonkeysBlog         string `mapstructure:"the_monkeys_blog"`
+	TheMonkeysUser         string `mapstructure:"the_monkeys_user"`
+	TheMonkeysFileStore    string `mapstructure:"the_monkeys_file_storage"`
+	TheMonkeysNotification string `mapstructure:"the_monkeys_notification"`
 }
 
 type Database struct {
@@ -64,6 +65,12 @@ type RabbitMQ struct {
 	RoutingKeys []string `yaml:"routingKeys"`
 }
 
+type Keys struct {
+	MediaStack     string `mapstructure:"mediastack"`
+	NewsApi        string `mapstructure:"newsapi"`
+	HindustanTimes string `mapstructure:"hindustantimes"`
+}
+
 type Config struct {
 	TheMonkeysGateway TheMonkeysGateway `mapstructure:"the_monkeys_gateway"`
 	Microservices     Microservices     `mapstructure:"microservices"`
@@ -73,15 +80,18 @@ type Config struct {
 	Email             Email             `mapstructure:"email"`
 	Authentication    Authentication    `mapstructure:"authentication"`
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
+	Keys              Keys              `mapstructure:"keys"`
 }
 
-// TODO: remove the print statement and add logger instead
 func GetConfig() (*Config, error) {
 	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
+	viper.SetConfigType("yaml") // Ensure this is yaml
 	viper.AddConfigPath("./config")
 
+	viper.AutomaticEnv() // Ensures environment variables are loaded
 	config := &Config{}
+
+	// Binding struct to config
 	if err := viper.ReadInConfig(); err != nil {
 		logrus.Errorf("Error reading config file, %v", err)
 		return config, err

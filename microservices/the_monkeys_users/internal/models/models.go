@@ -87,6 +87,8 @@ type UserLogs struct {
 	AccountId string `json:"account_id,omitempty"`
 	Client    string `json:"client,omitempty"`
 	IpAddress string `json:"ip_address,omitempty"`
+	OS        string `json:"os,omitempty"`
+	Country   string `json:"country,omitempty"`
 }
 
 type TheMonkeysMessage struct {

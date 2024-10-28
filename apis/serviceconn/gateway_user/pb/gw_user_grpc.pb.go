@@ -19,21 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_GetUserActivities_FullMethodName     = "/auth_svc.UserService/GetUserActivities"
-	UserService_GetUserProfile_FullMethodName        = "/auth_svc.UserService/GetUserProfile"
-	UserService_UpdateUserProfile_FullMethodName     = "/auth_svc.UserService/UpdateUserProfile"
-	UserService_DeleteUserAccount_FullMethodName     = "/auth_svc.UserService/DeleteUserAccount"
-	UserService_GetAllTopics_FullMethodName          = "/auth_svc.UserService/GetAllTopics"
-	UserService_GetAllCategories_FullMethodName      = "/auth_svc.UserService/GetAllCategories"
-	UserService_GetUserDetailsByAccId_FullMethodName = "/auth_svc.UserService/GetUserDetailsByAccId"
-	UserService_FollowTopics_FullMethodName          = "/auth_svc.UserService/FollowTopics"
-	UserService_UnFollowTopics_FullMethodName        = "/auth_svc.UserService/UnFollowTopics"
-	UserService_BookMarkBlog_FullMethodName          = "/auth_svc.UserService/BookMarkBlog"
-	UserService_RemoveBookMark_FullMethodName        = "/auth_svc.UserService/RemoveBookMark"
-	UserService_InviteCoAuthor_FullMethodName        = "/auth_svc.UserService/InviteCoAuthor"
-	UserService_RevokeCoAuthorAccess_FullMethodName  = "/auth_svc.UserService/RevokeCoAuthorAccess"
-	UserService_GetBlogsByUserIds_FullMethodName     = "/auth_svc.UserService/GetBlogsByUserIds"
-	UserService_CreateNewTopics_FullMethodName       = "/auth_svc.UserService/CreateNewTopics"
+	UserService_GetUserActivities_FullMethodName    = "/auth_svc.UserService/GetUserActivities"
+	UserService_GetUserProfile_FullMethodName       = "/auth_svc.UserService/GetUserProfile"
+	UserService_UpdateUserProfile_FullMethodName    = "/auth_svc.UserService/UpdateUserProfile"
+	UserService_DeleteUserAccount_FullMethodName    = "/auth_svc.UserService/DeleteUserAccount"
+	UserService_GetAllTopics_FullMethodName         = "/auth_svc.UserService/GetAllTopics"
+	UserService_GetAllCategories_FullMethodName     = "/auth_svc.UserService/GetAllCategories"
+	UserService_GetUserDetails_FullMethodName       = "/auth_svc.UserService/GetUserDetails"
+	UserService_FollowTopics_FullMethodName         = "/auth_svc.UserService/FollowTopics"
+	UserService_UnFollowTopics_FullMethodName       = "/auth_svc.UserService/UnFollowTopics"
+	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
+	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
+	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
+	UserService_RevokeCoAuthorAccess_FullMethodName = "/auth_svc.UserService/RevokeCoAuthorAccess"
+	UserService_GetBlogsByUserIds_FullMethodName    = "/auth_svc.UserService/GetBlogsByUserIds"
+	UserService_CreateNewTopics_FullMethodName      = "/auth_svc.UserService/CreateNewTopics"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -46,7 +46,7 @@ type UserServiceClient interface {
 	DeleteUserAccount(ctx context.Context, in *DeleteUserProfileReq, opts ...grpc.CallOption) (*DeleteUserProfileRes, error)
 	GetAllTopics(ctx context.Context, in *GetTopicsRequests, opts ...grpc.CallOption) (*GetTopicsResponse, error)
 	GetAllCategories(ctx context.Context, in *GetAllCategoriesReq, opts ...grpc.CallOption) (*GetAllCategoriesRes, error)
-	GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error)
+	GetUserDetails(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*UserDetailsResp, error)
 	FollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
 	UnFollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
 	// Bookmark blog
@@ -131,10 +131,10 @@ func (c *userServiceClient) GetAllCategories(ctx context.Context, in *GetAllCate
 	return out, nil
 }
 
-func (c *userServiceClient) GetUserDetailsByAccId(ctx context.Context, in *UserDetailsByAccIdReq, opts ...grpc.CallOption) (*UserDetailsByAccIdResp, error) {
+func (c *userServiceClient) GetUserDetails(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*UserDetailsResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UserDetailsByAccIdResp)
-	err := c.cc.Invoke(ctx, UserService_GetUserDetailsByAccId_FullMethodName, in, out, cOpts...)
+	out := new(UserDetailsResp)
+	err := c.cc.Invoke(ctx, UserService_GetUserDetails_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ type UserServiceServer interface {
 	DeleteUserAccount(context.Context, *DeleteUserProfileReq) (*DeleteUserProfileRes, error)
 	GetAllTopics(context.Context, *GetTopicsRequests) (*GetTopicsResponse, error)
 	GetAllCategories(context.Context, *GetAllCategoriesReq) (*GetAllCategoriesRes, error)
-	GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error)
+	GetUserDetails(context.Context, *UserDetailReq) (*UserDetailsResp, error)
 	FollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
 	UnFollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
 	// Bookmark blog
@@ -274,8 +274,8 @@ func (UnimplementedUserServiceServer) GetAllTopics(context.Context, *GetTopicsRe
 func (UnimplementedUserServiceServer) GetAllCategories(context.Context, *GetAllCategoriesReq) (*GetAllCategoriesRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllCategories not implemented")
 }
-func (UnimplementedUserServiceServer) GetUserDetailsByAccId(context.Context, *UserDetailsByAccIdReq) (*UserDetailsByAccIdResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserDetailsByAccId not implemented")
+func (UnimplementedUserServiceServer) GetUserDetails(context.Context, *UserDetailReq) (*UserDetailsResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserDetails not implemented")
 }
 func (UnimplementedUserServiceServer) FollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FollowTopics not implemented")
@@ -430,20 +430,20 @@ func _UserService_GetAllCategories_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _UserService_GetUserDetailsByAccId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserDetailsByAccIdReq)
+func _UserService_GetUserDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDetailReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(UserServiceServer).GetUserDetailsByAccId(ctx, in)
+		return srv.(UserServiceServer).GetUserDetails(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: UserService_GetUserDetailsByAccId_FullMethodName,
+		FullMethod: UserService_GetUserDetails_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).GetUserDetailsByAccId(ctx, req.(*UserDetailsByAccIdReq))
+		return srv.(UserServiceServer).GetUserDetails(ctx, req.(*UserDetailReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -624,8 +624,8 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_GetAllCategories_Handler,
 		},
 		{
-			MethodName: "GetUserDetailsByAccId",
-			Handler:    _UserService_GetUserDetailsByAccId_Handler,
+			MethodName: "GetUserDetails",
+			Handler:    _UserService_GetUserDetails_Handler,
 		},
 		{
 			MethodName: "FollowTopics",

@@ -50,9 +50,6 @@ type BlogServiceClient interface {
 	GetPublishedBlogsByAccID(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(ctx context.Context, in *GetBlogsByTagsNameReq, opts ...grpc.CallOption) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error)
-	// Get a list of blogs
-	// Last 100 Blogs
-	// Last 100 blogs by tags
 	GetAllBlogsByBlogIds(ctx context.Context, in *GetBlogsByBlogIds, opts ...grpc.CallOption) (*GetBlogsRes, error)
 	CheckIfBlogsExist(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(ctx context.Context, in *DeleteBlogReq, opts ...grpc.CallOption) (*DeleteBlogResp, error)
@@ -233,9 +230,6 @@ type BlogServiceServer interface {
 	GetPublishedBlogsByAccID(context.Context, *BlogByIdReq) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(context.Context, *GetBlogsByTagsNameReq) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(context.Context, *BlogByIdReq) (*BlogByIdRes, error)
-	// Get a list of blogs
-	// Last 100 Blogs
-	// Last 100 blogs by tags
 	GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error)
 	CheckIfBlogsExist(context.Context, *BlogByIdReq) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error)

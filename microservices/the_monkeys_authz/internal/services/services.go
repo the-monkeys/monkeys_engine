@@ -69,8 +69,8 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	encHash := utils.HashPassword(hash)
 
 	// Create a userId and username
-	user.AccountId = utils.RandomString(16)
-	user.Username = utils.RandomString(12)
+	user.AccountId = utils.GenerateGUID()
+	user.Username = utils.GenerateGUID()
 	user.FirstName = req.FirstName
 	user.LastName = req.GetLastName()
 	user.Email = req.GetEmail()
@@ -116,9 +116,10 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	}
 
 	bx, err := json.Marshal(models.TheMonkeysMessage{
-		Username:  user.Username,
-		AccountId: user.AccountId,
-		Action:    constants.USER_PROFILE_DIRECTORY_CREATE,
+		Username:     user.Username,
+		AccountId:    user.AccountId,
+		Action:       constants.USER_REGISTER,
+		Notification: constants.NotificationRegister,
 	})
 	if err != nil {
 		as.logger.Errorf("failed to marshal message, error: %v", err)
@@ -128,6 +129,11 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 		if err != nil {
 			as.logger.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		}
+
+		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], bx)
+		if err != nil {
+			as.logger.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
 		}
 	}()
 
@@ -495,7 +501,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		Username:    user.Username,
 		NewUsername: req.NewUsername,
 		AccountId:   user.AccountId,
-		Action:      constants.USER_PROFILE_DIRECTORY_UPDATE,
+		Action:      constants.USERNAME_UPDATE,
 	})
 	if err != nil {
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
@@ -633,6 +639,8 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
+
+	// TODO: Add token to the db with status valid
 
 	return &pb.UpdateEmailIdRes{
 		StatusCode:    http.StatusOK,

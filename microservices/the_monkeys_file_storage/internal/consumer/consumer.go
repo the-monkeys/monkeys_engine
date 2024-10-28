@@ -69,12 +69,12 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger) {
 
 func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger) {
 	switch user.Action {
-	case constants.USER_PROFILE_DIRECTORY_CREATE:
+	case constants.USER_REGISTER:
 		log.Infof("Creating user folder: %s", user.Username)
 		if err := CreateUserFolder(user.Username); err != nil {
 			log.Errorf("Failed to create user folder: %v", err)
 		}
-	case constants.USER_PROFILE_DIRECTORY_UPDATE:
+	case constants.USERNAME_UPDATE:
 		log.Infof("Updating user folder: %s", user.Username)
 		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
 			log.Errorf("Failed to update user folder: %v", err)

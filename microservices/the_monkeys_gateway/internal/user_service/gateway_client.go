@@ -14,3 +14,11 @@ func (asc *UserServiceClient) GetBlogsIds(accountId string, blogType string) (*p
 
 	return res, err
 }
+
+func (asc *UserServiceClient) GetUserDetails(username string) (*pb.UserDetailsResp, error) {
+	res, err := asc.Client.GetUserDetails(context.Background(), &pb.UserDetailReq{
+		Username: username,
+	})
+
+	return res, err
+}
