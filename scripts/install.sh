@@ -149,7 +149,7 @@ THE_MONKEYS_SERVICES=(
     "the_monkeys_authz"
     "the_monkeys_blog"
     "the_monkeys_users"
-    "the_monkeys_file_storage"
+    "the_monkeys_storage"
 )
 
 # create a new user and group for the monkeys

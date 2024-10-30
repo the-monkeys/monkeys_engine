@@ -11,8 +11,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/utils"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

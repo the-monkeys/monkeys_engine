@@ -9,9 +9,9 @@ import (
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/consumer"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/server"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/consumer"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/server"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
