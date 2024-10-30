@@ -16,8 +16,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/constant"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_file_storage/internal/models"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/models"
 )
 
 func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger) {

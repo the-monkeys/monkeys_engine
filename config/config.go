@@ -14,7 +14,7 @@ type Microservices struct {
 	TheMonkeysAuthz        string `mapstructure:"the_monkeys_authz"`
 	TheMonkeysBlog         string `mapstructure:"the_monkeys_blog"`
 	TheMonkeysUser         string `mapstructure:"the_monkeys_user"`
-	TheMonkeysFileStore    string `mapstructure:"the_monkeys_file_storage"`
+	TheMonkeysFileStore    string `mapstructure:"the_monkeys_storage"`
 	TheMonkeysNotification string `mapstructure:"the_monkeys_notification"`
 }
 
