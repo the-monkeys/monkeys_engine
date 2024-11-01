@@ -59,6 +59,8 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 			BlogId:        req.BlogId,
 			Action:        constants.BLOG_CREATE,
 			BlogStatus:    constants.BlogStatusDraft,
+			IpAddress:     req.Ip,
+			Client:        req.Client,
 		})
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
@@ -67,6 +69,7 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		if len(req.Tags) == 0 {
 			req.Tags = []string{"untagged"}
 		}
+		fmt.Printf("bx: %v\n", string(bx))
 		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 	}
 
@@ -185,7 +188,11 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		BlogId:        req.BlogId,
 		Action:        constants.BLOG_PUBLISH,
 		BlogStatus:    constants.BlogStatusPublished,
+		IpAddress:     req.Ip,
+		Client:        req.Client,
 	})
+
+	fmt.Printf("bx: %+v\n", string(bx))
 
 	if err != nil {
 		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)

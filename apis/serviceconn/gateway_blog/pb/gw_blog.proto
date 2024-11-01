@@ -13,6 +13,9 @@ message DraftBlogRequest {
     repeated string tags = 6;
     string content_type = 7;
     repeated string author_list = 8;
+    string ip = 9;
+    string client = 10;
+    string action = 11;
 }
 
 message BlogResponse {
@@ -90,6 +93,8 @@ message Tunes {
 message PublishBlogReq {
     string blog_id = 1;
     string account_id = 2;
+    string ip = 3;
+    string client = 4;
 }
 
 message PublishBlogResp {

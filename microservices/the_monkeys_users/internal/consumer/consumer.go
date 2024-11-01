@@ -72,10 +72,12 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			IpAddress: user.IpAddress,
 			Client:    user.Client,
 		}
+		fmt.Printf("userLog: %+v\n", userLog)
 		userLog.IpAddress, userLog.Client = utils.IpClientConvert(userLog.IpAddress, userLog.Client)
 
 		switch user.Action {
 		case constants.BLOG_CREATE:
+			log.Infof("Creating blog: %v", user)
 			if err := userCon.dbConn.AddBlogWithId(user); err != nil {
 				userCon.log.Errorf("Error creating blog: %v", err)
 			}
@@ -95,7 +97,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			}
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
-		case constants.BLOG_EDIT:
+		case constants.BLOG_UPDATE:
 			// TODO: Add blog id and user id
 		default:
 			logrus.Errorf("Unknown action: %s", user.Action)
