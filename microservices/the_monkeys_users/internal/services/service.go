@@ -325,6 +325,8 @@ func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*p
 
 	userLog := &models.UserLogs{
 		AccountId: dbUserInfo.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -365,6 +367,8 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 
 	userLog := &models.UserLogs{
 		AccountId: dbUserInfo.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -397,6 +401,8 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 	usa, _ := us.dbConn.CheckIfUsernameExist(req.BlogOwnerUsername)
 	userLog := &models.UserLogs{
 		AccountId: usa.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -429,6 +435,8 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 
 	userLog := &models.UserLogs{
 		AccountId: usa.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
@@ -495,6 +503,8 @@ func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq)
 
 	userLog := &models.UserLogs{
 		AccountId: usa.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.CreatedTopics, req.Topics), constants.ServiceUser, constants.EventCreateTopics, us.log)
@@ -523,6 +533,8 @@ func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 
 	userLog := &models.UserLogs{
 		AccountId: user.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.BookMarkedBlog, req.BlogId), constants.ServiceUser, constants.EventBookMarkBlog, us.log)
@@ -551,6 +563,8 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 
 	userLog := &models.UserLogs{
 		AccountId: user.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RemoveBookMark, req.BlogId), constants.ServiceUser, constants.EventRemoveBookMark, us.log)

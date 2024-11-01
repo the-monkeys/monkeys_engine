@@ -95,6 +95,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 	id := ctx.Param("blog_id")
 
+	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
+
 	// Check if blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
 		BlogId: id,
@@ -115,20 +119,26 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		}
 	}
 
+	var action string
+	var initialLogDone bool // Flag to avoid repeated logging
+
 	if resp.BlogExists {
 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
 			return
 		}
+		action = constants.BLOG_UPDATE
+	} else {
+		action = constants.BLOG_CREATE
 	}
 
-	// Upgrade the connection to WebSocket
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		logrus.Errorf("error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	defer conn.Close() // Ensure WebSocket is closed when done
 
 	if asc.Client == nil {
 		logrus.Errorf("BlogServiceClient is not initialized")
@@ -146,7 +156,6 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 
 		// Unmarshal the received message into the Blog struct
 		var draftBlog pb.DraftBlogRequest
-
 		err = json.Unmarshal(msg, &draftBlog)
 		if err != nil {
 			logrus.Errorf("Error un-marshalling message: %v", err)
@@ -154,6 +163,14 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		}
 
 		draftBlog.BlogId = id
+		draftBlog.Ip = ipAddress
+		draftBlog.Client = client
+
+		// Only set the action and log the initial creation or update once
+		if !initialLogDone {
+			draftBlog.Action = action
+			initialLogDone = true // Prevent further logging
+		}
 
 		resp, err := asc.Client.DraftBlog(context.Background(), &draftBlog)
 		if err != nil {
@@ -457,6 +474,9 @@ func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
+
 	// Check permissions:
 	if !utils.CheckUserAccessInContext(ctx, "Publish") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
@@ -468,6 +488,8 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
 		BlogId:    id,
 		AccountId: accId,
+		Ip:        ipAddress,
+		Client:    client,
 	})
 
 	if err != nil {

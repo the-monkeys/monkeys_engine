@@ -5,7 +5,7 @@ const (
 	USERNAME_UPDATE     = "username_update"
 	USER_ACCOUNT_DELETE = "user_profile_directory_delete"
 	BLOG_CREATE         = "blog_create"
-	BLOG_EDIT           = "blog_edit"
+	BLOG_UPDATE         = "blog_update"
 	BLOG_PUBLISH        = "published"
 	BLOG_DELETE         = "delete"
 
