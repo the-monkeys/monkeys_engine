@@ -71,6 +71,14 @@ type Keys struct {
 	HindustanTimes string `mapstructure:"hindustantimes"`
 }
 
+type GoogleOAuth2 struct {
+	RedirectURL  string   `mapstructure:"redirect_url"`
+	ClientID     string   `mapstructure:"client_id"`
+	ClientSecret string   `mapstructure:"client_secret"`
+	Scope        []string `mapstructure:"scope"`
+	Endpoint     string   `mapstructure:"endpoint"`
+}
+
 type Config struct {
 	TheMonkeysGateway TheMonkeysGateway `mapstructure:"the_monkeys_gateway"`
 	Microservices     Microservices     `mapstructure:"microservices"`
@@ -81,6 +89,7 @@ type Config struct {
 	Authentication    Authentication    `mapstructure:"authentication"`
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 	Keys              Keys              `mapstructure:"keys"`
+	GoogleOAuth2      GoogleOAuth2      `mapstructure:"google_oauth2"`
 }
 
 func GetConfig() (*Config, error) {
