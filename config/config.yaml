@@ -39,8 +39,14 @@ authentication:
   # provide the domain name or UI: https://themonkeys.live
   email_verification_addr: http://127.0.0.1:8081
 
-google:
-  API_KEY: ""
+google_oauth2:
+  redirect_url: "<domain>/auth/google/callback" # exmaple: https://themonkeys.live/auth/google/callback
+  client_id: "<client_id>" # example: 1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com
+  client_secret: "<client_secret>" # example: abcdefghijklmnopqrstuvwxyz
+  scope:
+    - "<scope 1>" # example: https://www.googleapis.com/auth/userinfo.email
+    - "<scope 2>" # example: https://www.googleapis.com/auth/userinfo.profile
+  endpoint: ""  # example: google.Endpoint
 
 rabbitMQ:
   protocol: "amqp"

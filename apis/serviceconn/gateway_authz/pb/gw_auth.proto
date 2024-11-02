@@ -237,4 +237,5 @@ service AuthService {
   rpc UpdateUsername(UpdateUsernameReq) returns (UpdateUsernameRes) {}
   rpc UpdatePasswordWithPassword(UpdatePasswordWithPasswordReq) returns (UpdatePasswordWithPasswordRes) {}
   rpc UpdateEmailId(UpdateEmailIdReq) returns (UpdateEmailIdRes) {}
+  rpc GoogleLogin(RegisterUserRequest) returns (RegisterUserResponse) {}
 }

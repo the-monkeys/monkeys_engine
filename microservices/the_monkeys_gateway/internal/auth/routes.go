@@ -2,11 +2,15 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	"github.com/the-monkeys/the_monkeys/config"
 
@@ -18,8 +22,9 @@ import (
 )
 
 type ServiceClient struct {
-	Client pb.AuthServiceClient
-	Log    logrus.Logger
+	Client            pb.AuthServiceClient
+	Log               logrus.Logger
+	googleOauthConfig *oauth2.Config
 }
 
 // InitServiceClient initializes the gRPC connection to the auth service.
@@ -39,8 +44,21 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	asc := &ServiceClient{
 		Client: InitServiceClient(cfg),
 		Log:    *logrus.New(),
+		googleOauthConfig: &oauth2.Config{
+			RedirectURL:  cfg.GoogleOAuth2.RedirectURL,
+			ClientID:     cfg.GoogleOAuth2.ClientID,     // Replace with your Google Client ID
+			ClientSecret: cfg.GoogleOAuth2.ClientSecret, // Replace with your Google Client Secret
+			Scopes:       cfg.GoogleOAuth2.Scope,
+			Endpoint:     google.Endpoint,
+		},
 	}
+	fmt.Printf("asc.googleOauthConfig: %+v\n", asc.googleOauthConfig)
+
 	routes := router.Group("/api/v1/auth")
+
+	// SSO Google Login
+	router.GET("/auth/google/login", asc.HandleGoogleLogin)
+	router.GET("/auth/google/callback", asc.HandleGoogleCallback)
 
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
@@ -76,8 +94,6 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-
-	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
 
 	body.FirstName = strings.TrimSpace(body.FirstName)
 	body.LastName = strings.TrimSpace(body.LastName)
@@ -538,4 +554,51 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *ServiceClient) HandleGoogleLogin(c *gin.Context) {
+	// Redirect to Google's OAuth 2.0 server
+	url := asc.googleOauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("url: %v\n", url)
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
+	// Exchange the code for a token
+	code := c.Query("code")
+	token, err := asc.googleOauthConfig.Exchange(context.Background(), code)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Code exchange failed"})
+		return
+	}
+
+	// Retrieve user information
+	client := asc.googleOauthConfig.Client(context.Background(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user info"})
+		return
+	}
+	defer resp.Body.Close()
+
+	// Process user info (you could store it in a database or create a session)
+	var userInfo GoogleUser
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info"})
+		return
+	}
+
+	loginResp, err := asc.Client.GoogleLogin(context.Background(), &pb.RegisterUserRequest{
+		Email:       userInfo.Email,
+		LoginMethod: pb.RegisterUserRequest_GOOGLE_ACC,
+		FirstName:   userInfo.GivenName,
+		LastName:    userInfo.FamilyName,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login using google"})
+		return
+	}
+
+	// Example response for client
+	c.JSON(http.StatusOK, loginResp)
 }

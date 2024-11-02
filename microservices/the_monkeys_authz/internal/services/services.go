@@ -47,7 +47,7 @@ func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Co
 }
 
 func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
-	as.logger.Infof("got the request data for : %+v", req.Email)
+	as.logger.Debugf("got the request data for : %+v", req.Email)
 	user := &models.TheMonkeysUser{}
 
 	if err := utils.ValidateRegisterUserRequest(req); err != nil {
@@ -59,7 +59,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	_, err := as.dbConn.CheckIfEmailExist(req.Email)
 	if err == nil {
 		if err == sql.ErrNoRows {
-			as.logger.Infof("creating a new user with email: %v", req.Email)
+			as.logger.Debugf("creating a new user with email: %v", req.Email)
 		} else {
 			return nil, status.Errorf(codes.AlreadyExists, "The user with email %s already exists", req.Email)
 		}
@@ -652,5 +652,124 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 		FirstName:     user.FirstName,
 		LastName:      user.LastName,
 		AccountId:     user.AccountId,
+	}, nil
+}
+
+func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
+	as.logger.Debugf("google login: req from : %+v", req.Email)
+	user := &models.TheMonkeysUser{}
+
+	// Check if the user exists with the same email id return conflict
+	existingUser, err := as.dbConn.CheckIfEmailExist(req.Email)
+	if err == nil {
+		if err == sql.ErrNoRows {
+			as.logger.Debugf("google login: creating a new user with email: %v", req.Email)
+		} else {
+			as.logger.Debugf("google login: user with email %s already exists", req.Email)
+			// Generate and return token
+			token, err := as.jwt.GenerateToken(existingUser)
+			if err != nil {
+				as.logger.Errorf("google login: failed to generate token for user %s: %v", user.Email, err)
+				return nil, status.Errorf(codes.Aborted, "user cannot login using google at this time")
+			}
+
+			return &pb.RegisterUserResponse{
+				StatusCode:              http.StatusOK,
+				Token:                   token,
+				EmailVerified:           false,
+				Username:                existingUser.Username,
+				Email:                   existingUser.Email,
+				FirstName:               existingUser.FirstName,
+				LastName:                existingUser.LastName,
+				AccountId:               existingUser.AccountId,
+				EmailVerificationStatus: existingUser.EmailVerificationStatus,
+			}, nil
+		}
+	}
+
+	// Since it's a google login, password will be empty hence add a random password
+	req.Password = utils.RandomString(16)
+
+	hash := string(utils.GenHash())
+	encHash := utils.HashPassword(hash)
+
+	// Create a userId and username
+	user.AccountId = utils.GenerateGUID()
+	user.Username = utils.GenerateGUID()
+	user.FirstName = req.FirstName
+	user.LastName = req.GetLastName()
+	user.Email = req.GetEmail()
+	user.Password = utils.HashPassword(req.Password)
+	user.UserStatus = "active"
+	user.EmailVerificationToken = encHash
+	user.EmailVerificationTimeout = sql.NullTime{
+		Time:  time.Now().Add(time.Hour * 1),
+		Valid: true,
+	}
+	user.LoginMethod = constants.AuthGoogleOauth2
+
+	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
+
+	as.logger.Debugf("registering the user with email %v", req.Email)
+	userId, err := as.dbConn.RegisterUser(user)
+	if err != nil {
+		as.logger.Errorf("cannot register the user %s, error: %v", user.Email, err)
+		return nil, status.Errorf(codes.Internal, "cannot register the user, something went wrong")
+	}
+
+	// Send email verification mail as a routine else the register api gets slower
+	emailBody := utils.EmailVerificationHTML(user.FirstName, user.LastName, user.Username, hash)
+	go func() {
+		err := as.SendMail(user.Email, emailBody)
+		if err != nil {
+			as.logger.Errorf("Failed to send mail post registration: %v", err)
+		}
+		as.logger.Debugf("Email Sent!")
+	}()
+
+	go cache.AddUserLog(as.dbConn, user, constants.Register, constants.ServiceAuth, constants.EventRegister, as.logger)
+
+	as.logger.Debugf("user %s is successfully registered.", user.Email)
+
+	// Generate and return token
+	token, err := as.jwt.GenerateToken(user)
+	if err != nil {
+		as.logger.Errorf("failed to generate token for user %s: %v", user.Email, err)
+		return nil, status.Errorf(codes.Aborted, "The user with email %s is successfully registered, try to log in", user.Email)
+	}
+
+	bx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:     user.Username,
+		AccountId:    user.AccountId,
+		Action:       constants.USER_REGISTER,
+		Notification: constants.NotificationRegister,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal message, error: %v", err)
+	}
+
+	go func() {
+		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
+		if err != nil {
+			as.logger.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		}
+
+		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], bx)
+		if err != nil {
+			as.logger.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
+		}
+	}()
+
+	return &pb.RegisterUserResponse{
+		StatusCode:              http.StatusCreated,
+		Token:                   token,
+		EmailVerified:           false,
+		Username:                user.Username,
+		Email:                   user.Email,
+		UserId:                  userId,
+		FirstName:               user.FirstName,
+		LastName:                user.LastName,
+		AccountId:               user.AccountId,
+		EmailVerificationStatus: user.EmailVerificationStatus,
 	}, nil
 }
