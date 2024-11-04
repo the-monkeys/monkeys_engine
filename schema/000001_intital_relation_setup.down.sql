@@ -40,8 +40,11 @@ DROP TABLE IF EXISTS topics;
 DROP TABLE IF EXISTS logged_in_devices;
 DROP TABLE IF EXISTS user_account_log;
 DROP TABLE IF EXISTS clients;
+DROP TABLE IF EXISTS operating_system;
 
 -- Drop blog-related tables
+DROP TABLE IF EXISTS blog_comments;
+DROP TABLE IF EXISTS blog_likes;
 DROP TABLE IF EXISTS co_author_permissions;
 DROP TABLE IF EXISTS co_author_invites;
 DROP TABLE IF EXISTS blog_permissions;
@@ -52,11 +55,15 @@ DROP TABLE IF EXISTS permissions_granted;
 DROP TABLE IF EXISTS permissions;
 
 -- Drop user-related tables
+DROP TABLE IF EXISTS token_management;
 DROP TABLE IF EXISTS user_auth_info;
 DROP TABLE IF EXISTS auth_provider;
 DROP TABLE IF EXISTS email_validation_status;
+DROP TABLE IF EXISTS user_follows;
 DROP TABLE IF EXISTS user_account;
 DROP INDEX IF EXISTS idx_user_account_email;
+DROP INDEX IF EXISTS idx_user_account_account_id;
 DROP INDEX IF EXISTS idx_user_account_username;
+DROP INDEX IF EXISTS idx_user_account_created_at;
 DROP TABLE IF EXISTS user_role;
 DROP TABLE IF EXISTS user_status;
