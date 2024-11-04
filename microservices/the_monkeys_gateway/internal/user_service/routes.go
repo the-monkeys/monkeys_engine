@@ -269,6 +269,8 @@ func (asc *UserServiceClient) GetUserDetailsByAccId(ctx *gin.Context) {
 
 func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
 	username := ctx.Param("user_name")
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
 
 	if username != ctx.GetString("userName") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allow to perform this action"})
@@ -285,6 +287,8 @@ func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
 	res, err := asc.Client.FollowTopics(context.Background(), &pb.TopicActionReq{
 		Username: username,
 		Topic:    req.Topics,
+		Ip:       ipAddress,
+		Client:   client,
 	})
 
 	if err != nil {
@@ -308,6 +312,8 @@ func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
 
 func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 	username := ctx.Param("user_name")
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
 
 	if username != ctx.GetString("userName") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allow to perform this action"})
@@ -324,6 +330,8 @@ func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 	res, err := asc.Client.UnFollowTopics(context.Background(), &pb.TopicActionReq{
 		Username: username,
 		Topic:    req.Topics,
+		Ip:       ipAddress,
+		Client:   client,
 	})
 
 	if err != nil {
@@ -348,6 +356,10 @@ func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
 	userName := ctx.GetString("userName")
+
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
+
 	// Check permissions:
 	if !utils.CheckUserRoleInContext(ctx, constants.RoleOwner) {
 		logrus.Errorf("user does not have the permission to invite a co-author")
@@ -367,8 +379,8 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 		AccountId:         req.AccountId,
 		Username:          req.Username,
 		Email:             req.Email,
-		Ip:                req.Ip,
-		Client:            req.Client,
+		Ip:                ipAddress,
+		Client:            client,
 		BlogOwnerUsername: userName,
 		BlogId:            blogId,
 	})
@@ -395,6 +407,10 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
 	userName := ctx.GetString("userName")
+
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
+
 	// Check permissions:
 	if !utils.CheckUserRoleInContext(ctx, constants.RoleOwner) {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
@@ -412,8 +428,8 @@ func (asc *UserServiceClient) RevokeInviteCoAuthor(ctx *gin.Context) {
 		AccountId:         req.AccountId,
 		Username:          req.Username,
 		Email:             req.Email,
-		Ip:                req.Ip,
-		Client:            req.Client,
+		Ip:                ipAddress,
+		Client:            client,
 		BlogOwnerUsername: userName,
 		BlogId:            blogId,
 	})
@@ -508,6 +524,8 @@ func (asc *UserServiceClient) BookMarkABlog(ctx *gin.Context) {
 	res, err := asc.Client.BookMarkBlog(context.Background(), &pb.BookMarkReq{
 		Username: userName,
 		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
 	})
 
 	if err != nil {
@@ -536,6 +554,8 @@ func (asc *UserServiceClient) RemoveBookMarkFromABlog(ctx *gin.Context) {
 	res, err := asc.Client.RemoveBookMark(context.Background(), &pb.BookMarkReq{
 		Username: userName,
 		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
 	})
 
 	if err != nil {

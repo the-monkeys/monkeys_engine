@@ -85,7 +85,7 @@ func GenerateGUID() string {
 		panic(err)
 	}
 
-	return shuffleString(fmt.Sprintf("%x%x", timestamp, randomBytes))
+	return fmt.Sprintf("%x%x", randomBytes, timestamp)
 }
 
 // Function to shuffle a string

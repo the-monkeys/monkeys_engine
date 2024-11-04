@@ -167,8 +167,8 @@ services:
     command: go run microservices/the_monkeys_authz/main.go
     restart: always
 
-  the_monkeys_file_server:
-    container_name: "the-monkeys-file-server"
+  the_monkeys_storage:
+    container_name: "the_monkeys_storage"
     image: golang:latest
     networks:
       - monkeys-network
@@ -183,7 +183,7 @@ services:
     ports:
       - "50054:50054"
     working_dir: /go/src/app
-    command: go run microservices/the_monkeys_file_storage/main.go
+    command: go run microservices/the_monkeys_storage/main.go
     restart: always
 
   the_monkeys_user:
