@@ -847,3 +847,87 @@ func (uh *uDBHandler) UnFollowAUser(followingUsername, followersUsername string)
 	logrus.Infof("Successfully unfollowed user: %s by user: %s", followingUsername, followersUsername)
 	return nil
 }
+
+func (uh *uDBHandler) UsersFollowedBy(username string) ([]models.TheMonkeysUser, error) {
+	var users []models.TheMonkeysUser
+
+	// Step 1: Fetch the user ID using the username
+	var userID int64
+	if err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Fetch the list of users followed by the given user
+	rows, err := uh.db.Query(`
+		SELECT ua.username, ua.first_name, ua.last_name
+		FROM user_follows uf
+		JOIN user_account ua ON uf.following_id = ua.id
+		WHERE uf.follower_id = $1
+	`, userID)
+	if err != nil {
+		logrus.Errorf("Failed to fetch users followed by user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Iterate through the result set and populate the list of users
+	for rows.Next() {
+		var user models.TheMonkeysUser
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+			logrus.Errorf("Failed to scan user followed by user ID %d, error: %+v", userID, err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		logrus.Errorf("Error occurred while iterating users followed by user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+
+	logrus.Infof("Successfully fetched users followed by user: %s", username)
+	return users, nil
+}
+
+func (uh *uDBHandler) UserFollowsUsers(username string) ([]models.TheMonkeysUser, error) {
+	var users []models.TheMonkeysUser
+
+	// Step 1: Fetch the user ID using the username
+	var userID int64
+	if err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Fetch the list of users who follow the given user
+	rows, err := uh.db.Query(`
+		SELECT ua.username, ua.first_name, ua.last_name
+		FROM user_follows uf
+		JOIN user_account ua ON uf.follower_id = ua.id
+		WHERE uf.following_id = $1
+	`, userID)
+	if err != nil {
+		logrus.Errorf("Failed to fetch users who follow user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Iterate through the result set and populate the list of users
+	for rows.Next() {
+		var user models.TheMonkeysUser
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+			logrus.Errorf("Failed to scan user who follows user ID %d, error: %+v", userID, err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		logrus.Errorf("Error occurred while iterating users who follow user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+
+	logrus.Infof("Successfully fetched users who follow user: %s", username)
+	return users, nil
+}
