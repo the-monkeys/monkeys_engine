@@ -56,8 +56,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.GET("/activities/:user_name", usc.GetUserActivities)
 		routes.PUT("/follow-topics/:user_name", usc.FollowTopic)
 		routes.PUT("/un-follow-topics/:user_name", usc.UnFollowTopic)
-		routes.POST("/follow/:username", mware.AuthzRequired, usc.FollowUser)
-		routes.POST("/unfollow/:username", mware.AuthzRequired, usc.UnfollowUser)
+		routes.POST("/follow/:username", usc.FollowUser)
+		routes.POST("/unfollow/:username", usc.UnfollowUser)
 	}
 
 	// Invite and un invite as coauthor
@@ -609,7 +609,7 @@ func (asc *UserServiceClient) UnfollowUser(ctx *gin.Context) {
 	username := ctx.Param("username")
 	followerUsername := ctx.GetString("userName")
 
-	resp, err := asc.Client.FollowUser(context.Background(), &pb.UserFollowReq{
+	resp, err := asc.Client.UnFollowUser(context.Background(), &pb.UserFollowReq{
 		Username:         username,
 		FollowerUsername: followerUsername,
 		Ip:               ctx.Request.Header.Get("IP"),
