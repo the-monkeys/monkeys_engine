@@ -28,6 +28,8 @@ const (
 	UserService_GetUserDetails_FullMethodName       = "/auth_svc.UserService/GetUserDetails"
 	UserService_FollowTopics_FullMethodName         = "/auth_svc.UserService/FollowTopics"
 	UserService_UnFollowTopics_FullMethodName       = "/auth_svc.UserService/UnFollowTopics"
+	UserService_FollowUser_FullMethodName           = "/auth_svc.UserService/FollowUser"
+	UserService_UnFollowUser_FullMethodName         = "/auth_svc.UserService/UnFollowUser"
 	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
 	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
 	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
@@ -49,6 +51,8 @@ type UserServiceClient interface {
 	GetUserDetails(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*UserDetailsResp, error)
 	FollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
 	UnFollowTopics(ctx context.Context, in *TopicActionReq, opts ...grpc.CallOption) (*TopicActionRes, error)
+	FollowUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
+	UnFollowUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
 	// Bookmark blog
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Remove Bookmark
@@ -161,6 +165,26 @@ func (c *userServiceClient) UnFollowTopics(ctx context.Context, in *TopicActionR
 	return out, nil
 }
 
+func (c *userServiceClient) FollowUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserFollowRes)
+	err := c.cc.Invoke(ctx, UserService_FollowUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UnFollowUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserFollowRes)
+	err := c.cc.Invoke(ctx, UserService_UnFollowUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
@@ -234,6 +258,8 @@ type UserServiceServer interface {
 	GetUserDetails(context.Context, *UserDetailReq) (*UserDetailsResp, error)
 	FollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
 	UnFollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error)
+	FollowUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
+	UnFollowUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
 	// Bookmark blog
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Remove Bookmark
@@ -282,6 +308,12 @@ func (UnimplementedUserServiceServer) FollowTopics(context.Context, *TopicAction
 }
 func (UnimplementedUserServiceServer) UnFollowTopics(context.Context, *TopicActionReq) (*TopicActionRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnFollowTopics not implemented")
+}
+func (UnimplementedUserServiceServer) FollowUser(context.Context, *UserFollowReq) (*UserFollowRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FollowUser not implemented")
+}
+func (UnimplementedUserServiceServer) UnFollowUser(context.Context, *UserFollowReq) (*UserFollowRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnFollowUser not implemented")
 }
 func (UnimplementedUserServiceServer) BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BookMarkBlog not implemented")
@@ -484,6 +516,42 @@ func _UserService_UnFollowTopics_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_FollowUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserFollowReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).FollowUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_FollowUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).FollowUser(ctx, req.(*UserFollowReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UnFollowUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserFollowReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UnFollowUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UnFollowUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UnFollowUser(ctx, req.(*UserFollowReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_BookMarkBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BookMarkReq)
 	if err := dec(in); err != nil {
@@ -634,6 +702,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UnFollowTopics",
 			Handler:    _UserService_UnFollowTopics_Handler,
+		},
+		{
+			MethodName: "FollowUser",
+			Handler:    _UserService_FollowUser_Handler,
+		},
+		{
+			MethodName: "UnFollowUser",
+			Handler:    _UserService_UnFollowUser_Handler,
 		},
 		{
 			MethodName: "BookMarkBlog",
