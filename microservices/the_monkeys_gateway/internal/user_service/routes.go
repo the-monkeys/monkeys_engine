@@ -56,6 +56,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.GET("/activities/:user_name", usc.GetUserActivities)
 		routes.PUT("/follow-topics/:user_name", usc.FollowTopic)
 		routes.PUT("/un-follow-topics/:user_name", usc.UnFollowTopic)
+		routes.POST("/follow/:username", mware.AuthzRequired, usc.FollowUser)
+		routes.POST("/unfollow/:username", mware.AuthzRequired, usc.UnfollowUser)
 	}
 
 	// Invite and un invite as coauthor
@@ -575,4 +577,56 @@ func (asc *UserServiceClient) RemoveBookMarkFromABlog(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) FollowUser(ctx *gin.Context) {
+	username := ctx.Param("username")
+	followerUsername := ctx.GetString("userName")
+
+	resp, err := asc.Client.FollowUser(context.Background(), &pb.UserFollowReq{
+		Username:         username,
+		FollowerUsername: followerUsername,
+		Ip:               ctx.Request.Header.Get("IP"),
+		Client:           ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *UserServiceClient) UnfollowUser(ctx *gin.Context) {
+	username := ctx.Param("username")
+	followerUsername := ctx.GetString("userName")
+
+	resp, err := asc.Client.FollowUser(context.Background(), &pb.UserFollowReq{
+		Username:         username,
+		FollowerUsername: followerUsername,
+		Ip:               ctx.Request.Header.Get("IP"),
+		Client:           ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, resp)
 }
