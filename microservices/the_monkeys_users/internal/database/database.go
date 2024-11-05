@@ -26,6 +26,7 @@ type UserDb interface {
 	AddPermissionToAUser(blogId string, userId int64, inviterID string, permissionType string) error
 	CreateNewTopics(topics []string, category, username string) error
 	BookMarkABlog(blogId string, userId int64) error
+	FollowAUser(followingUsername, followersUsername string) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -53,6 +54,7 @@ type UserDb interface {
 	RevokeBlogPermissionFromAUser(blogId string, userId int64, permissionType string) error
 	RemoveBookmarkFromBlog(blogId string, userId int64) error
 	DeleteBlogAndReferences(blogId string) error
+	UnFollowAUser(followingUsername, followersUsername string) error
 }
 
 type uDBHandler struct {
@@ -259,16 +261,25 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
-	// Step 2: Delete all blogs the user owns and related data (permissions, invites)
-	_, err = tx.Exec(`DELETE FROM blog_permissions WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	// Step 2: Delete user-related data in the correct order to avoid constraint violations
+	// Delete blog likes by the user
+	_, err = tx.Exec(`DELETE FROM blog_likes WHERE user_id = $1`, id)
 	if err != nil {
-		logrus.Errorf("Failed to delete blog permissions for user ID %d, error: %+v", id, err)
+		logrus.Errorf("Failed to delete blog likes for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	// Delete blog comments by the user
+	_, err = tx.Exec(`DELETE FROM blog_comments WHERE user_id = $1`, id)
 	if err != nil {
-		logrus.Errorf("Failed to delete co-author invites for user ID %d, error: %+v", id, err)
+		logrus.Errorf("Failed to delete blog comments for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Delete blog permissions and co-author permissions related to the user's blogs
+	_, err = tx.Exec(`DELETE FROM blog_permissions WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete blog permissions for user ID %d, error: %+v", id, err)
 		return err
 	}
 
@@ -278,13 +289,21 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
+	// Delete co-author invites related to the user's blogs
+	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE blog_id IN (SELECT id FROM blog WHERE user_id = $1)`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete co-author invites for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Delete blogs owned by the user
 	_, err = tx.Exec(`DELETE FROM blog WHERE user_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete blogs for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	// Step 3: Remove any references where the user is a co-author in someone else's blog
+	// Step 3: Remove any references where the user is a co-author or invited in someone else's blog
 	_, err = tx.Exec(`DELETE FROM co_author_permissions WHERE co_author_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete co-author references for user ID %d, error: %+v", id, err)
@@ -297,21 +316,21 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
-	// Step 4: Delete all the user's interests
+	// Step 4: Delete user interests
 	_, err = tx.Exec(`DELETE FROM user_interest WHERE user_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete user interests for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	// Step 5: Delete all the topics created by the user
+	// Step 5: Delete topics created by the user
 	_, err = tx.Exec(`DELETE FROM topics WHERE user_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete topics for user ID %d, error: %+v", id, err)
 		return err
 	}
 
-	// Step 6: Delete all bookmarks created by the user
+	// Step 6: Delete blog bookmarks created by the user
 	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE user_id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete bookmarks for user ID %d, error: %+v", id, err)
@@ -325,7 +344,27 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 
-	// Step 8: Delete the user account itself
+	// Step 8: Delete user notifications and preferences
+	_, err = tx.Exec(`DELETE FROM user_notification_preferences WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete notification preferences for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM notifications WHERE user_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete notifications for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 9: Delete user follows (followers and following relationships)
+	_, err = tx.Exec(`DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1`, id)
+	if err != nil {
+		logrus.Errorf("Failed to delete user follows for user ID %d, error: %+v", id, err)
+		return err
+	}
+
+	// Step 10: Delete user account itself
 	_, err = tx.Exec(`DELETE FROM user_account WHERE id = $1`, id)
 	if err != nil {
 		logrus.Errorf("Failed to delete user account for user ID %d, error: %+v", id, err)
@@ -731,4 +770,164 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 
 	uh.log.Infof("Successfully removed selected interests for user: %s", username)
 	return nil
+}
+
+func (uh *uDBHandler) FollowAUser(followingUsername, followersUsername string) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var followingID, followersID int64
+
+	// Step 1: Fetch the user IDs using the usernames
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, followingUsername).Scan(&followingID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", followingUsername, err)
+		return err
+	}
+
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, followersUsername).Scan(&followersID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", followersUsername, err)
+		return err
+	}
+
+	// Step 2: Insert follow relationship
+	_, err = tx.Exec(`INSERT INTO user_follows (follower_id, following_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING`, followersID, followingID)
+	if err != nil {
+		logrus.Errorf("Failed to insert follow relationship between follower ID %d and following ID %d, error: %+v", followersID, followingID, err)
+		return err
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("Failed to commit transaction for following user %s by user %s, error: %+v", followingUsername, followersUsername, err)
+		return err
+	}
+
+	logrus.Infof("Successfully followed user: %s by user: %s", followingUsername, followersUsername)
+	return nil
+}
+
+func (uh *uDBHandler) UnFollowAUser(followingUsername, followersUsername string) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var followingID, followersID int64
+
+	// Step 1: Fetch the user IDs using the usernames
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, followingUsername).Scan(&followingID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", followingUsername, err)
+		return err
+	}
+
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, followersUsername).Scan(&followersID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", followersUsername, err)
+		return err
+	}
+
+	// Step 2: Delete follow relationship
+	_, err = tx.Exec(`DELETE FROM user_follows WHERE follower_id = $1 AND following_id = $2`, followersID, followingID)
+	if err != nil {
+		logrus.Errorf("Failed to delete follow relationship between follower ID %d and following ID %d, error: %+v", followersID, followingID, err)
+		return err
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("Failed to commit transaction for unfollowing user %s by user %s, error: %+v", followingUsername, followersUsername, err)
+		return err
+	}
+
+	logrus.Infof("Successfully unfollowed user: %s by user: %s", followingUsername, followersUsername)
+	return nil
+}
+
+func (uh *uDBHandler) UsersFollowedBy(username string) ([]models.TheMonkeysUser, error) {
+	var users []models.TheMonkeysUser
+
+	// Step 1: Fetch the user ID using the username
+	var userID int64
+	if err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Fetch the list of users followed by the given user
+	rows, err := uh.db.Query(`
+		SELECT ua.username, ua.first_name, ua.last_name
+		FROM user_follows uf
+		JOIN user_account ua ON uf.following_id = ua.id
+		WHERE uf.follower_id = $1
+	`, userID)
+	if err != nil {
+		logrus.Errorf("Failed to fetch users followed by user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Iterate through the result set and populate the list of users
+	for rows.Next() {
+		var user models.TheMonkeysUser
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+			logrus.Errorf("Failed to scan user followed by user ID %d, error: %+v", userID, err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		logrus.Errorf("Error occurred while iterating users followed by user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+
+	logrus.Infof("Successfully fetched users followed by user: %s", username)
+	return users, nil
+}
+
+func (uh *uDBHandler) UserFollowsUsers(username string) ([]models.TheMonkeysUser, error) {
+	var users []models.TheMonkeysUser
+
+	// Step 1: Fetch the user ID using the username
+	var userID int64
+	if err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Fetch the list of users who follow the given user
+	rows, err := uh.db.Query(`
+		SELECT ua.username, ua.first_name, ua.last_name
+		FROM user_follows uf
+		JOIN user_account ua ON uf.follower_id = ua.id
+		WHERE uf.following_id = $1
+	`, userID)
+	if err != nil {
+		logrus.Errorf("Failed to fetch users who follow user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 3: Iterate through the result set and populate the list of users
+	for rows.Next() {
+		var user models.TheMonkeysUser
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+			logrus.Errorf("Failed to scan user who follows user ID %d, error: %+v", userID, err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		logrus.Errorf("Error occurred while iterating users who follow user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+
+	logrus.Infof("Successfully fetched users who follow user: %s", username)
+	return users, nil
 }

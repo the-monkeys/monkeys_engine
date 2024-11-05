@@ -574,3 +574,53 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 		Message: fmt.Sprintf("blog %v has been removed from bookmark successfully", req.BlogId),
 	}, nil
 }
+
+func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
+	us.log.Infof("user %s has requested to follow %s.", req.FollowerUsername, req.Username)
+
+	err := us.dbConn.FollowAUser(req.Username, req.FollowerUsername)
+	if err != nil {
+		logrus.Errorf("error while following the user: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	usa, _ := us.dbConn.CheckIfUsernameExist(req.FollowerUsername)
+
+	userLog := &models.UserLogs{
+		AccountId: usa.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.FollowedUser, req.Username), constants.ServiceUser, constants.EventFollowUser, us.log)
+
+	return &pb.UserFollowRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("%s has been followed successfully", req.Username),
+	}, nil
+}
+
+func (us *UserSvc) UnFollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
+	us.log.Infof("user %s has requested to un-follow %s.", req.FollowerUsername, req.Username)
+
+	err := us.dbConn.UnFollowAUser(req.Username, req.FollowerUsername)
+	if err != nil {
+		logrus.Errorf("error while un-following the user: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	usa, _ := us.dbConn.CheckIfUsernameExist(req.FollowerUsername)
+
+	userLog := &models.UserLogs{
+		AccountId: usa.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnFollowUser, req.Username), constants.ServiceUser, constants.EventUnFollowUser, us.log)
+
+	return &pb.UserFollowRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("%s has been un-followed successfully", req.Username),
+	}, nil
+}

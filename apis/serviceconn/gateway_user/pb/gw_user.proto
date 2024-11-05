@@ -224,6 +224,19 @@ message BookMarkRes {
     string error = 3;
 }
 
+message UserFollowReq {
+    string username = 1;
+    string follower_username = 2;
+    string ip = 3;
+    string client = 4;
+}
+
+message UserFollowRes {
+    int32 status = 1;
+    string message = 2;
+    string error = 3;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -234,7 +247,8 @@ service UserService {
     rpc GetUserDetails(UserDetailReq) returns (UserDetailsResp) {}
     rpc FollowTopics(TopicActionReq) returns (TopicActionRes) {}
     rpc UnFollowTopics(TopicActionReq) returns (TopicActionRes) {}
-
+    rpc FollowUser(UserFollowReq) returns (UserFollowRes) {}
+    rpc UnFollowUser(UserFollowReq) returns (UserFollowRes) {}
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark

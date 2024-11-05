@@ -41,7 +41,21 @@ CREATE TABLE IF NOT EXISTS user_account (
 
 -- Adding indexes to user_account table
 CREATE INDEX idx_user_account_email ON user_account(email);
+CREATE INDEX idx_user_account_account_id ON user_account(account_id);
 CREATE INDEX idx_user_account_username ON user_account(username);
+CREATE INDEX idx_user_account_created_at ON user_account(created_at);
+
+
+-- Table to keep track of users following other users
+CREATE TABLE IF NOT EXISTS user_follows (
+    id BIGSERIAL PRIMARY KEY,
+    follower_id BIGINT NOT NULL,
+    following_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (follower_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (following_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    UNIQUE (follower_id, following_id) -- Ensures no duplicate follow relationships
+);
 
 -- Creating email validation status table
 CREATE TABLE IF NOT EXISTS email_validation_status (
@@ -74,6 +88,20 @@ CREATE TABLE IF NOT EXISTS user_auth_info (
     FOREIGN KEY (auth_provider_id) REFERENCES auth_provider(id) ON DELETE CASCADE
 );
 
+
+-- Table to manage various tokens (e.g., session, reset, API tokens) with statuses
+CREATE TABLE IF NOT EXISTS token_management (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    token_type VARCHAR(50) NOT NULL, -- e.g., 'session', 'reset', 'api'
+    status VARCHAR(50) DEFAULT 'active', -- 'active', 'expired', 'used', 'removed'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP, -- Nullable, if no expiration is set
+    used_at TIMESTAMP, -- Nullable, populated when token is used
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    UNIQUE (user_id, token, token_type) -- Ensures each token type is unique per user
+);
 -- ================================
 -- Permission-related Tables
 -- ================================
@@ -144,6 +172,38 @@ CREATE TABLE IF NOT EXISTS co_author_permissions (
     FOREIGN KEY (role_id) REFERENCES user_role(id) ON DELETE CASCADE
 );
 
+
+-- Table to keep track of users who like blogs
+CREATE TABLE IF NOT EXISTS blog_likes (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    blog_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
+    UNIQUE (user_id, blog_id) -- Ensures each user can like a blog only once
+);
+
+
+
+-- Table to store user comments on blogs
+CREATE TABLE IF NOT EXISTS blog_comments (
+    comment_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    blog_id BIGINT NOT NULL,
+    comment_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
+    FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE
+);
+
+-- Create operating_system table
+CREATE TABLE IF NOT EXISTS operating_system (
+    id SERIAL PRIMARY KEY,
+    os_name VARCHAR(32) UNIQUE
+);
+
 -- ================================
 -- User Activity-related Tables
 -- ================================
@@ -162,8 +222,10 @@ CREATE TABLE IF NOT EXISTS user_account_log (
     ip_address VARCHAR(20),
     description TEXT,
     client_id INTEGER NOT NULL,
+    operating_sys_id INTEGER,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (operating_sys_id) REFERENCES operating_system(id) ON DELETE CASCADE
 );
 
 -- Creating logged_in_devices table (with clients reference)
@@ -360,6 +422,10 @@ ON CONFLICT DO NOTHING;
 INSERT INTO permissions (permission_desc) VALUES ('Read'), ('Edit'), ('Delete'), ('Archive'), ('Transfer-Ownership'), ('Publish'), ('Draft')
 ON CONFLICT DO NOTHING;
 
+-- Inserting predefined operating system
+INSERT INTO operating_system (os_name) VALUES ('Windows'), ('MacOS'), ('Linux'), ('iOS'), ('Android'), ('Other')
+ON CONFLICT DO NOTHING;
+
 -- Inserting predefined clients
 INSERT INTO clients (c_name) VALUES ('Chrome'), ('Firefox'), ('Safari'), ('Edge'), ('Opera'), ('Android'), ('iOS'), ('Brave'), ('Others')
 ON CONFLICT DO NOTHING;
@@ -401,7 +467,20 @@ VALUES
     ('Password Reset', 'Notification for a password reset request'),
     ('Comment Reply', 'Notification for a reply to your blog comment'),
     ('Co-Author Invitation', 'Invitation to co-author a blog'),
-    ('New Follower', 'Notification when a new user follows your blog')
+    ('New Follower', 'Notification when a new user follows your blog'),
+    ('Blog Liked', 'Notification when someone likes your blog'),
+    ('Blog Bookmarked', 'Notification when someone bookmarks your blog'),
+    ('Blog Published', 'Notification when your blog is published'),
+    ('Blog Archived', 'Notification when your blog is archived'),
+    ('Blog Deleted', 'Notification when your blog is deleted'),
+    ('Blog Transfer Ownership', 'Notification when ownership of a blog is transferred'),
+    ('Blog Commented', 'Notification when someone comments on your blog'),
+    ('Blog Co-Author Added', 'Notification when a co-author is added to your blog'),
+    ('Blog Co-Author Removed', 'Notification when a co-author is removed from your blog'),
+    ('Tagged in comment', 'Notification when someone tags you in a comment'),
+    ('Tagged in blog', 'Notification when someone tags you in a blog'),
+    ('Mentioned in comment', 'Notification when someone mentions you in a comment'),
+    ('Mentioned in blog', 'Notification when someone mentions you in a blog')
 ON CONFLICT DO NOTHING;
 
 
@@ -410,14 +489,12 @@ ON CONFLICT DO NOTHING;
 INSERT INTO topics (description, category) VALUES
 ('Reading', 'Hobbies'),
 ('Writing', 'Hobbies'),
-('Coding', 'Tech'),
 ('Hiking', 'Outdoors'),
 ('Photography', 'Hobbies'),
 ('Music', 'Entertainment'),
 ('Traveling', 'Lifestyle'),
 ('Painting', 'Arts'),
 ('Gardening', 'Hobbies'),
-('Cooking', 'Food'),
 ('Dancing', 'Arts'),
 ('Sports', 'Fitness'),
 ('Gaming', 'Entertainment'),
@@ -434,7 +511,6 @@ INSERT INTO topics (description, category) VALUES
 ('Healthcare', 'Science'),
 ('Science', 'Science'),
 ('Education', 'Learning'),
-('Space', 'Science'),
 ('Movies', 'Entertainment'),
 ('Psychology', 'Science'),
 ('Mental Health', 'Wellness'),
@@ -455,7 +531,6 @@ INSERT INTO topics (description, category) VALUES
 ('Aviation', 'Transportation'),
 ('Rock n Roll', 'Music'),
 ('Night Life', 'Entertainment'),
-('Restaurants', 'Food'),
 ('Motivation', 'Self-Improvement'),
 ('Vibe', 'Lifestyle'),
 ('Scandinavia', 'Travel'),
@@ -466,7 +541,6 @@ INSERT INTO topics (description, category) VALUES
 ('Fashion', 'Lifestyle'),
 ('Television', 'Entertainment'),
 ('Design', 'Arts'),
-('Startups', 'Business'),
 ('Mobiles', 'Tech'),
 ('Love and Romance', 'Relationships'),
 ('Emotions', 'Wellness'),
@@ -655,7 +729,6 @@ INSERT INTO topics (description, category) VALUES
 ('Writing', 'Media'),
 ('30 Day Challenge', 'Media'),
 ('Book Reviews', 'Media'),
-('Books', 'Media'),
 ('Creative Nonfiction', 'Media'),
 ('Diary', 'Media'),
 ('Fiction', 'Media'),
@@ -787,7 +860,6 @@ INSERT INTO topics (description, category) VALUES
 ('Medicine', 'Science'),
 ('Neuroscience', 'Science'),
 ('Physics', 'Science'),
-('Psychology', 'Science'),
 ('Space', 'Science'),
 ('Algebra', 'Mathematics'),
 ('Calculus', 'Mathematics'),
