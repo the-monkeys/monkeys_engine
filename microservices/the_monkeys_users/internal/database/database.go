@@ -43,6 +43,8 @@ type UserDb interface {
 	GetBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
 	GetCoAuthorBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
 	GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
+	GetFollowings(username string) ([]models.TheMonkeysUser, error)
+	GetFollowers(username string) ([]models.TheMonkeysUser, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
@@ -848,7 +850,7 @@ func (uh *uDBHandler) UnFollowAUser(followingUsername, followersUsername string)
 	return nil
 }
 
-func (uh *uDBHandler) UsersFollowedBy(username string) ([]models.TheMonkeysUser, error) {
+func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, error) {
 	var users []models.TheMonkeysUser
 
 	// Step 1: Fetch the user ID using the username
@@ -890,7 +892,7 @@ func (uh *uDBHandler) UsersFollowedBy(username string) ([]models.TheMonkeysUser,
 	return users, nil
 }
 
-func (uh *uDBHandler) UserFollowsUsers(username string) ([]models.TheMonkeysUser, error) {
+func (uh *uDBHandler) GetFollowers(username string) ([]models.TheMonkeysUser, error) {
 	var users []models.TheMonkeysUser
 
 	// Step 1: Fetch the user ID using the username
