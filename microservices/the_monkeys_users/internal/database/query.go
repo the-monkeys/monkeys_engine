@@ -494,15 +494,21 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	return nil
 }
 
-func (uh *uDBHandler) LikeBlog(username string, blogID string) error {
+func (uh *uDBHandler) LikeBlog(username string, blogExtId string) error {
 	tx, err := uh.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	var userID int64
+	var blogID int64
+	// Step 1: Fetch the user ID using the username
+	if err := tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogExtId).Scan(&blogID); err != nil {
+		logrus.Errorf("Can't get ID for blog id %s, error: %+v", blogExtId, err)
+		return err
+	}
 
+	var userID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
 		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
@@ -540,15 +546,21 @@ func (uh *uDBHandler) LikeBlog(username string, blogID string) error {
 	return nil
 }
 
-func (uh *uDBHandler) UnlikeBlog(username string, blogID string) error {
+func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 	tx, err := uh.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	var userID int64
+	var blogID int64
+	// Step 1: Fetch the user ID using the username
+	if err := tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogExtId).Scan(&blogID); err != nil {
+		logrus.Errorf("Can't get ID for blog id %s, error: %+v", username, err)
+		return err
+	}
 
+	var userID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
 		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)

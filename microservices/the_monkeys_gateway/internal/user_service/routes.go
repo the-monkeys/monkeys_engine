@@ -69,6 +69,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.GET("/all-blogs/:username", usc.GetBlogsByUserName)
 		routes.POST("/bookmark/:blog_id", usc.BookMarkABlog)
 		routes.POST("/remove-bookmark/:blog_id", usc.RemoveBookMarkFromABlog)
+		routes.POST("/like/:blog_id", usc.LikeABlog)
+		routes.POST("/unlike/:blog_id", usc.UnlikeABlog)
 	}
 
 	{
@@ -675,4 +677,64 @@ func (asc *UserServiceClient) GetFollowing(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *UserServiceClient) LikeABlog(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.LikeBlog(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already like"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) UnlikeABlog(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.UnlikeBlog(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already removed from like"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
 }

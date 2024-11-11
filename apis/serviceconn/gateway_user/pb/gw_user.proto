@@ -270,6 +270,9 @@ service UserService {
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark
     rpc RemoveBookMark(BookMarkReq) returns (BookMarkRes) {}
+    rpc LikeBlog(BookMarkReq) returns (BookMarkRes) {}
+    rpc UnlikeBlog(BookMarkReq) returns (BookMarkRes) {}
+    
     // Invite a co author
     rpc InviteCoAuthor(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
 

@@ -34,6 +34,8 @@ const (
 	UserService_GetFollowing_FullMethodName         = "/auth_svc.UserService/GetFollowing"
 	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
 	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
+	UserService_LikeBlog_FullMethodName             = "/auth_svc.UserService/LikeBlog"
+	UserService_UnlikeBlog_FullMethodName           = "/auth_svc.UserService/UnlikeBlog"
 	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
 	UserService_RevokeCoAuthorAccess_FullMethodName = "/auth_svc.UserService/RevokeCoAuthorAccess"
 	UserService_GetBlogsByUserIds_FullMethodName    = "/auth_svc.UserService/GetBlogsByUserIds"
@@ -61,6 +63,8 @@ type UserServiceClient interface {
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	LikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	UnlikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Invite a co author
 	InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -229,6 +233,26 @@ func (c *userServiceClient) RemoveBookMark(ctx context.Context, in *BookMarkReq,
 	return out, nil
 }
 
+func (c *userServiceClient) LikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BookMarkRes)
+	err := c.cc.Invoke(ctx, UserService_LikeBlog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) UnlikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BookMarkRes)
+	err := c.cc.Invoke(ctx, UserService_UnlikeBlog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CoAuthorAccessRes)
@@ -290,6 +314,8 @@ type UserServiceServer interface {
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	LikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	UnlikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Invite a co author
 	InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -352,6 +378,12 @@ func (UnimplementedUserServiceServer) BookMarkBlog(context.Context, *BookMarkReq
 }
 func (UnimplementedUserServiceServer) RemoveBookMark(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveBookMark not implemented")
+}
+func (UnimplementedUserServiceServer) LikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LikeBlog not implemented")
+}
+func (UnimplementedUserServiceServer) UnlikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnlikeBlog not implemented")
 }
 func (UnimplementedUserServiceServer) InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InviteCoAuthor not implemented")
@@ -656,6 +688,42 @@ func _UserService_RemoveBookMark_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_LikeBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).LikeBlog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_LikeBlog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).LikeBlog(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_UnlikeBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UnlikeBlog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UnlikeBlog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UnlikeBlog(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_InviteCoAuthor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CoAuthorAccessReq)
 	if err := dec(in); err != nil {
@@ -794,6 +862,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveBookMark",
 			Handler:    _UserService_RemoveBookMark_Handler,
+		},
+		{
+			MethodName: "LikeBlog",
+			Handler:    _UserService_LikeBlog_Handler,
+		},
+		{
+			MethodName: "UnlikeBlog",
+			Handler:    _UserService_UnlikeBlog_Handler,
 		},
 		{
 			MethodName: "InviteCoAuthor",
