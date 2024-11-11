@@ -487,6 +487,13 @@ ON CONFLICT DO NOTHING;
 
 -- Insert some default topics
 INSERT INTO topics (description, category) VALUES
+('Public Health', 'Health & Wellness'),
+('Covid19', 'Health & Wellness'),
+('Telemedicine', 'Health & Wellness'),
+('Nutrition Science', 'Health & Wellness'),
+('Critical Thinking', 'Learning & Development'),
+('Project-Based Learning', 'Learning & Development'),
+('Personal Finance', 'Learning & Development'),
 ('Reading', 'Hobbies'),
 ('Writing', 'Hobbies'),
 ('Hiking', 'Outdoors'),
@@ -504,9 +511,12 @@ INSERT INTO topics (description, category) VALUES
 ('Crafting', 'Hobbies'),
 ('Collecting', 'Hobbies'),
 ('Food and Cuisine', 'Food'),
-('Technology', 'Tech'),
+('Backend Development', 'Technology'),
+('DevOps Practices', 'Technology'),
+('API Design', 'Technology'),
 ('Business and Finance', 'Business'),
 ('Infrastructure', 'Business'),
+('Market Analysis', 'Business'),
 ('Agriculture', 'Science'),
 ('Healthcare', 'Science'),
 ('Science', 'Science'),

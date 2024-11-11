@@ -493,3 +493,95 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	uh.log.Infof("Successfully deleted blog: %s and its references", blogId)
 	return nil
 }
+
+func (uh *uDBHandler) LikeBlog(username string, blogID string) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var userID int64
+
+	// Step 1: Fetch the user ID using the username
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return err
+	}
+
+	// Step 2: Check if the like relationship already exists
+	var exists bool
+	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM blog_likes WHERE user_id = $1 AND blog_id = $2)`, userID, blogID).Scan(&exists)
+	if err != nil {
+		logrus.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		return err
+	}
+
+	if exists {
+		logrus.Infof("User %s has already liked blog ID %d", username, blogID)
+		return nil
+	}
+
+	// Step 3: Insert like relationship
+	_, err = tx.Exec(`INSERT INTO blog_likes (user_id, blog_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP)`, userID, blogID)
+	if err != nil {
+		logrus.Errorf("Failed to insert like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		return err
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("Failed to commit transaction for liking blog ID %d by user %s, error: %+v", blogID, username, err)
+		return err
+	}
+
+	logrus.Infof("Successfully liked blog ID %d by user: %s", blogID, username)
+	return nil
+}
+
+func (uh *uDBHandler) UnlikeBlog(username string, blogID string) error {
+	tx, err := uh.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var userID int64
+
+	// Step 1: Fetch the user ID using the username
+	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
+		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		return err
+	}
+
+	// Step 2: Check if the like relationship exists
+	var exists bool
+	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM blog_likes WHERE user_id = $1 AND blog_id = $2)`, userID, blogID).Scan(&exists)
+	if err != nil {
+		logrus.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		return err
+	}
+
+	if !exists {
+		logrus.Infof("User %s has not liked blog ID %d", username, blogID)
+		return nil
+	}
+
+	// Step 3: Delete like relationship
+	_, err = tx.Exec(`DELETE FROM blog_likes WHERE user_id = $1 AND blog_id = $2`, userID, blogID)
+	if err != nil {
+		logrus.Errorf("Failed to delete like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		return err
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		logrus.Errorf("Failed to commit transaction for unliking blog ID %d by user %s, error: %+v", blogID, username, err)
+		return err
+	}
+
+	logrus.Infof("Successfully unliked blog ID %d by user: %s", blogID, username)
+	return nil
+}
