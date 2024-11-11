@@ -27,6 +27,7 @@ type UserDb interface {
 	CreateNewTopics(topics []string, category, username string) error
 	BookMarkABlog(blogId string, userId int64) error
 	FollowAUser(followingUsername, followersUsername string) error
+	LikeBlog(username string, blogID string) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)
@@ -57,6 +58,7 @@ type UserDb interface {
 	RemoveBookmarkFromBlog(blogId string, userId int64) error
 	DeleteBlogAndReferences(blogId string) error
 	UnFollowAUser(followingUsername, followersUsername string) error
+	UnlikeBlog(username string, blogID string) error
 }
 
 type uDBHandler struct {
