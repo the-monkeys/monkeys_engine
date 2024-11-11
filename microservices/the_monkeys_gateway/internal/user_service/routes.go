@@ -50,6 +50,8 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.PATCH("/:id", usc.UpdateUserProfile)
 		routes.GET("/:id", usc.GetUserProfile)
 		routes.DELETE("/:id", usc.DeleteUserProfile)
+		routes.GET("/followers", usc.GetFollowers)
+		routes.GET("/following", usc.GetFollowing)
 	}
 
 	{
@@ -614,6 +616,50 @@ func (asc *UserServiceClient) UnfollowUser(ctx *gin.Context) {
 		FollowerUsername: followerUsername,
 		Ip:               ctx.Request.Header.Get("IP"),
 		Client:           ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *UserServiceClient) GetFollowers(ctx *gin.Context) {
+	username := ctx.GetString("userName")
+
+	resp, err := asc.Client.GetFollowers(context.Background(), &pb.UserDetailReq{
+		Username: username,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *UserServiceClient) GetFollowing(ctx *gin.Context) {
+	username := ctx.GetString("userName")
+
+	resp, err := asc.Client.GetFollowing(context.Background(), &pb.UserDetailReq{
+		Username: username,
 	})
 
 	if err != nil {

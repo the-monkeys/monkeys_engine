@@ -237,6 +237,20 @@ message UserFollowRes {
     string error = 3;
 }
 
+message User {
+    string account_id = 1;
+    string username = 2;
+    string email = 3;
+    string first_name = 4;
+    string last_name = 5;
+    string bio = 6;
+    string avatar_url = 7;
+}
+
+message FollowerFollowingResp {
+    repeated User users = 1;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -249,6 +263,9 @@ service UserService {
     rpc UnFollowTopics(TopicActionReq) returns (TopicActionRes) {}
     rpc FollowUser(UserFollowReq) returns (UserFollowRes) {}
     rpc UnFollowUser(UserFollowReq) returns (UserFollowRes) {}
+    rpc GetFollowers(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users who follow me
+    rpc GetFollowing(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users I follow
+
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark

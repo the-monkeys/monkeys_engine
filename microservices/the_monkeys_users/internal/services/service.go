@@ -624,3 +624,55 @@ func (us *UserSvc) UnFollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb
 		Message: fmt.Sprintf("%s has been un-followed successfully", req.Username),
 	}, nil
 }
+
+func (us *UserSvc) GetFollowers(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingResp, error) {
+	us.log.Infof("fetching followers for user: %s", req.Username)
+	resp, err := us.dbConn.GetFollowers(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching followers for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("followers for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	var followers []*pb.User
+	for _, r := range resp {
+		followers = append(followers, &pb.User{
+			Username:  r.Username,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+		})
+	}
+
+	return &pb.FollowerFollowingResp{
+		Users: followers,
+	}, nil
+}
+
+func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingResp, error) {
+	us.log.Infof("fetching following for user: %s", req.Username)
+	resp, err := us.dbConn.GetFollowings(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching following for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("following for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	var followings []*pb.User
+	for _, r := range resp {
+		followings = append(followings, &pb.User{
+			Username:  r.Username,
+			FirstName: r.FirstName,
+			LastName:  r.LastName,
+		})
+	}
+
+	return &pb.FollowerFollowingResp{
+		Users: followings,
+	}, nil
+}
