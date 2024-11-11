@@ -68,7 +68,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		logrus.Infof("user: %+v\n", user)
 
 		userLog := &models.UserLogs{
-			AccountId: user.UserAccountId,
+			AccountId: user.AccountId,
 			IpAddress: user.IpAddress,
 			Client:    user.Client,
 		}

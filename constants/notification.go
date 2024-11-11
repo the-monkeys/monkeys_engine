@@ -6,4 +6,5 @@ const (
 	CommentReply       = "Comment Reply"
 	CoAuthorInvitation = "Co-Author Invitation"
 	NewFollower        = "New Follower"
+	BlogLiked          = "Blog Liked"
 )
