@@ -332,15 +332,15 @@ func (adh *authDBHandler) UpdateEmailVerificationStatus(req *models.TheMonkeysUs
 	}
 
 	defer stmt.Close()
-	result := stmt.QueryRow("verified", time.Now(), req.Id)
-	if result.Err() != nil {
-		logrus.Errorf("cannot sent the reset link for %s, error: %v", req.Email, err)
+	_, err = stmt.Exec(constants.EmailVerificationStatusVerified, time.Now(), req.Id)
+	if err != nil {
+		logrus.Errorf("cannot update the email verification status for %s, error: %v", req.Email, err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the password recovery token for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot commit the email verification status update for %s, error: %v", req.Email, err)
 		return err
 	}
 	return nil
