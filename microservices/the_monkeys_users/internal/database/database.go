@@ -47,6 +47,8 @@ type UserDb interface {
 	GetFollowings(username string) ([]models.TheMonkeysUser, error)
 	GetFollowers(username string) ([]models.TheMonkeysUser, error)
 	GetBlogsByBlogId(blogId string) (models.Blog, error)
+	IsUserFollowing(followerUsername string, followingUsername string) (bool, error)
+	IsBlogLikedByUser(username string, blogId string) (bool, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error

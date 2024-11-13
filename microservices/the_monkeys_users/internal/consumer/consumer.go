@@ -38,7 +38,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 	go func() {
 		<-sigChan
-		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
+		log.Infoln("Received termination signal. Closing connection and exiting gracefully.")
 		conn.Channel.Close()
 		os.Exit(0)
 	}()
@@ -65,14 +65,14 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			return
 		}
 
-		logrus.Infof("user: %+v\n", user)
+		log.Debugf("user: %+v\n", user)
 
 		userLog := &models.UserLogs{
 			AccountId: user.AccountId,
 			IpAddress: user.IpAddress,
 			Client:    user.Client,
 		}
-		fmt.Printf("userLog: %+v\n", userLog)
+		log.Debugf("userLog: %+v\n", userLog)
 		userLog.IpAddress, userLog.Client = utils.IpClientConvert(userLog.IpAddress, userLog.Client)
 
 		switch user.Action {
@@ -86,21 +86,21 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 		case constants.BLOG_PUBLISH:
 			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
-				logrus.Errorf("Can't update blog status to publish: %v", err)
+				log.Errorf("Can't update blog status to publish: %v", err)
 			}
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
 
 		case constants.BLOG_DELETE:
 			if err := userCon.dbConn.DeleteBlogAndReferences(user.BlogId); err != nil {
-				logrus.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
+				log.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
 			}
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
 		case constants.BLOG_UPDATE:
 			// TODO: Add blog id and user id
 		default:
-			logrus.Errorf("Unknown action: %s", user.Action)
+			log.Errorf("Unknown action: %s", user.Action)
 		}
 
 	}

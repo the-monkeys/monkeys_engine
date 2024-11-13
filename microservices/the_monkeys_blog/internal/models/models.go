@@ -25,13 +25,13 @@ package models
 // }
 
 type InterServiceMessage struct {
-	UserAccountId string `json:"user_account_id"`
-	UserStatus    string `json:"user_status"`
-	BlogId        string `json:"blog_id"`
-	Action        string `json:"action"`
-	BlogStatus    string `json:"blog_status"`
-	IpAddress     string `json:"ip_address"`
-	Client        string `json:"client"`
+	AccountId  string `json:"account_id"`
+	UserStatus string `json:"user_status"`
+	BlogId     string `json:"blog_id"`
+	Action     string `json:"action"`
+	BlogStatus string `json:"blog_status"`
+	IpAddress  string `json:"ip_address"`
+	Client     string `json:"client"`
 }
 
 type DraftBlogRequest struct {

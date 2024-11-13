@@ -32,10 +32,12 @@ const (
 	UserService_UnFollowUser_FullMethodName         = "/auth_svc.UserService/UnFollowUser"
 	UserService_GetFollowers_FullMethodName         = "/auth_svc.UserService/GetFollowers"
 	UserService_GetFollowing_FullMethodName         = "/auth_svc.UserService/GetFollowing"
+	UserService_GetIfIFollowedUser_FullMethodName   = "/auth_svc.UserService/GetIfIFollowedUser"
 	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
 	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
 	UserService_LikeBlog_FullMethodName             = "/auth_svc.UserService/LikeBlog"
 	UserService_UnlikeBlog_FullMethodName           = "/auth_svc.UserService/UnlikeBlog"
+	UserService_GetIfBlogLiked_FullMethodName       = "/auth_svc.UserService/GetIfBlogLiked"
 	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
 	UserService_RevokeCoAuthorAccess_FullMethodName = "/auth_svc.UserService/RevokeCoAuthorAccess"
 	UserService_GetBlogsByUserIds_FullMethodName    = "/auth_svc.UserService/GetBlogsByUserIds"
@@ -59,12 +61,14 @@ type UserServiceClient interface {
 	UnFollowUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
 	GetFollowers(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
 	GetFollowing(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
+	GetIfIFollowedUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
 	// Bookmark blog
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	LikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	UnlikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	GetIfBlogLiked(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Invite a co author
 	InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -213,6 +217,16 @@ func (c *userServiceClient) GetFollowing(ctx context.Context, in *UserDetailReq,
 	return out, nil
 }
 
+func (c *userServiceClient) GetIfIFollowedUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UserFollowRes)
+	err := c.cc.Invoke(ctx, UserService_GetIfIFollowedUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
@@ -247,6 +261,16 @@ func (c *userServiceClient) UnlikeBlog(ctx context.Context, in *BookMarkReq, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
 	err := c.cc.Invoke(ctx, UserService_UnlikeBlog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetIfBlogLiked(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BookMarkRes)
+	err := c.cc.Invoke(ctx, UserService_GetIfBlogLiked_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,12 +334,14 @@ type UserServiceServer interface {
 	UnFollowUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
 	GetFollowers(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
 	GetFollowing(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
+	GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
 	// Bookmark blog
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	LikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	UnlikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	GetIfBlogLiked(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Invite a co author
 	InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -373,6 +399,9 @@ func (UnimplementedUserServiceServer) GetFollowers(context.Context, *UserDetailR
 func (UnimplementedUserServiceServer) GetFollowing(context.Context, *UserDetailReq) (*FollowerFollowingResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFollowing not implemented")
 }
+func (UnimplementedUserServiceServer) GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIfIFollowedUser not implemented")
+}
 func (UnimplementedUserServiceServer) BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BookMarkBlog not implemented")
 }
@@ -384,6 +413,9 @@ func (UnimplementedUserServiceServer) LikeBlog(context.Context, *BookMarkReq) (*
 }
 func (UnimplementedUserServiceServer) UnlikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnlikeBlog not implemented")
+}
+func (UnimplementedUserServiceServer) GetIfBlogLiked(context.Context, *BookMarkReq) (*BookMarkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIfBlogLiked not implemented")
 }
 func (UnimplementedUserServiceServer) InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InviteCoAuthor not implemented")
@@ -652,6 +684,24 @@ func _UserService_GetFollowing_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetIfIFollowedUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserFollowReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetIfIFollowedUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetIfIFollowedUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetIfIFollowedUser(ctx, req.(*UserFollowReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_BookMarkBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BookMarkReq)
 	if err := dec(in); err != nil {
@@ -720,6 +770,24 @@ func _UserService_UnlikeBlog_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).UnlikeBlog(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetIfBlogLiked_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetIfBlogLiked(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetIfBlogLiked_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetIfBlogLiked(ctx, req.(*BookMarkReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -856,6 +924,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_GetFollowing_Handler,
 		},
 		{
+			MethodName: "GetIfIFollowedUser",
+			Handler:    _UserService_GetIfIFollowedUser_Handler,
+		},
+		{
 			MethodName: "BookMarkBlog",
 			Handler:    _UserService_BookMarkBlog_Handler,
 		},
@@ -870,6 +942,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UnlikeBlog",
 			Handler:    _UserService_UnlikeBlog_Handler,
+		},
+		{
+			MethodName: "GetIfBlogLiked",
+			Handler:    _UserService_GetIfBlogLiked_Handler,
 		},
 		{
 			MethodName: "InviteCoAuthor",

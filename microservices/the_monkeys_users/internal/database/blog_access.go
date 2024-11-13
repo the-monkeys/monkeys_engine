@@ -211,3 +211,22 @@ func (uh *uDBHandler) GetBlogsByBlogId(blogId string) (models.Blog, error) {
 
 	return blog, nil
 }
+
+func (uh *uDBHandler) IsBlogLikedByUser(username string, blogId string) (bool, error) {
+	query := `
+        SELECT COUNT(1)
+        FROM blog_likes bl
+        JOIN user_account u ON bl.user_id = u.id
+        JOIN blog b ON bl.blog_id = b.id
+        WHERE u.username = $1 AND b.blog_id = $2
+    `
+
+	var count int
+	err := uh.db.QueryRow(query, username, blogId).Scan(&count)
+	if err != nil {
+		uh.log.Errorf("Error checking if %s likes blog %s: %+v", username, blogId, err)
+		return false, err
+	}
+
+	return count > 0, nil
+}

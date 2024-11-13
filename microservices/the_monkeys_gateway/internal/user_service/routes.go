@@ -60,6 +60,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.PUT("/un-follow-topics/:user_name", usc.UnFollowTopic)
 		routes.POST("/follow/:username", usc.FollowUser)
 		routes.POST("/unfollow/:username", usc.UnfollowUser)
+		routes.GET("/is-followed/:username", usc.UnfollowUser)
 	}
 
 	// Invite and un invite as coauthor
@@ -71,6 +72,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.POST("/remove-bookmark/:blog_id", usc.RemoveBookMarkFromABlog)
 		routes.POST("/like/:blog_id", usc.LikeABlog)
 		routes.POST("/unlike/:blog_id", usc.UnlikeABlog)
+		routes.GET("/is-liked/:blog_id", usc.IsBlogLiked)
 	}
 
 	{
@@ -714,6 +716,36 @@ func (asc *UserServiceClient) UnlikeABlog(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
 
 	res, err := asc.Client.UnlikeBlog(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already removed from like"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) IsBlogLiked(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.GetIfBlogLiked(context.Background(), &pb.BookMarkReq{
 		Username: userName,
 		BlogId:   blogId,
 		Ip:       ctx.Request.Header.Get("Ip"),
