@@ -763,3 +763,35 @@ func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.Boo
 		Message: fmt.Sprintf("blog %v has been unliked successfully", req.BlogId),
 	}, nil
 }
+
+func (us *UserSvc) GetIfIFollowedUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
+	us.log.Debugf("user %s has requested to follow %s.", req.FollowerUsername, req.Username)
+
+	isFollowing, err := us.dbConn.IsUserFollowing(req.FollowerUsername, req.Username)
+	if err != nil {
+		logrus.Errorf("error while following the user: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.UserFollowRes{
+		Status:      http.StatusOK,
+		Message:     fmt.Sprintf("%s has been followed successfully", req.Username),
+		IsFollowing: isFollowing,
+	}, nil
+}
+
+func (us *UserSvc) GetIfBlogLiked(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	us.log.Debugf("user %s has requested to like blog %s.", req.Username, req.BlogId)
+
+	isLiked, err := us.dbConn.IsBlogLikedByUser(req.Username, req.BlogId)
+	if err != nil {
+		logrus.Errorf("error while liking the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("blog %v has been liked successfully", req.BlogId),
+		IsLiked: isLiked,
+	}, nil
+}

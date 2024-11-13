@@ -222,6 +222,8 @@ message BookMarkRes {
     int32 status = 1;
     string message = 2;
     string error = 3;
+    bool isLiked = 4;
+    bool bookMarked = 5;
 }
 
 message UserFollowReq {
@@ -235,6 +237,7 @@ message UserFollowRes {
     int32 status = 1;
     string message = 2;
     string error = 3;
+    bool isFollowing = 4;
 }
 
 message User {
@@ -265,6 +268,7 @@ service UserService {
     rpc UnFollowUser(UserFollowReq) returns (UserFollowRes) {}
     rpc GetFollowers(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users who follow me
     rpc GetFollowing(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users I follow
+    rpc GetIfIFollowedUser(UserFollowReq) returns (UserFollowRes) {}
 
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
@@ -272,7 +276,7 @@ service UserService {
     rpc RemoveBookMark(BookMarkReq) returns (BookMarkRes) {}
     rpc LikeBlog(BookMarkReq) returns (BookMarkRes) {}
     rpc UnlikeBlog(BookMarkReq) returns (BookMarkRes) {}
-    
+    rpc GetIfBlogLiked(BookMarkReq) returns (BookMarkRes) {}
     // Invite a co author
     rpc InviteCoAuthor(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
 

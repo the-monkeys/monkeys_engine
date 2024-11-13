@@ -597,3 +597,22 @@ func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 	logrus.Infof("Successfully unliked blog ID %d by user: %s", blogID, username)
 	return nil
 }
+
+func (uh *uDBHandler) IsUserFollowing(followerUsername string, followingUsername string) (bool, error) {
+	query := `
+        SELECT COUNT(1)
+        FROM user_follows uf
+        JOIN user_account u1 ON uf.follower_id = u1.id
+        JOIN user_account u2 ON uf.following_id = u2.id
+        WHERE u1.username = $1 AND u2.username = $2
+    `
+
+	var count int
+	err := uh.db.QueryRow(query, followerUsername, followingUsername).Scan(&count)
+	if err != nil {
+		uh.log.Errorf("Error checking if %s follows %s: %+v", followerUsername, followingUsername, err)
+		return false, err
+	}
+
+	return count > 0, nil
+}
