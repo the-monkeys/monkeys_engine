@@ -775,7 +775,6 @@ func (us *UserSvc) GetIfIFollowedUser(ctx context.Context, req *pb.UserFollowReq
 
 	return &pb.UserFollowRes{
 		Status:      http.StatusOK,
-		Message:     fmt.Sprintf("%s has been followed successfully", req.Username),
 		IsFollowing: isFollowing,
 	}, nil
 }
@@ -791,7 +790,6 @@ func (us *UserSvc) GetIfBlogLiked(ctx context.Context, req *pb.BookMarkReq) (*pb
 
 	return &pb.BookMarkRes{
 		Status:  http.StatusOK,
-		Message: fmt.Sprintf("blog %v has been liked successfully", req.BlogId),
 		IsLiked: isLiked,
 	}, nil
 }
