@@ -34,9 +34,9 @@ const (
 )
 
 const (
-	EmailVerificationStatusUnverified       = "unverified"
-	EmailVerificationStatusVerificationSent = "verification-link-sent"
-	EmailVerificationStatusVerified         = "verified"
+	EmailVerificationStatusUnverified       = "Unverified"
+	EmailVerificationStatusVerificationSent = "Verification link sent"
+	EmailVerificationStatusVerified         = "Verified"
 )
 
 const (
