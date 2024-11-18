@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -96,11 +95,11 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 	id := ctx.Param("blog_id")
 
-	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
+	// logrus.Infof("Traffic is coming from IP: %v", ctx.ClientIP())
 	ipAddress := ctx.Request.Header.Get("IP")
 	client := ctx.Request.Header.Get("Client")
 
-	// Check if blog exists
+	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
 		BlogId: id,
 	})
@@ -108,24 +107,24 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
 				return
 			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
 				return
 			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
 				return
 			}
 		}
 	}
 
 	var action string
-	var initialLogDone bool // Flag to avoid repeated logging
+	var initialLogDone bool
 
 	if resp.BlogExists {
 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 			return
 		}
 		action = constants.BLOG_UPDATE
@@ -135,31 +134,87 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		logrus.Errorf("error upgrading connection: %v", err)
+		logrus.Errorf("Error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close() // Ensure WebSocket is closed when done
-
-	if asc.Client == nil {
-		logrus.Errorf("BlogServiceClient is not initialized")
-		ctx.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+	defer conn.Close()
 
 	// Infinite loop to listen to WebSocket connection
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			logrus.Errorf("error reading the message: %v", err)
+			logrus.Errorf("Error reading the message: %v", err)
 			return
 		}
-		os.WriteFile("draft.json", msg, 0644)
-		// Unmarshal the received message into the Blog struct
-		var draftBlog pb.DraftBlogRequest
-		err = json.Unmarshal(msg, &draftBlog)
+
+		// Save the incoming message for debugging purposes
+		// os.WriteFile("draft.json", msg, 0644)
+
+		// Step 1: Unmarshal into a generic map
+		var genericMap map[string]interface{}
+		err = json.Unmarshal(msg, &genericMap)
 		if err != nil {
-			logrus.Errorf("Error un-marshalling message: %v", err)
+			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
+			return
+		}
+
+		// Step 2: Process "blog.blocks" for table-specific data
+		if blog, ok := genericMap["blog"].(map[string]interface{}); ok {
+			if blocks, ok := blog["blocks"].([]interface{}); ok {
+				for _, block := range blocks {
+					blockMap, ok := block.(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					// Process "table" blocks
+					if blockMap["type"] == "table" {
+						data, ok := blockMap["data"].(map[string]interface{})
+						if !ok {
+							continue
+						}
+
+						// if withBorder, ok := data["withBorder"].([]interface{}); ok {
+						// 	withBorderBool, ok := withBorder[0].(bool)
+						// }
+
+						// Transform "content" into pb.TableRow structure
+						if content, ok := data["content"].([]interface{}); ok {
+							var tableContent []*pb.TableRow
+							for _, row := range content {
+								rowSlice, ok := row.([]interface{})
+								if !ok {
+									continue
+								}
+								var cells []string
+								for _, cell := range rowSlice {
+									if cellStr, ok := cell.(string); ok {
+										cells = append(cells, cellStr)
+									}
+								}
+								tableContent = append(tableContent, &pb.TableRow{Cells: cells})
+							}
+							data["table_content"] = tableContent
+							delete(data, "content") // Remove the original field
+						}
+					}
+				}
+			}
+		}
+
+		// Step 3: Marshal back into JSON
+		updatedJSON, err := json.Marshal(genericMap)
+		if err != nil {
+			logrus.Errorf("Error marshalling updated JSON: %v", err)
+			return
+		}
+
+		// Step 4: Unmarshal into pb.DraftBlogRequest
+		var draftBlog pb.DraftBlogRequest
+		err = json.Unmarshal(updatedJSON, &draftBlog)
+		if err != nil {
+			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
 			return
 		}
 
@@ -170,25 +225,25 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		// Only set the action and log the initial creation or update once
 		if !initialLogDone {
 			draftBlog.Action = action
-			initialLogDone = true // Prevent further logging
+			initialLogDone = true
 		}
 
+		// Send the draft blog to the gRPC service
 		resp, err := asc.Client.DraftBlog(context.Background(), &draftBlog)
 		if err != nil {
-			logrus.Errorf("error while creating draft blog: %v", err)
+			logrus.Errorf("Error while creating draft blog: %v", err)
 			return
 		}
 
+		// Marshal and send the response back to the WebSocket client
 		response, err := json.Marshal(resp)
 		if err != nil {
-			logrus.Println("Error marshalling response message:", err)
+			logrus.Errorf("Error marshalling response message: %v", err)
 			return
 		}
 
-		// Send a response message to the client (optional)
-		err = conn.WriteMessage(websocket.TextMessage, response)
-		if err != nil {
-			logrus.Errorf("error returning the response message: %v", err)
+		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
+			logrus.Errorf("Error returning the response message: %v", err)
 			return
 		}
 	}
