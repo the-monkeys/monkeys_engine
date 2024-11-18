@@ -50,17 +50,18 @@ message Data {
     string caption = 9;  // For images
 
     // For tables
-    repeated TableRow table_content = 10;
+    bool withHeadings = 10; // For tables
+    repeated TableRow table_content = 11;
 
     // For code blocks
-    string code = 11;
-    string language = 12; // Optional: language of the code block
+    string code = 12;
+    string language = 13; // Optional: language of the code block
 
     // For URLs
-    URLData link = 13;
+    URLData link = 14;
 
     // For checklists
-    repeated ChecklistItem checklist = 14;
+    repeated ChecklistItem checklist = 15;
 }
 
 message TableRow {
