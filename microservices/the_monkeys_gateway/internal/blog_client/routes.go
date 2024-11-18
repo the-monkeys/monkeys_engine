@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -153,7 +154,7 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 			logrus.Errorf("error reading the message: %v", err)
 			return
 		}
-
+		os.WriteFile("draft.json", msg, 0644)
 		// Unmarshal the received message into the Blog struct
 		var draftBlog pb.DraftBlogRequest
 		err = json.Unmarshal(msg, &draftBlog)
