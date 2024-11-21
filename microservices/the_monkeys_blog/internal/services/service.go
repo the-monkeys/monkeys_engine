@@ -55,12 +55,12 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	} else {
 		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
 		bx, err := json.Marshal(models.InterServiceMessage{
-			UserAccountId: req.OwnerAccountId,
-			BlogId:        req.BlogId,
-			Action:        constants.BLOG_CREATE,
-			BlogStatus:    constants.BlogStatusDraft,
-			IpAddress:     req.Ip,
-			Client:        req.Client,
+			AccountId:  req.OwnerAccountId,
+			BlogId:     req.BlogId,
+			Action:     constants.BLOG_CREATE,
+			BlogStatus: constants.BlogStatusDraft,
+			IpAddress:  req.Ip,
+			Client:     req.Client,
 		})
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
@@ -184,12 +184,12 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	}
 
 	bx, err := json.Marshal(models.InterServiceMessage{
-		UserAccountId: req.AccountId,
-		BlogId:        req.BlogId,
-		Action:        constants.BLOG_PUBLISH,
-		BlogStatus:    constants.BlogStatusPublished,
-		IpAddress:     req.Ip,
-		Client:        req.Client,
+		AccountId:  req.AccountId,
+		BlogId:     req.BlogId,
+		Action:     constants.BLOG_PUBLISH,
+		BlogStatus: constants.BlogStatusPublished,
+		IpAddress:  req.Ip,
+		Client:     req.Client,
 	})
 
 	fmt.Printf("bx: %+v\n", string(bx))
@@ -267,12 +267,12 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 	}
 
 	bx, err := json.Marshal(models.InterServiceMessage{
-		UserAccountId: req.OwnerAccountId,
-		BlogId:        req.BlogId,
-		Action:        constants.BLOG_DELETE,
-		BlogStatus:    constants.BlogDeleted,
-		IpAddress:     req.Ip,
-		Client:        req.Client,
+		AccountId:  req.OwnerAccountId,
+		BlogId:     req.BlogId,
+		Action:     constants.BLOG_DELETE,
+		BlogStatus: constants.BlogDeleted,
+		IpAddress:  req.Ip,
+		Client:     req.Client,
 	})
 
 	if err != nil {
@@ -503,10 +503,10 @@ func (blog *BlogService) DraftBlogV2(ctx context.Context, req *pb.DraftBlogV2Req
 	} else {
 		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
 		bx, err := json.Marshal(models.InterServiceMessage{
-			UserAccountId: req.OwnerAccountId,
-			BlogId:        req.BlogId,
-			Action:        constants.BLOG_CREATE,
-			BlogStatus:    constants.BlogStatusDraft,
+			AccountId:  req.OwnerAccountId,
+			BlogId:     req.BlogId,
+			Action:     constants.BLOG_CREATE,
+			BlogStatus: constants.BlogStatusDraft,
 		})
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)

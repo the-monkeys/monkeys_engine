@@ -64,15 +64,15 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 func handleUserAction(user models.InterServiceMessage, log *logrus.Logger, db database.ElasticsearchStorage) {
 	switch user.Action {
 	case constants.USER_ACCOUNT_DELETE:
-		log.Infof("Deleting all blogs for user: %s", user.UserAccountId)
-		resp, err := db.DeleteBlogsByOwnerAccountID(context.Background(), user.UserAccountId)
+		log.Infof("Deleting all blogs for user: %s", user.AccountId)
+		resp, err := db.DeleteBlogsByOwnerAccountID(context.Background(), user.AccountId)
 		if err != nil {
-			log.Errorf("Failed to delete blogs for user: %s, error: %v", user.UserAccountId, err)
+			log.Errorf("Failed to delete blogs for user: %s, error: %v", user.AccountId, err)
 			return
 		}
-		log.Infof("Deleted blogs for user: %s, response: %v", user.UserAccountId, resp.StatusCode)
+		log.Infof("Deleted blogs for user: %s, response: %v", user.AccountId, resp.StatusCode)
 
 	default:
-		log.Errorf("Unknown action by: %s", user.UserAccountId)
+		log.Errorf("Unknown action by: %s", user.AccountId)
 	}
 }

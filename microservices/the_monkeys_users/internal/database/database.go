@@ -46,6 +46,9 @@ type UserDb interface {
 	GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsByUserNameRes, error)
 	GetFollowings(username string) ([]models.TheMonkeysUser, error)
 	GetFollowers(username string) ([]models.TheMonkeysUser, error)
+	GetBlogsByBlogId(blogId string) (models.Blog, error)
+	IsUserFollowing(followerUsername string, followingUsername string) (bool, error)
+	IsBlogLikedByUser(username string, blogId string) (bool, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
@@ -493,8 +496,8 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 	var userId int64
 	//From account_id find user_id
 	if err := tx.QueryRow(`
-			SELECT id FROM user_account WHERE account_id = $1;`, msg.UserAccountId).Scan(&userId); err != nil {
-		logrus.Errorf("can't get id by using user_account %s, error: %+v", msg.UserAccountId, err)
+			SELECT id FROM user_account WHERE account_id = $1;`, msg.AccountId).Scan(&userId); err != nil {
+		logrus.Errorf("can't get id by using user_account %s, error: %+v", msg.AccountId, err)
 		return nil
 	}
 
@@ -526,7 +529,7 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the add blog for user %s, error: %v", msg.UserAccountId, err)
+		logrus.Errorf("cannot commit the add blog for user %s, error: %v", msg.AccountId, err)
 		return err
 	}
 

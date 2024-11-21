@@ -203,9 +203,9 @@ func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProf
 	}
 
 	bx, err := json.Marshal(models.TheMonkeysMessage{
-		Username:      user.Username,
-		UserAccountId: user.AccountId,
-		Action:        constants.USER_ACCOUNT_DELETE,
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.USER_ACCOUNT_DELETE,
 	})
 
 	if err != nil {
@@ -674,5 +674,122 @@ func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb
 
 	return &pb.FollowerFollowingResp{
 		Users: followings,
+	}, nil
+}
+
+func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	err = us.dbConn.LikeBlog(req.Username, req.BlogId)
+	if err != nil {
+		logrus.Errorf("error while liking the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.LikeBlog, req.BlogId), constants.ServiceUser, constants.EventBlogLike, us.log)
+
+	// Send a notification to the user
+	blog, err := us.dbConn.GetBlogsByBlogId(req.BlogId)
+	if err != nil {
+		logrus.Errorf("error while getting the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	bx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:     user.Username,
+		AccountId:    user.AccountId,
+		Action:       constants.BLOG_LIKE,
+		Notification: fmt.Sprintf("%s liked your blog: %s", user.Username, blog.BlogId),
+	})
+	if err != nil {
+		logrus.Errorf("failed to marshal message, error: %v", err)
+	}
+
+	fmt.Printf("bx: %v\n", string(bx))
+
+	go func() {
+		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
+		if err != nil {
+			logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
+		}
+		logrus.Infof("message published successfully for user: %s", user.Username)
+	}()
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("blog %v has been liked successfully", req.BlogId),
+	}, nil
+}
+
+func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
+	if err != nil {
+		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+		}
+		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
+	}
+
+	err = us.dbConn.UnlikeBlog(req.Username, req.BlogId)
+	if err != nil {
+		logrus.Errorf("error while unliking the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	userLog := &models.UserLogs{
+		AccountId: user.AccountId,
+		IpAddress: req.Ip,
+		Client:    req.Client,
+	}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
+	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnlikeBlog, req.BlogId), constants.ServiceUser, constants.EventBlogUnlike, us.log)
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		Message: fmt.Sprintf("blog %v has been unliked successfully", req.BlogId),
+	}, nil
+}
+
+func (us *UserSvc) GetIfIFollowedUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
+	us.log.Debugf("user %s has requested to follow %s.", req.FollowerUsername, req.Username)
+
+	isFollowing, err := us.dbConn.IsUserFollowing(req.FollowerUsername, req.Username)
+	if err != nil {
+		logrus.Errorf("error while following the user: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.UserFollowRes{
+		Status:      http.StatusOK,
+		IsFollowing: isFollowing,
+	}, nil
+}
+
+func (us *UserSvc) GetIfBlogLiked(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	us.log.Debugf("user %s has requested to like blog %s.", req.Username, req.BlogId)
+
+	isLiked, err := us.dbConn.IsBlogLikedByUser(req.Username, req.BlogId)
+	if err != nil {
+		logrus.Errorf("error while liking the blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		IsLiked: isLiked,
 	}, nil
 }

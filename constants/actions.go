@@ -8,6 +8,7 @@ const (
 	BLOG_UPDATE         = "blog_update"
 	BLOG_PUBLISH        = "published"
 	BLOG_DELETE         = "delete"
+	BLOG_LIKE           = "blog_like"
 
 	DELETE_USERS_ALL_BLOGS = "delete_users_all_blogs"
 )
@@ -24,4 +25,8 @@ We're excited to have you on board!
 Best regards,
 The Monkeys Team
 `
+
+	NotificationBlogLicked = `Subject: Blog Liked! 
+		%s liked your blog %s
+	`
 )
