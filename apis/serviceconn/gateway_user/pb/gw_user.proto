@@ -136,6 +136,9 @@ message UserDetailReq {
     string account_id = 1;
     string username = 2;
     string email = 3;
+    string search_term = 4;
+    int32 limit = 5;
+    int32 offset = 6;
 }
 
 message UserDetailsResp {
@@ -252,6 +255,14 @@ message User {
 
 message FollowerFollowingResp {
     repeated User users = 1;
+    int32 limit = 2;
+    int32 offset = 3;
+}
+
+message CountResp {
+    int32 count = 1;
+    string error = 2;
+    int32 status = 3;
 }
 
 service UserService {
@@ -269,7 +280,7 @@ service UserService {
     rpc GetFollowers(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users who follow me
     rpc GetFollowing(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users I follow
     rpc GetIfIFollowedUser(UserFollowReq) returns (UserFollowRes) {}
-
+    rpc SearchUser(stream UserDetailReq) returns (stream FollowerFollowingResp) {}
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark
@@ -277,6 +288,9 @@ service UserService {
     rpc LikeBlog(BookMarkReq) returns (BookMarkRes) {}
     rpc UnlikeBlog(BookMarkReq) returns (BookMarkRes) {}
     rpc GetIfBlogLiked(BookMarkReq) returns (BookMarkRes) {}
+    rpc GetIfBlogBookMarked(BookMarkReq) returns (BookMarkRes) {}
+    rpc GetBookMarkCounts(BookMarkReq) returns (CountResp) {}
+    rpc GetLikeCounts(BookMarkReq) returns (CountResp) {}
     // Invite a co author
     rpc InviteCoAuthor(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
 
