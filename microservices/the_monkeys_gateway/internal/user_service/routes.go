@@ -2,7 +2,10 @@ package user_service
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -61,6 +64,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.POST("/follow/:username", usc.FollowUser)
 		routes.POST("/unfollow/:username", usc.UnfollowUser)
 		routes.GET("/is-followed/:username", usc.IsUserFollowed)
+		routes.GET("/search", usc.SearchUser)
 	}
 
 	// Invite and un invite as coauthor
@@ -70,8 +74,11 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.GET("/all-blogs/:username", usc.GetBlogsByUserName)
 		routes.POST("/bookmark/:blog_id", usc.BookMarkABlog)
 		routes.POST("/remove-bookmark/:blog_id", usc.RemoveBookMarkFromABlog)
+		routes.GET("/count-bookmarks/:blog_id", usc.CountBookMarks)
+		routes.GET("/is-bookmarked/:blog_id", usc.IsBlogBookMarked)
 		routes.POST("/like/:blog_id", usc.LikeABlog)
 		routes.POST("/unlike/:blog_id", usc.UnlikeABlog)
+		routes.GET("/count-likes/:blog_id", usc.CountLikes)
 		routes.GET("/is-liked/:blog_id", usc.IsBlogLiked)
 	}
 
@@ -795,4 +802,145 @@ func (asc *UserServiceClient) IsUserFollowed(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) CountBookMarks(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.GetBookMarkCounts(context.Background(), &pb.BookMarkReq{
+		BlogId: blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) IsBlogBookMarked(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.GetIfBlogBookMarked(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+		Ip:       ctx.Request.Header.Get("Ip"),
+		Client:   ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.AlreadyExists:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog already bookmarked"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) CountLikes(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+
+	res, err := asc.Client.GetLikeCounts(context.Background(), &pb.BookMarkReq{
+		BlogId: blogId,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
+	// Extract query parameters
+	searchTerm := ctx.Query("search_term")
+	limit := ctx.DefaultQuery("limit", "10")
+	offset := ctx.DefaultQuery("offset", "0")
+
+	// Convert limit and offset to integers
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil || limitInt <= 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid limit parameter"})
+		return
+	}
+
+	offsetInt, err := strconv.Atoi(offset)
+	if err != nil || offsetInt < 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid offset parameter"})
+		return
+	}
+
+	// Start the gRPC streaming client
+	stream, err := asc.Client.SearchUser(context.Background())
+	if err != nil {
+		logrus.Errorf("Failed to initialize SearchUser stream: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to initiate search"})
+		return
+	}
+
+	// Send the initial search request
+	err = stream.Send(&pb.UserDetailReq{
+		SearchTerm: searchTerm,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+	})
+	if err != nil {
+		logrus.Errorf("Failed to send search request: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send search request"})
+		return
+	}
+
+	// Close the stream after sending
+	if err := stream.CloseSend(); err != nil {
+		logrus.Warnf("Failed to close send stream: %v", err)
+	}
+
+	// Collect responses from the stream
+	var results []*pb.User
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			// End of stream
+			break
+		}
+		if err != nil {
+			logrus.Errorf("Error receiving search response: %v", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error receiving search results"})
+			return
+		}
+
+		// Append users to results
+		results = append(results, resp.Users...)
+	}
+
+	fmt.Printf("results: %v\n", results)
+	// Return results to the client
+	ctx.JSON(http.StatusOK, gin.H{"users": results})
 }

@@ -616,3 +616,101 @@ func (uh *uDBHandler) IsUserFollowing(followerUsername string, followingUsername
 
 	return count > 0, nil
 }
+
+func (uh *uDBHandler) CountBlogBookmarks(blogId string) (int64, error) {
+	query := `
+        SELECT COUNT(1)
+        FROM blog_bookmarks bb
+        JOIN blog b ON bb.blog_id = b.id
+        WHERE b.blog_id = $1
+    `
+
+	var count int64
+	err := uh.db.QueryRow(query, blogId).Scan(&count)
+	if err != nil {
+		uh.log.Errorf("Error counting bookmarks for blog %s: %+v", blogId, err)
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (uh *uDBHandler) IsBlogBookmarkedByUser(username string, blogId string) (bool, error) {
+	query := `
+        SELECT COUNT(1)
+        FROM blog_bookmarks bb
+        JOIN user_account u ON bb.user_id = u.id
+        JOIN blog b ON bb.blog_id = b.id
+        WHERE u.username = $1 AND b.blog_id = $2
+    `
+
+	var count int
+	err := uh.db.QueryRow(query, username, blogId).Scan(&count)
+	if err != nil {
+		uh.log.Errorf("Error checking if user %s bookmarked blog %s: %+v", username, blogId, err)
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (uh *uDBHandler) GetBlogLikeCount(blogId string) (int64, error) {
+	query := `
+        SELECT COUNT(1)
+        FROM blog_likes bl
+        JOIN blog b ON bl.blog_id = b.id
+        WHERE b.blog_id = $1
+    `
+
+	var count int64
+	err := uh.db.QueryRow(query, blogId).Scan(&count)
+	if err != nil {
+		uh.log.Errorf("Error counting likes for blog %s: %+v", blogId, err)
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (uh *uDBHandler) FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error) {
+	// Define the SQL query with pagination
+	query := `
+        SELECT username, first_name, last_name, bio, avatar_url
+        FROM user_account
+        WHERE username ILIKE $1 OR first_name ILIKE $1 OR last_name ILIKE $1
+        ORDER BY username
+        LIMIT $2 OFFSET $3
+    `
+
+	// Prepare the search term with wildcard for partial matching
+	searchPattern := "%" + searchTerm + "%"
+
+	// Slice to hold the results
+	var users []models.UserAccount
+
+	// Execute the query
+	rows, err := uh.db.Query(query, searchPattern, limit, offset)
+	if err != nil {
+		uh.log.Errorf("Error searching for users with term '%s': %+v", searchTerm, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Loop through the result rows and populate the users slice
+	for rows.Next() {
+		var user models.UserAccount
+		if err := rows.Scan(&user.UserName, &user.FirstName, &user.LastName, &user.Bio, &user.AvatarUrl); err != nil {
+			uh.log.Errorf("Error scanning user row: %+v", err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	// Check for any errors during iteration
+	if err = rows.Err(); err != nil {
+		uh.log.Errorf("Error iterating over user rows: %+v", err)
+		return nil, err
+	}
+
+	return users, nil
+}

@@ -33,11 +33,15 @@ const (
 	UserService_GetFollowers_FullMethodName         = "/auth_svc.UserService/GetFollowers"
 	UserService_GetFollowing_FullMethodName         = "/auth_svc.UserService/GetFollowing"
 	UserService_GetIfIFollowedUser_FullMethodName   = "/auth_svc.UserService/GetIfIFollowedUser"
+	UserService_SearchUser_FullMethodName           = "/auth_svc.UserService/SearchUser"
 	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
 	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
 	UserService_LikeBlog_FullMethodName             = "/auth_svc.UserService/LikeBlog"
 	UserService_UnlikeBlog_FullMethodName           = "/auth_svc.UserService/UnlikeBlog"
 	UserService_GetIfBlogLiked_FullMethodName       = "/auth_svc.UserService/GetIfBlogLiked"
+	UserService_GetIfBlogBookMarked_FullMethodName  = "/auth_svc.UserService/GetIfBlogBookMarked"
+	UserService_GetBookMarkCounts_FullMethodName    = "/auth_svc.UserService/GetBookMarkCounts"
+	UserService_GetLikeCounts_FullMethodName        = "/auth_svc.UserService/GetLikeCounts"
 	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
 	UserService_RevokeCoAuthorAccess_FullMethodName = "/auth_svc.UserService/RevokeCoAuthorAccess"
 	UserService_GetBlogsByUserIds_FullMethodName    = "/auth_svc.UserService/GetBlogsByUserIds"
@@ -62,6 +66,7 @@ type UserServiceClient interface {
 	GetFollowers(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
 	GetFollowing(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
 	GetIfIFollowedUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
+	SearchUser(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp], error)
 	// Bookmark blog
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Remove Bookmark
@@ -69,6 +74,9 @@ type UserServiceClient interface {
 	LikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	UnlikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	GetIfBlogLiked(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	GetIfBlogBookMarked(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	GetBookMarkCounts(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*CountResp, error)
+	GetLikeCounts(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*CountResp, error)
 	// Invite a co author
 	InviteCoAuthor(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -227,6 +235,19 @@ func (c *userServiceClient) GetIfIFollowedUser(ctx context.Context, in *UserFoll
 	return out, nil
 }
 
+func (c *userServiceClient) SearchUser(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[0], UserService_SearchUser_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UserDetailReq, FollowerFollowingResp]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_SearchUserClient = grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp]
+
 func (c *userServiceClient) BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
@@ -271,6 +292,36 @@ func (c *userServiceClient) GetIfBlogLiked(ctx context.Context, in *BookMarkReq,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
 	err := c.cc.Invoke(ctx, UserService_GetIfBlogLiked_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetIfBlogBookMarked(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BookMarkRes)
+	err := c.cc.Invoke(ctx, UserService_GetIfBlogBookMarked_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetBookMarkCounts(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*CountResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountResp)
+	err := c.cc.Invoke(ctx, UserService_GetBookMarkCounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetLikeCounts(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*CountResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CountResp)
+	err := c.cc.Invoke(ctx, UserService_GetLikeCounts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -335,6 +386,7 @@ type UserServiceServer interface {
 	GetFollowers(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
 	GetFollowing(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
 	GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
+	SearchUser(grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]) error
 	// Bookmark blog
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Remove Bookmark
@@ -342,6 +394,9 @@ type UserServiceServer interface {
 	LikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	UnlikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	GetIfBlogLiked(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	GetIfBlogBookMarked(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	GetBookMarkCounts(context.Context, *BookMarkReq) (*CountResp, error)
+	GetLikeCounts(context.Context, *BookMarkReq) (*CountResp, error)
 	// Invite a co author
 	InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
 	// Accept co author invitation
@@ -402,6 +457,9 @@ func (UnimplementedUserServiceServer) GetFollowing(context.Context, *UserDetailR
 func (UnimplementedUserServiceServer) GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIfIFollowedUser not implemented")
 }
+func (UnimplementedUserServiceServer) SearchUser(grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]) error {
+	return status.Errorf(codes.Unimplemented, "method SearchUser not implemented")
+}
 func (UnimplementedUserServiceServer) BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BookMarkBlog not implemented")
 }
@@ -416,6 +474,15 @@ func (UnimplementedUserServiceServer) UnlikeBlog(context.Context, *BookMarkReq) 
 }
 func (UnimplementedUserServiceServer) GetIfBlogLiked(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIfBlogLiked not implemented")
+}
+func (UnimplementedUserServiceServer) GetIfBlogBookMarked(context.Context, *BookMarkReq) (*BookMarkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIfBlogBookMarked not implemented")
+}
+func (UnimplementedUserServiceServer) GetBookMarkCounts(context.Context, *BookMarkReq) (*CountResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBookMarkCounts not implemented")
+}
+func (UnimplementedUserServiceServer) GetLikeCounts(context.Context, *BookMarkReq) (*CountResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLikeCounts not implemented")
 }
 func (UnimplementedUserServiceServer) InviteCoAuthor(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InviteCoAuthor not implemented")
@@ -702,6 +769,13 @@ func _UserService_GetIfIFollowedUser_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_SearchUser_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(UserServiceServer).SearchUser(&grpc.GenericServerStream[UserDetailReq, FollowerFollowingResp]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type UserService_SearchUserServer = grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]
+
 func _UserService_BookMarkBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BookMarkReq)
 	if err := dec(in); err != nil {
@@ -788,6 +862,60 @@ func _UserService_GetIfBlogLiked_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).GetIfBlogLiked(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetIfBlogBookMarked_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetIfBlogBookMarked(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetIfBlogBookMarked_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetIfBlogBookMarked(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetBookMarkCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetBookMarkCounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetBookMarkCounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetBookMarkCounts(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetLikeCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetLikeCounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetLikeCounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetLikeCounts(ctx, req.(*BookMarkReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -948,6 +1076,18 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_GetIfBlogLiked_Handler,
 		},
 		{
+			MethodName: "GetIfBlogBookMarked",
+			Handler:    _UserService_GetIfBlogBookMarked_Handler,
+		},
+		{
+			MethodName: "GetBookMarkCounts",
+			Handler:    _UserService_GetBookMarkCounts_Handler,
+		},
+		{
+			MethodName: "GetLikeCounts",
+			Handler:    _UserService_GetLikeCounts_Handler,
+		},
+		{
 			MethodName: "InviteCoAuthor",
 			Handler:    _UserService_InviteCoAuthor_Handler,
 		},
@@ -964,6 +1104,13 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_CreateNewTopics_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "SearchUser",
+			Handler:       _UserService_SearchUser_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "apis/serviceconn/gateway_user/pb/gw_user.proto",
 }
