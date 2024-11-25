@@ -714,3 +714,37 @@ func (uh *uDBHandler) FindUsersWithPagination(searchTerm string, limit int, offs
 
 	return users, nil
 }
+
+func (uh *uDBHandler) GetFollowersAndFollowingsCounts(username string) (int, int, error) {
+	// Define SQL queries for counting followers and followings
+	followerQuery := `
+        SELECT COUNT(1)
+        FROM user_follows uf
+        JOIN user_account u ON uf.following_id = u.id
+        WHERE u.username = $1
+    `
+	followingQuery := `
+        SELECT COUNT(1)
+        FROM user_follows uf
+        JOIN user_account u ON uf.follower_id = u.id
+        WHERE u.username = $1
+    `
+
+	var followers, followings int
+
+	// Get the follower count
+	err := uh.db.QueryRow(followerQuery, username).Scan(&followers)
+	if err != nil {
+		uh.log.Errorf("Error fetching followers count for %s: %+v", username, err)
+		return 0, 0, err
+	}
+
+	// Get the following count
+	err = uh.db.QueryRow(followingQuery, username).Scan(&followings)
+	if err != nil {
+		uh.log.Errorf("Error fetching followings count for %s: %+v", username, err)
+		return 0, 0, err
+	}
+
+	return followers, followings, nil
+}

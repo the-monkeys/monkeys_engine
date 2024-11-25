@@ -265,6 +265,14 @@ message CountResp {
     int32 status = 3;
 }
 
+message FollowerFollowingCountsResp {
+    int64 followers = 1;
+    int64 following = 2;
+    string error = 3;
+    string message = 4;
+    int32 status = 5;
+}
+
 service UserService {
     rpc GetUserActivities(UserActivityReq) returns (UserActivityResp) {}
     rpc GetUserProfile(UserProfileReq) returns (UserProfileRes) {}
@@ -280,6 +288,7 @@ service UserService {
     rpc GetFollowers(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users who follow me
     rpc GetFollowing(UserDetailReq) returns (FollowerFollowingResp) {} // Get Users I follow
     rpc GetIfIFollowedUser(UserFollowReq) returns (UserFollowRes) {}
+    rpc GetFollowersFollowingCounts(UserDetailReq) returns (FollowerFollowingCountsResp) {}
     rpc SearchUser(stream UserDetailReq) returns (stream FollowerFollowingResp) {}
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}

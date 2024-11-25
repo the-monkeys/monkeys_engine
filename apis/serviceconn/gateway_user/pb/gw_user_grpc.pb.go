@@ -19,33 +19,34 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_GetUserActivities_FullMethodName    = "/auth_svc.UserService/GetUserActivities"
-	UserService_GetUserProfile_FullMethodName       = "/auth_svc.UserService/GetUserProfile"
-	UserService_UpdateUserProfile_FullMethodName    = "/auth_svc.UserService/UpdateUserProfile"
-	UserService_DeleteUserAccount_FullMethodName    = "/auth_svc.UserService/DeleteUserAccount"
-	UserService_GetAllTopics_FullMethodName         = "/auth_svc.UserService/GetAllTopics"
-	UserService_GetAllCategories_FullMethodName     = "/auth_svc.UserService/GetAllCategories"
-	UserService_GetUserDetails_FullMethodName       = "/auth_svc.UserService/GetUserDetails"
-	UserService_FollowTopics_FullMethodName         = "/auth_svc.UserService/FollowTopics"
-	UserService_UnFollowTopics_FullMethodName       = "/auth_svc.UserService/UnFollowTopics"
-	UserService_FollowUser_FullMethodName           = "/auth_svc.UserService/FollowUser"
-	UserService_UnFollowUser_FullMethodName         = "/auth_svc.UserService/UnFollowUser"
-	UserService_GetFollowers_FullMethodName         = "/auth_svc.UserService/GetFollowers"
-	UserService_GetFollowing_FullMethodName         = "/auth_svc.UserService/GetFollowing"
-	UserService_GetIfIFollowedUser_FullMethodName   = "/auth_svc.UserService/GetIfIFollowedUser"
-	UserService_SearchUser_FullMethodName           = "/auth_svc.UserService/SearchUser"
-	UserService_BookMarkBlog_FullMethodName         = "/auth_svc.UserService/BookMarkBlog"
-	UserService_RemoveBookMark_FullMethodName       = "/auth_svc.UserService/RemoveBookMark"
-	UserService_LikeBlog_FullMethodName             = "/auth_svc.UserService/LikeBlog"
-	UserService_UnlikeBlog_FullMethodName           = "/auth_svc.UserService/UnlikeBlog"
-	UserService_GetIfBlogLiked_FullMethodName       = "/auth_svc.UserService/GetIfBlogLiked"
-	UserService_GetIfBlogBookMarked_FullMethodName  = "/auth_svc.UserService/GetIfBlogBookMarked"
-	UserService_GetBookMarkCounts_FullMethodName    = "/auth_svc.UserService/GetBookMarkCounts"
-	UserService_GetLikeCounts_FullMethodName        = "/auth_svc.UserService/GetLikeCounts"
-	UserService_InviteCoAuthor_FullMethodName       = "/auth_svc.UserService/InviteCoAuthor"
-	UserService_RevokeCoAuthorAccess_FullMethodName = "/auth_svc.UserService/RevokeCoAuthorAccess"
-	UserService_GetBlogsByUserIds_FullMethodName    = "/auth_svc.UserService/GetBlogsByUserIds"
-	UserService_CreateNewTopics_FullMethodName      = "/auth_svc.UserService/CreateNewTopics"
+	UserService_GetUserActivities_FullMethodName           = "/auth_svc.UserService/GetUserActivities"
+	UserService_GetUserProfile_FullMethodName              = "/auth_svc.UserService/GetUserProfile"
+	UserService_UpdateUserProfile_FullMethodName           = "/auth_svc.UserService/UpdateUserProfile"
+	UserService_DeleteUserAccount_FullMethodName           = "/auth_svc.UserService/DeleteUserAccount"
+	UserService_GetAllTopics_FullMethodName                = "/auth_svc.UserService/GetAllTopics"
+	UserService_GetAllCategories_FullMethodName            = "/auth_svc.UserService/GetAllCategories"
+	UserService_GetUserDetails_FullMethodName              = "/auth_svc.UserService/GetUserDetails"
+	UserService_FollowTopics_FullMethodName                = "/auth_svc.UserService/FollowTopics"
+	UserService_UnFollowTopics_FullMethodName              = "/auth_svc.UserService/UnFollowTopics"
+	UserService_FollowUser_FullMethodName                  = "/auth_svc.UserService/FollowUser"
+	UserService_UnFollowUser_FullMethodName                = "/auth_svc.UserService/UnFollowUser"
+	UserService_GetFollowers_FullMethodName                = "/auth_svc.UserService/GetFollowers"
+	UserService_GetFollowing_FullMethodName                = "/auth_svc.UserService/GetFollowing"
+	UserService_GetIfIFollowedUser_FullMethodName          = "/auth_svc.UserService/GetIfIFollowedUser"
+	UserService_GetFollowersFollowingCounts_FullMethodName = "/auth_svc.UserService/GetFollowersFollowingCounts"
+	UserService_SearchUser_FullMethodName                  = "/auth_svc.UserService/SearchUser"
+	UserService_BookMarkBlog_FullMethodName                = "/auth_svc.UserService/BookMarkBlog"
+	UserService_RemoveBookMark_FullMethodName              = "/auth_svc.UserService/RemoveBookMark"
+	UserService_LikeBlog_FullMethodName                    = "/auth_svc.UserService/LikeBlog"
+	UserService_UnlikeBlog_FullMethodName                  = "/auth_svc.UserService/UnlikeBlog"
+	UserService_GetIfBlogLiked_FullMethodName              = "/auth_svc.UserService/GetIfBlogLiked"
+	UserService_GetIfBlogBookMarked_FullMethodName         = "/auth_svc.UserService/GetIfBlogBookMarked"
+	UserService_GetBookMarkCounts_FullMethodName           = "/auth_svc.UserService/GetBookMarkCounts"
+	UserService_GetLikeCounts_FullMethodName               = "/auth_svc.UserService/GetLikeCounts"
+	UserService_InviteCoAuthor_FullMethodName              = "/auth_svc.UserService/InviteCoAuthor"
+	UserService_RevokeCoAuthorAccess_FullMethodName        = "/auth_svc.UserService/RevokeCoAuthorAccess"
+	UserService_GetBlogsByUserIds_FullMethodName           = "/auth_svc.UserService/GetBlogsByUserIds"
+	UserService_CreateNewTopics_FullMethodName             = "/auth_svc.UserService/CreateNewTopics"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -66,6 +67,7 @@ type UserServiceClient interface {
 	GetFollowers(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
 	GetFollowing(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingResp, error)
 	GetIfIFollowedUser(ctx context.Context, in *UserFollowReq, opts ...grpc.CallOption) (*UserFollowRes, error)
+	GetFollowersFollowingCounts(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingCountsResp, error)
 	SearchUser(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp], error)
 	// Bookmark blog
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
@@ -235,6 +237,16 @@ func (c *userServiceClient) GetIfIFollowedUser(ctx context.Context, in *UserFoll
 	return out, nil
 }
 
+func (c *userServiceClient) GetFollowersFollowingCounts(ctx context.Context, in *UserDetailReq, opts ...grpc.CallOption) (*FollowerFollowingCountsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FollowerFollowingCountsResp)
+	err := c.cc.Invoke(ctx, UserService_GetFollowersFollowingCounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) SearchUser(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[0], UserService_SearchUser_FullMethodName, cOpts...)
@@ -386,6 +398,7 @@ type UserServiceServer interface {
 	GetFollowers(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
 	GetFollowing(context.Context, *UserDetailReq) (*FollowerFollowingResp, error)
 	GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error)
+	GetFollowersFollowingCounts(context.Context, *UserDetailReq) (*FollowerFollowingCountsResp, error)
 	SearchUser(grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]) error
 	// Bookmark blog
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
@@ -456,6 +469,9 @@ func (UnimplementedUserServiceServer) GetFollowing(context.Context, *UserDetailR
 }
 func (UnimplementedUserServiceServer) GetIfIFollowedUser(context.Context, *UserFollowReq) (*UserFollowRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIfIFollowedUser not implemented")
+}
+func (UnimplementedUserServiceServer) GetFollowersFollowingCounts(context.Context, *UserDetailReq) (*FollowerFollowingCountsResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFollowersFollowingCounts not implemented")
 }
 func (UnimplementedUserServiceServer) SearchUser(grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]) error {
 	return status.Errorf(codes.Unimplemented, "method SearchUser not implemented")
@@ -769,6 +785,24 @@ func _UserService_GetIfIFollowedUser_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetFollowersFollowingCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UserDetailReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetFollowersFollowingCounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetFollowersFollowingCounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetFollowersFollowingCounts(ctx, req.(*UserDetailReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_SearchUser_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(UserServiceServer).SearchUser(&grpc.GenericServerStream[UserDetailReq, FollowerFollowingResp]{ServerStream: stream})
 }
@@ -1054,6 +1088,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetIfIFollowedUser",
 			Handler:    _UserService_GetIfIFollowedUser_Handler,
+		},
+		{
+			MethodName: "GetFollowersFollowingCounts",
+			Handler:    _UserService_GetFollowersFollowingCounts_Handler,
 		},
 		{
 			MethodName: "BookMarkBlog",

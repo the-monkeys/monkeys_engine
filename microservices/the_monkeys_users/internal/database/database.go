@@ -53,6 +53,7 @@ type UserDb interface {
 	CountBlogBookmarks(blogId string) (int64, error)
 	GetBlogLikeCount(blogId string) (int64, error)
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
+	GetFollowersAndFollowingsCounts(username string) (int, int, error)
 
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
