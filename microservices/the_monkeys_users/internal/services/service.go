@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -792,4 +793,101 @@ func (us *UserSvc) GetIfBlogLiked(ctx context.Context, req *pb.BookMarkReq) (*pb
 		Status:  http.StatusOK,
 		IsLiked: isLiked,
 	}, nil
+}
+
+// GetIfBlogBookMarked checks if a blog is bookmarked by the user
+func (s *UserSvc) GetIfBlogBookMarked(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	s.log.Debugf("Checking if blog %s is bookmarked by user %s", req.BlogId, req.Username)
+
+	isBookmark, err := s.dbConn.IsBlogBookmarkedByUser(req.Username, req.BlogId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to check if blog is bookmarked")
+	}
+	// Return the bookmarked status
+	return &pb.BookMarkRes{
+		Status:     http.StatusOK,
+		Message:    "Blog bookmark status retrieved successfully",
+		BookMarked: isBookmark,
+	}, nil
+}
+
+// GetBookMarkCounts returns the total number of bookmarks for a blog
+func (s *UserSvc) GetBookMarkCounts(ctx context.Context, req *pb.BookMarkReq) (*pb.CountResp, error) {
+	s.log.Debugf("Getting bookmark count for blog %s", req.GetBlogId())
+	count, err := s.dbConn.CountBlogBookmarks(req.BlogId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to get bookmark count")
+	}
+
+	return &pb.CountResp{
+		Status: 200,
+		Count:  int32(count),
+	}, nil
+}
+
+// GetLikeCounts returns the total number of likes for a blog
+func (s *UserSvc) GetLikeCounts(ctx context.Context, req *pb.BookMarkReq) (*pb.CountResp, error) {
+	s.log.Debugf("Getting like count for blog %s", req.GetBlogId())
+	count, err := s.dbConn.GetBlogLikeCount(req.BlogId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to get like count")
+	}
+
+	return &pb.CountResp{
+		Status: 200,
+		Count:  int32(count),
+	}, nil
+}
+
+func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
+	us.log.Info("SearchUser stream initiated")
+
+	for {
+		// Receive data from the stream
+		req, err := stream.Recv()
+		if err == io.EOF {
+			us.log.Info("SearchUser stream closed by client")
+			return nil
+		}
+		if err != nil {
+			us.log.Errorf("Error receiving data from stream: %v", err)
+			return status.Errorf(codes.Internal, "Error reading stream: %v", err)
+		}
+
+		us.log.Infof("Received search request for username: %s or account_id: %s", req.GetUsername(), req.GetAccountId())
+
+		// Search user based on the provided details
+		var users []models.UserAccount
+		if req.GetSearchTerm() == "" {
+
+		}
+
+		users, err = us.dbConn.FindUsersWithPagination(req.SearchTerm, int(req.Limit), int(req.Offset))
+		if err != nil {
+			us.log.Errorf("Error searching user: %v", err)
+			return status.Errorf(codes.Internal, "Failed to search users: %v", err)
+		}
+
+		fmt.Printf("users: %v\n", users)
+
+		// Send matching users back to the client
+		for _, user := range users {
+			resp := &pb.FollowerFollowingResp{
+				Users: []*pb.User{
+					{
+						AccountId: user.AccountId,
+						Username:  user.UserName,
+						FirstName: user.FirstName,
+						LastName:  user.LastName,
+						Bio:       user.Bio.String,
+						AvatarUrl: user.AvatarUrl.String,
+					},
+				},
+			}
+			if err := stream.Send(resp); err != nil {
+				us.log.Errorf("Error sending response to stream: %v", err)
+				return status.Errorf(codes.Internal, "Error sending response: %v", err)
+			}
+		}
+	}
 }
