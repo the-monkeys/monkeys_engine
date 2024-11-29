@@ -45,6 +45,7 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/category", usc.GetAllCategories)
 	routes.GET("/public/:id", usc.GetUserPublicProfile)
 	routes.GET("/public/account/:acc_id", usc.GetUserDetailsByAccId)
+	routes.GET("/connection-count/:username", usc.ConnectionCount)
 
 	routes.Use(mware.AuthRequired)
 
@@ -943,4 +944,26 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 	fmt.Printf("results: %v\n", results)
 	// Return results to the client
 	ctx.JSON(http.StatusOK, gin.H{"users": results})
+}
+
+func (asc *UserServiceClient) ConnectionCount(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	res, err := asc.Client.GetFollowersFollowingCounts(context.Background(), &pb.UserDetailReq{
+		Username: username,
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+				return
+			}
+		}
+	}
+	ctx.JSON(http.StatusOK, res)
 }

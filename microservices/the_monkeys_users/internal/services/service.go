@@ -709,25 +709,25 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
-	bx, err := json.Marshal(models.TheMonkeysMessage{
-		Username:     user.Username,
-		AccountId:    user.AccountId,
-		Action:       constants.BLOG_LIKE,
-		Notification: fmt.Sprintf("%s liked your blog: %s", user.Username, blog.BlogId),
-	})
-	if err != nil {
-		logrus.Errorf("failed to marshal message, error: %v", err)
-	}
-
-	fmt.Printf("bx: %v\n", string(bx))
-
-	go func() {
-		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
+	if blog.AccountId != user.AccountId {
+		bx, err := json.Marshal(models.TheMonkeysMessage{
+			Username:     blog.Username,
+			AccountId:    blog.AccountId,
+			Action:       constants.BLOG_LIKE,
+			Notification: fmt.Sprintf("%s liked your blog: %s", user.Username, blog.BlogId),
+		})
 		if err != nil {
-			logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
+			logrus.Errorf("failed to marshal message, error: %v", err)
 		}
-		logrus.Infof("message published successfully for user: %s", user.Username)
-	}()
+
+		go func() {
+			err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
+			if err != nil {
+				logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
+			}
+			logrus.Infof("message published successfully for user: %s", user.Username)
+		}()
+	}
 
 	return &pb.BookMarkRes{
 		Status:  http.StatusOK,
@@ -890,4 +890,23 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 			}
 		}
 	}
+}
+
+func (us *UserSvc) GetFollowersFollowingCounts(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingCountsResp, error) {
+	us.log.Infof("fetching followers and following count for user: %s", req.Username)
+	followers, following, err := us.dbConn.GetFollowersAndFollowingsCounts(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching followers and following count for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("followers and following count for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	return &pb.FollowerFollowingCountsResp{
+		Followers: int64(followers),
+		Following: int64(following),
+		Status:    http.StatusOK,
+	}, nil
 }
