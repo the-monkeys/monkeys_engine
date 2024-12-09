@@ -595,6 +595,27 @@ func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.U
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.FollowedUser, req.Username), constants.ServiceUser, constants.EventFollowUser, us.log)
 
+	if req.FollowerUsername != req.Username {
+		// Send a notification to the user
+		bx, err := json.Marshal(models.TheMonkeysMessage{
+			AccountId:    usa.AccountId,
+			Username:     req.FollowerUsername,
+			NewUsername:  req.Username,
+			Action:       constants.USER_FOLLOWED,
+			Notification: fmt.Sprintf("%s has followed you", req.FollowerUsername),
+		})
+		if err != nil {
+			logrus.Errorf("failed to marshal message, error: %v", err)
+		}
+
+		go func() {
+			err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
+			if err != nil {
+				logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", req.Username, err)
+			}
+		}()
+	}
+
 	return &pb.UserFollowRes{
 		Status:  http.StatusOK,
 		Message: fmt.Sprintf("%s has been followed successfully", req.Username),
