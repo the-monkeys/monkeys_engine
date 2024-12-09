@@ -16,6 +16,7 @@ type NotificationDB interface {
 	CreateNotification(accountID string, notificationName string, message string, relatedBlogID, relatedUserAccountID string, channelName string) error
 	GetUserNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
 	MarkNotificationAsSeen(notificationIDs []int64, username string) error
+	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
 }
 
 type notificationDB struct {
@@ -191,4 +192,33 @@ func (uh *notificationDB) MarkNotificationAsSeen(notificationIDs []int64, userna
 
 	uh.log.Infof("Successfully marked %d notifications as seen for user ID %d", rowsAffected, userID)
 	return nil
+}
+
+func (uh *notificationDB) CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error) {
+	return uh.fetchUserByIdentifier("username", username)
+}
+
+func (uh *notificationDB) fetchUserByIdentifier(identifierType, identifierValue string) (*models.TheMonkeysUser, error) {
+	var tmu models.TheMonkeysUser
+	query := `
+		SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
+		ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
+		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
+		FROM USER_ACCOUNT ua
+		LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
+		LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
+		LEFT JOIN user_status us ON ua.user_status = us.id
+		WHERE ua.` + identifierType + ` = $1;
+	`
+
+	if err := uh.db.QueryRow(query, identifierValue).
+		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
+			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
+			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
+			&tmu.EmailVerificationTimeout); err != nil {
+		uh.log.Errorf("Can't find a user with %s: %s, error: %+v", identifierType, identifierValue, err)
+		return nil, err
+	}
+
+	return &tmu, nil
 }

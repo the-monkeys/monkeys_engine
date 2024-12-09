@@ -71,12 +71,28 @@ func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, db data
 		if err != nil {
 			log.Errorf("Failed to create notification for user registration: %v", err)
 		}
+
 	case constants.BLOG_LIKE:
 		log.Infof("Received blog like notification: %s", user.Username)
 		err := db.CreateNotification(user.AccountId, constants.BlogLiked, user.Notification, user.BlogId, user.AccountId, "Browser")
 		if err != nil {
 			log.Errorf("Failed to create notification for blog like: %v", err)
 		}
+
+	case constants.USER_FOLLOWED:
+		log.Debugf("Received user follow notification: %s", user.Username)
+
+		dbUser, err := db.CheckIfUsernameExist(user.NewUsername)
+		if err != nil {
+			log.Errorf("Failed to check if username exists: %v", err)
+			return
+		}
+
+		err = db.CreateNotification(dbUser.AccountId, constants.NewFollower, user.Notification, user.BlogId, user.AccountId, "Browser")
+		if err != nil {
+			log.Errorf("Failed to create notification for blog like: %v", err)
+		}
+
 	default:
 		log.Errorf("Unknown action: %s", user.Action)
 	}

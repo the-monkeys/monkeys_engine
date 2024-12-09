@@ -9,6 +9,7 @@ const (
 	BLOG_PUBLISH        = "published"
 	BLOG_DELETE         = "delete"
 	BLOG_LIKE           = "blog_like"
+	USER_FOLLOWED       = "user_followed"
 
 	DELETE_USERS_ALL_BLOGS = "delete_users_all_blogs"
 )
