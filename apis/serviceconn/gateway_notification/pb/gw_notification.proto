@@ -58,5 +58,7 @@ service NotificationService {
     rpc GetNotification (GetNotificationReq) returns (GetNotificationRes) {}
     rpc DeleteNotification (DeleteNotificationReq) returns (DeleteNotificationRes) {}
     rpc NotificationSeen (WatchNotificationReq) returns (NotificationResponse) {}
+
+    rpc GetNotificationStream (GetNotificationReq) returns (stream GetNotificationRes) {}
 }
 

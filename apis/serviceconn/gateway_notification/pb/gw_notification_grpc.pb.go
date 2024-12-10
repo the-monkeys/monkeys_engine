@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationService_SendNotification_FullMethodName   = "/notification_svc.NotificationService/SendNotification"
-	NotificationService_GetNotification_FullMethodName    = "/notification_svc.NotificationService/GetNotification"
-	NotificationService_DeleteNotification_FullMethodName = "/notification_svc.NotificationService/DeleteNotification"
-	NotificationService_NotificationSeen_FullMethodName   = "/notification_svc.NotificationService/NotificationSeen"
+	NotificationService_SendNotification_FullMethodName      = "/notification_svc.NotificationService/SendNotification"
+	NotificationService_GetNotification_FullMethodName       = "/notification_svc.NotificationService/GetNotification"
+	NotificationService_DeleteNotification_FullMethodName    = "/notification_svc.NotificationService/DeleteNotification"
+	NotificationService_NotificationSeen_FullMethodName      = "/notification_svc.NotificationService/NotificationSeen"
+	NotificationService_GetNotificationStream_FullMethodName = "/notification_svc.NotificationService/GetNotificationStream"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -33,6 +34,7 @@ type NotificationServiceClient interface {
 	GetNotification(ctx context.Context, in *GetNotificationReq, opts ...grpc.CallOption) (*GetNotificationRes, error)
 	DeleteNotification(ctx context.Context, in *DeleteNotificationReq, opts ...grpc.CallOption) (*DeleteNotificationRes, error)
 	NotificationSeen(ctx context.Context, in *WatchNotificationReq, opts ...grpc.CallOption) (*NotificationResponse, error)
+	GetNotificationStream(ctx context.Context, in *GetNotificationReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetNotificationRes], error)
 }
 
 type notificationServiceClient struct {
@@ -83,6 +85,25 @@ func (c *notificationServiceClient) NotificationSeen(ctx context.Context, in *Wa
 	return out, nil
 }
 
+func (c *notificationServiceClient) GetNotificationStream(ctx context.Context, in *GetNotificationReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetNotificationRes], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &NotificationService_ServiceDesc.Streams[0], NotificationService_GetNotificationStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetNotificationReq, GetNotificationRes]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type NotificationService_GetNotificationStreamClient = grpc.ServerStreamingClient[GetNotificationRes]
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
@@ -91,6 +112,7 @@ type NotificationServiceServer interface {
 	GetNotification(context.Context, *GetNotificationReq) (*GetNotificationRes, error)
 	DeleteNotification(context.Context, *DeleteNotificationReq) (*DeleteNotificationRes, error)
 	NotificationSeen(context.Context, *WatchNotificationReq) (*NotificationResponse, error)
+	GetNotificationStream(*GetNotificationReq, grpc.ServerStreamingServer[GetNotificationRes]) error
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -112,6 +134,9 @@ func (UnimplementedNotificationServiceServer) DeleteNotification(context.Context
 }
 func (UnimplementedNotificationServiceServer) NotificationSeen(context.Context, *WatchNotificationReq) (*NotificationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotificationSeen not implemented")
+}
+func (UnimplementedNotificationServiceServer) GetNotificationStream(*GetNotificationReq, grpc.ServerStreamingServer[GetNotificationRes]) error {
+	return status.Errorf(codes.Unimplemented, "method GetNotificationStream not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -206,6 +231,17 @@ func _NotificationService_NotificationSeen_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_GetNotificationStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetNotificationReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(NotificationServiceServer).GetNotificationStream(m, &grpc.GenericServerStream[GetNotificationReq, GetNotificationRes]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type NotificationService_GetNotificationStreamServer = grpc.ServerStreamingServer[GetNotificationRes]
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -230,6 +266,12 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _NotificationService_NotificationSeen_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetNotificationStream",
+			Handler:       _NotificationService_GetNotificationStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "apis/serviceconn/gateway_notification/pb/gw_notification.proto",
 }
