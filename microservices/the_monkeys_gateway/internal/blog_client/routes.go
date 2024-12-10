@@ -62,7 +62,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes := router.Group("/api/v1/blog")
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
 	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
-	routes.GET("/tags", blogClient.GetBlogsByTagsName)
+	routes.POST("/tags", blogClient.GetBlogsByTagsName)
 	routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName)
 	routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId)
 	routes.GET("/news1", blogClient.GetNews1)
