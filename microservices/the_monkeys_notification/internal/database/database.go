@@ -17,6 +17,7 @@ type NotificationDB interface {
 	GetUserNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
 	MarkNotificationAsSeen(notificationIDs []int64, username string) error
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
+	GetUnseenNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
 }
 
 type notificationDB struct {
@@ -221,4 +222,60 @@ func (uh *notificationDB) fetchUserByIdentifier(identifierType, identifierValue 
 	}
 
 	return &tmu, nil
+}
+
+// GetUnseenNotifications fetches unseen notifications for a user with pagination
+func (uh *notificationDB) GetUnseenNotifications(username string, limit int64, offset int64) ([]*models.Notification, error) {
+	var userID int64
+
+	// Step 1: Fetch the user ID for the provided username
+	err := uh.db.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID)
+	if err != nil {
+		uh.log.Errorf("Error fetching user ID for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	// Step 2: Prepare the query to fetch only unseen notifications
+	query := `
+        SELECT n.id, n.notification_type_id, nt.notification_name, n.message, n.related_blog_id, n.related_user_id, 
+               n.created_at, n.seen, n.delivery_status, nc.channel_name
+        FROM notifications n
+        JOIN notification_type nt ON n.notification_type_id = nt.id
+        JOIN notification_channel nc ON n.channel_id = nc.id
+        WHERE n.user_id = $1 AND n.seen = FALSE
+        ORDER BY n.created_at DESC
+        LIMIT $2 OFFSET $3;
+    `
+
+	// Step 3: Execute the query
+	rows, err := uh.db.Query(query, userID, limit, offset)
+	if err != nil {
+		uh.log.Errorf("Error fetching unseen notifications for user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Step 4: Collect the results into a slice of Notification structs
+	var notifications []*models.Notification
+	for rows.Next() {
+		var notification models.Notification
+		err := rows.Scan(&notification.ID, &notification.NotificationTypeID, &notification.NotificationName,
+			&notification.Message, &notification.RelatedBlogID, &notification.RelatedUserID,
+			&notification.CreatedAt, &notification.Seen, &notification.DeliveryStatus,
+			&notification.ChannelName)
+		if err != nil {
+			uh.log.Errorf("Error scanning notification data for user ID %d, error: %+v", userID, err)
+			return nil, err
+		}
+		notifications = append(notifications, &notification)
+	}
+
+	// Step 5: Check for errors after iteration
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Row iteration error while fetching unseen notifications for user ID %d, error: %+v", userID, err)
+		return nil, err
+	}
+
+	// uh.log.Infof("Successfully fetched unseen notifications for user ID: %d", userID)
+	return notifications, nil
 }
