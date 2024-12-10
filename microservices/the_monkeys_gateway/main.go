@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
@@ -35,6 +36,7 @@ func main() {
 		logrus.Fatalf("failed to load the config: %v", err)
 	}
 
+	log := logger.GetLogger()
 	// Set Gin to Release mode
 	gin.SetMode(gin.ReleaseMode)
 
@@ -69,7 +71,7 @@ func main() {
 	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient)
 	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
-	notification.RegisterNotificationRoute(server.router, cfg, authClient)
+	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {

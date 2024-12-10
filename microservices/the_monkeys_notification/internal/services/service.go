@@ -31,7 +31,7 @@ func (ns *NotificationSvc) SendNotification(context.Context, *pb.SendNotificatio
 }
 
 func (ns *NotificationSvc) GetNotification(ctx context.Context, req *pb.GetNotificationReq) (*pb.GetNotificationRes, error) {
-	ns.log.Infof("GetNotification request received for user: %s", req.Username)
+	ns.log.Debugf("GetNotification request received for user: %s", req.Username)
 
 	res, err := ns.db.GetUserNotifications(req.Username, req.Limit, req.Offset)
 	if err != nil {
@@ -55,7 +55,7 @@ func (ns *NotificationSvc) GetNotification(ctx context.Context, req *pb.GetNotif
 }
 
 func (ns *NotificationSvc) NotificationSeen(ctx context.Context, req *pb.WatchNotificationReq) (*pb.NotificationResponse, error) {
-	ns.log.Infof("NotificationSeen request received for user: %s", req.UserId)
+	ns.log.Debugf("NotificationSeen request received for user: %s", req.UserId)
 
 	ids := make([]int64, 0)
 	for _, n := range req.Notification {
@@ -82,4 +82,46 @@ func (ns *NotificationSvc) NotificationSeen(ctx context.Context, req *pb.WatchNo
 
 func (ns *NotificationSvc) DeleteNotification(context.Context, *pb.DeleteNotificationReq) (*pb.DeleteNotificationRes, error) {
 	panic("not implemented") // TODO: Implement
+}
+
+func (ns *NotificationSvc) GetNotificationStream(req *pb.GetNotificationReq, stream pb.NotificationService_GetNotificationStreamServer) error {
+	ns.log.Debugf("GetNotificationStream request received for user: %s", req.Username)
+
+	// Fetch user notifications from the database
+	notifications, err := ns.db.GetUnseenNotifications(req.Username, req.Limit, req.Offset)
+	if err != nil {
+		ns.log.Errorf("Error fetching notifications for user %s: %v", req.Username, err)
+		return err
+	}
+
+	if len(notifications) == 0 {
+		ns.log.Debugf("No notifications found for user: %s", req.Username)
+		return nil
+	}
+
+	// Stream notifications one by one
+	for _, notification := range notifications {
+		sID := strconv.FormatInt(int64(notification.ID), 10)
+		res := &pb.GetNotificationRes{
+			Notification: []*pb.Notification{
+				{
+					Id:      sID,
+					UserId:  req.Username,
+					Message: notification.Message,
+					Status:  notification.DeliveryStatus,
+					Seen:    notification.Seen,
+				},
+			},
+		}
+
+		// Send the notification to the stream
+		if err := stream.Send(res); err != nil {
+			ns.log.Errorf("Error streaming notification ID %d to user %s: %v", notification.ID, req.Username, err)
+			return err
+		}
+		// ns.log.Debugf("Notification ID %d sent to user %s", notification.ID, req.Username)
+	}
+
+	// ns.log.Debugf("All notifications streamed for user: %s", req.Username)
+	return nil
 }
