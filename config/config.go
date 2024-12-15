@@ -90,6 +90,12 @@ type Config struct {
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 	Keys              Keys              `mapstructure:"keys"`
 	GoogleOAuth2      GoogleOAuth2      `mapstructure:"google_oauth2"`
+	AllowedCors       AllowedCors       `mapstructure:"allowed_cors"`
+}
+
+type AllowedCors struct {
+	AllowedOrigins []string `mapstructure:"allowed_origins"`
+	AllowedIPs     []string `mapstructure:"allowed_ips"`
 }
 
 func GetConfig() (*Config, error) {

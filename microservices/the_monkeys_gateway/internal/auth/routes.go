@@ -52,7 +52,6 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 			Endpoint:     google.Endpoint,
 		},
 	}
-	fmt.Printf("asc.googleOauthConfig: %+v\n", asc.googleOauthConfig)
 
 	routes := router.Group("/api/v1/auth")
 

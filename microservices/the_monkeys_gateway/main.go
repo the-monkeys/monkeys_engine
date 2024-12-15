@@ -55,8 +55,8 @@ func main() {
 	}))
 
 	// Enable CORS
-	server.router.Use(middleware.CORSMiddleware())
-
+	server.router.Use(middleware.CORSMiddleware(cfg.AllowedCors.AllowedOrigins, cfg.AllowedCors.AllowedIPs))
+	upgrdr := middleware.NewWebSocketUpgrader(cfg.AllowedCors.AllowedOrigins, cfg.AllowedCors.AllowedIPs)
 	// Log request body
 	server.router.Use(middleware.LogRequestBody())
 
@@ -69,9 +69,9 @@ func main() {
 	})
 
 	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient)
-	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
+	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient, upgrdr)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
-	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
+	notification.RegisterNotificationRoute(server.router, cfg, authClient, log, upgrdr)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {

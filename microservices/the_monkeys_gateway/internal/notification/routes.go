@@ -17,11 +17,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Consider restricting this based on your use case
-	},
-}
+// var upgrader = websocket.Upgrader{
+// 	CheckOrigin: func(r *http.Request) bool {
+// 		return true // Consider restricting this based on your use case
+// 	},
+// }
 
 type Notification struct {
 	ID      string `json:"id"`
@@ -35,6 +35,7 @@ type NotificationServiceClient struct {
 	mu          sync.Mutex
 	connections map[string][]*websocket.Conn // Map user ID to WebSocket connections
 	log         *logrus.Logger
+	upgrader    websocket.Upgrader
 }
 
 // NewNotificationServiceClient creates a new instance of NotificationServiceClient
@@ -49,13 +50,14 @@ func NewNotificationServiceClient(cfg *config.Config) pb.NotificationServiceClie
 }
 
 // RegisterNotificationRoute sets up the notification routes
-func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *logrus.Logger) *NotificationServiceClient {
+func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *logrus.Logger, upgrader websocket.Upgrader) *NotificationServiceClient {
 	mware := auth.InitAuthMiddleware(authClient)
 
 	nsc := &NotificationServiceClient{
 		Client:      NewNotificationServiceClient(cfg),
 		connections: make(map[string][]*websocket.Conn), // Map of user ID to WebSocket connections
 		log:         log,
+		upgrader:    upgrader,
 	}
 
 	routes := router.Group("/api/v1/notification")
@@ -174,7 +176,7 @@ func (nsc *NotificationServiceClient) ViewNotification(ctx *gin.Context) {
 
 func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 	// Upgrade the HTTP connection to a WebSocket connection
-	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	conn, err := nsc.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		nsc.log.Errorf("Failed to upgrade to WebSocket: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to establish WebSocket connection"})

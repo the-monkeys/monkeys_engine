@@ -24,12 +24,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins
-		return true
-	},
-}
+// var upgrader = websocket.Upgrader{
+// 	CheckOrigin: func(r *http.Request) bool {
+// 		// Allow all origins
+// 		return true
+// 	},
+// }
 
 type BlogServiceClient struct {
 	Client     pb.BlogServiceClient
@@ -39,6 +39,7 @@ type BlogServiceClient struct {
 	cache1     string
 	userCli    *user_service.UserServiceClient
 	config     *config.Config
+	upgrader   websocket.Upgrader
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
@@ -51,13 +52,14 @@ func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
 	return pb.NewBlogServiceClient(cc)
 }
 
-func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient) *BlogServiceClient {
+func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient, upgrader websocket.Upgrader) *BlogServiceClient {
 	mware := auth.InitAuthMiddleware(authClient)
 
 	blogClient := &BlogServiceClient{
-		Client:  NewBlogServiceClient(cfg),
-		userCli: userClient,
-		config:  cfg,
+		Client:   NewBlogServiceClient(cfg),
+		userCli:  userClient,
+		config:   cfg,
+		upgrader: upgrader,
 	}
 	routes := router.Group("/api/v1/blog")
 	routes.GET("/latest", blogClient.GetLatest100Blogs)
@@ -132,7 +134,7 @@ func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
 		action = constants.BLOG_CREATE
 	}
 
-	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	conn, err := asc.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		logrus.Errorf("Error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -1001,7 +1003,7 @@ func (asc *BlogServiceClient) DraftABlogV2(ctx *gin.Context) {
 	}
 
 	// Upgrade the connection to WebSocket
-	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	conn, err := asc.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		logrus.Errorf("error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
