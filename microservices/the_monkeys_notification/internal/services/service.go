@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -90,6 +91,10 @@ func (ns *NotificationSvc) GetNotificationStream(req *pb.GetNotificationReq, str
 	// Fetch user notifications from the database
 	notifications, err := ns.db.GetUnseenNotifications(req.Username, req.Limit, req.Offset)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+
 		ns.log.Errorf("Error fetching notifications for user %s: %v", req.Username, err)
 		return err
 	}

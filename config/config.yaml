@@ -73,3 +73,10 @@ keys:
   mediastack: token
   newsapi: "token"
   hindustantimes: token
+
+allowed_cors:
+  allowed_origins:
+    - "<fqdn1>"
+  allowed_ips:
+    - "<ip1>"
+ 
