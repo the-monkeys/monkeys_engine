@@ -95,7 +95,6 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routesV2.Use(mware.AuthRequired)
 
 	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
-
 	return blogClient
 }
 
@@ -537,22 +536,21 @@ func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
-	ipAddress := ctx.Request.Header.Get("IP")
-	client := ctx.Request.Header.Get("Client")
 
 	// Check permissions:
 	if !utils.CheckUserAccessInContext(ctx, "Publish") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
 		return
 	}
+
 	accId := ctx.GetString("accountId")
 
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
 		BlogId:    id,
 		AccountId: accId,
-		Ip:        ipAddress,
-		Client:    client,
+		Ip:        ctx.Request.Header.Get("IP"),
+		Client:    ctx.Request.Header.Get("Client"),
 	})
 
 	if err != nil {
