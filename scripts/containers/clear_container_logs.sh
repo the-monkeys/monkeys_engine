@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Base directory where container data is stored
-base_dir="/var/lib/docker/containers"
+base_dir="/var/snap/docker/common/var-lib-docker/containers"
 
 # Check if the base directory exists
 if [ ! -d "$base_dir" ]; then
