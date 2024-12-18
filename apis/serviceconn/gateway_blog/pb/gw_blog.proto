@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package blog_svc;
 
+import "google/protobuf/any.proto";
+
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
 message DraftBlogRequest {
@@ -250,8 +252,13 @@ service BlogService {
     rpc CheckIfBlogsExist(BlogByIdReq) returns (BlogExistsRes);
     rpc DeleteABlogByBlogId(DeleteBlogReq) returns (DeleteBlogResp);
 
-    rpc DraftBlogV2(DraftBlogV2Req) returns (BlogV2Response);
+    // rpc DraftBlogV2(DraftBlogV2Req) returns (BlogV2Response);
 
     // Corrected APIS
     rpc GetDraftBlogByBlogId(BlogByIdReq) returns (BlogByIdRes);
+
+
+    // BlogV2 APIS
+    // Grpc API for DraftBlogV2: Streams any json format bi-directional
+    rpc DraftBlogV2(stream google.protobuf.Any) returns (stream google.protobuf.Any);
 }
