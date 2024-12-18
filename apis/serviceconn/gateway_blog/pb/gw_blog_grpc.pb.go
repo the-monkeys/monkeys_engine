@@ -56,8 +56,7 @@ type BlogServiceClient interface {
 	DeleteABlogByBlogId(ctx context.Context, in *DeleteBlogReq, opts ...grpc.CallOption) (*DeleteBlogResp, error)
 	// Corrected APIS
 	GetDraftBlogByBlogId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error)
-	// BlogV2 APIS
-	// Grpc API for DraftBlogV2: Streams any json format bi-directional
+	// --------------------------------------------------------------------- V2 APIs ---------------------------------------------------------------------
 	DraftBlogV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[anypb.Any, anypb.Any], error)
 }
 
@@ -241,8 +240,7 @@ type BlogServiceServer interface {
 	DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error)
 	// Corrected APIS
 	GetDraftBlogByBlogId(context.Context, *BlogByIdReq) (*BlogByIdRes, error)
-	// BlogV2 APIS
-	// Grpc API for DraftBlogV2: Streams any json format bi-directional
+	// --------------------------------------------------------------------- V2 APIs ---------------------------------------------------------------------
 	DraftBlogV2(grpc.BidiStreamingServer[anypb.Any, anypb.Any]) error
 	mustEmbedUnimplementedBlogServiceServer()
 }
