@@ -32,7 +32,8 @@ type ElasticsearchStorage interface {
 	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error)
 	DeleteBlogsByOwnerAccountID(ctx context.Context, ownerAccountId string) (*esapi.Response, error)
 
-	DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error)
+	// -------------------------------------------------------------------------------- V2 --------------------------------------------------------------------------------
+	SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error)
 }
 
 type elasticsearchStorage struct {
