@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var upgrader = websocket.Upgrader{
@@ -74,7 +76,6 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	// Use AuthzRequired for routes needing access control
 	routes.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.DraftABlog)
-	routes.GET("/draft/v2/:blog_id", mware.AuthzRequired, blogClient.DraftABlogV2)
 
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
@@ -88,6 +89,12 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.GET("/all/bookmarks", blogClient.GetBookmarks)
 
 	routes.DELETE("/:blog_id", mware.AuthzRequired, blogClient.DeleteBlogById)
+
+	// -------------------------------------------------- V2 --------------------------------------------------
+	routesV2 := router.Group("/api/v2/blog")
+	routesV2.Use(mware.AuthRequired)
+
+	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
 
 	return blogClient
 }
@@ -969,11 +976,15 @@ func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
 // 	ctx.JSON(http.StatusCreated, response)
 // }
 
-func (asc *BlogServiceClient) DraftABlogV2(ctx *gin.Context) {
-	id := ctx.Param("blog_id")
-	tokenAccountId := ctx.GetString("accountId")
+// -------------------------------------------------- V2 --------------------------------------------------
 
-	// Check if blog exists
+func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
+	id := ctx.Param("blog_id")
+
+	ipAddress := ctx.Request.Header.Get("IP")
+	client := ctx.Request.Header.Get("Client")
+
+	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
 		BlogId: id,
 	})
@@ -981,208 +992,129 @@ func (asc *BlogServiceClient) DraftABlogV2(ctx *gin.Context) {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
 				return
 			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
 				return
 			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
 				return
 			}
 		}
 	}
 
+	var action string
+	var initialLogDone bool
+
 	if resp.BlogExists {
 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 			return
 		}
+		action = constants.BLOG_UPDATE
+	} else {
+		action = constants.BLOG_CREATE
 	}
 
-	// Upgrade the connection to WebSocket
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		logrus.Errorf("error upgrading connection: %v", err)
+		logrus.Errorf("Error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	defer conn.Close()
 
-	if asc.Client == nil {
-		logrus.Errorf("BlogServiceClient is not initialized")
+	// Establish a bi-directional stream with the gRPC server
+	stream, err := asc.Client.DraftBlogV2(context.Background())
+	if err != nil {
+		logrus.Errorf("Error establishing gRPC stream: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	defer stream.CloseSend()
 
 	// Infinite loop to listen to WebSocket connection
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			logrus.Errorf("error reading the message: %v", err)
+			logrus.Errorf("Error reading the message: %v", err)
 			return
 		}
 
-		// Unmarshal the received JSON message into a Go structure
-		var incomingData struct {
-			OwnerAccountId string    `json:"owner_account_id"`
-			Blog           BlogInput `json:"blog"`
-			Tags           []string  `json:"tags"`
-			ContentType    string    `json:"content_type"` // Identifies whether it's "editorjs" or "platejs"
-			Time           int64     `json:"time"`
-		}
+		// Save the incoming message for debugging purposes
+		// os.WriteFile("draft.json", msg, 0644)
 
-		err = json.Unmarshal(msg, &incomingData)
+		// Step 1: Unmarshal into a generic map
+		var genericMap map[string]interface{}
+		err = json.Unmarshal(msg, &genericMap)
 		if err != nil {
-			logrus.Errorf("Error un-marshalling message: %v", err)
+			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
 			return
 		}
 
-		// Create the DraftBlogV2Req Protobuf message
-		var draftBlog *pb.DraftBlogV2Req
-
-		switch incomingData.ContentType {
-		case "editorjs":
-			draftBlog = &pb.DraftBlogV2Req{
-				BlogId:         id,
-				OwnerAccountId: tokenAccountId,
-				Tags:           incomingData.Tags,
-				Blog: &pb.DraftBlogV2Req_EditorJsContent{
-					EditorJsContent: &pb.EditorJSContent{
-						Blocks: mapBlocksToProto(incomingData.Blog.Blocks), // Handle Editor.js blocks
-						Time:   incomingData.Time,
-					},
-				},
-			}
-		case "platejs":
-			draftBlog = &pb.DraftBlogV2Req{
-				BlogId:         id,
-				OwnerAccountId: tokenAccountId,
-				Tags:           incomingData.Tags,
-				Blog: &pb.DraftBlogV2Req_PlateData{
-					PlateData: &pb.PlateData{
-						Nodes: mapNodesToProto(incomingData.Blog.Nodes), // Handle Plate.js nodes
-					},
-				},
-			}
-		default:
-			logrus.Errorf("Unsupported content type: %s", incomingData.ContentType)
-			return
-		}
-
-		// Send the request to the gRPC service
-		resp, err := asc.Client.DraftBlogV2(context.Background(), draftBlog)
+		// Step 3: Marshal back into JSON
+		updatedJSON, err := json.Marshal(genericMap)
 		if err != nil {
-			logrus.Errorf("error while creating draft blog: %v", err)
+			logrus.Errorf("Error marshalling updated JSON: %v", err)
 			return
 		}
 
+		// Step 4: Unmarshal into pb.DraftBlogRequest
+		var draftBlog map[string]interface{}
+		err = json.Unmarshal(updatedJSON, &draftBlog)
+		if err != nil {
+			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
+			return
+		}
+
+		draftBlog["BlogId"] = id
+		draftBlog["Ip"] = ipAddress
+		draftBlog["Client"] = client
+
+		// Only set the action and log the initial creation or update once
+		if !initialLogDone {
+			draftBlog["Action"] = action
+			initialLogDone = true
+		}
+
+		// Convert draftBlog to google.protobuf.Any
+		draftStruct, err := structpb.NewStruct(draftBlog)
+		if err != nil {
+			logrus.Errorf("Error converting draftBlog to Any: %v", err)
+			return
+		}
+
+		// Wrap *structpb.Struct in *anypb.Any
+		anyMsg, err := anypb.New(draftStruct)
+		if err != nil {
+			logrus.Errorf("Error wrapping structpb.Struct in anypb.Any: %v", err)
+			return
+		}
+
+		// Send the draft blog to the gRPC service
+		if err := stream.Send(anyMsg); err != nil {
+			logrus.Errorf("Error sending draft blog to gRPC stream: %v", err)
+			return
+		}
+
+		// Receive the response from the gRPC service
+		resp, err := stream.Recv()
+		if err != nil {
+			logrus.Errorf("Error receiving response from gRPC stream: %v", err)
+			return
+		}
+
+		// Marshal and send the response back to the WebSocket client
 		response, err := json.Marshal(resp)
 		if err != nil {
-			logrus.Println("Error marshalling response message:", err)
+			logrus.Errorf("Error marshalling response message: %v", err)
 			return
 		}
 
-		// Send a response message to the client
-		err = conn.WriteMessage(websocket.TextMessage, response)
-		if err != nil {
-			logrus.Errorf("error returning the response message: %v", err)
+		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
+			logrus.Errorf("Error returning the response message: %v", err)
 			return
 		}
 	}
-}
-
-// Helper function to map the incoming JSON blocks to Protobuf blocks (Editor.js)
-func mapBlocksToProto(blocks []BlockInput) []*pb.Block {
-	var protoBlocks []*pb.Block
-
-	for _, block := range blocks {
-		protoBlock := &pb.Block{
-			Id:     block.Id,
-			Type:   block.Type,
-			Author: block.Author,
-			Time:   block.Time,
-			Data: &pb.Data{
-				Text:           block.Data.Text,
-				Level:          block.Data.Level,
-				ListType:       block.Data.ListType,
-				WithBorder:     block.Data.WithBorder,
-				WithBackground: block.Data.WithBackground,
-				Stretched:      block.Data.Stretched,
-				Caption:        block.Data.Caption,
-			},
-		}
-
-		if block.Data.File != nil {
-			protoBlock.Data.File = &pb.File{
-				Url:       block.Data.File.Url,
-				Size:      block.Data.File.Size,
-				Name:      block.Data.File.Name,
-				Extension: block.Data.File.Extension,
-			}
-		}
-
-		protoBlocks = append(protoBlocks, protoBlock)
-	}
-
-	return protoBlocks
-}
-
-// Helper function to map the incoming JSON nodes to Protobuf nodes (Plate.js)
-func mapNodesToProto(nodes []NodeInput) []*pb.PlateNode {
-	var protoNodes []*pb.PlateNode
-
-	for _, node := range nodes {
-		protoNode := &pb.PlateNode{
-			Type:       node.Type,
-			Text:       node.Text,
-			Attributes: node.Attributes,
-			Children:   mapNodesToProto(node.Children), // Recursively map child nodes
-		}
-
-		protoNodes = append(protoNodes, protoNode)
-	}
-
-	return protoNodes
-}
-
-// Incoming JSON structure for blocks (Editor.js)
-type BlockInput struct {
-	Id     string    `json:"id"`
-	Type   string    `json:"type"`
-	Author []string  `json:"author"`
-	Time   int64     `json:"time"`
-	Data   DataInput `json:"data"`
-}
-
-type DataInput struct {
-	Text           string     `json:"text"`
-	Level          int32      `json:"level"`
-	ListType       string     `json:"list_type"`
-	WithBorder     bool       `json:"withBorder"`
-	WithBackground bool       `json:"withBackground"`
-	Stretched      bool       `json:"stretched"`
-	Caption        string     `json:"caption"`
-	File           *FileInput `json:"file"`
-}
-
-type FileInput struct {
-	Url       string `json:"url"`
-	Size      int32  `json:"size"`
-	Name      string `json:"name"`
-	Extension string `json:"extension"`
-}
-
-// Incoming JSON structure for nodes (Plate.js)
-type NodeInput struct {
-	Type       string            `json:"type"`
-	Text       string            `json:"text"`
-	Attributes map[string]string `json:"attributes"`
-	Children   []NodeInput       `json:"children"`
-}
-
-// BlogInput handles both Editor.js blocks and Plate.js nodes
-type BlogInput struct {
-	Time   int64        `json:"time"`
-	Blocks []BlockInput `json:"blocks"` // For Editor.js content
-	Nodes  []NodeInput  `json:"nodes"`  // For Plate.js content
 }
