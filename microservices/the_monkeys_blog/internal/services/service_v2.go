@@ -47,10 +47,10 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		bx, _ := json.MarshalIndent(req, "", "  ")
 		os.WriteFile("drafted_blog.json", bx, 0777)
 
-		blog.logger.Infof("Received a blog containing id: %v", req["BlogId"])
+		blog.logger.Infof("Received a blog containing id: %v", req["blog_id"])
 		req["is_draft"] = true
 
-		blogId := req["BlogId"].(string)
+		blogId := req["blog_id"].(string)
 		ownerAccountId := req["owner_account_id"].(string)
 		ip := req["Ip"].(string)
 		client := req["Client"].(string)
@@ -68,13 +68,13 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			}
 		}
 
-		fmt.Printf("blogId: %v\n", blogId)
+		fmt.Printf("blog_id: %v\n", blogId)
 		fmt.Printf("ownerAccountId: %v\n", ownerAccountId)
 		fmt.Printf("ip: %v\n", ip)
 		fmt.Printf("client: %v\n", client)
 		fmt.Printf("tags: %v\n", tags)
 
-		exists, _ := blog.osClient.DoesBlogExist(stream.Context(), req["BlogId"].(string))
+		exists, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
 		if exists {
 			blog.logger.Infof("Updating the blog with id: %s", blogId)
 			// Additional logic for existing blog handling

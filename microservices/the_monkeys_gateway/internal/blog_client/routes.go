@@ -1067,7 +1067,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 			return
 		}
 
-		draftBlog["BlogId"] = id
+		draftBlog["blog_id"] = id
 		draftBlog["Ip"] = ipAddress
 		draftBlog["Client"] = client
 
@@ -1224,7 +1224,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	}
 
 	for _, blog := range allBlogs {
-		blogID, ok := blog["BlogId"].(string)
+		blogID, ok := blog["blog_id"].(string)
 		if !ok {
 			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
