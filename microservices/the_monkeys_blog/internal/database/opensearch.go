@@ -1097,41 +1097,6 @@ func (es *elasticsearchStorage) GetPublishedBlogByIdAndOwner(ctx context.Context
 	return &blog, nil
 }
 
-func (es *elasticsearchStorage) DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error) {
-	// Marshal the blog request to JSON, ensuring the correct handling of oneof content
-	bs, err := json.Marshal(blog)
-	if err != nil {
-		es.log.Errorf("DraftABlogV2: cannot marshal the blog request, error: %v", err)
-		return nil, err
-	}
-
-	document := strings.NewReader(string(bs))
-
-	// Create an Elasticsearch Index Request
-	req := esapi.IndexRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blog.BlogId, // Use the Blog ID as the document ID
-		Body:       document,
-	}
-
-	// Send the request to Elasticsearch
-	insertResponse, err := req.Do(ctx, es.client)
-	if err != nil {
-		es.log.Errorf("DraftABlogV2: error while indexing blog, error: %+v", err)
-		return insertResponse, err
-	}
-
-	// Check if there was an error with the insert response
-	if insertResponse.IsError() {
-		err = fmt.Errorf("DraftABlogV2: error indexing blog, response: %+v", insertResponse)
-		es.log.Error(err)
-		return insertResponse, err
-	}
-
-	es.log.Infof("DraftABlogV2: successfully created blog for user: %s, response: %+v", blog.OwnerAccountId, insertResponse)
-	return insertResponse, nil
-}
-
 func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error) {
 	// Ensure blogIds is not empty
 	if len(blogIds) == 0 {
