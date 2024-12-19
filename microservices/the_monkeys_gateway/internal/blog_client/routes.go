@@ -1234,22 +1234,13 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		isLikedByMe, err := asc.userCli.HaveILikedTheBlog(blog["BlogId"].(string), myUsername)
-		if err != nil {
-			isLikedByMe = false
-		}
+		isLikedByMe, _ := asc.userCli.HaveILikedTheBlog(blogID, myUsername)
 		blog["IsLikedByMe"] = isLikedByMe
 
-		bookmarkCount, err := asc.userCli.GetNoOfBookmarkCounts(blog["BlogId"].(string))
-		if err != nil {
-			bookmarkCount = 0
-		}
+		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
-		isBookmarkedByMe, err := asc.userCli.HaveIBookmarkedTheBlog(blog["BlogId"].(string), myUsername)
-		if err != nil {
-			isBookmarkedByMe = false
-		}
+		isBookmarkedByMe, _ := asc.userCli.HaveIBookmarkedTheBlog(blogID, myUsername)
 		blog["IsBookmarkedByMe"] = isBookmarkedByMe
 	}
 
