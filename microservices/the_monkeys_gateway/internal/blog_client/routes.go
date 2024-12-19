@@ -1224,11 +1224,14 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	}
 
 	for _, blog := range allBlogs {
-		fmt.Printf("blog: %+v\n", blog["BlogId"])
-		likeCount, err := asc.userCli.GetNoOfLikeCounts(blog["BlogId"].(string))
-		if err != nil {
-			likeCount = 0
+		blogID, ok := blog["BlogId"].(string)
+		if !ok {
+			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			continue
 		}
+
+		fmt.Printf("blog: %+v\n", blogID)
+		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
 		isLikedByMe, err := asc.userCli.HaveILikedTheBlog(blog["BlogId"].(string), myUsername)
