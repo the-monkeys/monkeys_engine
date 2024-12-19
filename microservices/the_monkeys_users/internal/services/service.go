@@ -691,6 +691,7 @@ func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb
 			Username:  r.Username,
 			FirstName: r.FirstName,
 			LastName:  r.LastName,
+			AccountId: r.AccountId,
 		})
 	}
 

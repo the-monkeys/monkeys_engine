@@ -872,7 +872,7 @@ func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, e
 
 	// Step 2: Fetch the list of users followed by the given user
 	rows, err := uh.db.Query(`
-		SELECT ua.username, ua.first_name, ua.last_name
+		SELECT ua.username, ua.first_name, ua.last_name, ua.account_id
 		FROM user_follows uf
 		JOIN user_account ua ON uf.following_id = ua.id
 		WHERE uf.follower_id = $1
@@ -886,7 +886,7 @@ func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, e
 	// Step 3: Iterate through the result set and populate the list of users
 	for rows.Next() {
 		var user models.TheMonkeysUser
-		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName, &user.AccountId); err != nil {
 			logrus.Errorf("Failed to scan user followed by user ID %d, error: %+v", userID, err)
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -34,6 +35,7 @@ type ElasticsearchStorage interface {
 
 	// -------------------------------------------------------------------------------- V2 --------------------------------------------------------------------------------
 	SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error)
+	GetBlogsOfUsersByAccountIds(ctx context.Context, accountIds []string, limit, offset int32) ([]map[string]interface{}, error)
 }
 
 type elasticsearchStorage struct {
@@ -368,10 +370,13 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 		return nil, fmt.Errorf("blogId cannot be empty")
 	}
 
-	// Build the update query to set is_draft to false
+	// Build the update query to set is_draft to false and add published_time
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": "ctx._source.is_draft = false",
+			"source": "ctx._source.is_draft = false; ctx._source.published_time = params.published_time;",
+			"params": map[string]interface{}{
+				"published_time": time.Now().Format(time.RFC3339),
+			},
 		},
 	}
 
