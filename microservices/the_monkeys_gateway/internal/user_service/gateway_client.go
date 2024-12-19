@@ -30,3 +30,51 @@ func (asc *UserServiceClient) GetFollowingAccounts(followersUsername string) (*p
 
 	return resp, err
 }
+
+func (asc *UserServiceClient) GetNoOfLikeCounts(blogId string) (int32, error) {
+	resp, err := asc.Client.GetLikeCounts(context.Background(), &pb.BookMarkReq{
+		BlogId: blogId,
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return resp.Count, nil
+}
+
+func (asc *UserServiceClient) GetNoOfBookmarkCounts(blogId string) (int32, error) {
+	resp, err := asc.Client.GetBookMarkCounts(context.Background(), &pb.BookMarkReq{
+		BlogId: blogId,
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return resp.Count, nil
+}
+
+func (asc *UserServiceClient) HaveILikedTheBlog(blogId, userName string) (bool, error) {
+	res, err := asc.Client.GetIfBlogLiked(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return res.BookMarked, nil
+}
+
+func (asc *UserServiceClient) HaveIBookmarkedTheBlog(blogId, userName string) (bool, error) {
+	res, err := asc.Client.GetIfBlogBookMarked(context.Background(), &pb.BookMarkReq{
+		Username: userName,
+		BlogId:   blogId,
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return res.BookMarked, nil
+}

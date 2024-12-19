@@ -1223,6 +1223,33 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 		allBlogs = append(allBlogs, blogMaps...)
 	}
 
+	for _, blog := range allBlogs {
+		fmt.Printf("blog: %+v\n", blog["BlogId"])
+		likeCount, err := asc.userCli.GetNoOfLikeCounts(blog["BlogId"].(string))
+		if err != nil {
+			likeCount = 0
+		}
+		blog["LikeCount"] = likeCount
+
+		isLikedByMe, err := asc.userCli.HaveILikedTheBlog(blog["BlogId"].(string), myUsername)
+		if err != nil {
+			isLikedByMe = false
+		}
+		blog["IsLikedByMe"] = isLikedByMe
+
+		bookmarkCount, err := asc.userCli.GetNoOfBookmarkCounts(blog["BlogId"].(string))
+		if err != nil {
+			bookmarkCount = 0
+		}
+		blog["BookmarkCount"] = bookmarkCount
+
+		isBookmarkedByMe, err := asc.userCli.HaveIBookmarkedTheBlog(blog["BlogId"].(string), myUsername)
+		if err != nil {
+			isBookmarkedByMe = false
+		}
+		blog["IsBookmarkedByMe"] = isBookmarkedByMe
+	}
+
 	responseBlogs := map[string]interface{}{
 		"blogs": allBlogs,
 	}
