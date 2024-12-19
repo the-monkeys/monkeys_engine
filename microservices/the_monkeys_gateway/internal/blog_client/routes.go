@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -95,6 +96,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routesV2.Use(mware.AuthRequired)
 
 	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
+	// FollowingBlogsFeed
+	routesV2.GET("/following", blogClient.FollowingBlogsFeed)
 	return blogClient
 }
 
@@ -712,8 +715,6 @@ func (asc *BlogServiceClient) GetBookmarks(ctx *gin.Context) {
 		}
 	}
 
-	fmt.Printf("uc: %+v\n", uc)
-
 	blogId := []string{}
 
 	for _, blog := range uc.Blogs {
@@ -1115,4 +1116,118 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 			return
 		}
 	}
+}
+
+func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
+	myUsername := ctx.GetString("userName")
+
+	// Get Accounts I am following
+	followings, err := asc.userCli.GetFollowingAccounts(myUsername)
+	if err != nil {
+		logrus.Errorf("cannot get the following accounts, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the following accounts"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the following accounts"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	if len(followings.Users) == 0 {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "you are not following anyone"})
+		return
+	}
+
+	accountIds := []string{}
+
+	for _, user := range followings.Users {
+		accountIds = append(accountIds, user.AccountId)
+	}
+
+	fmt.Printf("accountIds: %v\n", accountIds)
+
+	limit := ctx.DefaultQuery("limit", "100")
+	offset := ctx.DefaultQuery("offset", "0")
+	// Convert to int
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		limitInt = 100
+	}
+
+	offsetInt, err := strconv.Atoi(offset)
+	if err != nil {
+		offsetInt = 0
+	}
+
+	// Get all the drafted blogs based on the following accounts with limit and offset
+	stream, err := asc.Client.BlogsOfFollowingAccounts(context.Background(), &pb.FollowingAccounts{
+		AccountIds: accountIds,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+	})
+
+	if err != nil {
+		logrus.Errorf("cannot get the following blogs, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the following blogs"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the following blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var allBlogs []map[string]interface{}
+	for {
+		blog, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if status, ok := status.FromError(err); ok {
+				switch status.Code() {
+				case codes.NotFound:
+					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found from people you are following"})
+					return
+				case codes.Internal:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+					return
+				default:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+					return
+				}
+			}
+		}
+
+		fmt.Printf("blog.Value: %v\n", string(blog.Value))
+
+		var blogMaps []map[string]interface{}
+		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+			return
+		}
+		allBlogs = append(allBlogs, blogMaps...)
+	}
+
+	responseBlogs := map[string]interface{}{
+		"blogs": allBlogs,
+	}
+
+	fmt.Printf("responseBlogs: %+v\n", responseBlogs)
+
+	ctx.JSON(http.StatusOK, responseBlogs)
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/models"
 	"google.golang.org/grpc"
@@ -47,7 +48,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		os.WriteFile("drafted_blog.json", bx, 0777)
 
 		blog.logger.Infof("Received a blog containing id: %v", req["BlogId"])
-		req["draft"] = true
+		req["is_draft"] = true
 
 		blogId := req["BlogId"].(string)
 		ownerAccountId := req["owner_account_id"].(string)
@@ -56,7 +57,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		tagsInterface, ok := req["tags"].([]interface{})
 		if !ok {
 			blog.logger.Errorf("Tags field is not of type []interface{}")
-			return status.Errorf(codes.InvalidArgument, "Tags field is not of type []interface{}")
+			tagsInterface = []interface{}{"untagged"}
 		}
 		tags := make([]string, len(tagsInterface))
 		for i, v := range tagsInterface {
@@ -127,34 +128,45 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 	}
 }
 
-func (blog *BlogService) DraftBlogV21(stream grpc.BidiStreamingServer[*anypb.Any, *anypb.Any]) error {
-	for {
-		// Receive a message from the client
-		reqAny, err := stream.Recv()
-		if err == io.EOF {
-			// Client has closed the stream
-			blog.logger.Infof("Client closed the stream")
-			return nil
-		}
-		if err != nil {
-			blog.logger.Errorf("Error receiving message from stream: %v", err)
-			return status.Errorf(codes.Internal, "Error receiving message: %v", err)
-		}
+func (blog *BlogService) BlogsOfFollowingAccounts(req *pb.FollowingAccounts, stream pb.BlogService_BlogsOfFollowingAccountsServer) error {
+	blog.logger.Debugf("Received request for blogs of following accounts: %v", req.AccountIds)
 
-		// Unmarshal the incoming Any message into a struct
-		reqStruct := &structpb.Struct{}
-		if err := anypb.UnmarshalTo(*reqAny, reqStruct, proto.UnmarshalOptions{}); err != nil {
-			blog.logger.Errorf("Error unmarshaling message: %v", err)
-			return status.Errorf(codes.InvalidArgument, "Invalid message format: %v", err)
-		}
+	if len(req.AccountIds) == 0 {
+		return status.Errorf(codes.InvalidArgument, "No account ids provided")
+	}
 
-		// Convert the struct to a map for further processing
-		req := reqStruct.AsMap()
+	blogs, err := blog.osClient.GetBlogsOfUsersByAccountIds(stream.Context(), req.AccountIds, req.Limit, req.Offset)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs of following accounts: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs of following accounts: %v", err)
+	}
 
-		blog.logger.Infof("Content: %+v", req)
-		blog.logger.Infof("Received a blog containing id: %v", req["BlogId"])
-		req["draft"] = true
+	// TODO: remove a key from here blogs blogs = []map[string]interface{}
+	removeKeyFromBlogs(blogs, "Action")
+	removeKeyFromBlogs(blogs, "Ip")
+	removeKeyFromBlogs(blogs, "Client")
 
-		// Rest of your code remains unchanged...
+	blogBytes, err := json.Marshal(blogs)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	fmt.Printf("blogBytes: %v\n", string(blogBytes))
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeKeyFromBlogs(blogs []map[string]interface{}, key string) {
+	for _, blog := range blogs {
+		delete(blog, key)
 	}
 }

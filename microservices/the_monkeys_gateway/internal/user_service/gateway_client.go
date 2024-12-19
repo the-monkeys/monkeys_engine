@@ -22,3 +22,11 @@ func (asc *UserServiceClient) GetUserDetails(username string) (*pb.UserDetailsRe
 
 	return res, err
 }
+
+func (asc *UserServiceClient) GetFollowingAccounts(followersUsername string) (*pb.FollowerFollowingResp, error) {
+	resp, err := asc.Client.GetFollowing(context.Background(), &pb.UserDetailReq{
+		Username: followersUsername,
+	})
+
+	return resp, err
+}
