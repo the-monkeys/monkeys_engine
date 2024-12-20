@@ -599,7 +599,7 @@ func (uh *uDBHandler) fetchUserByIdentifier(identifierType, identifierValue stri
 	query := `
 		SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
 		ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
-		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
+		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout, ua.bio, ua.address 
 		FROM USER_ACCOUNT ua
 		LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
 		LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
@@ -611,7 +611,7 @@ func (uh *uDBHandler) fetchUserByIdentifier(identifierType, identifierValue stri
 		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
 			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
-			&tmu.EmailVerificationTimeout); err != nil {
+			&tmu.EmailVerificationTimeout, &tmu.Bio, &tmu.Location); err != nil {
 		uh.log.Errorf("Can't find a user with %s: %s, error: %+v", identifierType, identifierValue, err)
 		return nil, err
 	}
