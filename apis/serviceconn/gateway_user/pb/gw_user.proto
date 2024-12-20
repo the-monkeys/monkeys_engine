@@ -147,7 +147,9 @@ message UserDetailsResp {
     string first_name = 3;
     string last_name = 4;
     string bio = 5;
-    string error = 6;
+    string avatar_url = 6;
+    string location = 7;
+    string error = 8;
 }
 
 message TopicActionReq {

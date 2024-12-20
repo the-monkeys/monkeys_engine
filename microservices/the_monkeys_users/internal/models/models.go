@@ -47,6 +47,8 @@ type TheMonkeysUser struct {
 	Username                    string         `json:"username"`
 	FirstName                   string         `json:"first_name"`
 	LastName                    string         `json:"last_name"`
+	Bio                         sql.NullString `json:"bio"`
+	Location                    sql.NullString `json:"location"`
 	Email                       string         `json:"email"`
 	Password                    string         `json:"password"`
 	PasswordVerificationToken   sql.NullString `json:"password_verification_token"`
