@@ -296,6 +296,7 @@ func (us *UserSvc) GetUserDetails(ctx context.Context, req *pb.UserDetailReq) (*
 		LastName:  userInfo.LastName,
 		AccountId: userInfo.AccountId,
 		Bio:       userInfo.Bio.String,
+		Location:  userInfo.Location.String,
 	}, nil
 }
 
