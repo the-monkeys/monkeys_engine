@@ -68,12 +68,6 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			}
 		}
 
-		fmt.Printf("blog_id: %v\n", blogId)
-		fmt.Printf("ownerAccountId: %v\n", ownerAccountId)
-		fmt.Printf("ip: %v\n", ip)
-		fmt.Printf("client: %v\n", client)
-		fmt.Printf("tags: %v\n", tags)
-
 		exists, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
 		if exists {
 			blog.logger.Infof("Updating the blog with id: %s", blogId)
@@ -142,7 +136,7 @@ func (blog *BlogService) BlogsOfFollowingAccounts(req *pb.FollowingAccounts, str
 	}
 
 	// TODO: remove a key from here blogs blogs = []map[string]interface{}
-	removeKeyFromBlogs(blogs, "Action")
+	removeKeyFromBlogs(blogs, "action")
 	removeKeyFromBlogs(blogs, "Ip")
 	removeKeyFromBlogs(blogs, "Client")
 
@@ -169,4 +163,88 @@ func removeKeyFromBlogs(blogs []map[string]interface{}, key string) {
 	for _, blog := range blogs {
 		delete(blog, key)
 	}
+}
+
+func (blog *BlogService) GetBlogs(req *pb.GetBlogsReq, stream pb.BlogService_GetBlogsServer) error {
+	blog.logger.Debugf("Received request for blogs: %v", req)
+
+	var blogs []map[string]interface{}
+	var err error
+
+	// Check if specific tags are requested
+	if len(req.Tags) > 0 {
+		if req.IsDraft {
+			blog.logger.Debug("Fetching draft blogs by tags")
+		} else {
+			blog.logger.Debug("Fetching published blogs by tags")
+			blogs, err = blog.osClient.GetBlogsByTags(stream.Context(), req.Tags, false, req.Limit, req.Offset)
+			if err != nil {
+				blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+				return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
+			}
+		}
+
+		// TODO: remove a key from here blogs blogs = []map[string]interface{}
+		removeKeyFromBlogs(blogs, "action")
+		removeKeyFromBlogs(blogs, "Ip")
+		removeKeyFromBlogs(blogs, "Client")
+
+		blogBytes, err := json.Marshal(blogs)
+		if err != nil {
+			blog.logger.Errorf("Error marshalling blogs: %v", err)
+			return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+		}
+
+		fmt.Printf("blogBytes: %v\n", string(blogBytes))
+
+		// Send the packed message over the stream
+		if err := stream.Send(&anypb.Any{
+			TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+			Value:   blogBytes,
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// No tags provided, handle based on draft or published status
+	if req.IsDraft {
+		blog.logger.Debug("Fetching draft blogs by account ID")
+		blogs, err = blog.osClient.GetBlogsByAccountId(stream.Context(), req.AccountId, true, req.Limit, req.Offset)
+		if err != nil {
+			blog.logger.Errorf("Error fetching draft blogs by account ID: %v", err)
+			return status.Errorf(codes.Internal, "Error fetching draft blogs by account ID: %v", err)
+		}
+	} else {
+		blog.logger.Debug("Fetching published blogs by account ID")
+		blogs, err = blog.osClient.GetBlogsByAccountId(stream.Context(), req.AccountId, false, req.Limit, req.Offset)
+		if err != nil {
+			blog.logger.Errorf("Error fetching published blogs by account ID: %v", err)
+			return status.Errorf(codes.Internal, "Error fetching published blogs by account ID: %v", err)
+		}
+	}
+
+	// TODO: remove a key from here blogs blogs = []map[string]interface{}
+	removeKeyFromBlogs(blogs, "action")
+	removeKeyFromBlogs(blogs, "Ip")
+	removeKeyFromBlogs(blogs, "Client")
+
+	blogBytes, err := json.Marshal(blogs)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	fmt.Printf("blogBytes: %v\n", string(blogBytes))
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -198,8 +198,19 @@ message FollowingAccounts {
     repeated string account_ids = 1;
     int32 limit = 2;
     int32 offset = 3;
+    string sort_by = 4;
 }
 
+message GetBlogsReq {
+    string account_id = 1;
+    string username = 2;
+    bool is_draft = 3;
+    bool is_archive = 4;
+    repeated string tags = 5;
+    int32 limit = 6;
+    int32 offset = 7;
+    string sort_by = 8;
+}
 
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse); // Migrated to DraftBlogV2
@@ -227,4 +238,5 @@ service BlogService {
   // --------------------------------------------------------------------- V2 APIs ---------------------------------------------------------------------
     rpc DraftBlogV2(stream google.protobuf.Any) returns (stream google.protobuf.Any);
     rpc BlogsOfFollowingAccounts(FollowingAccounts) returns (stream google.protobuf.Any);
+    rpc GetBlogs(GetBlogsReq) returns (stream google.protobuf.Any);
 }

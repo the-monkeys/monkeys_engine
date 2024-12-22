@@ -28,7 +28,8 @@ const (
 	AddedInstagram = "Added Instagram"
 	AddedTwitter   = "Added Twitter"
 
-	CreateBlog               = "Created a Blog %s"
+	CreateBlog               = "Created a blog: %s"
+	MovedBlogToDraft         = "Moved the blog to draft: %s"
 	UpdateDraftedBlog        = "Updated the Drafted Blog"
 	UpdateBlog               = "Updated the Blog"
 	DeleteBlog               = "Deleted the Blog %s"
