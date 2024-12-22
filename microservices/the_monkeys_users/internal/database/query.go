@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"errors"
 
 	"github.com/sirupsen/logrus"
@@ -747,4 +748,94 @@ func (uh *uDBHandler) GetFollowersAndFollowingsCounts(username string) (int, int
 	}
 
 	return followers, followings, nil
+}
+
+func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) error {
+	uh.log.Infof("Setting blog %v to Draft and cleaning up associated likes and bookmarks", blogId)
+
+	// Start a transaction
+	tx, err := uh.db.Begin()
+	if err != nil {
+		uh.log.Errorf("Failed to start transaction: %+v", err)
+		return err
+	}
+
+	// Step 1: Update the blog's status to 'Draft'
+	_, err = tx.Exec(`UPDATE blog SET status = $1 WHERE blog_id = $2`, status, blogId)
+	if err != nil {
+		uh.log.Errorf("Failed to update blog status to 'Draft' for blog %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 2: Get the internal blog ID
+	var blogIdInt int64
+	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to fetch internal blog ID for blog %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 3: Clean up likes associated with the blog
+	_, err = tx.Exec(`DELETE FROM blog_likes WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to clean up likes for blog %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 4: Clean up bookmarks associated with the blog
+	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE blog_id = $1`, blogIdInt)
+	if err != nil {
+		uh.log.Errorf("Failed to clean up bookmarks for blog %s, error: %+v", blogId, err)
+		tx.Rollback()
+		return err
+	}
+
+	// Step 5: Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		uh.log.Errorf("Failed to commit transaction for updating blog status to Draft and cleaning up, error: %+v", err)
+		return err
+	}
+
+	uh.log.Infof("Successfully set blog %v to Draft and cleaned up likes and bookmarks", blogId)
+	return nil
+}
+
+func (uh *uDBHandler) GetBlogByBlogId(blogId string) (*models.Blog, error) {
+	uh.log.Infof("Fetching blog details for blogId: %s", blogId)
+
+	// SQL query to retrieve the blog details
+	query := `
+        SELECT b.id, b.blog_id, b.status, u.username, u.account_id
+        FROM blog b
+        JOIN user_account u ON b.user_id = u.id
+        WHERE b.blog_id = $1;
+    `
+
+	// Create a Blog struct to store the result
+	var blog models.Blog
+
+	// Execute the query and scan the results into the blog struct
+	err := uh.db.QueryRow(query, blogId).Scan(
+		&blog.Id,
+		&blog.BlogId,
+		&blog.BlogStatus,
+		&blog.Username,
+		&blog.AccountId,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			uh.log.Warnf("No blog found with blogId: %s", blogId)
+			return nil, nil
+		}
+		uh.log.Errorf("Error fetching blog with blogId: %s, error: %+v", blogId, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched blog details for blogId: %s", blogId)
+	return &blog, nil
 }

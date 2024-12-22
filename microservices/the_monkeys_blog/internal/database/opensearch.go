@@ -36,6 +36,11 @@ type ElasticsearchStorage interface {
 	// -------------------------------------------------------------------------------- V2 --------------------------------------------------------------------------------
 	SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error)
 	GetBlogsOfUsersByAccountIds(ctx context.Context, accountIds []string, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogsByTagsAccId(ctx context.Context, accountId string, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogsByAccountId(ctx context.Context, accountId string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogByBlogId(ctx context.Context, blogId string, isDraft bool) (map[string]interface{}, error)
+	GetABlogByBlogIdAccId(ctx context.Context, blogId, accountId string, isDraft bool) (map[string]interface{}, error)
+	GetBlogsByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
 }
 
 type elasticsearchStorage struct {

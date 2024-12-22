@@ -54,10 +54,11 @@ type UserDb interface {
 	GetBlogLikeCount(blogId string) (int64, error)
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
 	GetFollowersAndFollowingsCounts(username string) (int, int, error)
-
+	GetBlogByBlogId(blogId string) (*models.Blog, error)
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
 	UpdateBlogStatusToPublish(blogId string, status string) error
+	UpdateBlogStatusToDraft(blogId string, status string) error
 
 	// Delete queries
 	DeleteUserProfile(username string) error
