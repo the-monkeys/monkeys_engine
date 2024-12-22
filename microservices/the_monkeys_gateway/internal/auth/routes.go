@@ -187,6 +187,12 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 			}
 		}
 	}
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:   "monkeys-auth-token",
+		Value:  res.Token,
+		Secure: true,
+	})
 	ctx.JSON(http.StatusOK, &res)
 }
 
