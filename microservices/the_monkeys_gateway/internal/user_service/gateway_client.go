@@ -78,3 +78,11 @@ func (asc *UserServiceClient) HaveIBookmarkedTheBlog(blogId, userName string) (b
 
 	return res.BookMarked, nil
 }
+
+func (asc *UserServiceClient) GetUsersBookmarks(username string) ([]string, error) {
+	res, err := asc.Client.GetBookMarks(context.Background(), &pb.BookMarkReq{
+		Username: username,
+	})
+
+	return res.BlogIds, err
+}

@@ -36,6 +36,7 @@ const (
 	UserService_GetFollowersFollowingCounts_FullMethodName = "/auth_svc.UserService/GetFollowersFollowingCounts"
 	UserService_SearchUser_FullMethodName                  = "/auth_svc.UserService/SearchUser"
 	UserService_BookMarkBlog_FullMethodName                = "/auth_svc.UserService/BookMarkBlog"
+	UserService_GetBookMarks_FullMethodName                = "/auth_svc.UserService/GetBookMarks"
 	UserService_RemoveBookMark_FullMethodName              = "/auth_svc.UserService/RemoveBookMark"
 	UserService_LikeBlog_FullMethodName                    = "/auth_svc.UserService/LikeBlog"
 	UserService_UnlikeBlog_FullMethodName                  = "/auth_svc.UserService/UnlikeBlog"
@@ -71,6 +72,7 @@ type UserServiceClient interface {
 	SearchUser(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[UserDetailReq, FollowerFollowingResp], error)
 	// Bookmark blog
 	BookMarkBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
+	GetBookMarks(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
 	LikeBlog(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error)
@@ -270,6 +272,16 @@ func (c *userServiceClient) BookMarkBlog(ctx context.Context, in *BookMarkReq, o
 	return out, nil
 }
 
+func (c *userServiceClient) GetBookMarks(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BookMarkRes)
+	err := c.cc.Invoke(ctx, UserService_GetBookMarks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) RemoveBookMark(ctx context.Context, in *BookMarkReq, opts ...grpc.CallOption) (*BookMarkRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BookMarkRes)
@@ -402,6 +414,7 @@ type UserServiceServer interface {
 	SearchUser(grpc.BidiStreamingServer[UserDetailReq, FollowerFollowingResp]) error
 	// Bookmark blog
 	BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
+	GetBookMarks(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	// Remove Bookmark
 	RemoveBookMark(context.Context, *BookMarkReq) (*BookMarkRes, error)
 	LikeBlog(context.Context, *BookMarkReq) (*BookMarkRes, error)
@@ -478,6 +491,9 @@ func (UnimplementedUserServiceServer) SearchUser(grpc.BidiStreamingServer[UserDe
 }
 func (UnimplementedUserServiceServer) BookMarkBlog(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BookMarkBlog not implemented")
+}
+func (UnimplementedUserServiceServer) GetBookMarks(context.Context, *BookMarkReq) (*BookMarkRes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBookMarks not implemented")
 }
 func (UnimplementedUserServiceServer) RemoveBookMark(context.Context, *BookMarkReq) (*BookMarkRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveBookMark not implemented")
@@ -828,6 +844,24 @@ func _UserService_BookMarkBlog_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetBookMarks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BookMarkReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetBookMarks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetBookMarks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetBookMarks(ctx, req.(*BookMarkReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_RemoveBookMark_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BookMarkReq)
 	if err := dec(in); err != nil {
@@ -1096,6 +1130,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BookMarkBlog",
 			Handler:    _UserService_BookMarkBlog_Handler,
+		},
+		{
+			MethodName: "GetBookMarks",
+			Handler:    _UserService_GetBookMarks_Handler,
 		},
 		{
 			MethodName: "RemoveBookMark",

@@ -243,3 +243,40 @@ func (blog *BlogService) GetBlogs(req *pb.GetBlogsReq, stream pb.BlogService_Get
 
 	return nil
 }
+
+func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.BlogService_GetBlogsBySliceServer) error {
+	blog.logger.Debugf("Received request for blogs by slice: %v", req)
+
+	if len(req.BlogIds) == 0 {
+		return status.Errorf(codes.InvalidArgument, "No blog ids provided")
+	}
+
+	blogs, err := blog.osClient.GetBlogsByBlogIdsV2(stream.Context(), req.BlogIds, req.Limit, req.Offset)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by slice: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by slice: %v", err)
+	}
+
+	// TODO: remove a key from here blogs blogs = []map[string]interface{}
+	removeKeyFromBlogs(blogs, "action")
+	removeKeyFromBlogs(blogs, "Ip")
+	removeKeyFromBlogs(blogs, "Client")
+
+	blogBytes, err := json.Marshal(blogs)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	fmt.Printf("blogBytes: %v\n", string(blogBytes))
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
