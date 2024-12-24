@@ -217,6 +217,15 @@ message GetBlogsReq {
     string sort_by = 8;
 }
 
+message GetBlogsBySliceReq {
+    repeated string blog_ids = 1;
+    repeated string owner_account_ids = 2;
+    repeated string tags = 3;
+    repeated string usernames = 4;
+    int32 limit = 5;
+    int32 offset = 6;
+}
+
 message BlogReq {
     string blog_id = 1;
     string account_id = 2;
@@ -256,4 +265,5 @@ service BlogService {
     rpc BlogsOfFollowingAccounts(FollowingAccounts) returns (stream google.protobuf.Any);
     rpc GetBlogs(GetBlogsReq) returns (stream google.protobuf.Any);
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
+    rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
 }

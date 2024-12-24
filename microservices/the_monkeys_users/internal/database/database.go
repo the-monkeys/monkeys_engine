@@ -51,6 +51,7 @@ type UserDb interface {
 	IsBlogLikedByUser(username string, blogId string) (bool, error)
 	IsBlogBookmarkedByUser(username string, blogId string) (bool, error)
 	CountBlogBookmarks(blogId string) (int64, error)
+	GetBookmarkBlogsByUsername(username string) ([]models.Blog, error)
 	GetBlogLikeCount(blogId string) (int64, error)
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
 	GetFollowersAndFollowingsCounts(username string) (int, int, error)

@@ -839,3 +839,54 @@ func (uh *uDBHandler) GetBlogByBlogId(blogId string) (*models.Blog, error) {
 	uh.log.Infof("Successfully fetched blog details for blogId: %s", blogId)
 	return &blog, nil
 }
+
+func (uh *uDBHandler) GetBookmarkBlogsByUsername(username string) ([]models.Blog, error) {
+	uh.log.Infof("Fetching bookmarked blogs for username: %s", username)
+
+	// SQL query to fetch bookmarked blogs
+	query := `
+		SELECT b.id, b.blog_id, b.status, ua.username AS owner_username, ua.account_id AS owner_account_id
+		FROM blog b
+		JOIN blog_bookmarks bb ON b.id = bb.blog_id
+		JOIN user_account ua ON b.user_id = ua.id
+		JOIN user_account u ON bb.user_id = u.id
+		WHERE u.username = $1;
+	`
+
+	// Slice to store the results
+	var blogs []models.Blog
+
+	// Execute the query
+	rows, err := uh.db.Query(query, username)
+	if err != nil {
+		uh.log.Errorf("Error fetching bookmarked blogs for username %s, error: %+v", username, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Iterate through the rows and populate the blogs slice
+	for rows.Next() {
+		var blog models.Blog
+		err := rows.Scan(
+			&blog.Id,
+			&blog.BlogId,
+			&blog.BlogStatus,
+			&blog.Username,  // Owner's username
+			&blog.AccountId, // Owner's account ID
+		)
+		if err != nil {
+			uh.log.Errorf("Error scanning bookmarked blog row for username %s, error: %+v", username, err)
+			return nil, err
+		}
+		blogs = append(blogs, blog)
+	}
+
+	// Check for any iteration errors
+	if err := rows.Err(); err != nil {
+		uh.log.Errorf("Error iterating over bookmarked blogs for username %s, error: %+v", username, err)
+		return nil, err
+	}
+
+	uh.log.Infof("Successfully fetched %d bookmarked blogs for username: %s", len(blogs), username)
+	return blogs, nil
+}

@@ -229,6 +229,7 @@ message BookMarkRes {
     string error = 3;
     bool isLiked = 4;
     bool bookMarked = 5;
+    repeated string blog_ids = 6;
 }
 
 message UserFollowReq {
@@ -294,6 +295,7 @@ service UserService {
     rpc SearchUser(stream UserDetailReq) returns (stream FollowerFollowingResp) {}
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
+    rpc GetBookMarks(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark
     rpc RemoveBookMark(BookMarkReq) returns (BookMarkRes) {}
     rpc LikeBlog(BookMarkReq) returns (BookMarkRes) {}

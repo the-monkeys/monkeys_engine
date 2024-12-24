@@ -934,3 +934,27 @@ func (us *UserSvc) GetFollowersFollowingCounts(ctx context.Context, req *pb.User
 		Status:    http.StatusOK,
 	}, nil
 }
+
+func (us *UserSvc) GetBookMarks(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	us.log.Debugf("fetching bookmarks for user: %s", req.Username)
+
+	resp, err := us.dbConn.GetBookmarkBlogsByUsername(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching bookmarks for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("bookmarks for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	var blogIds []string
+	for _, r := range resp {
+		blogIds = append(blogIds, r.BlogId)
+	}
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		BlogIds: blogIds,
+	}, nil
+}
