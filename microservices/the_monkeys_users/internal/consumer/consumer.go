@@ -85,13 +85,12 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
 
 		case constants.BLOG_UPDATE:
-			log.Infof("Updating blog: %+v", user)
 			usr, err := userCon.dbConn.GetBlogByBlogId(user.BlogId)
 			if err != nil {
 				log.Errorf("Error getting blog: %v", err)
 			}
 
-			if usr.BlogStatus == user.BlogStatus {
+			if usr.BlogStatus != user.BlogStatus {
 				if err := userCon.dbConn.UpdateBlogStatusToDraft(user.BlogId, user.BlogStatus); err != nil {
 					log.Errorf("Can't update blog status to draft: %v", err)
 				}

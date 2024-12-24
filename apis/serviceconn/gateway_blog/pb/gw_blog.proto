@@ -169,6 +169,11 @@ message GetPublishedBlogsRes {
 
 message BlogExistsRes {
     bool blog_exists = 1;
+    bool is_draft = 2;
+    bool is_archive = 3;
+    repeated string tags = 4;
+    string last_publish_time = 5;
+    string error = 6;
 }
 
 message DeleteBlogReq {
@@ -212,6 +217,17 @@ message GetBlogsReq {
     string sort_by = 8;
 }
 
+message BlogReq {
+    string blog_id = 1;
+    string account_id = 2;
+    string ip = 3;
+    string client = 4;
+}
+message BlogResp {
+    string message = 1;
+    string error = 2;
+}
+
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse); // Migrated to DraftBlogV2
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
@@ -239,4 +255,5 @@ service BlogService {
     rpc DraftBlogV2(stream google.protobuf.Any) returns (stream google.protobuf.Any);
     rpc BlogsOfFollowingAccounts(FollowingAccounts) returns (stream google.protobuf.Any);
     rpc GetBlogs(GetBlogsReq) returns (stream google.protobuf.Any);
+    rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
 }
