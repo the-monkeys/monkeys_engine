@@ -100,6 +100,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routesV2.Use(mware.AuthRequired)
 
 	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
+	// TODO: Add api to /to-publish/:blog_id
+	routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
 	routesV2.GET("/following", blogClient.FollowingBlogsFeed) // Blogs for following feed
 	routesV2.GET("/my-drafts", blogClient.MyDraftBlogs)       // Get all my draft blogs
 	// routesV2.GET("/my-published", blogClient.MyPublishedBlogs)                 // Get all my published blogs
@@ -1004,8 +1006,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
 				return
 			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
-				return
+
 			}
 		}
 	}
@@ -1013,6 +1014,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	var action string
 	var initialLogDone bool
 
+	fmt.Printf("resp: %v\n", resp)
 	if resp.BlogExists {
 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
@@ -1021,6 +1023,11 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		action = constants.BLOG_UPDATE
 	} else {
 		action = constants.BLOG_CREATE
+	}
+
+	if !resp.IsDraft {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "you need to move the blog to draft to edit it"})
+		return
 	}
 
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
@@ -1445,4 +1452,40 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+func (asc *BlogServiceClient) MoveBlogToDraft(ctx *gin.Context) {
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
+	accId := ctx.GetString("accountId")
+
+	id := ctx.Param("blog_id")
+	resp, err := asc.Client.MoveBlogToDraftStatus(context.Background(), &pb.BlogReq{
+		BlogId:    id,
+		AccountId: accId,
+		Ip:        ctx.Request.Header.Get("IP"),
+		Client:    ctx.Request.Header.Get("Client"),
+	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot move the blog to draft"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }

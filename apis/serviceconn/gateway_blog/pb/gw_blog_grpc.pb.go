@@ -37,6 +37,7 @@ const (
 	BlogService_DraftBlogV2_FullMethodName                    = "/blog_svc.BlogService/DraftBlogV2"
 	BlogService_BlogsOfFollowingAccounts_FullMethodName       = "/blog_svc.BlogService/BlogsOfFollowingAccounts"
 	BlogService_GetBlogs_FullMethodName                       = "/blog_svc.BlogService/GetBlogs"
+	BlogService_MoveBlogToDraftStatus_FullMethodName          = "/blog_svc.BlogService/MoveBlogToDraftStatus"
 )
 
 // BlogServiceClient is the client API for BlogService service.
@@ -62,6 +63,7 @@ type BlogServiceClient interface {
 	DraftBlogV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[anypb.Any, anypb.Any], error)
 	BlogsOfFollowingAccounts(ctx context.Context, in *FollowingAccounts, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
 	GetBlogs(ctx context.Context, in *GetBlogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
+	MoveBlogToDraftStatus(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*BlogResp, error)
 }
 
 type blogServiceClient struct {
@@ -263,6 +265,16 @@ func (c *blogServiceClient) GetBlogs(ctx context.Context, in *GetBlogsReq, opts 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type BlogService_GetBlogsClient = grpc.ServerStreamingClient[anypb.Any]
 
+func (c *blogServiceClient) MoveBlogToDraftStatus(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*BlogResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlogResp)
+	err := c.cc.Invoke(ctx, BlogService_MoveBlogToDraftStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BlogServiceServer is the server API for BlogService service.
 // All implementations must embed UnimplementedBlogServiceServer
 // for forward compatibility.
@@ -286,6 +298,7 @@ type BlogServiceServer interface {
 	DraftBlogV2(grpc.BidiStreamingServer[anypb.Any, anypb.Any]) error
 	BlogsOfFollowingAccounts(*FollowingAccounts, grpc.ServerStreamingServer[anypb.Any]) error
 	GetBlogs(*GetBlogsReq, grpc.ServerStreamingServer[anypb.Any]) error
+	MoveBlogToDraftStatus(context.Context, *BlogReq) (*BlogResp, error)
 	mustEmbedUnimplementedBlogServiceServer()
 }
 
@@ -346,6 +359,9 @@ func (UnimplementedBlogServiceServer) BlogsOfFollowingAccounts(*FollowingAccount
 }
 func (UnimplementedBlogServiceServer) GetBlogs(*GetBlogsReq, grpc.ServerStreamingServer[anypb.Any]) error {
 	return status.Errorf(codes.Unimplemented, "method GetBlogs not implemented")
+}
+func (UnimplementedBlogServiceServer) MoveBlogToDraftStatus(context.Context, *BlogReq) (*BlogResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MoveBlogToDraftStatus not implemented")
 }
 func (UnimplementedBlogServiceServer) mustEmbedUnimplementedBlogServiceServer() {}
 func (UnimplementedBlogServiceServer) testEmbeddedByValue()                     {}
@@ -649,6 +665,24 @@ func _BlogService_GetBlogs_Handler(srv interface{}, stream grpc.ServerStream) er
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type BlogService_GetBlogsServer = grpc.ServerStreamingServer[anypb.Any]
 
+func _BlogService_MoveBlogToDraftStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlogReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).MoveBlogToDraftStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlogService_MoveBlogToDraftStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).MoveBlogToDraftStatus(ctx, req.(*BlogReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BlogService_ServiceDesc is the grpc.ServiceDesc for BlogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -711,6 +745,10 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDraftBlogByBlogId",
 			Handler:    _BlogService_GetDraftBlogByBlogId_Handler,
+		},
+		{
+			MethodName: "MoveBlogToDraftStatus",
+			Handler:    _BlogService_MoveBlogToDraftStatus_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -43,10 +42,6 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		// Convert the struct to a map for further processing
 		req := reqStruct.AsMap()
 
-		blog.logger.Infof("Content: %+v", req)
-		bx, _ := json.MarshalIndent(req, "", "  ")
-		os.WriteFile("drafted_blog.json", bx, 0777)
-
 		blog.logger.Infof("Received a blog containing id: %v", req["blog_id"])
 		req["is_draft"] = true
 
@@ -68,7 +63,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			}
 		}
 
-		exists, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
+		exists, _, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
 		if exists {
 			blog.logger.Infof("Updating the blog with id: %s", blogId)
 			// Additional logic for existing blog handling
