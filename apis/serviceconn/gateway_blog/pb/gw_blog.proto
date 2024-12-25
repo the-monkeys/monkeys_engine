@@ -224,6 +224,8 @@ message GetBlogsBySliceReq {
     repeated string usernames = 4;
     int32 limit = 5;
     int32 offset = 6;
+    bool is_draft = 7;
+    bool is_archive = 8;    
 }
 
 message BlogReq {
@@ -231,7 +233,11 @@ message BlogReq {
     string account_id = 2;
     string ip = 3;
     string client = 4;
+    string username = 5;
+    bool is_draft = 6;
+    bool is_archive = 7;
 }
+
 message BlogResp {
     string message = 1;
     string error = 2;
@@ -264,6 +270,7 @@ service BlogService {
     rpc DraftBlogV2(stream google.protobuf.Any) returns (stream google.protobuf.Any);
     rpc BlogsOfFollowingAccounts(FollowingAccounts) returns (stream google.protobuf.Any);
     rpc GetBlogs(GetBlogsReq) returns (stream google.protobuf.Any);
+    rpc GetBlog(BlogReq) returns (google.protobuf.Any); // By blog id
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
     rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
 }

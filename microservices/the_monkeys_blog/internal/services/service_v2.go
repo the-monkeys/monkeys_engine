@@ -1,8 +1,8 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/sirupsen/logrus"
@@ -141,8 +141,6 @@ func (blog *BlogService) BlogsOfFollowingAccounts(req *pb.FollowingAccounts, str
 		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
 	}
 
-	fmt.Printf("blogBytes: %v\n", string(blogBytes))
-
 	// Send the packed message over the stream
 	if err := stream.Send(&anypb.Any{
 		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
@@ -190,8 +188,6 @@ func (blog *BlogService) GetBlogs(req *pb.GetBlogsReq, stream pb.BlogService_Get
 			return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
 		}
 
-		fmt.Printf("blogBytes: %v\n", string(blogBytes))
-
 		// Send the packed message over the stream
 		if err := stream.Send(&anypb.Any{
 			TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
@@ -231,8 +227,6 @@ func (blog *BlogService) GetBlogs(req *pb.GetBlogsReq, stream pb.BlogService_Get
 		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
 	}
 
-	fmt.Printf("blogBytes: %v\n", string(blogBytes))
-
 	// Send the packed message over the stream
 	if err := stream.Send(&anypb.Any{
 		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
@@ -251,7 +245,25 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 		return status.Errorf(codes.InvalidArgument, "No blog ids provided")
 	}
 
-	blogs, err := blog.osClient.GetBlogsByBlogIdsV2(stream.Context(), req.BlogIds, req.Limit, req.Offset)
+	blogsIds := []string{}
+	for _, blogId := range req.BlogIds {
+		exist, blogInfo, err := blog.osClient.DoesBlogExist(stream.Context(), blogId)
+		if err != nil {
+			blog.logger.Errorf("Error checking if blog exists: %v", err)
+			return status.Errorf(codes.Internal, "Error checking if blog exists: %v", err)
+		}
+
+		idDraft, ok := blogInfo["is_draft"].(bool)
+		if !ok {
+			idDraft = false
+		}
+
+		if exist && !idDraft {
+			blogsIds = append(blogsIds, blogId)
+		}
+	}
+
+	blogs, err := blog.osClient.GetBlogsByBlogIdsV2(stream.Context(), blogsIds, req.Limit, req.Offset)
 	if err != nil {
 		blog.logger.Errorf("Error fetching blogs by slice: %v", err)
 		return status.Errorf(codes.Internal, "Error fetching blogs by slice: %v", err)
@@ -259,6 +271,7 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 
 	// TODO: remove a key from here blogs blogs = []map[string]interface{}
 	removeKeyFromBlogs(blogs, "action")
+	removeKeyFromBlogs(blogs, "Action")
 	removeKeyFromBlogs(blogs, "Ip")
 	removeKeyFromBlogs(blogs, "Client")
 
@@ -267,8 +280,6 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 		blog.logger.Errorf("Error marshalling blogs: %v", err)
 		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
 	}
-
-	fmt.Printf("blogBytes: %v\n", string(blogBytes))
 
 	// Send the packed message over the stream
 	if err := stream.Send(&anypb.Any{
@@ -279,4 +290,31 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 	}
 
 	return nil
+}
+
+func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
+	blog.logger.Debugf("Received request for blog: %v", req)
+
+	blogData, err := blog.osClient.GetBlogByBlogId(ctx, req.BlogId, req.IsDraft)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blog: %v", err)
+		return nil, status.Errorf(codes.Internal, "Error fetching blog: %v", err)
+	}
+
+	delete(blogData, "action")
+	delete(blogData, "Action")
+	delete(blogData, "Ip")
+	delete(blogData, "Client")
+
+	blogBytes, err := json.Marshal(blogData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return nil, status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Pack the message into an Any message
+	return &anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}, nil
 }
