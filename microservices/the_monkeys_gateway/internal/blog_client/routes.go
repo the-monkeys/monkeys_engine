@@ -94,18 +94,28 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
 
-	routesV2.POST("/tags", blogClient.GetBlogsByTags)     // Get blogs by tags
-	routesV2.GET("/all/:username", blogClient.UsersBlogs) // Update of  blogClient.AllPublishesByUserName
-	// routes.GET("/:blog_id", blogClient.GetPubBlogByBlogId) // Get published blog by blog_id
+	// Get blogs by tags, as users can filter the blogs using multiple tags
+	routesV2.POST("/tags", blogClient.GetBlogsByTags) // Get blogs by tags
+
+	// Get blogs by username, not auth required as it is public and can be visible at users profile
+	routesV2.GET("/all/:username", blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
+	routesV2.GET("/:blog_id", blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
 	routesV2.Use(mware.AuthRequired)
 
+	// Write a blog, when the user have edit access
 	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
-	// TODO: Add api to /to-publish/:blog_id
+	// TODO: Add api to /to-publish/:blog_id now v1  blogClient.PublishBlogById is working
 	routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
-	routesV2.GET("/following", blogClient.FollowingBlogsFeed)  // Blogs for following feed
-	routesV2.GET("/my-drafts", blogClient.MyDraftBlogs)        // Get all my draft blogs
+	// Get blogs of following users
+	routesV2.GET("/following", blogClient.FollowingBlogsFeed) // Blogs for following feed
+	// User can get their blogs (draft)
+	routesV2.GET("/my-drafts", blogClient.MyDraftBlogs) // Get all my draft blogs
+	// Users can get their blogs (published)
 	routesV2.GET("/my-published", blogClient.MyPublishedBlogs) // Get all my published blogs
-	routesV2.GET("/my-bookmarks", blogClient.MyBookmarks)      // Get all my bookmarked blogs
+	// Users can get the blogs they bookmarked (published)
+	routesV2.GET("/my-bookmarks", blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
+	// Get my draft blog by id
+	routesV2.GET("/my-draft/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogIdV2)
 
 	return blogClient
 }
@@ -934,56 +944,6 @@ func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
 	ctx.Data(http.StatusOK, "application/json", body)
 }
 
-// func (svc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
-// 	id := ctx.Param("id")
-
-// 	res, err := svc.Client.DeleteBlogById(context.Background(), &pb.DeleteBlogByIdRequest{Id: id})
-// 	if err != nil {
-// 		logrus.Errorf("cannot connect to article rpc server, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusInternalServerError, err)
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusCreated, res)
-// }
-
-// func (svc *BlogServiceClient) Get100PostsByTags(ctx *gin.Context) {
-// 	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
-
-// 	reqObj := Tag{}
-
-// 	if err := ctx.BindJSON(&reqObj); err != nil {
-// 		logrus.Errorf("invalid body, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusBadRequest, err)
-// 		return
-// 	}
-
-// 	stream, err := svc.Client.GetBlogsByTag(context.Background(), &pb.GetBlogsByTagReq{
-// 		TagName: reqObj.TagName,
-// 	})
-
-// 	if err != nil {
-// 		logrus.Errorf("cannot connect to article stream rpc server, error: %v", err)
-// 		_ = ctx.AbortWithError(http.StatusBadGateway, err)
-// 		return
-// 	}
-
-// 	response := []*pb.GetBlogsResponse{}
-// 	for {
-// 		resp, err := stream.Recv()
-// 		if err == io.EOF {
-// 			break
-// 		}
-// 		if err != nil {
-// 			logrus.Errorf("cannot get the stream data, error: %+v", err)
-// 		}
-
-// 		response = append(response, resp)
-// 	}
-
-// 	ctx.JSON(http.StatusCreated, response)
-// }
-
 // -------------------------------------------------- V2 --------------------------------------------------
 
 func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
@@ -1718,7 +1678,6 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 
 	// Get all the draft blogs by my username
 	blogResp, err := asc.userCli.GetUsersBookmarks(tokenAccountId)
-	fmt.Printf("blogResp: %+v\n", blogResp)
 
 	if err != nil {
 		logrus.Errorf("cannot get the bookmarks, error: %v", err)
@@ -1733,6 +1692,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 
 	stream, err := asc.Client.GetBlogsBySlice(context.Background(), &pb.GetBlogsBySliceReq{
 		BlogIds: blogResp,
+		IsDraft: false,
 		Limit:   int32(limitInt),
 		Offset:  int32(offsetInt),
 	})
@@ -1776,8 +1736,6 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1794,7 +1752,6 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
@@ -1808,4 +1765,95 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+
+	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
+		BlogId:  blogId,
+		IsDraft: false,
+	})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't find the blog due to some internal error"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var blogMap map[string]interface{}
+	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
+		logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+		return
+	}
+
+	// Initialize the map if it is nil
+	if blogMap == nil {
+		// blogMap = make(map[string]interface{})
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+		return
+	}
+
+	likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogId)
+	blogMap["LikeCount"] = likeCount
+
+	bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogId)
+	blogMap["BookmarkCount"] = bookmarkCount
+
+	ctx.JSON(http.StatusOK, blogMap)
+}
+
+func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
+	blogId := ctx.Param("blog_id")
+
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
+	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
+		BlogId:  blogId,
+		IsDraft: true,
+	})
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't find the blog due to some internal error"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var blogMap map[string]interface{}
+	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
+		logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+		return
+	}
+
+	// Initialize the map if it is nil
+	if blogMap == nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, blogMap)
 }
