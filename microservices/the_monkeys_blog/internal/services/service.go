@@ -69,7 +69,7 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		if len(req.Tags) == 0 {
 			req.Tags = []string{"untagged"}
 		}
-		fmt.Printf("bx: %v\n", string(bx))
+		// fmt.Printf("bx: %v\n", string(bx))
 		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 	}
 
@@ -199,7 +199,7 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		Client:     req.Client,
 	})
 
-	fmt.Printf("bx: %+v\n", string(bx))
+	// fmt.Printf("bx: %+v\n", string(bx))
 
 	if err != nil {
 		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
@@ -315,7 +315,7 @@ func (blog *BlogService) GetLatest100Blogs(ctx context.Context, req *pb.GetBlogs
 
 // TODO: Incase of blog doesn't exists, do return 404
 func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.DeleteBlogReq) (*pb.DeleteBlogResp, error) {
-	resp, err := blog.osClient.DeleteABlogById(ctx, req.BlogId)
+	_, err := blog.osClient.DeleteABlogById(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("failed to delete the blog with ID: %s, error: %v", req.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "failed to delete the blog with ID: %s", req.BlogId)
@@ -351,7 +351,7 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 		}
 	}()
 
-	fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
+	// fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
 	return &pb.DeleteBlogResp{
 		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
 	}, nil

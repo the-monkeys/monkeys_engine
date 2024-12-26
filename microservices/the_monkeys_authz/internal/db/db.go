@@ -233,7 +233,7 @@ func (adh *authDBHandler) UpdatePassword(password string, user *models.TheMonkey
 		return err
 	}
 
-	fmt.Printf("userId: %v\n", userId)
+	// fmt.Printf("userId: %v\n", userId)
 	// TODO: Add a record into the log table using the userId
 
 	err = tx.Commit()

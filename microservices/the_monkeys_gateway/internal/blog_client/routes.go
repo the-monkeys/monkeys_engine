@@ -974,7 +974,6 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	var action string
 	var initialLogDone bool
 
-	fmt.Printf("resp: %v\n", resp)
 	if resp.BlogExists {
 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
@@ -1125,8 +1124,6 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 		accountIds = append(accountIds, user.AccountId)
 	}
 
-	fmt.Printf("accountIds: %v\n", accountIds)
-
 	limit := ctx.DefaultQuery("limit", "100")
 	offset := ctx.DefaultQuery("offset", "0")
 	// Convert to int
@@ -1186,8 +1183,6 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1204,7 +1199,6 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
@@ -1221,8 +1215,6 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	responseBlogs := map[string]interface{}{
 		"blogs": allBlogs,
 	}
-
-	fmt.Printf("responseBlogs: %+v\n", responseBlogs)
 
 	ctx.JSON(http.StatusOK, responseBlogs)
 }
@@ -1295,8 +1287,6 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1313,14 +1303,11 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["like_count"] = likeCount
-		fmt.Printf("likeCount: %v\n", likeCount)
 
 		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
 		blog["bookmark_count"] = bookmarkCount
-		fmt.Printf("bookmarkCount: %v\n", bookmarkCount)
 
 	}
 
@@ -1380,8 +1367,6 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1398,7 +1383,6 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
@@ -1476,8 +1460,6 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1494,7 +1476,6 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
@@ -1590,8 +1571,6 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 			}
 		}
 
-		fmt.Printf("blog.Value: %v\n", string(blog.Value))
-
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
@@ -1608,7 +1587,6 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("blog: %+v\n", blogID)
 		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 

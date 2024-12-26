@@ -2,7 +2,6 @@ package user_service
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -960,7 +959,6 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 		results = append(results, resp.Users...)
 	}
 
-	fmt.Printf("results: %v\n", results)
 	// Return results to the client
 	ctx.JSON(http.StatusOK, gin.H{"users": results})
 }

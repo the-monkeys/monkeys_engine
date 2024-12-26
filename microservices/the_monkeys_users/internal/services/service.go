@@ -86,7 +86,6 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
-	fmt.Printf("userDetails: %+v\n", userDetails)
 
 	return &pb.UserProfileRes{
 		AccountId:     userDetails.AccountId,
@@ -891,8 +890,6 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 			us.log.Errorf("Error searching user: %v", err)
 			return status.Errorf(codes.Internal, "Failed to search users: %v", err)
 		}
-
-		fmt.Printf("users: %v\n", users)
 
 		// Send matching users back to the client
 		for _, user := range users {
