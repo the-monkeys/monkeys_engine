@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -32,8 +33,14 @@ const (
 	BlogService_GetAllBlogsByBlogIds_FullMethodName           = "/blog_svc.BlogService/GetAllBlogsByBlogIds"
 	BlogService_CheckIfBlogsExist_FullMethodName              = "/blog_svc.BlogService/CheckIfBlogsExist"
 	BlogService_DeleteABlogByBlogId_FullMethodName            = "/blog_svc.BlogService/DeleteABlogByBlogId"
-	BlogService_DraftBlogV2_FullMethodName                    = "/blog_svc.BlogService/DraftBlogV2"
 	BlogService_GetDraftBlogByBlogId_FullMethodName           = "/blog_svc.BlogService/GetDraftBlogByBlogId"
+	BlogService_DraftBlogV2_FullMethodName                    = "/blog_svc.BlogService/DraftBlogV2"
+	BlogService_BlogsOfFollowingAccounts_FullMethodName       = "/blog_svc.BlogService/BlogsOfFollowingAccounts"
+	BlogService_GetBlogs_FullMethodName                       = "/blog_svc.BlogService/GetBlogs"
+	BlogService_GetBlog_FullMethodName                        = "/blog_svc.BlogService/GetBlog"
+	BlogService_MoveBlogToDraftStatus_FullMethodName          = "/blog_svc.BlogService/MoveBlogToDraftStatus"
+	BlogService_GetBlogsBySlice_FullMethodName                = "/blog_svc.BlogService/GetBlogsBySlice"
+	BlogService_GetFeedBlogs_FullMethodName                   = "/blog_svc.BlogService/GetFeedBlogs"
 )
 
 // BlogServiceClient is the client API for BlogService service.
@@ -53,9 +60,16 @@ type BlogServiceClient interface {
 	GetAllBlogsByBlogIds(ctx context.Context, in *GetBlogsByBlogIds, opts ...grpc.CallOption) (*GetBlogsRes, error)
 	CheckIfBlogsExist(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(ctx context.Context, in *DeleteBlogReq, opts ...grpc.CallOption) (*DeleteBlogResp, error)
-	DraftBlogV2(ctx context.Context, in *DraftBlogV2Req, opts ...grpc.CallOption) (*BlogV2Response, error)
 	// Corrected APIS
 	GetDraftBlogByBlogId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error)
+	// --------------------------------------------------------------------- V2 APIs ---------------------------------------------------------------------
+	DraftBlogV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[anypb.Any, anypb.Any], error)
+	BlogsOfFollowingAccounts(ctx context.Context, in *FollowingAccounts, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
+	GetBlogs(ctx context.Context, in *GetBlogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
+	GetBlog(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*anypb.Any, error)
+	MoveBlogToDraftStatus(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*BlogResp, error)
+	GetBlogsBySlice(ctx context.Context, in *GetBlogsBySliceReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
+	GetFeedBlogs(ctx context.Context, in *FeedReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error)
 }
 
 type blogServiceClient struct {
@@ -196,16 +210,6 @@ func (c *blogServiceClient) DeleteABlogByBlogId(ctx context.Context, in *DeleteB
 	return out, nil
 }
 
-func (c *blogServiceClient) DraftBlogV2(ctx context.Context, in *DraftBlogV2Req, opts ...grpc.CallOption) (*BlogV2Response, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BlogV2Response)
-	err := c.cc.Invoke(ctx, BlogService_DraftBlogV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *blogServiceClient) GetDraftBlogByBlogId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BlogByIdRes)
@@ -215,6 +219,115 @@ func (c *blogServiceClient) GetDraftBlogByBlogId(ctx context.Context, in *BlogBy
 	}
 	return out, nil
 }
+
+func (c *blogServiceClient) DraftBlogV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[anypb.Any, anypb.Any], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlogService_ServiceDesc.Streams[0], BlogService_DraftBlogV2_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[anypb.Any, anypb.Any]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_DraftBlogV2Client = grpc.BidiStreamingClient[anypb.Any, anypb.Any]
+
+func (c *blogServiceClient) BlogsOfFollowingAccounts(ctx context.Context, in *FollowingAccounts, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlogService_ServiceDesc.Streams[1], BlogService_BlogsOfFollowingAccounts_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[FollowingAccounts, anypb.Any]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_BlogsOfFollowingAccountsClient = grpc.ServerStreamingClient[anypb.Any]
+
+func (c *blogServiceClient) GetBlogs(ctx context.Context, in *GetBlogsReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlogService_ServiceDesc.Streams[2], BlogService_GetBlogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBlogsReq, anypb.Any]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetBlogsClient = grpc.ServerStreamingClient[anypb.Any]
+
+func (c *blogServiceClient) GetBlog(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*anypb.Any, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(anypb.Any)
+	err := c.cc.Invoke(ctx, BlogService_GetBlog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogServiceClient) MoveBlogToDraftStatus(ctx context.Context, in *BlogReq, opts ...grpc.CallOption) (*BlogResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlogResp)
+	err := c.cc.Invoke(ctx, BlogService_MoveBlogToDraftStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogServiceClient) GetBlogsBySlice(ctx context.Context, in *GetBlogsBySliceReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlogService_ServiceDesc.Streams[3], BlogService_GetBlogsBySlice_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBlogsBySliceReq, anypb.Any]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetBlogsBySliceClient = grpc.ServerStreamingClient[anypb.Any]
+
+func (c *blogServiceClient) GetFeedBlogs(ctx context.Context, in *FeedReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[anypb.Any], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlogService_ServiceDesc.Streams[4], BlogService_GetFeedBlogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[FeedReq, anypb.Any]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetFeedBlogsClient = grpc.ServerStreamingClient[anypb.Any]
 
 // BlogServiceServer is the server API for BlogService service.
 // All implementations must embed UnimplementedBlogServiceServer
@@ -233,9 +346,16 @@ type BlogServiceServer interface {
 	GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error)
 	CheckIfBlogsExist(context.Context, *BlogByIdReq) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error)
-	DraftBlogV2(context.Context, *DraftBlogV2Req) (*BlogV2Response, error)
 	// Corrected APIS
 	GetDraftBlogByBlogId(context.Context, *BlogByIdReq) (*BlogByIdRes, error)
+	// --------------------------------------------------------------------- V2 APIs ---------------------------------------------------------------------
+	DraftBlogV2(grpc.BidiStreamingServer[anypb.Any, anypb.Any]) error
+	BlogsOfFollowingAccounts(*FollowingAccounts, grpc.ServerStreamingServer[anypb.Any]) error
+	GetBlogs(*GetBlogsReq, grpc.ServerStreamingServer[anypb.Any]) error
+	GetBlog(context.Context, *BlogReq) (*anypb.Any, error)
+	MoveBlogToDraftStatus(context.Context, *BlogReq) (*BlogResp, error)
+	GetBlogsBySlice(*GetBlogsBySliceReq, grpc.ServerStreamingServer[anypb.Any]) error
+	GetFeedBlogs(*FeedReq, grpc.ServerStreamingServer[anypb.Any]) error
 	mustEmbedUnimplementedBlogServiceServer()
 }
 
@@ -285,11 +405,29 @@ func (UnimplementedBlogServiceServer) CheckIfBlogsExist(context.Context, *BlogBy
 func (UnimplementedBlogServiceServer) DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteABlogByBlogId not implemented")
 }
-func (UnimplementedBlogServiceServer) DraftBlogV2(context.Context, *DraftBlogV2Req) (*BlogV2Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DraftBlogV2 not implemented")
-}
 func (UnimplementedBlogServiceServer) GetDraftBlogByBlogId(context.Context, *BlogByIdReq) (*BlogByIdRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDraftBlogByBlogId not implemented")
+}
+func (UnimplementedBlogServiceServer) DraftBlogV2(grpc.BidiStreamingServer[anypb.Any, anypb.Any]) error {
+	return status.Errorf(codes.Unimplemented, "method DraftBlogV2 not implemented")
+}
+func (UnimplementedBlogServiceServer) BlogsOfFollowingAccounts(*FollowingAccounts, grpc.ServerStreamingServer[anypb.Any]) error {
+	return status.Errorf(codes.Unimplemented, "method BlogsOfFollowingAccounts not implemented")
+}
+func (UnimplementedBlogServiceServer) GetBlogs(*GetBlogsReq, grpc.ServerStreamingServer[anypb.Any]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBlogs not implemented")
+}
+func (UnimplementedBlogServiceServer) GetBlog(context.Context, *BlogReq) (*anypb.Any, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlog not implemented")
+}
+func (UnimplementedBlogServiceServer) MoveBlogToDraftStatus(context.Context, *BlogReq) (*BlogResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MoveBlogToDraftStatus not implemented")
+}
+func (UnimplementedBlogServiceServer) GetBlogsBySlice(*GetBlogsBySliceReq, grpc.ServerStreamingServer[anypb.Any]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBlogsBySlice not implemented")
+}
+func (UnimplementedBlogServiceServer) GetFeedBlogs(*FeedReq, grpc.ServerStreamingServer[anypb.Any]) error {
+	return status.Errorf(codes.Unimplemented, "method GetFeedBlogs not implemented")
 }
 func (UnimplementedBlogServiceServer) mustEmbedUnimplementedBlogServiceServer() {}
 func (UnimplementedBlogServiceServer) testEmbeddedByValue()                     {}
@@ -546,24 +684,6 @@ func _BlogService_DeleteABlogByBlogId_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BlogService_DraftBlogV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DraftBlogV2Req)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlogServiceServer).DraftBlogV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BlogService_DraftBlogV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServiceServer).DraftBlogV2(ctx, req.(*DraftBlogV2Req))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _BlogService_GetDraftBlogByBlogId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlogByIdReq)
 	if err := dec(in); err != nil {
@@ -581,6 +701,93 @@ func _BlogService_GetDraftBlogByBlogId_Handler(srv interface{}, ctx context.Cont
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _BlogService_DraftBlogV2_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(BlogServiceServer).DraftBlogV2(&grpc.GenericServerStream[anypb.Any, anypb.Any]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_DraftBlogV2Server = grpc.BidiStreamingServer[anypb.Any, anypb.Any]
+
+func _BlogService_BlogsOfFollowingAccounts_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(FollowingAccounts)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlogServiceServer).BlogsOfFollowingAccounts(m, &grpc.GenericServerStream[FollowingAccounts, anypb.Any]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_BlogsOfFollowingAccountsServer = grpc.ServerStreamingServer[anypb.Any]
+
+func _BlogService_GetBlogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBlogsReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlogServiceServer).GetBlogs(m, &grpc.GenericServerStream[GetBlogsReq, anypb.Any]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetBlogsServer = grpc.ServerStreamingServer[anypb.Any]
+
+func _BlogService_GetBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlogReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).GetBlog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlogService_GetBlog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).GetBlog(ctx, req.(*BlogReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlogService_MoveBlogToDraftStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlogReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServiceServer).MoveBlogToDraftStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlogService_MoveBlogToDraftStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServiceServer).MoveBlogToDraftStatus(ctx, req.(*BlogReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlogService_GetBlogsBySlice_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBlogsBySliceReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlogServiceServer).GetBlogsBySlice(m, &grpc.GenericServerStream[GetBlogsBySliceReq, anypb.Any]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetBlogsBySliceServer = grpc.ServerStreamingServer[anypb.Any]
+
+func _BlogService_GetFeedBlogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(FeedReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlogServiceServer).GetFeedBlogs(m, &grpc.GenericServerStream[FeedReq, anypb.Any]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlogService_GetFeedBlogsServer = grpc.ServerStreamingServer[anypb.Any]
 
 // BlogService_ServiceDesc is the grpc.ServiceDesc for BlogService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -642,14 +849,45 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BlogService_DeleteABlogByBlogId_Handler,
 		},
 		{
-			MethodName: "DraftBlogV2",
-			Handler:    _BlogService_DraftBlogV2_Handler,
-		},
-		{
 			MethodName: "GetDraftBlogByBlogId",
 			Handler:    _BlogService_GetDraftBlogByBlogId_Handler,
 		},
+		{
+			MethodName: "GetBlog",
+			Handler:    _BlogService_GetBlog_Handler,
+		},
+		{
+			MethodName: "MoveBlogToDraftStatus",
+			Handler:    _BlogService_MoveBlogToDraftStatus_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "DraftBlogV2",
+			Handler:       _BlogService_DraftBlogV2_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "BlogsOfFollowingAccounts",
+			Handler:       _BlogService_BlogsOfFollowingAccounts_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetBlogs",
+			Handler:       _BlogService_GetBlogs_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetBlogsBySlice",
+			Handler:       _BlogService_GetBlogsBySlice_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetFeedBlogs",
+			Handler:       _BlogService_GetFeedBlogs_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "apis/serviceconn/gateway_blog/pb/gw_blog.proto",
 }

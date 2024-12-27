@@ -101,13 +101,13 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 		}
 	}
 
-	fmt.Printf("res: %+v\n", accessResp)
+	// fmt.Printf("res: %+v\n", accessResp)
 
 	ctx.Set("accountId", res.AccountId)
 	ctx.Set("user_access_level", accessResp.Access)
 	ctx.Set("user_role", accessResp.Role)
 
-	fmt.Printf("accessResp.Role: %v\n", accessResp.Role)
+	// fmt.Printf("accessResp.Role: %v\n", accessResp.Role)
 	ctx.Next()
 }
 
@@ -145,12 +145,12 @@ func (c *AuthMiddlewareConfig) BlogsAuthorization(ctx *gin.Context) {
 		}
 	}
 
-	fmt.Printf("res: %+v\n", accessResp)
+	// fmt.Printf("res: %+v\n", accessResp)
 	ctx.Set("accountId", res.AccountId)
 	ctx.Set("user_access_level", accessResp.Access)
 	ctx.Set("user_role", accessResp.Role)
 
-	fmt.Printf("accessResp.Role: %v\n", accessResp.Role)
+	// fmt.Printf("accessResp.Role: %v\n", accessResp.Role)
 	ctx.Next()
 }
 

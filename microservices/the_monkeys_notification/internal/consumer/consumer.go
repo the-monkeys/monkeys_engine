@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -62,8 +61,6 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 }
 
 func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, db database.NotificationDB) {
-	fmt.Printf("user: %+v\n", user)
-
 	switch user.Action {
 	case constants.USER_REGISTER:
 		log.Infof("Received user registration notification: %s", user.Username)

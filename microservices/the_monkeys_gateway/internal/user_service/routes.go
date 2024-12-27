@@ -2,7 +2,6 @@ package user_service
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -265,6 +264,7 @@ func (asc *UserServiceClient) GetAllCategories(ctx *gin.Context) {
 func (asc *UserServiceClient) GetUserDetailsByAccId(ctx *gin.Context) {
 	accId := ctx.Param("acc_id")
 
+	// Fetch user details by AccountId
 	res, err := asc.Client.GetUserDetails(context.Background(), &pb.UserDetailReq{
 		AccountId: accId,
 	})
@@ -280,7 +280,25 @@ func (asc *UserServiceClient) GetUserDetailsByAccId(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, res)
+	// Fetch followers and following counts
+	connCount, err := asc.Client.GetFollowersFollowingCounts(context.Background(), &pb.UserDetailReq{
+		Username: res.Username,
+	})
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't fetch connection counts"})
+		return
+	}
+
+	// Return the JSON response
+	ctx.JSON(http.StatusOK, struct {
+		User      *pb.UserDetailsResp `json:"user"`
+		Followers int64               `json:"followers"`
+		Following int64               `json:"following"`
+	}{
+		User:      res,
+		Followers: connCount.Followers,
+		Following: connCount.Following,
+	})
 }
 
 func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
@@ -941,7 +959,6 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 		results = append(results, resp.Users...)
 	}
 
-	fmt.Printf("results: %v\n", results)
 	// Return results to the client
 	ctx.JSON(http.StatusOK, gin.H{"users": results})
 }

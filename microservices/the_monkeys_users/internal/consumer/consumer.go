@@ -84,6 +84,20 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
 
+		case constants.BLOG_UPDATE:
+			usr, err := userCon.dbConn.GetBlogByBlogId(user.BlogId)
+			if err != nil {
+				log.Errorf("Error getting blog: %v", err)
+			}
+
+			if usr.BlogStatus != user.BlogStatus {
+				if err := userCon.dbConn.UpdateBlogStatusToDraft(user.BlogId, user.BlogStatus); err != nil {
+					log.Errorf("Can't update blog status to draft: %v", err)
+				}
+
+				go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.MovedBlogToDraft, user.BlogId), constants.ServiceBlog, constants.EventDraftedBlog, userCon.log)
+			}
+
 		case constants.BLOG_PUBLISH:
 			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
 				log.Errorf("Can't update blog status to publish: %v", err)
@@ -97,8 +111,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			}
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
-		case constants.BLOG_UPDATE:
-			// TODO: Add blog id and user id
+
 		default:
 			log.Errorf("Unknown action: %s", user.Action)
 		}

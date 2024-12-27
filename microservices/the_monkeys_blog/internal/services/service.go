@@ -39,7 +39,7 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
 	req.IsDraft = true
 
-	exists, _ := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	exists, _, _ := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if exists {
 		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
 		// owner, _, err := blog.osClient.GetBlogDetailsById(ctx, req.BlogId)
@@ -69,7 +69,7 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		if len(req.Tags) == 0 {
 			req.Tags = []string{"untagged"}
 		}
-		fmt.Printf("bx: %v\n", string(bx))
+		// fmt.Printf("bx: %v\n", string(bx))
 		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 	}
 
@@ -85,14 +85,21 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 }
 
 func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogExistsRes, error) {
-	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	exists, blogInfo, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("cannot find the blog with id: %s, error: %v", req.BlogId, err)
 		return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
 	}
 
+	isDraft, ok := blogInfo["is_draft"].(bool)
+	if !ok {
+		blog.logger.Errorf("unexpected type for is_draft field")
+		isDraft = true
+	}
+
 	return &pb.BlogExistsRes{
 		BlogExists: exists,
+		IsDraft:    isDraft,
 	}, nil
 }
 
@@ -166,7 +173,7 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
 
 	// TODO: Check if blog exists and published
-	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("Error checking blog existence: %v", err)
 		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.BlogId)
@@ -192,7 +199,7 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		Client:     req.Client,
 	})
 
-	fmt.Printf("bx: %+v\n", string(bx))
+	// fmt.Printf("bx: %+v\n", string(bx))
 
 	if err != nil {
 		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
@@ -209,6 +216,54 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 
 	return &pb.PublishBlogResp{
 		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
+	}, nil
+}
+
+func (blog *BlogService) MoveBlogToDraftStatus(ctx context.Context, req *pb.BlogReq) (*pb.BlogResp, error) {
+	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
+
+	// TODO: Check if blog exists and published
+	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("Error checking blog existence: %v", err)
+		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.BlogId)
+	}
+
+	if !exists {
+		blog.logger.Errorf("The blog with ID: %s doesn't exist", req.BlogId)
+		return nil, status.Errorf(codes.NotFound, "cannot find the blog for id: %s", req.BlogId)
+	}
+
+	_, err = blog.osClient.MoveBlogToDraft(ctx, req.BlogId)
+	if err != nil {
+		blog.logger.Errorf("Error Publishing the blog: %s, error: %v", req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.BlogId)
+	}
+
+	bx, err := json.Marshal(models.InterServiceMessage{
+		AccountId:  req.AccountId,
+		BlogId:     req.BlogId,
+		Action:     constants.BLOG_UPDATE,
+		BlogStatus: constants.BlogStatusDraft,
+		IpAddress:  req.Ip,
+		Client:     req.Client,
+	})
+
+	if err != nil {
+		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
+	}
+
+	// Enqueue publish message to user service asynchronously
+	go func() {
+		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		if err != nil {
+			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+	}()
+
+	return &pb.BlogResp{
+		Message: fmt.Sprintf("the blog %s has been moved to draft.", req.BlogId),
 	}, nil
 }
 
@@ -231,7 +286,7 @@ func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.BlogB
 func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
 	blog.logger.Infof("Archiving blog %s", req.BlogId)
 
-	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
+	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("Error checking blog existence: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to check existence for blog with ID: %s", req.BlogId)
@@ -260,7 +315,7 @@ func (blog *BlogService) GetLatest100Blogs(ctx context.Context, req *pb.GetBlogs
 
 // TODO: Incase of blog doesn't exists, do return 404
 func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.DeleteBlogReq) (*pb.DeleteBlogResp, error) {
-	resp, err := blog.osClient.DeleteABlogById(ctx, req.BlogId)
+	_, err := blog.osClient.DeleteABlogById(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("failed to delete the blog with ID: %s, error: %v", req.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "failed to delete the blog with ID: %s", req.BlogId)
@@ -296,7 +351,7 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 		}
 	}()
 
-	fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
+	// fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
 	return &pb.DeleteBlogResp{
 		Message: fmt.Sprintf("Blog with id %s has been successfully deleted", req.BlogId),
 	}, nil
@@ -485,76 +540,3 @@ func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBl
 
 // 	return &pb.DeleteBlogByIdResponse{Status: int64(deleteResponse.StatusCode)}, nil
 // }
-
-func (blog *BlogService) DraftBlogV2(ctx context.Context, req *pb.DraftBlogV2Req) (*pb.BlogV2Response, error) {
-	blog.logger.Infof("Content: %+v", req)
-	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
-	req.IsDraft = true
-
-	// Check if the blog already exists
-	exists, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("error checking if blog exists: %v", err)
-		return nil, status.Errorf(codes.Internal, "error checking blog existence")
-	}
-
-	if exists {
-		blog.logger.Infof("updating the blog with id: %s", req.BlogId)
-	} else {
-		blog.logger.Infof("creating the blog with id: %s for author: %s", req.BlogId, req.OwnerAccountId)
-		bx, err := json.Marshal(models.InterServiceMessage{
-			AccountId:  req.OwnerAccountId,
-			BlogId:     req.BlogId,
-			Action:     constants.BLOG_CREATE,
-			BlogStatus: constants.BlogStatusDraft,
-		})
-		if err != nil {
-			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
-			return nil, status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
-		}
-		if len(req.Tags) == 0 {
-			req.Tags = []string{"untagged"}
-		}
-		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
-	}
-
-	// Send the request to store the draft blog in Elasticsearch (using V2)
-	_, err = blog.osClient.DraftABlogV2(ctx, req)
-	if err != nil {
-		blog.logger.Errorf("cannot store draft into Elasticsearch: %v", err)
-		return nil, status.Errorf(codes.Internal, "error storing draft in Elasticsearch")
-	}
-
-	// Build the BlogV2Response based on the content type in req.Blog
-	var response *pb.BlogV2Response
-	switch blogContent := req.Blog.(type) {
-	case *pb.DraftBlogV2Req_EditorJsContent:
-		response = &pb.BlogV2Response{
-			Message: "Blog draft saved successfully",
-			Content: &pb.BlogV2Response_EditorJsContent{
-				EditorJsContent: blogContent.EditorJsContent,
-			},
-			ContentType: "editorjs",
-		}
-	case *pb.DraftBlogV2Req_PlateData:
-		response = &pb.BlogV2Response{
-			Message: "Blog draft saved successfully",
-			Content: &pb.BlogV2Response_PlateData{
-				PlateData: blogContent.PlateData,
-			},
-			ContentType: "platejs",
-		}
-	case *pb.DraftBlogV2Req_ContentJson:
-		response = &pb.BlogV2Response{
-			Message: "Blog draft saved successfully",
-			Content: &pb.BlogV2Response_ContentJson{
-				ContentJson: blogContent.ContentJson,
-			},
-			ContentType: "json",
-		}
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "unsupported content type")
-	}
-
-	return response, nil
-}

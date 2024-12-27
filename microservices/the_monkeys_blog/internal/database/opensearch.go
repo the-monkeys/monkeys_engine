@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -19,8 +20,9 @@ type ElasticsearchStorage interface {
 	DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*esapi.Response, error)
 	GetDraftBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetDraftBlogsRes, error)
 	GetDraftBlogByBlogId(ctx context.Context, blogId string) (*pb.BlogByIdRes, error)
-	DoesBlogExist(ctx context.Context, blogID string) (bool, error)
+	DoesBlogExist(ctx context.Context, blogID string) (bool, map[string]interface{}, error)
 	PublishBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
+	MoveBlogToDraft(ctx context.Context, blogId string) (*esapi.Response, error)
 	GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.BlogByIdRes, error)
 	AchieveAPublishedBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
@@ -32,7 +34,16 @@ type ElasticsearchStorage interface {
 	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error)
 	DeleteBlogsByOwnerAccountID(ctx context.Context, ownerAccountId string) (*esapi.Response, error)
 
-	DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error)
+	// -------------------------------------------------------------------------------- V2 --------------------------------------------------------------------------------
+	SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error)
+	GetBlogsOfUsersByAccountIds(ctx context.Context, accountIds []string, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogsByTagsAccId(ctx context.Context, accountId string, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogsByAccountId(ctx context.Context, accountId string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogByBlogId(ctx context.Context, blogId string, isDraft bool) (map[string]interface{}, error)
+	GetABlogByBlogIdAccId(ctx context.Context, blogId, accountId string, isDraft bool) (map[string]interface{}, error)
+	GetBlogsByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetBlogsByBlogIdsV2(ctx context.Context, blogIds []string, limit, offset int32) ([]map[string]interface{}, error)
+	GetAllPublishedBlogsLatestFirst(ctx context.Context, limit, offset int) ([]map[string]interface{}, error)
 }
 
 type elasticsearchStorage struct {
@@ -324,11 +335,11 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 	return blogs, nil
 }
 
-func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string) (bool, error) {
+func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string) (bool, map[string]interface{}, error) {
 	// Ensure blogID is not empty
 	if blogID == "" {
 		es.log.Error("DoesBlogExist: blogID is empty")
-		return false, fmt.Errorf("blogID cannot be empty")
+		return false, nil, fmt.Errorf("blogID cannot be empty")
 	}
 
 	// Create a Get request to check if the document exists
@@ -341,23 +352,43 @@ func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string
 	getResponse, err := req.Do(ctx, es.client)
 	if err != nil {
 		es.log.Errorf("DoesBlogExist: error executing Get request, error: %+v", err)
-		return false, err
+		return false, nil, err
 	}
 	defer getResponse.Body.Close()
 
 	// Check if the response indicates the document exists
 	if getResponse.StatusCode == http.StatusOK {
+		// Parse the response body to extract blog details
+		bodyBytes, err := io.ReadAll(getResponse.Body)
+		if err != nil {
+			es.log.Errorf("DoesBlogExist: error reading response body, error: %v", err)
+			return false, nil, err
+		}
+
+		var response map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &response); err != nil {
+			es.log.Errorf("DoesBlogExist: error decoding response body, error: %v", err)
+			return false, nil, err
+		}
+
+		// Extract the _source field which contains the blog details
+		blogDetails, ok := response["_source"].(map[string]interface{})
+		if !ok {
+			es.log.Errorf("DoesBlogExist: failed to parse _source from response")
+			return false, nil, fmt.Errorf("failed to parse blog details from response")
+		}
+
 		es.log.Infof("DoesBlogExist: blog with id %s exists", blogID)
-		return true, nil
+		return true, blogDetails, nil
 	} else if getResponse.StatusCode == http.StatusNotFound {
 		es.log.Infof("DoesBlogExist: blog with id %s does not exist", blogID)
-		return false, nil
+		return false, nil, nil
 	}
 
 	// If the response is something else, log it as an error
 	err = fmt.Errorf("DoesBlogExist: unexpected status code %d", getResponse.StatusCode)
 	es.log.Error(err)
-	return false, err
+	return false, nil, err
 }
 
 func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId string) (*esapi.Response, error) {
@@ -367,10 +398,13 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 		return nil, fmt.Errorf("blogId cannot be empty")
 	}
 
-	// Build the update query to set is_draft to false
+	// Build the update query to set is_draft to false and add published_time
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": "ctx._source.is_draft = false",
+			"source": "ctx._source.is_draft = false; ctx._source.published_time = params.published_time;",
+			"params": map[string]interface{}{
+				"published_time": time.Now().Format(time.RFC3339),
+			},
 		},
 	}
 
@@ -404,6 +438,56 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 	}
 
 	es.log.Infof("PublishBlogById: successfully published blog with id: %s", blogId)
+	return updateResponse, nil
+}
+
+func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId string) (*esapi.Response, error) {
+	// Ensure blogId is not empty
+	if blogId == "" {
+		es.log.Error("MoveBlogToDraft: blogId is empty")
+		return nil, fmt.Errorf("blogId cannot be empty")
+	}
+
+	// Build the update query to set is_draft to false and add published_time
+	updateScript := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": "ctx._source.is_draft = true; ctx._source.published_time = params.published_time;",
+			"params": map[string]interface{}{
+				"published_time": time.Now().Format(time.RFC3339),
+			},
+		},
+	}
+
+	// Marshal the update script to JSON
+	bs, err := json.Marshal(updateScript)
+	if err != nil {
+		es.log.Errorf("MoveBlogToDraft: cannot marshal the update script, error: %v", err)
+		return nil, err
+	}
+
+	// Create an update request
+	req := esapi.UpdateRequest{
+		Index:      constants.ElasticsearchBlogIndex,
+		DocumentID: blogId,
+		Body:       strings.NewReader(string(bs)),
+	}
+
+	// Execute the update request
+	updateResponse, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("MoveBlogToDraft: error executing update request, error: %+v", err)
+		return updateResponse, err
+	}
+	defer updateResponse.Body.Close()
+
+	// Check if the response indicates an error
+	if updateResponse.IsError() {
+		err = fmt.Errorf("MoveBlogToDraft: update query failed, response: %+v", updateResponse)
+		es.log.Error(err)
+		return updateResponse, err
+	}
+
+	es.log.Infof("MoveBlogToDraft: successfully published blog with id: %s", blogId)
 	return updateResponse, nil
 }
 
@@ -1094,41 +1178,6 @@ func (es *elasticsearchStorage) GetPublishedBlogByIdAndOwner(ctx context.Context
 
 	es.log.Infof("GetPublishedBlogByIdAndOwner: successfully fetched published blog with blogId: %s and ownerAccountId: %s", blogId, ownerAccountId)
 	return &blog, nil
-}
-
-func (es *elasticsearchStorage) DraftABlogV2(ctx context.Context, blog *pb.DraftBlogV2Req) (*esapi.Response, error) {
-	// Marshal the blog request to JSON, ensuring the correct handling of oneof content
-	bs, err := json.Marshal(blog)
-	if err != nil {
-		es.log.Errorf("DraftABlogV2: cannot marshal the blog request, error: %v", err)
-		return nil, err
-	}
-
-	document := strings.NewReader(string(bs))
-
-	// Create an Elasticsearch Index Request
-	req := esapi.IndexRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blog.BlogId, // Use the Blog ID as the document ID
-		Body:       document,
-	}
-
-	// Send the request to Elasticsearch
-	insertResponse, err := req.Do(ctx, es.client)
-	if err != nil {
-		es.log.Errorf("DraftABlogV2: error while indexing blog, error: %+v", err)
-		return insertResponse, err
-	}
-
-	// Check if there was an error with the insert response
-	if insertResponse.IsError() {
-		err = fmt.Errorf("DraftABlogV2: error indexing blog, response: %+v", insertResponse)
-		es.log.Error(err)
-		return insertResponse, err
-	}
-
-	es.log.Infof("DraftABlogV2: successfully created blog for user: %s, response: %+v", blog.OwnerAccountId, insertResponse)
-	return insertResponse, nil
 }
 
 func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error) {

@@ -147,7 +147,9 @@ message UserDetailsResp {
     string first_name = 3;
     string last_name = 4;
     string bio = 5;
-    string error = 6;
+    string avatar_url = 6;
+    string location = 7;
+    string error = 8;
 }
 
 message TopicActionReq {
@@ -227,6 +229,7 @@ message BookMarkRes {
     string error = 3;
     bool isLiked = 4;
     bool bookMarked = 5;
+    repeated string blog_ids = 6;
 }
 
 message UserFollowReq {
@@ -292,6 +295,7 @@ service UserService {
     rpc SearchUser(stream UserDetailReq) returns (stream FollowerFollowingResp) {}
     // Bookmark blog
     rpc BookMarkBlog(BookMarkReq) returns (BookMarkRes) {}
+    rpc GetBookMarks(BookMarkReq) returns (BookMarkRes) {}
     // Remove Bookmark
     rpc RemoveBookMark(BookMarkReq) returns (BookMarkRes) {}
     rpc LikeBlog(BookMarkReq) returns (BookMarkRes) {}

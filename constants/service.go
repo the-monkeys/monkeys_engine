@@ -24,6 +24,7 @@ const (
 	EventBlogUnlike        = "event-blog-unlike"
 
 	EventCreatedBlog    = "event-created-blog"
+	EventDraftedBlog    = "event-drafted-blog"
 	EventPublishedBlog  = "event-published-blog"
 	EventDeleteBlog     = "event-delete-blog"
 	EventInviteCoAuthor = "event-invite-co-author"

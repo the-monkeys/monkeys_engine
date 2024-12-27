@@ -86,7 +86,6 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
-	fmt.Printf("userDetails: %+v\n", userDetails)
 
 	return &pb.UserProfileRes{
 		AccountId:     userDetails.AccountId,
@@ -295,6 +294,8 @@ func (us *UserSvc) GetUserDetails(ctx context.Context, req *pb.UserDetailReq) (*
 		FirstName: userInfo.FirstName,
 		LastName:  userInfo.LastName,
 		AccountId: userInfo.AccountId,
+		Bio:       userInfo.Bio.String,
+		Location:  userInfo.Location.String,
 	}, nil
 }
 
@@ -691,6 +692,7 @@ func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb
 			Username:  r.Username,
 			FirstName: r.FirstName,
 			LastName:  r.LastName,
+			AccountId: r.AccountId,
 		})
 	}
 
@@ -889,8 +891,6 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 			return status.Errorf(codes.Internal, "Failed to search users: %v", err)
 		}
 
-		fmt.Printf("users: %v\n", users)
-
 		// Send matching users back to the client
 		for _, user := range users {
 			resp := &pb.FollowerFollowingResp{
@@ -929,5 +929,29 @@ func (us *UserSvc) GetFollowersFollowingCounts(ctx context.Context, req *pb.User
 		Followers: int64(followers),
 		Following: int64(following),
 		Status:    http.StatusOK,
+	}, nil
+}
+
+func (us *UserSvc) GetBookMarks(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
+	us.log.Debugf("fetching bookmarks for user: %s", req.Username)
+
+	resp, err := us.dbConn.GetBookmarkBlogsByUsername(req.Username)
+	if err != nil {
+		us.log.Errorf("error while fetching bookmarks for user %s, err: %v", req.Username, err)
+		if err == sql.ErrNoRows {
+			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("bookmarks for user %s doesn't exist", req.Username))
+		}
+
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
+	var blogIds []string
+	for _, r := range resp {
+		blogIds = append(blogIds, r.BlogId)
+	}
+
+	return &pb.BookMarkRes{
+		Status:  http.StatusOK,
+		BlogIds: blogIds,
 	}, nil
 }

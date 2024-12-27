@@ -51,13 +51,15 @@ type UserDb interface {
 	IsBlogLikedByUser(username string, blogId string) (bool, error)
 	IsBlogBookmarkedByUser(username string, blogId string) (bool, error)
 	CountBlogBookmarks(blogId string) (int64, error)
+	GetBookmarkBlogsByUsername(username string) ([]models.Blog, error)
 	GetBlogLikeCount(blogId string) (int64, error)
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
 	GetFollowersAndFollowingsCounts(username string) (int, int, error)
-
+	GetBlogByBlogId(blogId string) (*models.Blog, error)
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
 	UpdateBlogStatusToPublish(blogId string, status string) error
+	UpdateBlogStatusToDraft(blogId string, status string) error
 
 	// Delete queries
 	DeleteUserProfile(username string) error
@@ -599,7 +601,7 @@ func (uh *uDBHandler) fetchUserByIdentifier(identifierType, identifierValue stri
 	query := `
 		SELECT ua.id, ua.account_id, ua.username, ua.first_name, ua.last_name, 
 		ua.email, uai.password_hash, uai.password_recovery_token, uai.password_recovery_timeout,
-		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout
+		evs.status, us.status, uai.email_validation_token, uai.email_verification_timeout, ua.bio, ua.address 
 		FROM USER_ACCOUNT ua
 		LEFT JOIN USER_AUTH_INFO uai ON ua.id = uai.user_id
 		LEFT JOIN email_validation_status evs ON uai.email_validation_status = evs.id
@@ -611,7 +613,7 @@ func (uh *uDBHandler) fetchUserByIdentifier(identifierType, identifierValue stri
 		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email,
 			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
-			&tmu.EmailVerificationTimeout); err != nil {
+			&tmu.EmailVerificationTimeout, &tmu.Bio, &tmu.Location); err != nil {
 		uh.log.Errorf("Can't find a user with %s: %s, error: %+v", identifierType, identifierValue, err)
 		return nil, err
 	}
@@ -872,7 +874,7 @@ func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, e
 
 	// Step 2: Fetch the list of users followed by the given user
 	rows, err := uh.db.Query(`
-		SELECT ua.username, ua.first_name, ua.last_name
+		SELECT ua.username, ua.first_name, ua.last_name, ua.account_id
 		FROM user_follows uf
 		JOIN user_account ua ON uf.following_id = ua.id
 		WHERE uf.follower_id = $1
@@ -886,7 +888,7 @@ func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, e
 	// Step 3: Iterate through the result set and populate the list of users
 	for rows.Next() {
 		var user models.TheMonkeysUser
-		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName); err != nil {
+		if err := rows.Scan(&user.Username, &user.FirstName, &user.LastName, &user.AccountId); err != nil {
 			logrus.Errorf("Failed to scan user followed by user ID %d, error: %+v", userID, err)
 			return nil, err
 		}
