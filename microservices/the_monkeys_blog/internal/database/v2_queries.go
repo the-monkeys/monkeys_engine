@@ -55,7 +55,12 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"published_time": map[string]string{
+				"_script": map[string]interface{}{
+					"type": "number",
+					"script": map[string]interface{}{
+						"source": "doc.containsKey('published_time') ? doc['published_time'].value.millis : doc['blog.time'].value.millis",
+						"lang":   "painless",
+					},
 					"order": "desc",
 				},
 			},
@@ -79,7 +84,7 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 				"must_not": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"is_archived": false,
+							"is_archived": true,
 						},
 					},
 				},
