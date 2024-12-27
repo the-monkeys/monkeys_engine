@@ -243,6 +243,12 @@ message BlogResp {
     string error = 2;
 }
 
+message FeedReq {
+    repeated string tags = 1;
+    int32 limit = 2;
+    int32 offset = 3;
+}
+
 service BlogService {
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse); // Migrated to DraftBlogV2
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
@@ -273,4 +279,5 @@ service BlogService {
     rpc GetBlog(BlogReq) returns (google.protobuf.Any); // By blog id
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
     rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
+    rpc GetFeedBlogs(FeedReq) returns (stream google.protobuf.Any);
 }

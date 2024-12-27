@@ -94,28 +94,43 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
 
-	// Get blogs by tags, as users can filter the blogs using multiple tags
-	routesV2.POST("/tags", blogClient.GetBlogsByTags) // Get blogs by tags
+	// Public APIs
+	{
+		// Get all blogs
+		routesV2.GET("/feed", blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
+		// Get blogs by tags, as users can filter the blogs using multiple tags
+		routesV2.POST("/tags", blogClient.GetBlogsByTags) // Get blogs by tags
+		// Get blogs by username, not auth required as it is public and can be visible at users profile
+		routesV2.GET("/all/:username", blogClient.UsersBlogs) // Update of blogClient.AllPublishesByUserName
+		// Get published blog by blog_id
+		routesV2.GET("/:blog_id", blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
+	}
 
-	// Get blogs by username, not auth required as it is public and can be visible at users profile
-	routesV2.GET("/all/:username", blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
-	routesV2.GET("/:blog_id", blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
 	routesV2.Use(mware.AuthRequired)
 
-	// Write a blog, when the user have edit access
-	routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
-	// TODO: Add api to /to-publish/:blog_id now v1  blogClient.PublishBlogById is working
-	routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
-	// Get blogs of following users
-	routesV2.GET("/following", blogClient.FollowingBlogsFeed) // Blogs for following feed
-	// User can get their blogs (draft)
-	routesV2.GET("/my-drafts", blogClient.MyDraftBlogs) // Get all my draft blogs
-	// Users can get their blogs (published)
-	routesV2.GET("/my-published", blogClient.MyPublishedBlogs) // Get all my published blogs
-	// Users can get the blogs they bookmarked (published)
-	routesV2.GET("/my-bookmarks", blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
-	// Get my draft blog by id
-	routesV2.GET("/my-draft/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogIdV2)
+	// Protected APIs
+	{
+		// Get blogs of following users
+		routesV2.GET("/following", blogClient.FollowingBlogsFeed) // Blogs for following feed
+		// User can get their blogs (draft)
+		routesV2.GET("/my-drafts", blogClient.MyDraftBlogs) // Get all my draft blogs
+		// Users can get their blogs (published)
+		routesV2.GET("/my-published", blogClient.MyPublishedBlogs) // Get all my published blogs
+		// Users can get the blogs they bookmarked (published)
+		routesV2.GET("/my-bookmarks", blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
+		// My feed blogs, contains blogs from people I follow + my own blogs + topics I follow
+		// routesV2.GET("/my-feed", blogClient.MyFeedBlogs) // Get my feed blogs
+	}
+
+	// Authorization required APIs
+	{
+		// Write a blog, when the user have edit access
+		routesV2.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.WriteBlog)
+		// TODO: Add api to /to-publish/:blog_id now v1  blogClient.PublishBlogById is working
+		routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
+		// Get my draft blog by id
+		routesV2.GET("/my-draft/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogIdV2)
+	}
 
 	return blogClient
 }
@@ -1210,6 +1225,96 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 
 		isBookmarkedByMe, _ := asc.userCli.HaveIBookmarkedTheBlog(blogID, myUsername)
 		blog["IsBookmarkedByMe"] = isBookmarkedByMe
+	}
+
+	responseBlogs := map[string]interface{}{
+		"blogs": allBlogs,
+	}
+
+	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
+	// Get Limits and offset
+	limit := ctx.DefaultQuery("limit", "100")
+	offset := ctx.DefaultQuery("offset", "0")
+	// Convert to int
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		limitInt = 100
+	}
+
+	offsetInt, err := strconv.Atoi(offset)
+	if err != nil {
+		offsetInt = 0
+	}
+
+	stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.FeedReq{
+		Limit:  int32(limitInt),
+		Offset: int32(offsetInt),
+	})
+
+	if err != nil {
+		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the blogs for the given tags"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs by tags"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var allBlogs []map[string]interface{}
+	for {
+		blog, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if status, ok := status.FromError(err); ok {
+				switch status.Code() {
+				case codes.NotFound:
+					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
+					return
+				case codes.Internal:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+					return
+				default:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+					return
+				}
+			}
+		}
+
+		var blogMaps []map[string]interface{}
+		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+			return
+		}
+		allBlogs = append(allBlogs, blogMaps...)
+	}
+
+	for _, blog := range allBlogs {
+		blogID, ok := blog["blog_id"].(string)
+		if !ok {
+			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			continue
+		}
+
+		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		blog["like_count"] = likeCount
+
+		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		blog["bookmark_count"] = bookmarkCount
+
 	}
 
 	responseBlogs := map[string]interface{}{

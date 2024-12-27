@@ -791,3 +791,99 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 	es.log.Infof("GetBlogsByBlogIds: successfully fetched %d blogs", len(blogs))
 	return blogs, nil
 }
+
+func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Context, limit, offset int) ([]map[string]interface{}, error) {
+	// Build the query to get all published blogs with sorting by published_time or blog.time as fallback
+	query := map[string]interface{}{
+		"sort": []map[string]interface{}{
+			{
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date", // Handle cases where published_time is missing
+				},
+			},
+			{
+				"blog.time": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+		"from": offset,
+		"size": limit,
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_draft": false,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetAllPublishedBlogsLatestFirst: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetAllPublishedBlogsLatestFirst: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		err = fmt.Errorf("GetAllPublishedBlogsLatestFirst: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetAllPublishedBlogsLatestFirst: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetAllPublishedBlogsLatestFirst: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		err := fmt.Errorf("GetAllPublishedBlogsLatestFirst: failed to parse hits from response")
+		es.log.Error(err)
+		return nil, err
+	}
+
+	blogs := make([]map[string]interface{}, 0, len(hits))
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"]
+		blog, ok := hitSource.(map[string]interface{})
+		if !ok {
+			es.log.Errorf("GetAllPublishedBlogsLatestFirst: failed to cast hit source to map")
+			continue
+		}
+		blogs = append(blogs, blog)
+	}
+
+	es.log.Infof("GetAllPublishedBlogsLatestFirst: successfully fetched %d blogs", len(blogs))
+	return blogs, nil
+}
