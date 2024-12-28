@@ -51,7 +51,8 @@ func main() {
 		FrameDeny:             true,
 		ContentTypeNosniff:    true,
 		BrowserXssFilter:      true,
-		ContentSecurityPolicy: "default-src 'self'",
+		ContentSecurityPolicy: "default-src 'self';", // Customize as needed
+		ReferrerPolicy:        "strict-origin-when-cross-origin",
 	}))
 
 	// Enable CORS
