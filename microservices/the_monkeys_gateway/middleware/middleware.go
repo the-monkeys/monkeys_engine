@@ -8,6 +8,9 @@ import (
 	"github.com/gin-contrib/cors" // Use this package
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/ulule/limiter/v3"
+	limiterGin "github.com/ulule/limiter/v3/drivers/middleware/gin"
+	"github.com/ulule/limiter/v3/drivers/store/memory"
 )
 
 func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
@@ -69,4 +72,19 @@ func LogRequestBody() gin.HandlerFunc {
 		// logrus.Infof("Raw request body: %s", string(bodyBuffer.Bytes()))
 		c.Next()
 	}
+}
+
+// RateLimiterMiddleware creates a rate limiter middleware for Gin routes
+func RateLimiterMiddleware(limit string) gin.HandlerFunc {
+	// Define the rate limit (e.g., "5-S" means 5 requests per second)
+	rate, err := limiter.NewRateFromFormatted(limit)
+	if err != nil {
+		panic(err)
+	}
+
+	store := memory.NewStore()
+
+	instance := limiter.New(store, rate)
+
+	return limiterGin.NewMiddleware(instance)
 }
