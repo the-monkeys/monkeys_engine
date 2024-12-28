@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -43,4 +46,31 @@ func CheckUserAccessInContext(ctx *gin.Context, accessToCheck string) bool {
 func CheckUserRoleInContext(ctx *gin.Context, role string) bool {
 	userRole := ctx.GetString("user_role")
 	return strings.EqualFold(userRole, role)
+}
+
+func GetCLientIP(ctx *gin.Context) {
+	ip := ctx.ClientIP()
+	if _, err := os.Stat("ip.json"); os.IsNotExist(err) {
+		file, err := os.Create("ip.json")
+		if err != nil {
+			logrus.Errorf("cannot create log file, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot create log file"})
+			return
+		}
+		defer file.Close()
+
+		logData := map[string]string{"ip": ip}
+		logBytes, err := json.Marshal(logData)
+		if err != nil {
+			logrus.Errorf("cannot marshal log data, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot marshal log data"})
+			return
+		}
+
+		if _, err := file.Write(logBytes); err != nil {
+			logrus.Errorf("cannot write to log file, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
+			return
+		}
+	}
 }

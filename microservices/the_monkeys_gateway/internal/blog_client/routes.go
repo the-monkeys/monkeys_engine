@@ -1235,6 +1235,9 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
+	// Check if the file exists, if not create a new one and add ctx.ClientIP() in json
+	go utils.GetCLientIP(ctx)
+
 	// Get Limits and offset
 	limit := ctx.DefaultQuery("limit", "100")
 	offset := ctx.DefaultQuery("offset", "0")
