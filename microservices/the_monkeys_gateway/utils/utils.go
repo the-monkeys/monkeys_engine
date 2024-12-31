@@ -48,29 +48,30 @@ func CheckUserRoleInContext(ctx *gin.Context, role string) bool {
 	return strings.EqualFold(userRole, role)
 }
 
-func GetCLientIP(ctx *gin.Context) {
+func GetClientIP(ctx *gin.Context) {
 	ip := ctx.ClientIP()
-	if _, err := os.Stat("ip.json"); os.IsNotExist(err) {
-		file, err := os.Create("ip.json")
-		if err != nil {
-			logrus.Errorf("cannot create log file, error: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot create log file"})
-			return
-		}
-		defer file.Close()
 
-		logData := map[string]string{"ip": ip}
-		logBytes, err := json.Marshal(logData)
-		if err != nil {
-			logrus.Errorf("cannot marshal log data, error: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot marshal log data"})
-			return
-		}
+	file, err := os.OpenFile("ip.json", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		logrus.Errorf("cannot open log file, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot open log file"})
+		return
+	}
+	defer file.Close()
 
-		if _, err := file.Write(logBytes); err != nil {
-			logrus.Errorf("cannot write to log file, error: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
-			return
-		}
+	logData := map[string]string{"ip": ip}
+	completeMapData := []map[string]string{}
+	completeMapData = append(completeMapData, logData)
+	logBytes, err := json.Marshal(completeMapData)
+	if err != nil {
+		logrus.Errorf("cannot marshal log data, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot marshal log data"})
+		return
+	}
+
+	if _, err := file.Write(append(logBytes, '\n')); err != nil {
+		logrus.Errorf("cannot write to log file, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
+		return
 	}
 }

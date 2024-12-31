@@ -28,6 +28,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+var UserIpMap = map[string]string{}
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		// Allow all origins
@@ -97,6 +99,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
 
+	// Test Apis
+	{
+		routesV2.GET("/get-ips", rateLimiter, blogClient.GetIps)
+	}
 	// Public APIs
 	{
 		// Get all blogs
@@ -1237,9 +1243,20 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, responseBlogs)
 }
 
+// TODO: Delete this route
+func (asc *BlogServiceClient) GetIps(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, UserIpMap)
+}
+
 func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	// Check if the file exists, if not create a new one and add ctx.ClientIP() in json
-	go utils.GetCLientIP(ctx)
+	// go utils.GetClientIP(ctx)
+	accuntID := ctx.GetString("accountId")
+	if accuntID == "" {
+		UserIpMap[ctx.ClientIP()] = ctx.ClientIP()
+	} else {
+		UserIpMap[accuntID] = ctx.ClientIP()
+	}
 
 	// Get Limits and offset
 	limit := ctx.DefaultQuery("limit", "100")
