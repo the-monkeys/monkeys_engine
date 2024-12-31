@@ -55,20 +55,15 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"_script": map[string]interface{}{
-					"type": "number",
-					"script": map[string]interface{}{
-						"source": `
-                            if (doc['published_time'].size() > 0) {
-                                return doc['published_time'].value;
-                            } else if (doc['blog.time'].size() > 0) {
-                                return doc['blog.time'].value;
-                            } else {
-                                return 0;
-                            }`,
-						"lang": "painless",
-					},
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date", // Use this to handle missing fields
+				},
+			},
+			{
+				"blog.time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "long", // Use this as a fallback
 				},
 			},
 		},
