@@ -192,6 +192,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		Name:   "monkeys-auth-token",
 		Value:  res.Token,
 		Secure: true,
+		HttpOnly: true,
 	})
 	ctx.JSON(http.StatusOK, &res)
 }
