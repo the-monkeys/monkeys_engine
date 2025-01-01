@@ -23,6 +23,11 @@ func InitAuthMiddleware(svc *ServiceClient) AuthMiddlewareConfig {
 
 // Extracts the token from the Authorization header or query parameter
 func (c *AuthMiddlewareConfig) extractToken(ctx *gin.Context) (string, error) {
+	authCookie, err := ctx.Request.Cookie("monkeys-auth-token")
+	if err == nil {
+		return authCookie.Value, nil
+	}
+
 	authorization := ctx.Request.Header.Get("Authorization")
 
 	if authorization == "" {
