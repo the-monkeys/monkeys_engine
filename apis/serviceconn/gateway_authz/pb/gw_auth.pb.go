@@ -766,7 +766,7 @@ type LoginUserResponse struct {
 	unknownFields protoimpl.UnknownFields
 
 	StatusCode              int64  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
-	Token                   string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	Token                   string `protobuf:"bytes,2,opt,name=token,proto3" json:"-"`
 	EmailVerified           bool   `protobuf:"varint,3,opt,name=email_verified,json=emailVerified,proto3" json:"email_verified,omitempty"`
 	UserId                  int64  `protobuf:"varint,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Username                string `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
