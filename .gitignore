@@ -31,4 +31,5 @@ tracker
 cloud/*
 local/*
 profile/*
+blogs/*
 backup/*

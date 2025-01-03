@@ -18,6 +18,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -26,6 +27,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+var UserIpMap = map[string]string{}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -55,6 +58,8 @@ func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
 }
 
 func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient) *BlogServiceClient {
+	rateLimiter := middleware.RateLimiterMiddleware("1-S") // 10 requests per second for mins do 1-M
+
 	mware := auth.InitAuthMiddleware(authClient)
 
 	blogClient := &BlogServiceClient{
@@ -63,14 +68,14 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		config:  cfg,
 	}
 	routes := router.Group("/api/v1/blog")
-	routes.GET("/latest", blogClient.GetLatest100Blogs)
+	routes.GET("/latest", rateLimiter, blogClient.GetLatest100Blogs)
 	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
 	routes.POST("/tags", blogClient.GetBlogsByTagsName)
 	routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName)
 	routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId)
-	routes.GET("/news1", blogClient.GetNews1)
-	routes.GET("/news2", blogClient.GetNews2)
-	routes.GET("/news3", blogClient.GetNews3)
+	routes.GET("/news1", rateLimiter, blogClient.GetNews1)
+	routes.GET("/news2", rateLimiter, blogClient.GetNews2)
+	routes.GET("/news3", rateLimiter, blogClient.GetNews3)
 
 	// Use AuthRequired for basic authorization
 	routes.Use(mware.AuthRequired)
@@ -94,16 +99,20 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
 
+	// Test Apis
+	{
+		routesV2.GET("/get-ips", rateLimiter, blogClient.GetIps)
+	}
 	// Public APIs
 	{
 		// Get all blogs
-		routesV2.GET("/feed", blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
+		routesV2.GET("/feed", rateLimiter, blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
 		// Get blogs by tags, as users can filter the blogs using multiple tags
-		routesV2.POST("/tags", blogClient.GetBlogsByTags) // Get blogs by tags
+		routesV2.POST("/tags", rateLimiter, blogClient.GetBlogsByTags) // Get blogs by tags
 		// Get blogs by username, not auth required as it is public and can be visible at users profile
-		routesV2.GET("/all/:username", blogClient.UsersBlogs) // Update of blogClient.AllPublishesByUserName
+		routesV2.GET("/all/:username", rateLimiter, blogClient.UsersBlogs) // Update of blogClient.AllPublishesByUserName
 		// Get published blog by blog_id
-		routesV2.GET("/:blog_id", blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
+		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
 	}
 
 	routesV2.Use(mware.AuthRequired)
@@ -111,13 +120,13 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// Protected APIs
 	{
 		// Get blogs of following users
-		routesV2.GET("/following", blogClient.FollowingBlogsFeed) // Blogs for following feed
+		routesV2.GET("/following", rateLimiter, blogClient.FollowingBlogsFeed) // Blogs for following feed
 		// User can get their blogs (draft)
-		routesV2.GET("/my-drafts", blogClient.MyDraftBlogs) // Get all my draft blogs
+		routesV2.GET("/my-drafts", rateLimiter, blogClient.MyDraftBlogs) // Get all my draft blogs
 		// Users can get their blogs (published)
-		routesV2.GET("/my-published", blogClient.MyPublishedBlogs) // Get all my published blogs
+		routesV2.GET("/my-published", rateLimiter, blogClient.MyPublishedBlogs) // Get all my published blogs
 		// Users can get the blogs they bookmarked (published)
-		routesV2.GET("/my-bookmarks", blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
+		routesV2.GET("/my-bookmarks", rateLimiter, blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
 		// My feed blogs, contains blogs from people I follow + my own blogs + topics I follow
 		// routesV2.GET("/my-feed", blogClient.MyFeedBlogs) // Get my feed blogs
 	}
@@ -1234,9 +1243,20 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, responseBlogs)
 }
 
+// TODO: Delete this route
+func (asc *BlogServiceClient) GetIps(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, UserIpMap)
+}
+
 func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	// Check if the file exists, if not create a new one and add ctx.ClientIP() in json
-	go utils.GetCLientIP(ctx)
+	// go utils.GetClientIP(ctx)
+	accuntID := ctx.GetString("accountId")
+	if accuntID == "" {
+		UserIpMap[ctx.ClientIP()] = ctx.ClientIP()
+	} else {
+		UserIpMap[accuntID] = ctx.ClientIP()
+	}
 
 	// Get Limits and offset
 	limit := ctx.DefaultQuery("limit", "100")
