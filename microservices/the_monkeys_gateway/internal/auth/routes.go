@@ -194,7 +194,19 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		Secure: true,
 		HttpOnly: true,
 	})
-	ctx.JSON(http.StatusOK, &res)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"statusCode": res.StatusCode,
+		"emailVerified": res.EmailVerified,
+		"userId": res.UserId,
+		"username": res.Username,
+		"firstName": res.FirstName,
+		"lastName": res.LastName,
+		"email": res.Email,
+		"emailVerificationStatus": res.EmailVerificationStatus,
+		"error": res.Error,
+		"accountId": res.AccountId,
+	})
 }
 
 func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
