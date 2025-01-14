@@ -73,3 +73,6 @@ keys:
   mediastack: token
   newsapi: "token"
   hindustantimes: token
+
+cors: 
+  allowed_origin_regexp: '^https?://((local-)?monkeys.com.co|deploy-preview-\d+.*.netlify.app)$'
