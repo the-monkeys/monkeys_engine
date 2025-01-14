@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -63,6 +64,8 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
+	routes.GET("/validate", asc.Validate)
+	routes.GET("/logout", asc.Logout)
 
 	routes.POST("/forgot-pass", asc.ForgotPassword)
 	routes.GET("/reset-password", asc.PasswordResetEmailVerification)
@@ -189,12 +192,24 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 	}
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:   "monkeys-auth-token",
-		Value:  res.Token,
-		Secure: true,
+		Name:     "mat",
+		Value:    res.Token,
 		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
+		Path:     "/",
+		MaxAge:   int(24 * 365 * time.Second),
 	})
-	ctx.JSON(http.StatusOK, &res)
+
+	loginRespJson, _ := json.Marshal(&res)
+
+	// Convert to map to safely delete private fields
+	var loginRespMap map[string]interface{}
+	_ = json.Unmarshal(loginRespJson, &loginRespMap)
+
+	delete(loginRespMap, "token")
+
+	ctx.JSON(http.StatusOK, &loginRespMap)
 }
 
 func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
@@ -608,4 +623,28 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 
 	// Example response for client
 	c.JSON(http.StatusOK, loginResp)
+}
+
+/*
+Validates user session by validating Cookie. Returns jwt payload in successful response
+*/
+func (asc *ServiceClient) Validate(ctx *gin.Context) {
+	authCookie, err := ctx.Request.Cookie("mat")
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+		return
+	}
+
+	res, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value})
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+	}
+
+	ctx.JSON(http.StatusOK, &res)
+}
+
+func (asc *ServiceClient) Logout(ctx *gin.Context) {
+	ctx.SetCookie("mat", "", -1, "/", "", true, true)
+	ctx.JSON(http.StatusOK, gin.H{})
+	return
 }
