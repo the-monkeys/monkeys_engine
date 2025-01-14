@@ -195,10 +195,9 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		Name:     "mat",
 		Value:    res.Token,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
-		Secure:   true,
 		Path:     "/",
 		MaxAge:   int(24 * 365 * time.Second),
+		Domain: ".monkeys.com.co",
 	})
 
 	loginRespJson, _ := json.Marshal(&res)
