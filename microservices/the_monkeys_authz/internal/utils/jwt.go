@@ -30,10 +30,12 @@ type jwtClaims struct {
 func (w *JwtWrapper) GenerateToken(user *models.TheMonkeysUser) (signedToken string, err error) {
 	claims := &jwtClaims{
 		AccountId:               user.AccountId,
-		Username:                user.Username,
 		Email:                   user.Email,
-		IpAddress:               user.IpAddress,
 		EmailVerificationStatus: user.EmailVerificationStatus,
+		Username:                user.Username,
+		ClientId:                user.ClientId,
+		Client:                  user.Client,
+		IpAddress:               user.IpAddress,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(w.ExpirationHours)).Unix(),
 			Issuer:    w.Issuer,

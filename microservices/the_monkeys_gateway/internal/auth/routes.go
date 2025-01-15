@@ -624,24 +624,6 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 	c.JSON(http.StatusOK, loginResp)
 }
 
-/*
-Validates user session by validating Cookie. Returns jwt payload in successful response
-*/
-func (asc *ServiceClient) Validate(ctx *gin.Context) {
-	authCookie, err := ctx.Request.Cookie("mat")
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-		return
-	}
-
-	res, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value})
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
-	}
-
-	ctx.JSON(http.StatusOK, &res)
-}
-
 func (asc *ServiceClient) Logout(ctx *gin.Context) {
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{})
