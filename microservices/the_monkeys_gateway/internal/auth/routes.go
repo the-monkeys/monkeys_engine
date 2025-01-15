@@ -195,8 +195,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		Value:    res.Token,
 		HttpOnly: true,
 		Path:     "/",
-		Domain: ".monkeys.com.co",
-		MaxAge:   int(time.Duration(24*30) * time.Hour)/int(time.Second), // 30d days
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
 		Secure:   true,
 	})
 
@@ -492,7 +491,24 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "mat",
+		Value:    resp.Token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		Secure:   true,
+	})
+
+	response, _ := json.Marshal(&resp)
+
+	// Convert to map to safely delete private fields
+	var responseMap map[string]interface{}
+	_ = json.Unmarshal(response, &responseMap)
+
+	delete(responseMap, "token")
+
+	ctx.JSON(http.StatusOK, responseMap)
 }
 
 func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
@@ -574,7 +590,23 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "mat",
+		Value:    resp.Token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		Secure:   true,
+	})
+
+	response, _ := json.Marshal(&resp)
+
+	// Convert to map to safely delete private fields
+	var responseMap map[string]interface{}
+	_ = json.Unmarshal(response, &responseMap)
+
+	delete(responseMap, "token")
+	ctx.JSON(http.StatusOK, responseMap)
 }
 
 func (asc *ServiceClient) HandleGoogleLogin(c *gin.Context) {
