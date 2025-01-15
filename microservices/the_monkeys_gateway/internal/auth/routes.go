@@ -195,8 +195,9 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		Value:    res.Token,
 		HttpOnly: true,
 		Path:     "/",
-		MaxAge:   int(24 * 365 * time.Second),
 		Domain: ".monkeys.com.co",
+		MaxAge:   int(time.Duration(24*30) * time.Hour)/int(time.Second), // 30d days
+		Secure:   true,
 	})
 
 	loginRespJson, _ := json.Marshal(&res)
