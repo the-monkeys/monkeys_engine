@@ -64,7 +64,6 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
-	routes.GET("/validate", asc.Validate)
 	routes.GET("/logout", asc.Logout)
 
 	routes.POST("/forgot-pass", asc.ForgotPassword)
