@@ -520,6 +520,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 	// Add a user log
 	go cache.AddUserLog(as.dbConn, user, constants.UpdatedUserName, constants.ServiceAuth, constants.EventUpdateUsername, as.logger)
 
+	user.Username = req.NewUsername
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Errorf(service_types.CannotCreateToken(req.NewUsername, err))
