@@ -549,6 +549,7 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		}
 	}
 
+	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{"message": "successfully updated password", "status": resp.StatusCode})
 }
 
