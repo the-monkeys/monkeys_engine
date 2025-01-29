@@ -56,7 +56,7 @@ func main() {
 	}))
 
 	// Enable CORS
-	server.router.Use(middleware.CORSMiddleware(cfg.Cors.AllowedOriginExp))
+	server.router.Use(middleware.CORSMiddleware())
 
 	// Log request body
 	server.router.Use(middleware.LogRequestBody())
