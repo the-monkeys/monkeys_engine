@@ -79,10 +79,6 @@ type GoogleOAuth2 struct {
 	Endpoint     string   `mapstructure:"endpoint"`
 }
 
-type Cors struct {
-	AllowedOriginExp string `mapstructure:"allowed_origin_regexp"`
-}
-
 type Config struct {
 	TheMonkeysGateway TheMonkeysGateway `mapstructure:"the_monkeys_gateway"`
 	Microservices     Microservices     `mapstructure:"microservices"`
@@ -94,7 +90,6 @@ type Config struct {
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 	Keys              Keys              `mapstructure:"keys"`
 	GoogleOAuth2      GoogleOAuth2      `mapstructure:"google_oauth2"`
-	Cors              Cors              `mapstructure:"cors"`
 }
 
 func GetConfig() (*Config, error) {
