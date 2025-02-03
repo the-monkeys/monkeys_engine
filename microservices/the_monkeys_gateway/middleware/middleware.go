@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"regexp"
 
 	"github.com/gin-contrib/cors" // Use this package
 	"github.com/gin-gonic/gin"
@@ -20,9 +21,14 @@ func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func CORSMiddleware() gin.HandlerFunc {
+func CORSMiddleware(allowedOriginExp string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		requestOrigin := c.Request.Header.Get("Origin")
+
+		if match, _ := regexp.Match(allowedOriginExp, []byte(requestOrigin)); match {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, IP, Client, OS")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
