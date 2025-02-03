@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -63,6 +64,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
+	routes.GET("/logout", asc.Logout)
 
 	routes.POST("/forgot-pass", asc.ForgotPassword)
 	routes.GET("/reset-password", asc.PasswordResetEmailVerification)
@@ -189,12 +191,23 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 	}
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:   "monkeys-auth-token",
-		Value:  res.Token,
-		Secure: true,
+		Name:     "mat",
+		Value:    res.Token,
 		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		Secure:   true,
 	})
-	ctx.JSON(http.StatusOK, &res)
+
+	loginRespJson, _ := json.Marshal(&res)
+
+	// Convert to map to safely delete private fields
+	var loginRespMap map[string]interface{}
+	_ = json.Unmarshal(loginRespJson, &loginRespMap)
+
+	delete(loginRespMap, "token")
+
+	ctx.JSON(http.StatusOK, &loginRespMap)
 }
 
 func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
@@ -478,7 +491,24 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "mat",
+		Value:    resp.Token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		Secure:   true,
+	})
+
+	response, _ := json.Marshal(&resp)
+
+	// Convert to map to safely delete private fields
+	var responseMap map[string]interface{}
+	_ = json.Unmarshal(response, &responseMap)
+
+	delete(responseMap, "token")
+
+	ctx.JSON(http.StatusOK, responseMap)
 }
 
 func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
@@ -561,7 +591,23 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, resp)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "mat",
+		Value:    resp.Token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		Secure:   true,
+	})
+
+	response, _ := json.Marshal(&resp)
+
+	// Convert to map to safely delete private fields
+	var responseMap map[string]interface{}
+	_ = json.Unmarshal(response, &responseMap)
+
+	delete(responseMap, "token")
+	ctx.JSON(http.StatusOK, responseMap)
 }
 
 func (asc *ServiceClient) HandleGoogleLogin(c *gin.Context) {
@@ -609,4 +655,10 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 
 	// Example response for client
 	c.JSON(http.StatusOK, loginResp)
+}
+
+func (asc *ServiceClient) Logout(ctx *gin.Context) {
+	ctx.SetCookie("mat", "", -1, "/", "", true, true)
+	ctx.JSON(http.StatusOK, gin.H{})
+	return
 }

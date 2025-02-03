@@ -238,6 +238,7 @@ func (asc *UserServiceClient) DeleteUserProfile(ctx *gin.Context) {
 		}
 	}
 
+	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, res)
 }
 
