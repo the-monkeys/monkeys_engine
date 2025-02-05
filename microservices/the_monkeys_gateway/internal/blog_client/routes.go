@@ -28,8 +28,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var UserIpMap = map[string]string{}
-
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		// Allow all origins
@@ -68,20 +66,21 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		config:  cfg,
 	}
 	routes := router.Group("/api/v1/blog")
-	routes.GET("/latest", rateLimiter, blogClient.GetLatest100Blogs)
-	routes.GET("/:blog_id", blogClient.GetPublishedBlogById)
-	routes.POST("/tags", blogClient.GetBlogsByTagsName)
-	routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName)
-	routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId)
-	routes.GET("/news1", rateLimiter, blogClient.GetNews1)
-	routes.GET("/news2", rateLimiter, blogClient.GetNews2)
-	routes.GET("/news3", rateLimiter, blogClient.GetNews3)
+	routes.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
+	// routes.GET("/latest", rateLimiter, blogClient.GetLatest100Blogs) Deprecating
+	// routes.GET("/:blog_id", blogClient.GetPublishedBlogById) Deprecating
+	// routes.POST("/tags", blogClient.GetBlogsByTagsName) Deprecating
+	// routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName) Deprecating
+	// routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId) Deprecating
+	// routes.GET("/news1", rateLimiter, blogClient.GetNews1) Deprecating
+	// routes.GET("/news2", rateLimiter, blogClient.GetNews2) Deprecating
+	// routes.GET("/news3", rateLimiter, blogClient.GetNews3) Deprecating
 
 	// Use AuthRequired for basic authorization
 	routes.Use(mware.AuthRequired)
 
 	// Use AuthzRequired for routes needing access control
-	routes.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.DraftABlog)
+	// routes.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.DraftABlog)
 
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
@@ -99,10 +98,6 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
 
-	// Test Apis
-	{
-		routesV2.GET("/get-ips", rateLimiter, blogClient.GetIps)
-	}
 	// Public APIs
 	{
 		// Get all blogs
@@ -144,162 +139,162 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	return blogClient
 }
 
-func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
-	id := ctx.Param("blog_id")
+// func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
+// 	id := ctx.Param("blog_id")
 
-	// logrus.Infof("Traffic is coming from IP: %v", ctx.ClientIP())
-	ipAddress := ctx.Request.Header.Get("IP")
-	client := ctx.Request.Header.Get("Client")
+// 	// logrus.Infof("Traffic is coming from IP: %v", ctx.ClientIP())
+// 	ipAddress := ctx.Request.Header.Get("IP")
+// 	client := ctx.Request.Header.Get("Client")
 
-	// Check if the blog exists
-	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
-		BlogId: id,
-	})
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
-				return
-			}
-		}
-	}
+// 	// Check if the blog exists
+// 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
+// 		BlogId: id,
+// 	})
+// 	if err != nil {
+// 		if status, ok := status.FromError(err); ok {
+// 			switch status.Code() {
+// 			case codes.InvalidArgument:
+// 				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
+// 				return
+// 			case codes.Internal:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
+// 				return
+// 			default:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
+// 				return
+// 			}
+// 		}
+// 	}
 
-	var action string
-	var initialLogDone bool
+// 	var action string
+// 	var initialLogDone bool
 
-	if resp.BlogExists {
-		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
-			return
-		}
-		action = constants.BLOG_UPDATE
-	} else {
-		action = constants.BLOG_CREATE
-	}
+// 	if resp.BlogExists {
+// 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+// 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
+// 			return
+// 		}
+// 		action = constants.BLOG_UPDATE
+// 	} else {
+// 		action = constants.BLOG_CREATE
+// 	}
 
-	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
-	if err != nil {
-		logrus.Errorf("Error upgrading connection: %v", err)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer conn.Close()
+// 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+// 	if err != nil {
+// 		logrus.Errorf("Error upgrading connection: %v", err)
+// 		ctx.AbortWithStatus(http.StatusInternalServerError)
+// 		return
+// 	}
+// 	defer conn.Close()
 
-	// Infinite loop to listen to WebSocket connection
-	for {
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			logrus.Errorf("Error reading the message: %v", err)
-			return
-		}
+// 	// Infinite loop to listen to WebSocket connection
+// 	for {
+// 		_, msg, err := conn.ReadMessage()
+// 		if err != nil {
+// 			logrus.Errorf("Error reading the message: %v", err)
+// 			return
+// 		}
 
-		// Save the incoming message for debugging purposes
-		// os.WriteFile("draft.json", msg, 0644)
+// 		// Save the incoming message for debugging purposes
+// 		// os.WriteFile("draft.json", msg, 0644)
 
-		// Step 1: Unmarshal into a generic map
-		var genericMap map[string]interface{}
-		err = json.Unmarshal(msg, &genericMap)
-		if err != nil {
-			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
-			return
-		}
+// 		// Step 1: Unmarshal into a generic map
+// 		var genericMap map[string]interface{}
+// 		err = json.Unmarshal(msg, &genericMap)
+// 		if err != nil {
+// 			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
+// 			return
+// 		}
 
-		// Step 2: Process "blog.blocks" for table-specific data
-		if blog, ok := genericMap["blog"].(map[string]interface{}); ok {
-			if blocks, ok := blog["blocks"].([]interface{}); ok {
-				for _, block := range blocks {
-					blockMap, ok := block.(map[string]interface{})
-					if !ok {
-						continue
-					}
+// 		// Step 2: Process "blog.blocks" for table-specific data
+// 		if blog, ok := genericMap["blog"].(map[string]interface{}); ok {
+// 			if blocks, ok := blog["blocks"].([]interface{}); ok {
+// 				for _, block := range blocks {
+// 					blockMap, ok := block.(map[string]interface{})
+// 					if !ok {
+// 						continue
+// 					}
 
-					// Process "table" blocks
-					if blockMap["type"] == "table" {
-						data, ok := blockMap["data"].(map[string]interface{})
-						if !ok {
-							continue
-						}
+// 					// Process "table" blocks
+// 					if blockMap["type"] == "table" {
+// 						data, ok := blockMap["data"].(map[string]interface{})
+// 						if !ok {
+// 							continue
+// 						}
 
-						// if withBorder, ok := data["withBorder"].([]interface{}); ok {
-						// 	withBorderBool, ok := withBorder[0].(bool)
-						// }
+// 						// if withBorder, ok := data["withBorder"].([]interface{}); ok {
+// 						// 	withBorderBool, ok := withBorder[0].(bool)
+// 						// }
 
-						// Transform "content" into pb.TableRow structure
-						if content, ok := data["content"].([]interface{}); ok {
-							var tableContent []*pb.TableRow
-							for _, row := range content {
-								rowSlice, ok := row.([]interface{})
-								if !ok {
-									continue
-								}
-								var cells []string
-								for _, cell := range rowSlice {
-									if cellStr, ok := cell.(string); ok {
-										cells = append(cells, cellStr)
-									}
-								}
-								tableContent = append(tableContent, &pb.TableRow{Cells: cells})
-							}
-							data["table_content"] = tableContent
-							delete(data, "content") // Remove the original field
-						}
-					}
-				}
-			}
-		}
+// 						// Transform "content" into pb.TableRow structure
+// 						if content, ok := data["content"].([]interface{}); ok {
+// 							var tableContent []*pb.TableRow
+// 							for _, row := range content {
+// 								rowSlice, ok := row.([]interface{})
+// 								if !ok {
+// 									continue
+// 								}
+// 								var cells []string
+// 								for _, cell := range rowSlice {
+// 									if cellStr, ok := cell.(string); ok {
+// 										cells = append(cells, cellStr)
+// 									}
+// 								}
+// 								tableContent = append(tableContent, &pb.TableRow{Cells: cells})
+// 							}
+// 							data["table_content"] = tableContent
+// 							delete(data, "content") // Remove the original field
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
 
-		// Step 3: Marshal back into JSON
-		updatedJSON, err := json.Marshal(genericMap)
-		if err != nil {
-			logrus.Errorf("Error marshalling updated JSON: %v", err)
-			return
-		}
+// 		// Step 3: Marshal back into JSON
+// 		updatedJSON, err := json.Marshal(genericMap)
+// 		if err != nil {
+// 			logrus.Errorf("Error marshalling updated JSON: %v", err)
+// 			return
+// 		}
 
-		// Step 4: Unmarshal into pb.DraftBlogRequest
-		var draftBlog pb.DraftBlogRequest
-		err = json.Unmarshal(updatedJSON, &draftBlog)
-		if err != nil {
-			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
-			return
-		}
+// 		// Step 4: Unmarshal into pb.DraftBlogRequest
+// 		var draftBlog pb.DraftBlogRequest
+// 		err = json.Unmarshal(updatedJSON, &draftBlog)
+// 		if err != nil {
+// 			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
+// 			return
+// 		}
 
-		draftBlog.BlogId = id
-		draftBlog.Ip = ipAddress
-		draftBlog.Client = client
+// 		draftBlog.BlogId = id
+// 		draftBlog.Ip = ipAddress
+// 		draftBlog.Client = client
 
-		// Only set the action and log the initial creation or update once
-		if !initialLogDone {
-			draftBlog.Action = action
-			initialLogDone = true
-		}
+// 		// Only set the action and log the initial creation or update once
+// 		if !initialLogDone {
+// 			draftBlog.Action = action
+// 			initialLogDone = true
+// 		}
 
-		// Send the draft blog to the gRPC service
-		resp, err := asc.Client.DraftBlog(context.Background(), &draftBlog)
-		if err != nil {
-			logrus.Errorf("Error while creating draft blog: %v", err)
-			return
-		}
+// 		// Send the draft blog to the gRPC service
+// 		resp, err := asc.Client.DraftBlog(context.Background(), &draftBlog)
+// 		if err != nil {
+// 			logrus.Errorf("Error while creating draft blog: %v", err)
+// 			return
+// 		}
 
-		// Marshal and send the response back to the WebSocket client
-		response, err := json.Marshal(resp)
-		if err != nil {
-			logrus.Errorf("Error marshalling response message: %v", err)
-			return
-		}
+// 		// Marshal and send the response back to the WebSocket client
+// 		response, err := json.Marshal(resp)
+// 		if err != nil {
+// 			logrus.Errorf("Error marshalling response message: %v", err)
+// 			return
+// 		}
 
-		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
-			logrus.Errorf("Error returning the response message: %v", err)
-			return
-		}
-	}
-}
+// 		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
+// 			logrus.Errorf("Error returning the response message: %v", err)
+// 			return
+// 		}
+// 	}
+// }
 
 func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 	// Check permissions:
@@ -683,26 +678,26 @@ func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
-	res, err := asc.Client.GetLatest100Blogs(context.Background(), &pb.GetBlogsByTagsNameReq{})
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blogs do not exist"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the latest blogs"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
+// func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
+// 	res, err := asc.Client.GetLatest100Blogs(context.Background(), &pb.GetBlogsByTagsNameReq{})
+// 	if err != nil {
+// 		if status, ok := status.FromError(err); ok {
+// 			switch status.Code() {
+// 			case codes.NotFound:
+// 				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blogs do not exist"})
+// 				return
+// 			case codes.Internal:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the latest blogs"})
+// 				return
+// 			default:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+// 				return
+// 			}
+// 		}
+// 	}
 
-	ctx.JSON(http.StatusOK, res)
-}
+// 	ctx.JSON(http.StatusOK, res)
+// }
 
 func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 	// Check permissions to Delete
@@ -1243,21 +1238,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, responseBlogs)
 }
 
-// TODO: Delete this route
-func (asc *BlogServiceClient) GetIps(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, UserIpMap)
-}
-
 func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
-	// Check if the file exists, if not create a new one and add ctx.ClientIP() in json
-	// go utils.GetClientIP(ctx)
-	accuntID := ctx.GetString("accountId")
-	if accuntID == "" {
-		UserIpMap[ctx.ClientIP()] = ctx.ClientIP()
-	} else {
-		UserIpMap[accuntID] = ctx.ClientIP()
-	}
-
 	// Get Limits and offset
 	limit := ctx.DefaultQuery("limit", "100")
 	offset := ctx.DefaultQuery("offset", "0")

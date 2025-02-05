@@ -380,3 +380,63 @@ func (blog *BlogService) GetFeedBlogs(req *pb.FeedReq, stream pb.BlogService_Get
 
 	return nil
 }
+
+func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService_GetBlogsMetadataServer) error {
+	returnData := make(map[string]interface{})
+	var blogs []map[string]interface{}
+
+	// Find blog by tags
+	if len(req.Tags) > 0 {
+		blog.logger.Debug("Fetching published blogs by tags")
+		blogs, count, err := blog.osClient.GetBlogsMetadataByTags(stream.Context(), req.Tags, false, req.Limit, req.Offset)
+		if err != nil {
+			blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+			return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
+		}
+
+		returnData["total_blogs"] = count
+		returnData["blogs"] = blogs
+
+		blogBytes, err := json.Marshal(returnData)
+		if err != nil {
+			blog.logger.Errorf("Error marshalling blogs: %v", err)
+			return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+		}
+
+		// Send the packed message over the stream
+		if err := stream.Send(&anypb.Any{
+			TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+			Value:   blogBytes,
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	blog.logger.Debug("Fetching feed metadata")
+	blogs, count, err := blog.osClient.GetAllPublishedBlogsMetadata(stream.Context(), int(req.Limit), int(req.Offset))
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
+	}
+
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
