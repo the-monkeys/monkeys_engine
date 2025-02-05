@@ -44,6 +44,10 @@ type ElasticsearchStorage interface {
 	GetBlogsByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
 	GetBlogsByBlogIdsV2(ctx context.Context, blogIds []string, limit, offset int32) ([]map[string]interface{}, error)
 	GetAllPublishedBlogsLatestFirst(ctx context.Context, limit, offset int) ([]map[string]interface{}, error)
+
+	// -------------------------------------------------------------------------------- Metadata --------------------------------------------------------------------------------
+	GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error)
+	GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, error)
 }
 
 type elasticsearchStorage struct {

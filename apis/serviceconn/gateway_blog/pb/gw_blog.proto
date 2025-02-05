@@ -250,6 +250,11 @@ message FeedReq {
 }
 
 service BlogService {
+    // Metadata may contain the blog id, owner account id, title, first paragraph, 
+    // tags, first image, publish time, author name, etc.
+    rpc GetBlogsMetadata(FeedReq) returns (stream google.protobuf.Any); 
+
+    // TODO: Remove the deprecated APIs
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse); // Migrated to DraftBlogV2
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
     rpc GetPublishedBlogById(BlogByIdReq) returns (BlogByIdRes); // One blog by blog id
