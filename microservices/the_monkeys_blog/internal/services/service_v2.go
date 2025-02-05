@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -369,6 +370,64 @@ func (blog *BlogService) GetFeedBlogs(req *pb.FeedReq, stream pb.BlogService_Get
 		blog.logger.Errorf("Error marshalling blogs: %v", err)
 		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
 	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService_GetBlogsMetadataServer) error {
+	var blogs []map[string]interface{}
+	// Find blog by tags
+	if len(req.Tags) > 0 {
+		blog.logger.Debug("Fetching published blogs by tags")
+		blogs, err := blog.osClient.GetBlogsByTags(stream.Context(), req.Tags, false, req.Limit, req.Offset)
+		if err != nil {
+			blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+			return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
+		}
+		// TODO: remove a key from here blogs blogs = []map[string]interface{}
+		removeKeyFromBlogs(blogs, "action")
+		removeKeyFromBlogs(blogs, "Ip")
+		removeKeyFromBlogs(blogs, "Client")
+
+		blogBytes, err := json.Marshal(blogs)
+		if err != nil {
+			blog.logger.Errorf("Error marshalling blogs: %v", err)
+			return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+		}
+
+		// Send the packed message over the stream
+		if err := stream.Send(&anypb.Any{
+			TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+			Value:   blogBytes,
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	blog.logger.Debug("Fetching feed metadata")
+	blogs, err := blog.osClient.GetAllPublishedBlogsMetadata(stream.Context(), int(req.Limit), int(req.Offset))
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
+	}
+
+	blogBytes, err := json.Marshal(blogs)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	os.WriteFile("metadata.json", blogBytes, 0777)
 
 	// Send the packed message over the stream
 	if err := stream.Send(&anypb.Any{
