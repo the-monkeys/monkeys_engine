@@ -66,7 +66,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		config:  cfg,
 	}
 	routes := router.Group("/api/v1/blog")
-	routes.GET("/meta", rateLimiter, blogClient.GetFeedPostsMeta)
+	routes.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
 	// routes.GET("/latest", rateLimiter, blogClient.GetLatest100Blogs) Deprecating
 	// routes.GET("/:blog_id", blogClient.GetPublishedBlogById) Deprecating
 	// routes.POST("/tags", blogClient.GetBlogsByTagsName) Deprecating

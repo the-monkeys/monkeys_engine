@@ -15,9 +15,10 @@ import (
 )
 
 func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
-	// Get Limits and offset
+	// Get Limits and Offset
 	limit := ctx.DefaultQuery("limit", "100")
 	offset := ctx.DefaultQuery("offset", "0")
+
 	// Convert to int
 	limitInt, err := strconv.Atoi(limit)
 	if err != nil {
@@ -29,9 +30,18 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
+	// Bind tags from request body
+	var tags Tags
+	if err := ctx.ShouldBindBodyWithJSON(&tags); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
+		return
+	}
+
+	// Call gRPC to get blog metadata
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.FeedReq{
 		Limit:  int32(limitInt),
 		Offset: int32(offsetInt),
+		Tags:   tags.Tags,
 	})
 
 	if err != nil {
@@ -52,6 +62,8 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	}
 
 	var allBlogs []map[string]interface{}
+	var totalBlogs int // Store total number of blogs
+
 	for {
 		blog, err := stream.Recv()
 		if err == io.EOF {
@@ -73,15 +85,42 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 			}
 		}
 
-		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		// Unmarshal into a map since response structure has changed
+		var blogMap map[string]interface{}
+		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
 			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
-		allBlogs = append(allBlogs, blogMaps...)
+
+		// Extract "total_blogs" if present
+		if total, ok := blogMap["total_blogs"].(float64); ok { // JSON numbers default to float64
+			totalBlogs = int(total)
+		}
+
+		// Extract the "blogs" array safely
+		blogsData, ok := blogMap["blogs"]
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "missing blogs data in response"})
+			return
+		}
+
+		// Convert blogsData to []map[string]interface{}
+		blogList, ok := blogsData.([]interface{})
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "invalid blogs format in response"})
+			return
+		}
+
+		// Convert []interface{} to []map[string]interface{}
+		for _, b := range blogList {
+			if blogEntry, valid := b.(map[string]interface{}); valid {
+				allBlogs = append(allBlogs, blogEntry)
+			}
+		}
 	}
 
+	// Add additional metadata (like & bookmark count) for each blog
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
@@ -94,11 +133,12 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 
 		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
 		blog["bookmark_count"] = bookmarkCount
-
 	}
 
+	// Final response including total blogs count
 	responseBlogs := map[string]interface{}{
-		"blogs": allBlogs,
+		"total_blogs": totalBlogs,
+		"blogs":       allBlogs,
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
