@@ -474,9 +474,16 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	// Add user log asynchronously
 	go cache.AddUserLog(as.dbConn, user, constants.VerifyEmail, constants.ServiceAuth, constants.EventVerifiedEmail, as.logger)
 
+	user.Email = req.Email
+	token, err := as.jwt.GenerateToken(user)
+	if err != nil {
+		as.logger.Errorf("Unable to generate new token for existing user %s, error %v", user.Email, err)
+	}
+
 	// Return a success response with status code 200
 	return &pb.VerifyEmailRes{
 		StatusCode: 200,
+		Token:      token,
 	}, nil
 }
 
