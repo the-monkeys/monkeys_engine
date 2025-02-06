@@ -412,6 +412,21 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 		}
 	}
 
+	// If user is logged in then update the session token
+	authCookie, err := ctx.Request.Cookie("mat")
+	if authCookie != nil {
+		if _, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value}); err != nil {
+			http.SetCookie(ctx.Writer, &http.Cookie{
+				Name:     "mat",
+				Value:    res.Token,
+				HttpOnly: true,
+				Path:     "/",
+				MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+				Secure:   true,
+			})
+		}
+	}
+
 	// Return success response
 	ctx.JSON(http.StatusOK, gin.H{"message": "email verified", "status": res.StatusCode})
 }
