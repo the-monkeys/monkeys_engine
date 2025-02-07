@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -14,6 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"google.golang.org/grpc"
@@ -190,14 +190,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 		}
 	}
 
-	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "mat",
-		Value:    res.Token,
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
-		Secure:   true,
-	})
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
 
 	loginRespJson, _ := json.Marshal(&res)
 
@@ -416,14 +409,7 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	authCookie, err := ctx.Request.Cookie("mat")
 	if authCookie != nil {
 		if _, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value}); err != nil {
-			http.SetCookie(ctx.Writer, &http.Cookie{
-				Name:     "mat",
-				Value:    res.Token,
-				HttpOnly: true,
-				Path:     "/",
-				MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
-				Secure:   true,
-			})
+			utils.SetMonkeysAuthCookie(ctx, res.Token)
 		}
 	}
 
@@ -506,14 +492,7 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		}
 	}
 
-	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "mat",
-		Value:    resp.Token,
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
-		Secure:   true,
-	})
+	utils.SetMonkeysAuthCookie(ctx, resp.Token)
 
 	response, _ := json.Marshal(&resp)
 
@@ -606,15 +585,8 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 		}
 	}
 
-	http.SetCookie(ctx.Writer, &http.Cookie{
-		Name:     "mat",
-		Value:    resp.Token,
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
-		Secure:   true,
-	})
-
+	utils.SetMonkeysAuthCookie(ctx, resp.Token)
+	
 	response, _ := json.Marshal(&resp)
 
 	// Convert to map to safely delete private fields
