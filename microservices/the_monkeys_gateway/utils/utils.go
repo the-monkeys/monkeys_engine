@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -74,4 +75,20 @@ func GetClientIP(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
 		return
 	}
+}
+
+func SetMonkeysAuthCookie(ctx *gin.Context, token string) {
+	var authCookie *http.Cookie
+
+	authCookie = &http.Cookie{
+		Name:     "mat",
+		Value:    token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
+		SameSite: http.SameSiteNoneMode,
+		Secure: true,
+	}
+
+	http.SetCookie(ctx.Writer, authCookie)
 }
