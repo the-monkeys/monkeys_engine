@@ -71,6 +71,8 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.POST("/update-password", asc.UpdatePassword)
 	routes.GET("/verify-email", asc.VerifyEmail)
 
+	routes.GET("/validate-session", asc.ValidateSession)
+
 	// Authentication Point
 	mware := InitAuthMiddleware(asc)
 	routes.Use(mware.AuthRequired)
@@ -586,7 +588,7 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 	}
 
 	utils.SetMonkeysAuthCookie(ctx, resp.Token)
-	
+
 	response, _ := json.Marshal(&resp)
 
 	// Convert to map to safely delete private fields
@@ -648,4 +650,20 @@ func (asc *ServiceClient) Logout(ctx *gin.Context) {
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{})
 	return
+}
+
+func (asc *ServiceClient) ValidateSession(ctx *gin.Context) {
+	authCookie, err := ctx.Request.Cookie("mat")
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+	}
+
+	resp, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value})
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }
