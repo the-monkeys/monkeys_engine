@@ -7,11 +7,6 @@ services:
       POSTGRES_PASSWORD: Secret
       POSTGRES_USER: root
       POSTGRES_DB: the_monkeys_user_dev
-      POSTGRES_REPLICATION_MODE: master
-      POSTGRES_REPLICATION_USER: repl_user
-      POSTGRES_REPLICATION_PASSWORD: repl_password
-      POSTGRES_NUM_SYNCHRONOUS_REPLICAS: 1
-      POSTGRES_SYNCHRONOUS_COMMIT_MODE: on
     ports:
       - 1234:5432
     networks:
@@ -19,33 +14,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  the_monkeys_db_replica:
-    container_name: "the-monkeys-psql-replica"
-    image: bitnami/postgresql:latest
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: Secret
-      POSTGRES_USER: root
-      POSTGRES_DB: the_monkeys_user_dev
-      POSTGRES_REPLICATION_MODE: slave
-      POSTGRES_MASTER_HOST: the_monkeys_db
-      POSTGRES_MASTER_PORT_NUMBER: 5432
-      POSTGRES_REPLICATION_USER: repl_user
-      POSTGRES_REPLICATION_PASSWORD: repl_password
-      POSTGRES_PRIMARY_HOST: the_monkeys_db
-      POSTGRES_PRIMARY_PORT_NUMBER: 5432
-    ports:
-      - 1235:5432
-    networks:
-      - monkeys-network
-    volumes:
-      - postgres_data_replica:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U root"]
       interval: 5s
@@ -65,7 +33,7 @@ services:
         "-path",
         "/migrations",
         "-database",
-        "postgres://root:Secret@the_monkeys_db:5432/the_monkeys_user_dev?sslmode=disable",
+        "postgres://root:Secret@the_monkeys_db:5432/the_monkeys_user_dev?sslmode=disable"
       ]
     command: ["up"]
     depends_on:
@@ -81,8 +49,8 @@ services:
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
       - ELASTIC_PASSWORD=a!Too5hortPassword@1
-      - xpack.security.enabled=false  # Disable security features including SSL/TLS
-      - xpack.security.transport.ssl.enabled=false  # Disable transport layer security
+      - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
     ulimits:
       memlock:
         soft: -1
@@ -103,7 +71,6 @@ services:
       timeout: 10s
       retries: 5
     restart: always
-
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -128,6 +95,22 @@ services:
       retries: 5
     restart: always
 
+  the_monkeys_cache:
+    container_name: "the_monkeys_cache"
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - monkeys-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    restart: always
+
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
     image: golang:latest
@@ -137,6 +120,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -159,6 +143,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -176,6 +161,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -195,6 +181,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -213,6 +200,7 @@ services:
       - db-migrations
       - the_monkeys_db
       - elasticsearch-node1
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -222,7 +210,7 @@ services:
     restart: always
 
   the_monkeys_notification:
-    container_name: "the_monkeys_notification"
+    container_name: "the-monkeys_notification"
     image: golang:latest
     networks:
       - monkeys-network
@@ -233,6 +221,7 @@ services:
       - elasticsearch-node1
       - the_monkeys_blog
       - the_monkeys_user
+      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -247,9 +236,9 @@ networks:
 
 volumes:
   postgres_data:
-  postgres_data_replica:
   the_monkeys_profile:
   blogs_volume:
   rabbitmq_data:
   elasticsearch-data1:
     driver: local
+  redis_data:
