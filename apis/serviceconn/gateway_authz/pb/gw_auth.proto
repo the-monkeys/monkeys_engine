@@ -57,6 +57,22 @@ message ValidateResponse {
   string account_id = 6;
 }
 
+message DecodeSignedJWTRequest {
+  string token = 1;
+}
+
+message DecodeSignedJWTResponse {
+  int64 status_code = 1;
+  int64 user_id = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string email = 6;
+  string email_verification_status = 7;
+  Error error = 8;
+  string account_id = 9;
+}
+
 message AccessCheckReq { 
   string token = 1;
   string email = 2;
@@ -239,4 +255,5 @@ service AuthService {
   rpc UpdatePasswordWithPassword(UpdatePasswordWithPasswordReq) returns (UpdatePasswordWithPasswordRes) {}
   rpc UpdateEmailId(UpdateEmailIdReq) returns (UpdateEmailIdRes) {}
   rpc GoogleLogin(RegisterUserRequest) returns (RegisterUserResponse) {}
+  rpc DecodeSignedJWT(DecodeSignedJWTRequest) returns (DecodeSignedJWTResponse) {}
 }
