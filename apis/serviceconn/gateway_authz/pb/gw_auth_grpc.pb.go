@@ -32,6 +32,7 @@ const (
 	AuthService_UpdatePasswordWithPassword_FullMethodName  = "/auth_svc.AuthService/UpdatePasswordWithPassword"
 	AuthService_UpdateEmailId_FullMethodName               = "/auth_svc.AuthService/UpdateEmailId"
 	AuthService_GoogleLogin_FullMethodName                 = "/auth_svc.AuthService/GoogleLogin"
+	AuthService_DecodeSignedJWT_FullMethodName             = "/auth_svc.AuthService/DecodeSignedJWT"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -51,6 +52,7 @@ type AuthServiceClient interface {
 	UpdatePasswordWithPassword(ctx context.Context, in *UpdatePasswordWithPasswordReq, opts ...grpc.CallOption) (*UpdatePasswordWithPasswordRes, error)
 	UpdateEmailId(ctx context.Context, in *UpdateEmailIdReq, opts ...grpc.CallOption) (*UpdateEmailIdRes, error)
 	GoogleLogin(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
+	DecodeSignedJWT(ctx context.Context, in *DecodeSignedJWTRequest, opts ...grpc.CallOption) (*DecodeSignedJWTResponse, error)
 }
 
 type authServiceClient struct {
@@ -191,6 +193,16 @@ func (c *authServiceClient) GoogleLogin(ctx context.Context, in *RegisterUserReq
 	return out, nil
 }
 
+func (c *authServiceClient) DecodeSignedJWT(ctx context.Context, in *DecodeSignedJWTRequest, opts ...grpc.CallOption) (*DecodeSignedJWTResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecodeSignedJWTResponse)
+	err := c.cc.Invoke(ctx, AuthService_DecodeSignedJWT_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -208,6 +220,7 @@ type AuthServiceServer interface {
 	UpdatePasswordWithPassword(context.Context, *UpdatePasswordWithPasswordReq) (*UpdatePasswordWithPasswordRes, error)
 	UpdateEmailId(context.Context, *UpdateEmailIdReq) (*UpdateEmailIdRes, error)
 	GoogleLogin(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
+	DecodeSignedJWT(context.Context, *DecodeSignedJWTRequest) (*DecodeSignedJWTResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -256,6 +269,9 @@ func (UnimplementedAuthServiceServer) UpdateEmailId(context.Context, *UpdateEmai
 }
 func (UnimplementedAuthServiceServer) GoogleLogin(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GoogleLogin not implemented")
+}
+func (UnimplementedAuthServiceServer) DecodeSignedJWT(context.Context, *DecodeSignedJWTRequest) (*DecodeSignedJWTResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DecodeSignedJWT not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -512,6 +528,24 @@ func _AuthService_GoogleLogin_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_DecodeSignedJWT_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecodeSignedJWTRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DecodeSignedJWT(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DecodeSignedJWT_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DecodeSignedJWT(ctx, req.(*DecodeSignedJWTRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +604,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GoogleLogin",
 			Handler:    _AuthService_GoogleLogin_Handler,
+		},
+		{
+			MethodName: "DecodeSignedJWT",
+			Handler:    _AuthService_DecodeSignedJWT_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

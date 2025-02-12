@@ -180,6 +180,31 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 	}, nil
 }
 
+func (as *AuthzSvc) DecodeSignedJWT(ctx context.Context, req *pb.DecodeSignedJWTRequest) (*pb.DecodeSignedJWTResponse, error) {
+	claims, err := as.jwt.ValidateToken(req.Token)
+	if err != nil {
+		as.logger.Errorf("cannot validate the auth token, error: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "couldn't validate auth token")
+	}
+
+	// Check if the email exists
+	user, err := as.dbConn.CheckIfEmailExist(claims.Email)
+	if err != nil {
+		as.logger.Errorf("cannot validate token as the email %s doesn't exist, error: %+v", claims.Email, err)
+		return nil, status.Errorf(codes.NotFound, "email does not exist")
+	}
+
+	return &pb.DecodeSignedJWTResponse{
+		StatusCode: http.StatusOK,
+		Email: user.Email,
+		FirstName: user.FirstName,
+		LastName: user.LastName,
+		Username: user.Username,
+		EmailVerificationStatus: user.EmailVerificationStatus,
+		AccountId: user.AccountId,
+	}, nil
+}
+
 func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq) (*pb.AccessCheckRes, error) {
 	as.logger.Infof("checking access of user %s for blog %s", req.AccountId, req.BlogId)
 	if req.AccountId == "" || req.BlogId == "" {
