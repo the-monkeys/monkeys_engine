@@ -545,6 +545,7 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		}
 	}
 
+	ctx.SetSameSite(http.SameSiteNoneMode)
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{"message": "successfully updated password", "status": resp.StatusCode})
 }
@@ -647,6 +648,7 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 }
 
 func (asc *ServiceClient) Logout(ctx *gin.Context) {
+	ctx.SetSameSite(http.SameSiteNoneMode)
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{})
 	return
