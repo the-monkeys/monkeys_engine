@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -45,6 +46,10 @@ func NewAuthPostgresDb(cfg *config.Config, log *logrus.Logger) (Repository, erro
 		logrus.Fatalf("cannot connect psql using sql driver, error:, %+v", err)
 		return nil, err
 	}
+	// Configure connection pooling
+	dbPsql.SetMaxOpenConns(25)                 // Maximum number of open connections
+	dbPsql.SetMaxIdleConns(10)                 // Maximum number of idle connections
+	dbPsql.SetConnMaxLifetime(5 * time.Minute) // Connection lifetime limit
 
 	if err = dbPsql.Ping(); err != nil {
 		logrus.Errorf("ping test failed to psql using sql driver, error: %+v", err)
