@@ -210,7 +210,7 @@ services:
     restart: always
 
   the_monkeys_notification:
-    container_name: "the-monkeys_notification"
+    container_name: "the_monkeys_notification"
     image: golang:latest
     networks:
       - monkeys-network
