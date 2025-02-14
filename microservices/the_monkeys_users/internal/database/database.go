@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/lib/pq"
 	// _ "github.com/lib/pq"
@@ -76,6 +77,7 @@ type uDBHandler struct {
 	log *logrus.Logger
 }
 
+// NewUserDbHandler initializes the database with connection pooling
 func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.Postgresql.PrimaryDB.DBUsername,
@@ -84,18 +86,23 @@ func NewUserDbHandler(cfg *config.Config, log *logrus.Logger) (UserDb, error) {
 		cfg.Postgresql.PrimaryDB.DBPort,
 		cfg.Postgresql.PrimaryDB.DBName,
 	)
-	dbPsql, err := sql.Open("postgres", url)
+	db, err := sql.Open("postgres", url)
 	if err != nil {
-		logrus.Fatalf("cannot connect psql using sql driver, error: %+v", err)
+		logrus.Fatalf("Cannot connect to PostgreSQL, error: %+v", err)
 		return nil, err
 	}
 
-	if err = dbPsql.Ping(); err != nil {
-		logrus.Errorf("ping test failed to psql using sql driver, error: %+v", err)
+	// Configure connection pooling
+	db.SetMaxOpenConns(25)                 // Maximum number of open connections
+	db.SetMaxIdleConns(10)                 // Maximum number of idle connections
+	db.SetConnMaxLifetime(5 * time.Minute) // Connection lifetime limit
+
+	if err = db.Ping(); err != nil {
+		logrus.Errorf("Ping test failed for PostgreSQL, error: %+v", err)
 		return nil, err
 	}
 
-	return &uDBHandler{db: dbPsql, log: log}, nil
+	return &uDBHandler{db: db, log: log}, nil
 }
 
 // To get User Profile

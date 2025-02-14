@@ -1240,7 +1240,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 
 func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	// Get Limits and offset
-	limit := ctx.DefaultQuery("limit", "100")
+	limit := ctx.DefaultQuery("limit", "500")
 	offset := ctx.DefaultQuery("offset", "0")
 	// Convert to int
 	limitInt, err := strconv.Atoi(limit)
@@ -1337,7 +1337,7 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 	}
 
 	// Get Limits and offset
-	limit := ctx.DefaultQuery("limit", "100")
+	limit := ctx.DefaultQuery("limit", "500")
 	offset := ctx.DefaultQuery("offset", "0")
 	// Convert to int
 	limitInt, err := strconv.Atoi(limit)
