@@ -659,12 +659,14 @@ func (asc *ServiceClient) ValidateSession(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+		return
 	}
 
 	resp, err := asc.Client.DecodeSignedJWT(context.Background(), &pb.DecodeSignedJWTRequest{Token: authCookie.Value})
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, Authorization{AuthorizationStatus: false, Error: "unauthorized"})
+		return
 	}
 
 	ctx.JSON(http.StatusOK, resp)
