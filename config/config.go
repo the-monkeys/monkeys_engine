@@ -83,6 +83,15 @@ type Cors struct {
 	AllowedOriginExp string `mapstructure:"allowed_origin_regexp"`
 }
 
+type Redis struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+	PoolSize int    `mapstructure:"pool_size"`
+	MaxIdle  int    `mapstructure:"max_idle"`
+}
+
 type Config struct {
 	TheMonkeysGateway TheMonkeysGateway `mapstructure:"the_monkeys_gateway"`
 	Microservices     Microservices     `mapstructure:"microservices"`
@@ -95,6 +104,7 @@ type Config struct {
 	Keys              Keys              `mapstructure:"keys"`
 	GoogleOAuth2      GoogleOAuth2      `mapstructure:"google_oauth2"`
 	Cors              Cors              `mapstructure:"cors"`
+	Redis             Redis             `mapstructure:"redis"`
 }
 
 func GetConfig() (*Config, error) {
