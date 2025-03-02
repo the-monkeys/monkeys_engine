@@ -58,8 +58,8 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes := router.Group("/api/v1/auth")
 
 	// SSO Google Login
-	router.GET("/auth/google/login", asc.HandleGoogleLogin)
-	router.GET("/auth/google/callback", asc.HandleGoogleCallback)
+	routes.GET("/google/login", asc.HandleGoogleLogin)
+	routes.GET("/google/callback", asc.HandleGoogleCallback)
 
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
@@ -643,8 +643,17 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Example response for client
-	c.JSON(http.StatusOK, loginResp)
+	utils.SetMonkeysAuthCookie(c, loginResp.Token)
+
+	loginRespJson, _ := json.Marshal(&loginResp)
+
+	// Convert to map to safely delete private fields
+	var loginRespMap map[string]interface{}
+	_ = json.Unmarshal(loginRespJson, &loginRespMap)
+
+	delete(loginRespMap, "token")
+
+	c.JSON(http.StatusOK, &loginRespMap)
 }
 
 func (asc *ServiceClient) Logout(ctx *gin.Context) {
