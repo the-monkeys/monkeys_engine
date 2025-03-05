@@ -55,6 +55,11 @@ func NewAuthDBHandler(cfg *config.Config) (AuthDBHandler, error) {
 		return nil, err
 	}
 
+	// Configure connection pooling
+	dbPsql.SetMaxOpenConns(25)                 // Maximum number of open connections
+	dbPsql.SetMaxIdleConns(10)                 // Maximum number of idle connections
+	dbPsql.SetConnMaxLifetime(5 * time.Minute) // Connection lifetime limit
+
 	if err = dbPsql.Ping(); err != nil {
 		logrus.Errorf("ping test failed to psql using sql driver, error: %+v", err)
 		return nil, err
