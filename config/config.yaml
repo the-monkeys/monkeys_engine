@@ -76,3 +76,11 @@ keys:
 
 cors: 
   allowed_origin_regexp: '^https?://((local\\.)?monkeys.com.co|deploy-preview-\d+.*.netlify.app)(:\d+)?$'
+
+redis:
+  host: "the_monkeys_cache:6379"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  max_idle: 5

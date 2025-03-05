@@ -19,6 +19,11 @@ func NewESClient(url, username, password string) (*elasticsearch.Client, error) 
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true, // Disable SSL certificate verification (for testing)
 			},
+			MaxIdleConnsPerHost:   10, // Set the maximum number of idle connections per host
+			MaxIdleConns:          10, // Set the maximum number of idle connections
+			IdleConnTimeout:       90, // Set the maximum amount of time an idle connection will remain idle before closing itself
+			TLSHandshakeTimeout:   10, // Set the maximum amount of time waiting to wait for a TLS handshake
+			ExpectContinueTimeout: 1,  // Set the maximum amount of time to wait for an HTTP/1.1 100-continue response
 		},
 	})
 	if err != nil {

@@ -41,7 +41,7 @@ type BlogServiceClient struct {
 	cacheTime  time.Time
 	cache      string
 	cache1     string
-	userCli    *user_service.UserServiceClient
+	UserCli    *user_service.UserServiceClient
 	config     *config.Config
 }
 
@@ -62,7 +62,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	blogClient := &BlogServiceClient{
 		Client:  NewBlogServiceClient(cfg),
-		userCli: userClient,
+		UserCli: userClient,
 		config:  cfg,
 	}
 	routes := router.Group("/api/v1/blog")
@@ -346,7 +346,7 @@ func (asc *BlogServiceClient) AllCollabBlogs(ctx *gin.Context) {
 	}
 
 	// Get all the drafted blogs
-	uc, err := asc.userCli.GetBlogsIds(accId, "colab")
+	uc, err := asc.UserCli.GetBlogsIds(accId, "colab")
 	if err != nil {
 		logrus.Errorf("cannot get the colab blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
@@ -452,7 +452,7 @@ func (asc *BlogServiceClient) AllPublishesByUserName(ctx *gin.Context) {
 	userName := ctx.Param("username")
 
 	// Get the account_id from the username
-	userInfo, err := asc.userCli.GetUserDetails(userName)
+	userInfo, err := asc.UserCli.GetUserDetails(userName)
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
@@ -735,7 +735,7 @@ func (asc *BlogServiceClient) GetBookmarks(ctx *gin.Context) {
 	tokenAccountId := ctx.GetString("accountId")
 
 	// Get all the drafted blogs
-	uc, err := asc.userCli.GetBlogsIds(tokenAccountId, "bookmark")
+	uc, err := asc.UserCli.GetBlogsIds(tokenAccountId, "bookmark")
 	if err != nil {
 		logrus.Errorf("cannot get the bookmarked blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
@@ -1114,7 +1114,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	myUsername := ctx.GetString("userName")
 	accountID := ctx.GetString("accountId")
 	// Get Accounts I am following
-	followings, err := asc.userCli.GetFollowingAccounts(myUsername)
+	followings, err := asc.UserCli.GetFollowingAccounts(myUsername)
 	if err != nil {
 		logrus.Errorf("cannot get the following accounts, error: %v", err)
 		if status, ok := status.FromError(err); ok {
@@ -1218,16 +1218,16 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		isLikedByMe, _ := asc.userCli.HaveILikedTheBlog(blogID, myUsername)
+		isLikedByMe, _ := asc.UserCli.HaveILikedTheBlog(blogID, myUsername)
 		blog["IsLikedByMe"] = isLikedByMe
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
-		isBookmarkedByMe, _ := asc.userCli.HaveIBookmarkedTheBlog(blogID, myUsername)
+		isBookmarkedByMe, _ := asc.UserCli.HaveIBookmarkedTheBlog(blogID, myUsername)
 		blog["IsBookmarkedByMe"] = isBookmarkedByMe
 	}
 
@@ -1313,10 +1313,10 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["like_count"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["bookmark_count"] = bookmarkCount
 
 	}
@@ -1412,10 +1412,10 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["like_count"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["bookmark_count"] = bookmarkCount
 
 	}
@@ -1492,10 +1492,10 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
 	}
@@ -1585,10 +1585,10 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
 	}
@@ -1604,7 +1604,7 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 	userName := ctx.Param("username")
 
 	// Get the account_id from the username
-	userInfo, err := asc.userCli.GetUserDetails(userName)
+	userInfo, err := asc.UserCli.GetUserDetails(userName)
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
@@ -1696,10 +1696,10 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
 	}
@@ -1764,7 +1764,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	}
 
 	// Get all the draft blogs by my username
-	blogResp, err := asc.userCli.GetUsersBookmarks(tokenAccountId)
+	blogResp, err := asc.UserCli.GetUsersBookmarks(tokenAccountId)
 
 	if err != nil {
 		logrus.Errorf("cannot get the bookmarks, error: %v", err)
@@ -1839,10 +1839,10 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["LikeCount"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["BookmarkCount"] = bookmarkCount
 
 	}
@@ -1891,10 +1891,10 @@ func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 		return
 	}
 
-	likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogId)
+	likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogId)
 	blogMap["LikeCount"] = likeCount
 
-	bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogId)
+	bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogId)
 	blogMap["BookmarkCount"] = bookmarkCount
 
 	ctx.JSON(http.StatusOK, blogMap)

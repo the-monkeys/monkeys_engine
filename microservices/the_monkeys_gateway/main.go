@@ -19,6 +19,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/redis"
 )
 
 type Server struct {
@@ -45,6 +46,12 @@ func main() {
 	server.router.Use(gin.Recovery())
 	server.router.Use(gin.Logger())
 	server.router.MaxMultipartMemory = 8 << 20
+
+	redisClient, err := redis.RedisConn(cfg)
+	if err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
+	defer redisClient.Close()
 
 	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{

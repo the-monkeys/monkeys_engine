@@ -130,7 +130,7 @@ services:
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
-      interval: 30s
+      interval: 300s
       timeout: 10s
       retries: 3
 
