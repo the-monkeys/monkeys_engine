@@ -128,10 +128,10 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 			continue
 		}
 
-		likeCount, _ := asc.userCli.GetNoOfLikeCounts(blogID)
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
 		blog["like_count"] = likeCount
 
-		bookmarkCount, _ := asc.userCli.GetNoOfBookmarkCounts(blogID)
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
 		blog["bookmark_count"] = bookmarkCount
 	}
 
