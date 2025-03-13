@@ -1,0 +1,41 @@
+package main
+
+import (
+	"net"
+
+	"github.com/sirupsen/logrus"
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_cache/pb"
+	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+)
+
+func main() {
+	log := logrus.New()
+
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Fatalf("Failed to load file server config, error: %+v", err)
+	}
+
+	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysCache)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+
+	cacheServer := service.NewCacheServer(log)
+
+	grpcServer := service.NewGRPCServer(cacheServer)
+
+	pb.RegisterCacheServiceServer(s, grpcServer)
+
+	reflection.Register(s)
+
+	log.Infof("✅ the cache server started at: %v", cfg.Microservices.TheMonkeysCache)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}

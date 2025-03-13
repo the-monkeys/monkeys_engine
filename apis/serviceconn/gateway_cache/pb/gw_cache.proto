@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package cache_svc;
+
+import "google/protobuf/timestamp.proto";
+
+
+
+
+option go_package = "./apis/serviceconn/gateway_cache/pb";
+
+
+
+// SetRequest represents a request to set a value in the cache
+message SetRequest {
+  string key = 1;
+  bytes value = 2;
+  int64 expiration_seconds = 3;
+}
+
+// SetResponse represents the response from a Set operation
+message SetResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GetRequest represents a request to get a value from the cache
+message GetRequest {
+  string key = 1;
+}
+
+// GetResponse represents the response from a Get operation
+message GetResponse {
+  bool success = 1;
+  bytes value = 2;
+  string error = 3;
+}
+
+// DeleteRequest represents a request to delete a key from the cache
+message DeleteRequest {
+  string key = 1;
+}
+
+// DeleteResponse represents the response from a Delete operation
+message DeleteResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// ClearRequest represents a request to clear all items from the cache
+message ClearRequest {}
+
+// ClearResponse represents the response from a Clear operation
+message ClearResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GetStatsRequest represents a request to get cache statistics
+message GetStatsRequest {}
+
+// GetStatsResponse represents the response containing cache statistics
+message GetStatsResponse {
+  bool success = 1;
+  int32 total_items = 2;
+  int32 expired = 3;
+  int32 active = 4;
+  string error = 5;
+} 
+
+// CacheService defines the gRPC service for cache operations
+service CacheService {
+    rpc Set(SetRequest) returns (SetResponse) {}
+    rpc Get(GetRequest) returns (GetResponse) {}
+    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+    rpc Clear(ClearRequest) returns (ClearResponse) {}
+    rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
+  }
