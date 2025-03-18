@@ -1,16 +1,20 @@
 package consumer
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/models"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
 )
 
 type UserDbConn struct {
@@ -51,7 +55,10 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		return
 	}
 
-	// userCon := NewUserDb(dbConn, log, conf)
+	cacheServer := service.NewCacheServer(log)
+	context := context.Background()
+
+	userCon := NewUserDb(log, conf)
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err = json.Unmarshal(d.Body, &user); err != nil {
@@ -67,6 +74,17 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		case constants.BLOG_UPDATE:
 
 		case constants.BLOG_PUBLISH:
+			// Set User published blogs in cache
+			userPublished, err := userCon.GetUserPublishedBlogs(user.Username)
+			if err != nil {
+				log.Errorf("Failed to get user published blogs: %v", err)
+				return
+			}
+			cacheServer.Set(context, fmt.Sprintf(constants.UserPublished, user.Username), userPublished, time.Duration(time.Hour*24))
+
+			// Update feed
+			feed := userCon.Feed()
+			cacheServer.Set(context, constants.UserPublished, feed, time.Duration(time.Hour*24))
 
 		case constants.BLOG_DELETE:
 
@@ -77,4 +95,12 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		}
 
 	}
+}
+
+func (u *UserDbConn) GetUserPublishedBlogs(username string) (interface{}, error) {
+	return nil, nil
+}
+
+func (u *UserDbConn) Feed() interface{} {
+	return nil
 }
