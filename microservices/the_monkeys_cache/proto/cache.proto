@@ -1,11 +1,26 @@
 syntax = "proto3";
 
-package cache_svc;
+package cache;
 
+option go_package = "github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/proto";
 
-option go_package = "./apis/serviceconn/gateway_cache/pb";
-
-
+// CacheService defines the gRPC service for cache operations
+service CacheService {
+  // Set stores a value in the cache
+  rpc Set(SetRequest) returns (SetResponse) {}
+  
+  // Get retrieves a value from the cache
+  rpc Get(GetRequest) returns (GetResponse) {}
+  
+  // Delete removes a key from the cache
+  rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+  
+  // Clear removes all items from the cache
+  rpc Clear(ClearRequest) returns (ClearResponse) {}
+  
+  // GetStats returns cache statistics
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
+}
 
 // SetRequest represents a request to set a value in the cache
 message SetRequest {
@@ -63,12 +78,3 @@ message GetStatsResponse {
   int32 active = 4;
   string error = 5;
 } 
-
-// CacheService defines the gRPC service for cache operations
-service CacheService {
-    rpc Set(SetRequest) returns (SetResponse) {}
-    rpc Get(GetRequest) returns (GetResponse) {}
-    rpc Delete(DeleteRequest) returns (DeleteResponse) {}
-    rpc Clear(ClearRequest) returns (ClearResponse) {}
-    rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
-  }
