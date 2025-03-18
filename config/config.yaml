@@ -63,13 +63,15 @@ rabbitMQ:
     - "blog_svc_file_svc_queue"
     - "to_blog_svc_queue"
     - "to_notification_svc_queue"
+    - "to_cache_svc_queue"
   routingKeys:
     - "key1"
     - "key2"
     - "blog_svc_file_svc_key"
     - "to_blog_svc_key"
     - "to_notification_svc_key"
-
+    - "to_cache_svc_key"
+    
 keys:
   mediastack: token
   newsapi: "token"
