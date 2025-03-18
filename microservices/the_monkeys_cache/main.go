@@ -6,6 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_cache/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -24,8 +26,11 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
+	// Connect to rabbitmq server
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	go consumer.ConsumeFromQueue(qConn, cfg, log)
 
+	s := grpc.NewServer()
 	cacheServer := service.NewCacheServer(log)
 
 	grpcServer := service.NewGRPCServer(cacheServer)
