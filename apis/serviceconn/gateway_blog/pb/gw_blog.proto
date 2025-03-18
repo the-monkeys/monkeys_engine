@@ -98,6 +98,7 @@ message PublishBlogReq {
     string account_id = 2;
     string ip = 3;
     string client = 4;
+    repeated string tags = 5;
 }
 
 message PublishBlogResp {

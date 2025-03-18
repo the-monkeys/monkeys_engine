@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -101,6 +102,13 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		case constants.BLOG_PUBLISH:
 			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
 				log.Errorf("Can't update blog status to publish: %v", err)
+			}
+
+			// TODO: Add tags like it is created by the User
+			for _, tag := range user.Tags {
+				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, ""); err != nil {
+					log.Errorf("Can't update blog status to publish: %v", err)
+				}
 			}
 
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)

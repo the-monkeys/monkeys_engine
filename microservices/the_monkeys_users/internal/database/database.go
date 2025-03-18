@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -29,6 +30,7 @@ type UserDb interface {
 	BookMarkABlog(blogId string, userId int64) error
 	FollowAUser(followingUsername, followersUsername string) error
 	LikeBlog(username string, blogID string) error
+	InsertTopicWithCategory(ctx context.Context, description, category string) error
 
 	// Get queries
 	CheckIfEmailExist(email string) (*models.TheMonkeysUser, error)

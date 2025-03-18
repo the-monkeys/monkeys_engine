@@ -585,6 +585,12 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	}
 
 	accId := ctx.GetString("accountId")
+	// Bind tags from request body
+	var tags Tags
+	if err := ctx.ShouldBindBodyWithJSON(&tags); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
+		return
+	}
 
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
@@ -592,6 +598,7 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 		AccountId: accId,
 		Ip:        ctx.Request.Header.Get("IP"),
 		Client:    ctx.Request.Header.Get("Client"),
+		Tags:      tags.Tags,
 	})
 
 	if err != nil {
