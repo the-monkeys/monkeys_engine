@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -63,6 +62,9 @@ func RegisterFileStorageRouter(router *gin.Engine, cfg *config.Config, authClien
 	routes.POST("/profile/:user_id/profile", usc.UploadProfilePic)
 	routes.DELETE("/profile/:user_id/profile", usc.DeleteProfilePic)
 
+	rotuesV11 := router.Group("/api/v1.1/files")
+	rotuesV11.GET("/profile/:user_id/profile", usc.GetProfilePicStream)
+
 	return usc
 }
 
@@ -79,7 +81,7 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 	defer file.Close()
 
 	// Read the file and make it slice of bytes
-	imageData, err := ioutil.ReadAll(file)
+	imageData, err := io.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading image data:", err)
 	}
@@ -181,7 +183,7 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 	defer file.Close()
 
 	// Read the file and make it slice of bytes
-	imageData, err := ioutil.ReadAll(file)
+	imageData, err := io.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading image data:", err)
 	}
@@ -240,6 +242,52 @@ func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 	}
 
 	ctx.Writer.Write(resp.Data)
+}
+
+func (asc *FileServiceClient) GetProfilePicStream(ctx *gin.Context) {
+	userID := ctx.Param("user_id")
+
+	stream, err := asc.Client.GetProfilePic(context.Background(), &pb.GetProfilePicReq{
+		UserId:   userID,
+		FileName: "profile.png",
+	})
+	if err != nil {
+		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": "cannot connect to user rpc server"})
+		return
+	}
+
+	//ctx.Header("Content-Disposition", "attachment; filename=img.png")
+	ctx.Header("Content-Type", "image/png")
+
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			// Check for gRPC error code
+			if status, ok := status.FromError(err); ok {
+				if status.Code() == codes.NotFound {
+					// Handle "profile picture not found" error
+					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "Profile picture for user is not found"})
+					return
+				}
+			}
+			// Fallback for other errors
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
+			return
+		}
+
+		_, err = ctx.Writer.Write(resp.Data)
+
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Internal server error"})
+		}
+
+		ctx.Writer.Flush()
+	}
 }
 
 func (asc *FileServiceClient) DeleteProfilePic(ctx *gin.Context) {
