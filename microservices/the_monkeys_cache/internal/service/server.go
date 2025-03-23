@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -50,6 +51,10 @@ func (c *CacheServer) Set(ctx context.Context, key string, value interface{}, ex
 		Value:      bytes,
 		Expiration: exp,
 	}
+
+	// TODO: Delete this line
+	bx, _ := json.MarshalIndent(c.items, "", "  ")
+	os.WriteFile("cache.json", bx, 0644)
 
 	return nil
 }

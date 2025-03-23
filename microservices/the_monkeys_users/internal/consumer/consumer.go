@@ -100,13 +100,14 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			}
 
 		case constants.BLOG_PUBLISH:
+			fmt.Printf("User published a blog: %+v", user)
 			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
 				log.Errorf("Can't update blog status to publish: %v", err)
 			}
 
 			// TODO: Add tags like it is created by the User
 			for _, tag := range user.Tags {
-				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, ""); err != nil {
+				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
 					log.Errorf("Can't update blog status to publish: %v", err)
 				}
 			}

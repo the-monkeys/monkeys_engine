@@ -901,15 +901,10 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 	}
 	defer tx.Rollback()
 
-	categoryID, err := uh.ensureCategoryExists(ctx, tx, category)
-	if err != nil {
-		return fmt.Errorf("category validation failed: %v", err)
-	}
-
 	var exists bool
 	err = tx.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM topics WHERE description = $1 AND category_id = $2)`,
-		description, categoryID,
+		`SELECT EXISTS(SELECT 1 FROM topics WHERE description = $1)`,
+		description,
 	).Scan(&exists)
 
 	if err != nil {
@@ -917,13 +912,13 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 	}
 
 	if exists {
-		uh.log.Printf("Topic '%s' already exists in category ID %d", description, categoryID)
+		uh.log.Printf("Topic '%s' already exists in category ID %s", description, category)
 		return tx.Commit()
 	}
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO topics (description, category_id) VALUES ($1, $2)`,
-		description, categoryID,
+		`INSERT INTO topics (description, category) VALUES ($1, $2)`,
+		description, category,
 	)
 
 	if err != nil {
@@ -934,43 +929,6 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 		return fmt.Errorf("commit failed: %v", err)
 	}
 
-	uh.log.Printf("Successfully inserted '%s' into category ID %d", description, categoryID)
+	uh.log.Printf("Successfully inserted '%s' into category %s", description, category)
 	return nil
-}
-
-// Helper function to ensure category exists or create it
-func (uh *uDBHandler) ensureCategoryExists(ctx context.Context, tx *sql.Tx, categoryName string) (int64, error) {
-	if categoryName == "" {
-		categoryName = "General"
-	}
-
-	var categoryID int64
-	err := tx.QueryRowContext(ctx,
-		`SELECT id FROM categories WHERE name = $1`,
-		categoryName,
-	).Scan(&categoryID)
-
-	if err == nil {
-		return categoryID, nil
-	}
-
-	if err != sql.ErrNoRows {
-		return 0, fmt.Errorf("category lookup error: %v", err)
-	}
-
-	result, err := tx.ExecContext(ctx,
-		`INSERT INTO categories (name) VALUES ($1)`,
-		categoryName,
-	)
-	if err != nil {
-		return uh.ensureCategoryExists(ctx, tx, "General")
-	}
-
-	categoryID, err = result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get new category ID: %v", err)
-	}
-
-	uh.log.Printf("Created new category '%s' with ID %d", categoryName, categoryID)
-	return categoryID, nil
 }
