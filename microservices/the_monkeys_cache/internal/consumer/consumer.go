@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	blogPkg "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	userPkg "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
 	"google.golang.org/grpc"
@@ -82,6 +82,12 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 	context := context.Background()
 
 	userCon := NewUserDb(log, conf)
+	redis, err := db.RedisConn(conf, log)
+	if err != nil {
+		log.Errorf("Failed to connect to redis: %v", err)
+		return
+	}
+
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err = json.Unmarshal(d.Body, &user); err != nil {
@@ -96,19 +102,27 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 		case constants.BLOG_PUBLISH:
 			userCon.log.Infof("User published a blog: %+v", user)
-			// Set User published blogs in cache
-			// userPublished, err := userCon.GetUserPublishedBlogs(user.AccountId, 10, 0)
-			// if err != nil {
-			// 	log.Errorf("Failed to get user published blogs: %v", err)
-			// }
-			// cacheServer.Set(context, fmt.Sprintf(constants.UserPublished, user.AccountId), userPublished, time.Duration(time.Hour*24))
+			// TODO: Update Users profile published and draft blogs
 
 			// Update feed
 			feed := userCon.Feed(500, 0)
-			if err := cacheServer.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feed, time.Duration(time.Hour*24)); err != nil {
-				log.Errorf("Failed to set feed in cache: %v", err)
+
+			// Redis cache
+			feedJSON, err := json.Marshal(feed)
+			if err != nil {
+				userCon.log.Errorf("Failed to marshal feed: %v", err)
 				return
 			}
+
+			status := redis.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30).Err()
+			if status != nil {
+				userCon.log.Errorf("Failed to set feed in cache: %v", status)
+			} else {
+				fmt.Println("Feed successfully set in cache")
+			}
+
+			// Inbuilt cache
+			cacheServer.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30)
 
 		case constants.BLOG_DELETE:
 
@@ -130,7 +144,7 @@ func (u *UserDbConn) GetUserPublishedBlogs(username string, limit, offset int32)
 		return nil, err
 	}
 
-	stream, err := u.blogClient.GetBlogs(context.Background(), &pb.GetBlogsReq{
+	stream, err := u.blogClient.GetBlogs(context.Background(), &blogPkg.GetBlogsReq{
 		AccountId: userInfo.AccountId,
 		IsDraft:   false,
 		Limit:     limit,
@@ -181,7 +195,7 @@ func (u *UserDbConn) GetUserPublishedBlogs(username string, limit, offset int32)
 }
 
 func (u *UserDbConn) Feed(limit, offset int32) interface{} {
-	stream, err := u.blogClient.GetBlogsMetadata(context.Background(), &pb.FeedReq{
+	stream, err := u.blogClient.GetBlogsMetadata(context.Background(), &blogPkg.FeedReq{
 		Limit:  limit,
 		Offset: offset,
 	})
