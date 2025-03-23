@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_cache/pb"
@@ -35,6 +36,9 @@ func (s *GRPCServer) Set(ctx context.Context, req *pb.SetRequest) (*pb.SetRespon
 
 func (s *GRPCServer) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
 	value, err := s.cache.Get(ctx, req.Key)
+	fmt.Printf("value: %v\n", value)
+	fmt.Printf("err: %v\n", err)
+
 	if err != nil {
 		return &pb.GetResponse{
 			Success: false,

@@ -10,5 +10,5 @@ const (
 	UserFollowers     = "%s_followers"
 	UserFollowing     = "%s_following"
 
-	Feed = "feed__limit_%d_offset_%d"
+	Feed = "feed_limit_%d_offset_%d"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,15 +17,13 @@ type CacheItem struct {
 }
 
 type CacheServer struct {
-	mu    sync.RWMutex
-	items map[string]CacheItem
+	items sync.Map
 	log   *logrus.Logger
 }
 
 func NewCacheServer(log *logrus.Logger) *CacheServer {
 	cache := &CacheServer{
-		items: make(map[string]CacheItem),
-		log:   log,
+		log: log,
 	}
 
 	go cache.cleanupLoop()
@@ -33,10 +31,7 @@ func NewCacheServer(log *logrus.Logger) *CacheServer {
 	return cache
 }
 
-func (c *CacheServer) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func (c *CacheServer) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
 	bytes, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -47,34 +42,32 @@ func (c *CacheServer) Set(ctx context.Context, key string, value interface{}, ex
 		exp = time.Now().Add(expiration).UnixNano()
 	}
 
-	c.items[key] = CacheItem{
+	fmt.Printf("key: %v\n", key)
+
+	c.items.Store(key, CacheItem{
 		Value:      bytes,
 		Expiration: exp,
-	}
-
-	// TODO: Delete this line
-	bx, _ := json.MarshalIndent(c.items, "", "  ")
-	os.WriteFile("cache.json", bx, 0644)
+	})
 
 	return nil
 }
 
-func (c *CacheServer) Get(ctx context.Context, key string) (interface{}, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *CacheServer) Get(ctx context.Context, key string) (any, error) {
+	fmt.Printf("key: %v\n", key)
 
-	item, exists := c.items[key]
+	item, exists := c.items.Load(key)
 	if !exists {
 		return nil, errors.New("key not found")
 	}
 
-	if item.Expiration > 0 && time.Now().UnixNano() > item.Expiration {
-		delete(c.items, key)
+	cacheItem := item.(CacheItem)
+	if cacheItem.Expiration > 0 && time.Now().UnixNano() > cacheItem.Expiration {
+		c.items.Delete(key)
 		return nil, errors.New("item expired")
 	}
 
-	var value interface{}
-	if err := json.Unmarshal(item.Value, &value); err != nil {
+	var value any
+	if err := json.Unmarshal(cacheItem.Value, &value); err != nil {
 		return nil, err
 	}
 
@@ -82,18 +75,15 @@ func (c *CacheServer) Get(ctx context.Context, key string) (interface{}, error) 
 }
 
 func (c *CacheServer) Delete(ctx context.Context, key string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.items, key)
+	c.items.Delete(key)
 	return nil
 }
 
 func (c *CacheServer) Clear(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.items = make(map[string]CacheItem)
+	c.items.Range(func(key, value any) bool {
+		c.items.Delete(key)
+		return true
+	})
 	return nil
 }
 
@@ -105,32 +95,33 @@ func (c *CacheServer) cleanupLoop() {
 }
 
 func (c *CacheServer) cleanup() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	now := time.Now().UnixNano()
-	for key, item := range c.items {
+	c.items.Range(func(key, value any) bool {
+		item := value.(CacheItem)
 		if item.Expiration > 0 && now > item.Expiration {
-			delete(c.items, key)
+			c.items.Delete(key)
 		}
-	}
+		return true
+	})
 }
 
-func (c *CacheServer) GetStats(ctx context.Context) (map[string]interface{}, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *CacheServer) GetStats(ctx context.Context) (map[string]any, error) {
 	now := time.Now().UnixNano()
 	expired := 0
-	for _, item := range c.items {
+	total := 0
+
+	c.items.Range(func(key, value any) bool {
+		total++
+		item := value.(CacheItem)
 		if item.Expiration > 0 && now > item.Expiration {
 			expired++
 		}
-	}
+		return true
+	})
 
-	return map[string]interface{}{
-		"total_items": len(c.items),
+	return map[string]any{
+		"total_items": total,
 		"expired":     expired,
-		"active":      len(c.items) - expired,
+		"active":      total - expired,
 	}, nil
 }
