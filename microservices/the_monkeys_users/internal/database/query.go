@@ -1,8 +1,10 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
@@ -889,4 +891,44 @@ func (uh *uDBHandler) GetBookmarkBlogsByUsername(username string) ([]models.Blog
 
 	uh.log.Infof("Successfully fetched %d bookmarked blogs for username: %s", len(blogs), username)
 	return blogs, nil
+}
+
+// Generic function to insert topics with category validation
+func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, category string) error {
+	tx, err := uh.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("could not begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	var exists bool
+	err = tx.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM topics WHERE description = $1)`,
+		description,
+	).Scan(&exists)
+
+	if err != nil {
+		return fmt.Errorf("existence check failed: %v", err)
+	}
+
+	if exists {
+		uh.log.Printf("Topic '%s' already exists in category ID %s", description, category)
+		return tx.Commit()
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO topics (description, category) VALUES ($1, $2)`,
+		description, category,
+	)
+
+	if err != nil {
+		return fmt.Errorf("insert failed: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit failed: %v", err)
+	}
+
+	uh.log.Printf("Successfully inserted '%s' into category %s", description, category)
+	return nil
 }

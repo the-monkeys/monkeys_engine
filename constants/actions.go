@@ -12,6 +12,8 @@ const (
 	USER_FOLLOWED       = "user_followed"
 
 	DELETE_USERS_ALL_BLOGS = "delete_users_all_blogs"
+
+	PROFILE_UPDATE = "profile_update"
 )
 
 const (
