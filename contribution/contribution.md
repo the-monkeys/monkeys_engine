@@ -20,6 +20,13 @@ The following tools are required for local setup:
 * Golang v1.18.0+
 * Protoc compiler using the [link](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os)
 * [migrate](https://github.com/golang-migrate/migrate)
+* Python
+* Pip
+
+Note: Create a virtual environment and activate the virtual environment, then run
+```
+ pip install -r requirements.txt 
+```
 
 ## Additional Setup
 
@@ -45,6 +52,8 @@ $ `golangci-lint run`
 * `make` command
 * `yq` for reading from yaml
 * Install and Linter
+
+
 
 
 
