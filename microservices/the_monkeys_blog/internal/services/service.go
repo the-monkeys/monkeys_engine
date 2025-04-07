@@ -190,6 +190,8 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.BlogId)
 	}
 
+	// TODO: Add Tags to the db if not already added
+
 	bx, err := json.Marshal(models.InterServiceMessage{
 		AccountId:  req.AccountId,
 		BlogId:     req.BlogId,
@@ -197,20 +199,32 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 		BlogStatus: constants.BlogStatusPublished,
 		IpAddress:  req.Ip,
 		Client:     req.Client,
+		Tags:       req.Tags,
 	})
-
-	// fmt.Printf("bx: %+v\n", string(bx))
 
 	if err != nil {
 		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
 	}
 
-	// Enqueue publish message to user service asynchronously
 	go func() {
+		// Enqueue publish message to user service asynchronously
 		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 		if err != nil {
-			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+			blog.logger.Errorf(`failed to publish blog publish message to RabbitMQ: 
+			 exchange=%s, routing_key=%s, error=%v`, blog.config.RabbitMQ.Exchange,
+				blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+
+	}()
+
+	go func() {
+		// Enqueue publish message to cache service asynchronously
+		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[5], bx)
+		if err != nil {
+			blog.logger.Errorf(`failed to publish blog publish message to RabbitMQ:
+			 exchange=%s, routing_key=%s, error=%v`, blog.config.RabbitMQ.Exchange,
+				blog.config.RabbitMQ.RoutingKeys[5], err)
 		}
 	}()
 

@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -19,6 +21,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/redis_conn"
+
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -39,7 +43,7 @@ type BlogServiceClient struct {
 	Client     pb.BlogServiceClient
 	cacheMutex sync.Mutex
 	cacheTime  time.Time
-	cache      string
+	redis      *redis.Client
 	cache1     string
 	UserCli    *user_service.UserServiceClient
 	config     *config.Config
@@ -60,10 +64,16 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	mware := auth.InitAuthMiddleware(authClient)
 
+	redisClient, err := redis_conn.RedisConn(cfg)
+	if err != nil {
+		logrus.Fatalf("cannot connect to redis: %v", err)
+	}
+
 	blogClient := &BlogServiceClient{
 		Client:  NewBlogServiceClient(cfg),
 		UserCli: userClient,
 		config:  cfg,
+		redis:   redisClient,
 	}
 	routes := router.Group("/api/v1/blog")
 	routes.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
@@ -585,6 +595,12 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	}
 
 	accId := ctx.GetString("accountId")
+	// Bind tags from request body
+	var tags Tags
+	if err := ctx.ShouldBindBodyWithJSON(&tags); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
+		return
+	}
 
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
@@ -592,6 +608,7 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 		AccountId: accId,
 		Ip:        ctx.Request.Header.Get("IP"),
 		Client:    ctx.Request.Header.Get("Client"),
+		Tags:      tags.Tags,
 	})
 
 	if err != nil {
@@ -877,91 +894,91 @@ func (asc *BlogServiceClient) GetColDraftBlogByBlogId(ctx *gin.Context) {
 
 // ******************************************************* Third Party API ************************************************
 
-type NewsResponse struct {
-	Data interface{} `json:"data"`
-}
+// type NewsResponse struct {
+// 	Data interface{} `json:"data"`
+// }
 
-const apiURL = "http://api.mediastack.com/v1/news?access_key=%s&language=en&categories=business,entertainment,sports,science,technology&limit=100"
+// const apiURL = "http://api.mediastack.com/v1/news?access_key=%s&language=en&categories=business,entertainment,sports,science,technology&limit=100"
 
-func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
-	svc.cacheMutex.Lock()
-	defer svc.cacheMutex.Unlock()
+// func (svc *BlogServiceClient) GetNews1(ctx *gin.Context) {
+// 	svc.cacheMutex.Lock()
+// 	defer svc.cacheMutex.Unlock()
 
-	// Check if cache is valid
-	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache != "" {
-		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache))
-		return
-	}
+// 	// Check if cache is valid
+// 	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache != "" {
+// 		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache))
+// 		return
+// 	}
 
-	resp, err := http.Get(fmt.Sprintf(apiURL, svc.config.Keys.MediaStack))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
-		return
-	}
-	defer resp.Body.Close()
+// 	resp, err := http.Get(fmt.Sprintf(apiURL, svc.config.Keys.MediaStack))
+// 	if err != nil || resp.StatusCode != http.StatusOK {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+// 		return
+// 	}
+// 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
-		return
-	}
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+// 		return
+// 	}
 
-	// Cache the response
-	svc.cache = string(body)
-	svc.cacheTime = time.Now()
+// 	// Cache the response
+// 	svc.cache = string(body)
+// 	svc.cacheTime = time.Now()
 
-	ctx.Data(http.StatusOK, "application/json", body)
-}
+// 	ctx.Data(http.StatusOK, "application/json", body)
+// }
 
-const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=%s&language=en"
+// const apiURL2 = "https://newsapi.org/v2/everything?domains=techcrunch.com,thenextweb.com&apiKey=%s&language=en"
 
-func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
-	svc.cacheMutex.Lock()
-	defer svc.cacheMutex.Unlock()
+// func (svc *BlogServiceClient) GetNews2(ctx *gin.Context) {
+// 	svc.cacheMutex.Lock()
+// 	defer svc.cacheMutex.Unlock()
 
-	// Check if cache1 is valid
-	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache1 != "" {
-		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache1))
-		return
-	}
-	// Call the API
-	resp, err := http.Get(fmt.Sprintf(apiURL2, svc.config.Keys.NewsApi))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
-		return
-	}
-	defer resp.Body.Close()
+// 	// Check if cache1 is valid
+// 	if time.Now().Format("2006-01-02") == svc.cacheTime.Format("2006-01-02") && svc.cache1 != "" {
+// 		ctx.Data(http.StatusOK, "application/json", []byte(svc.cache1))
+// 		return
+// 	}
+// 	// Call the API
+// 	resp, err := http.Get(fmt.Sprintf(apiURL2, svc.config.Keys.NewsApi))
+// 	if err != nil || resp.StatusCode != http.StatusOK {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+// 		return
+// 	}
+// 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
-		return
-	}
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+// 		return
+// 	}
 
-	// Cache the response
-	svc.cache1 = string(body)
-	svc.cacheTime = time.Now()
+// 	// Cache the response
+// 	svc.cache1 = string(body)
+// 	svc.cacheTime = time.Now()
 
-	ctx.Data(http.StatusOK, "application/json", body)
-}
+// 	ctx.Data(http.StatusOK, "application/json", body)
+// }
 
-func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
-	// Call the API
-	resp, err := http.Get("https://hindustantimes-1-t3366110.deta.app/top-world-news")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
-		return
-	}
-	defer resp.Body.Close()
+// func (svc *BlogServiceClient) GetNews3(ctx *gin.Context) {
+// 	// Call the API
+// 	resp, err := http.Get("https://hindustantimes-1-t3366110.deta.app/top-world-news")
+// 	if err != nil || resp.StatusCode != http.StatusOK {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch news"})
+// 		return
+// 	}
+// 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
-		return
-	}
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read response body"})
+// 		return
+// 	}
 
-	ctx.Data(http.StatusOK, "application/json", body)
-}
+// 	ctx.Data(http.StatusOK, "application/json", body)
+// }
 
 // -------------------------------------------------- V2 --------------------------------------------------
 

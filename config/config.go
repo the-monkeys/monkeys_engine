@@ -16,6 +16,7 @@ type Microservices struct {
 	TheMonkeysUser         string `mapstructure:"the_monkeys_user"`
 	TheMonkeysFileStore    string `mapstructure:"the_monkeys_storage"`
 	TheMonkeysNotification string `mapstructure:"the_monkeys_notification"`
+	TheMonkeysCache        string `mapstructure:"the_monkeys_cache"`
 }
 
 type Database struct {
