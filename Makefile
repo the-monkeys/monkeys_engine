@@ -35,3 +35,11 @@ migrate-force:
 
 proto-gen:
 	protoc apis/serviceconn/**/pb/*.proto --go_out=. --go-grpc_out=.
+        # --exclude=apis/serviceconn/gateway_recom/pb/other_file.proto  # Include other files explicitly
+    # To Generate Python code
+	python3 -m grpc_tools.protoc \
+        -I=apis/serviceconn \
+        -I=apis/python/recom_engine \
+        apis/serviceconn/gateway_recom/pb/*.proto \
+        --python_out=apis/python/recom_engine \
+        --grpc_python_out=apis/python/recom_engine
