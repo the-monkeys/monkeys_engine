@@ -39,7 +39,7 @@ func main() {
 
 	reflection.Register(s)
 
-	log.Infof("✅ the cache server started at: %v", cfg.Microservices.TheMonkeysCache)
+	log.Infof("✅ the monkey's cache server started at: %v", cfg.Microservices.TheMonkeysCache)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
