@@ -9,7 +9,6 @@ type TheMonkeysGateway struct {
 	HTTPS string `mapstructure:"HTTPS"`
 	HTTP  string `mapstructure:"HTTP"`
 }
-
 type Microservices struct {
 	TheMonkeysAuthz        string `mapstructure:"the_monkeys_authz"`
 	TheMonkeysBlog         string `mapstructure:"the_monkeys_blog"`
@@ -17,6 +16,7 @@ type Microservices struct {
 	TheMonkeysFileStore    string `mapstructure:"the_monkeys_storage"`
 	TheMonkeysNotification string `mapstructure:"the_monkeys_notification"`
 	TheMonkeysCache        string `mapstructure:"the_monkeys_cache"`
+	TheMonkeysRecommEngine string `mapstructure:"the_monkeys_recomm_engine"`
 }
 
 type Database struct {

@@ -4,7 +4,7 @@
 // - protoc             v4.25.1
 // source: apis/serviceconn/gateway_recom/pb/gw_recom.proto
 
-package gateway_recom
+package pb
 
 import (
 	context "context"

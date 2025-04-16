@@ -35,14 +35,13 @@ migrate-force:
 
 proto-gen:
 	protoc apis/serviceconn/**/pb/*.proto --go_out=. --go-grpc_out=.
-        # --exclude=apis/serviceconn/gateway_recom/pb/other_file.proto  # Include other files explicitly
-    # To Generate Python code
-	python3 -m grpc_tools.protoc \
-        -I=apis/serviceconn \
-        -I=apis/python/recom_engine \
-        apis/serviceconn/gateway_recom/pb/*.proto \
-        --python_out=apis/python/recom_engine \
-        --grpc_python_out=apis/python/recom_engine
+       
+    # To Generate Python Recommendation Server code
+	python -m grpc_tools.protoc \
+    -I=microservices/the_monkeys_recommendations \
+    --python_out=microservices/the_monkeys_recommendations \
+    --grpc_python_out=microservices/the_monkeys_recommendations \
+    microservices/the_monkeys_recommendations/gw_recom.proto
 
 
 freeze:
