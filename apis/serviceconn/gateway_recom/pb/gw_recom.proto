@@ -29,7 +29,5 @@ message RecommendationRes {
 }
 
 service RecommendationService {
-    rpc GetRecommendations(UserProfileReq) returns (RecommendationRes) {
-        
-    }
+    rpc GetRecommendations(UserProfileReq) returns (RecommendationRes) {}
 }

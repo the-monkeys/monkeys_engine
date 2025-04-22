@@ -195,13 +195,13 @@ func (as *AuthzSvc) DecodeSignedJWT(ctx context.Context, req *pb.DecodeSignedJWT
 	}
 
 	return &pb.DecodeSignedJWTResponse{
-		StatusCode: http.StatusOK,
-		Email: user.Email,
-		FirstName: user.FirstName,
-		LastName: user.LastName,
-		Username: user.Username,
+		StatusCode:              http.StatusOK,
+		Email:                   user.Email,
+		FirstName:               user.FirstName,
+		LastName:                user.LastName,
+		Username:                user.Username,
 		EmailVerificationStatus: user.EmailVerificationStatus,
-		AccountId: user.AccountId,
+		AccountId:               user.AccountId,
 	}, nil
 }
 
