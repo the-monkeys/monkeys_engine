@@ -43,3 +43,7 @@ proto-gen:
         apis/serviceconn/gateway_recom/pb/*.proto \
         --python_out=apis/python/recom_engine \
         --grpc_python_out=apis/python/recom_engine
+
+
+freeze:
+	pip freeze > requirements.txt
