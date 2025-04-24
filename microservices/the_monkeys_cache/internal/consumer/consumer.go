@@ -35,14 +35,14 @@ func NewUserDb(log *logrus.Logger, config *config.Config) *UserDbConn {
 	if err != nil {
 		logrus.Errorf("cannot dial to grpc user server: %v", err)
 	}
-	logrus.Infof("✅ the monkeys cache server is dialing to user rpc server at: %v", config.Microservices.TheMonkeysUser)
+	logrus.Infof("✅ the monkeys cache is dialing to user rpc server at: %v", config.Microservices.TheMonkeysUser)
 
 	blogCon, err := grpc.NewClient(config.Microservices.TheMonkeysBlog, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to blog server: %v", err)
 	}
 
-	logrus.Infof("✅ the monkeys cache server is dialing to the blog rpc server at: %v", config.Microservices.TheMonkeysBlog)
+	logrus.Infof("✅ the monkeys cache is dialing to the blog rpc server at: %v", config.Microservices.TheMonkeysBlog)
 
 	return &UserDbConn{
 		log:        log,
