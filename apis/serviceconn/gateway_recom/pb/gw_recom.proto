@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package gateway_recom;
+
+option go_package = "apis/serviceconn/gateway_recom/pb";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
+
+
+
+
+message UserProfileReq {
+    string account_id = 1;
+    string username = 2;
+    string email = 3;
+    bool is_private = 4;
+    string ip = 5;
+    string client = 6;
+    Location location = 7;
+}
+
+message Location {
+    string country = 1;
+    string city = 2;
+    string lat = 3;
+    string lon = 4;
+    string timezone = 5;
+    string region = 6;
+    string postal_code = 7;
+    string street = 8;
+}
+
+message RecommendationRes {
+    repeated string topics = 1;
+    repeated string users_to_follow = 2;
+    repeated google.protobuf.Any posts_to_read = 3;
+}
+
+service RecommendationService {
+    rpc GetRecommendations(UserProfileReq) returns (RecommendationRes) {}
+}

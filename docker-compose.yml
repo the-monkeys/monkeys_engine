@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root"]
+      test: [ "CMD-SHELL", "pg_isready -U root" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,15 +27,8 @@ services:
       - ./schema:/migrations
     networks:
       - monkeys-network
-    entrypoint:
-      [
-        "migrate",
-        "-path",
-        "/migrations",
-        "-database",
-        "postgres://root:Secret@the_monkeys_db:5432/the_monkeys_user_dev?sslmode=disable"
-      ]
-    command: ["up"]
+    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://root:Secret@the_monkeys_db:5432/the_monkeys_user_dev?sslmode=disable" ]
+    command: [ "up" ]
     depends_on:
       the_monkeys_db:
         condition: service_healthy
@@ -66,7 +59,7 @@ services:
     networks:
       - monkeys-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -89,7 +82,7 @@ services:
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -105,7 +98,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -129,7 +122,7 @@ services:
     command: go run microservices/the_monkeys_gateway/main.go
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/healthz" ]
       interval: 300s
       timeout: 10s
       retries: 3
@@ -250,6 +243,37 @@ services:
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_cache/main.go
     restart: always
+
+  the_monkeys_recomm_engine:
+    container_name: "the_monkeys_recomm_engine"
+    image: python:3.10
+    networks:
+      - monkeys-network
+    depends_on:
+      - rabbitmq
+      - the_monkeys_db
+      - the_monkeys_cache
+    volumes:
+      - .:/app
+    ports:
+      - "50057:50057"
+    working_dir: /app
+    command: >
+      bash -c "echo 'Starting setup...' && 
+              echo 'Installing requirements...' &&
+              pip install -r requirements.txt && 
+              cd /app && 
+              echo 'Generating proto files...' &&
+              cd microservices/the_monkeys_recommendations &&
+              python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto &&
+              echo 'Proto files generated successfully!' &&
+              ls -la && # Show files in directory
+              cd /app &&
+              echo 'Running main.py...' &&
+              PYTHONPATH=/app python -u microservices/the_monkeys_recommendations/main.py 2>&1"
+    restart: always
+    environment:
+      - PYTHONPATH=/app
 
 networks:
   monkeys-network:
