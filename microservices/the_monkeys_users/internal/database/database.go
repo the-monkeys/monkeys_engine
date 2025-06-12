@@ -581,7 +581,7 @@ func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, err
 	}
 
 	if len(activities) == 0 {
-		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("activity for user id %v doesn't exist", userId))
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("activity for user id %v doesn't exist", userId))
 	}
 
 	return &pb.UserActivityResp{

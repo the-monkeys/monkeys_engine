@@ -6,7 +6,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/opensearch-project/opensearch-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,7 +16,6 @@ const (
 )
 
 var db *sql.DB
-var client *opensearch.Client
 
 func main() {
 	// Connect to PostgreSQL
