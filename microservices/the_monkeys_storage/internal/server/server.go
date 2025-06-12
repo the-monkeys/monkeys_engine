@@ -89,7 +89,7 @@ func (fs *FileService) GetBlogFile(req *pb.GetBlogFileReq, stream pb.UploadBlogF
 	_, err := os.Stat(fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return status.Errorf(codes.NotFound, fmt.Sprintf("image for blog id %v not found", req.BlogId))
+			return status.Error(codes.NotFound, fmt.Sprintf("image for blog id %v not found", req.BlogId))
 		} else {
 			return status.Errorf(codes.Internal, "something went wrong")
 		}
@@ -179,7 +179,7 @@ func (fs *FileService) GetProfilePic(req *pb.GetProfilePicReq, stream pb.UploadB
 	_, err := os.Stat(fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return status.Errorf(codes.NotFound, fmt.Sprintf("profile picture for %v not found", req.UserId))
+			return status.Error(codes.NotFound, fmt.Sprintf("profile picture for %v not found", req.UserId))
 		} else {
 			return status.Errorf(codes.Internal, "something went wrong")
 		}

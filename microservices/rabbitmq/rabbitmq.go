@@ -31,7 +31,9 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		if cerr := conn.Close(); cerr != nil {
+			logrus.Errorf("failed to close connection after channel error: %v", cerr)
+		}
 		return Conn{}, fmt.Errorf("failed to open a channel: %w", err)
 	}
 
@@ -136,7 +138,9 @@ func (c Conn) ReceiveData(queueName string) error {
 // Close closes the RabbitMQ connection and channel gracefully.
 func (c Conn) Close() {
 	if c.Channel != nil {
-		c.Channel.Close()
+		if err := c.Channel.Close(); err != nil {
+			logrus.Errorf("failed to close channel: %v", err)
+		}
 	}
 	if c.Connection != nil {
 		c.Connection.Close()
