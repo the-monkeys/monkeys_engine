@@ -60,7 +60,11 @@ func BlogServiceConn(addr string) (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logrus.Errorf("failed to close gRPC connection: %v", err)
+		}
+	}()
 
 	return conn, err
 }

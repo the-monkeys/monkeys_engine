@@ -305,7 +305,7 @@ func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*p
 		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
 	}
 
-	for i, _ := range req.Topic {
+	for i := range req.Topic {
 		req.Topic[i] = strings.TrimSpace(req.Topic[i])
 	}
 
@@ -347,7 +347,7 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
 	}
 
-	for i, _ := range req.Topic {
+	for i := range req.Topic {
 		req.Topic[i] = strings.TrimSpace(req.Topic[i])
 	}
 
@@ -881,9 +881,9 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 
 		// Search user based on the provided details
 		var users []models.UserAccount
-		if req.GetSearchTerm() == "" {
-
-		}
+		//if req.GetSearchTerm() == "" {
+		//
+		//}
 
 		users, err = us.dbConn.FindUsersWithPagination(req.SearchTerm, int(req.Limit), int(req.Offset))
 		if err != nil {

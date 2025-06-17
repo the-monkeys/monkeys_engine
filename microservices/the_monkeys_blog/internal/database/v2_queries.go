@@ -113,7 +113,11 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 		es.log.Errorf("GetBlogsOfUsersByAccountIds: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsOfUsersByAccountIds: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -231,7 +235,11 @@ func (es *elasticsearchStorage) GetBlogsByTagsAccId(ctx context.Context, account
 		es.log.Errorf("GetBlogsByTags: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsByTags: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -340,7 +348,11 @@ func (es *elasticsearchStorage) GetBlogsByAccountId(ctx context.Context, account
 		es.log.Errorf("GetBlogsByAccountId: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsByAccountId: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -440,7 +452,11 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 		es.log.Errorf("GetBlogByBlogId: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogByBlogId: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -544,7 +560,11 @@ func (es *elasticsearchStorage) GetABlogByBlogIdAccId(ctx context.Context, blogI
 		es.log.Errorf("GetABlogByBlogIdAccId: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetABlogByBlogIdAccId: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -648,7 +668,11 @@ func (es *elasticsearchStorage) GetBlogsByTags(ctx context.Context, tags []strin
 		es.log.Errorf("GetBlogsByTagsWithoutAccId: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsByTagsWithoutAccId: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -752,7 +776,11 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 		es.log.Errorf("GetBlogsByBlogIds: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsByBlogIds: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -853,7 +881,11 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Cont
 		es.log.Errorf("GetAllPublishedBlogsLatestFirst: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetAllPublishedBlogsLatestFirst: error closing response body, error: %v", err)
+		}
+	}()
 
 	if res.IsError() {
 		err = fmt.Errorf("GetAllPublishedBlogsLatestFirst: search query failed, response: %+v", res)

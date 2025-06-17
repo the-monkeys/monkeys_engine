@@ -134,7 +134,11 @@ func (uh *uDBHandler) GetUserProfile(username string) (*models.UserAccount, erro
 		uh.log.Errorf("Error fetching interests for user ID %d, error: %+v", tmu.Id, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows for user ID %d, error: %+v", tmu.Id, err)
+		}
+	}()
 
 	// Step 3: Collect the interests into the UserAccount struct
 	var interests []string
@@ -197,7 +201,11 @@ func (uh *uDBHandler) GetMyProfile(username string) (*models.UserProfileRes, err
 		logrus.Errorf("Error fetching interests for username %s, error: %+v", username, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows for username %s, error: %+v", username, err)
+		}
+	}()
 
 	// Step 3: Collect the interests into the UserProfileRes struct
 	var interests []string
@@ -246,7 +254,11 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 		uh.log.Errorf("cannot prepare the update user query for user %s, error: %v", username, err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			uh.log.Errorf("cannot close the prepared statement for user %s, error: %v", username, err)
+		}
+	}()
 
 	result := stmt.QueryRow(dbUserInfo.FirstName, dbUserInfo.LastName, dbUserInfo.DateOfBirth.Time,
 		dbUserInfo.Bio.String, dbUserInfo.Address.String, dbUserInfo.ContactNumber.String,
@@ -275,7 +287,11 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction for deleting user profile %s, error: %+v", username, err)
+		}
+	}()
 
 	var id int64
 	// Step 1: Fetch the user ID using the username from the user_account table
@@ -430,7 +446,11 @@ func (uh *uDBHandler) AddUserLog(username string, ip string, description string,
 		return err
 	}
 
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			uh.log.Errorf("cannot close the prepared statement for user %s, error: %v", username, err)
+		}
+	}()
 
 	row := stmt.QueryRow(userId, ip, description, clientId)
 	if row.Err() != nil {
@@ -452,7 +472,11 @@ func (uh *uDBHandler) GetAllTopicsFromDb() (*pb.GetTopicsResponse, error) {
 		}
 		return nil, constants.ErrInternal
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows in GetAllTopicsFromDb: %v", err)
+		}
+	}()
 
 	var topic, category string
 	for rows.Next() {
@@ -480,7 +504,11 @@ func (uh *uDBHandler) GetAllCategories() (*pb.GetAllCategoriesRes, error) {
 		}
 		return nil, constants.ErrInternal
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows in GetAllCategories: %v", err)
+		}
+	}()
 
 	var Description, category string
 	for rows.Next() {
@@ -522,7 +550,11 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 		uh.log.Errorf("cannot prepare statement to add blog into the blog: %v", err)
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			uh.log.Errorf("cannot close the prepared statement for user %s, error: %v", msg.AccountId, err)
+		}
+	}()
 
 	var blogId int64
 	err = stmt.QueryRow(userId, msg.BlogId, msg.BlogStatus).Scan(&blogId)
@@ -560,7 +592,11 @@ func (uh *uDBHandler) GetUserActivities(userId int64) (*pb.UserActivityResp, err
 		uh.log.Errorf("error retrieving user activities for user id %v, err: %v", userId, err)
 		return nil, status.Errorf(codes.Internal, "cannot get the user activity")
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("error closing rows for user id %v, err: %v", userId, err)
+		}
+	}()
 
 	for rows.Next() {
 		var desc, timestamp string
@@ -643,7 +679,9 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
-		tx.Rollback() // rollback transaction on error
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -654,7 +692,9 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 		err = tx.QueryRow(`SELECT id FROM topics WHERE description = $1`, interest).Scan(&topicId)
 		if err != nil {
 			uh.log.Errorf("Failed to fetch topic ID for interest: %s, error: %+v", interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -663,7 +703,9 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 		err = tx.QueryRow(`SELECT COUNT(1) FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId).Scan(&exists)
 		if err != nil {
 			uh.log.Errorf("Failed to check if user is already following interest: %s, error: %+v", interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -677,7 +719,9 @@ func (uh *uDBHandler) AddUserInterest(interests []string, username string) error
 		_, err = tx.Exec(`INSERT INTO user_interest (user_id, topics_id) VALUES ($1, $2)`, userId, topicId)
 		if err != nil {
 			uh.log.Errorf("Failed to insert user interest for username: %s and interest: %s, error: %+v", username, interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -711,7 +755,11 @@ func (uh *uDBHandler) GetUserInterest(username string) ([]string, error) {
 		uh.log.Errorf("Failed to fetch user interests for user ID: %d, error: %+v", userId, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows for user interests, error: %+v", err)
+		}
+	}()
 
 	// Step 3: Collect the descriptions of the topics
 	var interests []string
@@ -746,7 +794,9 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
-		tx.Rollback() // rollback transaction on error
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -757,7 +807,9 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 		err = tx.QueryRow(`SELECT id FROM topics WHERE description = $1`, interest).Scan(&topicId)
 		if err != nil {
 			uh.log.Errorf("Failed to fetch topic ID for interest: %s, error: %+v", interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -766,7 +818,9 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 		err = tx.QueryRow(`SELECT COUNT(1) FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId).Scan(&exists)
 		if err != nil {
 			uh.log.Errorf("Failed to check if user follows interest: %s, error: %+v", interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -780,7 +834,9 @@ func (uh *uDBHandler) RemoveUserInterest(interests []string, username string) er
 		_, err = tx.Exec(`DELETE FROM user_interest WHERE user_id = $1 AND topics_id = $2`, userId, topicId)
 		if err != nil {
 			uh.log.Errorf("Failed to remove user interest for username: %s and interest: %s, error: %+v", username, interest, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -800,7 +856,11 @@ func (uh *uDBHandler) FollowAUser(followingUsername, followersUsername string) e
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logrus.Errorf("Failed to rollback transaction for following user %s by user %s, error: %+v", followingUsername, followersUsername, err)
+		}
+	}()
 
 	var followingID, followersID int64
 
@@ -838,7 +898,11 @@ func (uh *uDBHandler) UnFollowAUser(followingUsername, followersUsername string)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logrus.Errorf("Failed to rollback transaction for unfollowing user %s by user %s, error: %+v", followingUsername, followersUsername, err)
+		}
+	}()
 
 	var followingID, followersID int64
 
@@ -892,7 +956,11 @@ func (uh *uDBHandler) GetFollowings(username string) ([]models.TheMonkeysUser, e
 		logrus.Errorf("Failed to fetch users followed by user ID %d, error: %+v", userID, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows for user ID %d, error: %+v", userID, err)
+		}
+	}()
 
 	// Step 3: Iterate through the result set and populate the list of users
 	for rows.Next() {
@@ -934,7 +1002,11 @@ func (uh *uDBHandler) GetFollowers(username string) ([]models.TheMonkeysUser, er
 		logrus.Errorf("Failed to fetch users who follow user ID %d, error: %+v", userID, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows for user ID %d, error: %+v", userID, err)
+		}
+	}()
 
 	// Step 3: Iterate through the result set and populate the list of users
 	for rows.Next() {

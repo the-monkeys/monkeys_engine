@@ -60,7 +60,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 	go func() {
 		<-sigChan
 		log.Infoln("Received termination signal. Closing connection and exiting gracefully.")
-		conn.Channel.Close()
+		if err := conn.Channel.Close(); err != nil {
+			log.Errorf("Error closing RabbitMQ channel: %v", err)
+		}
 		os.Exit(0)
 	}()
 
@@ -122,7 +124,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			}
 
 			// Inbuilt cache
-			cacheServer.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30)
+			if err := cacheServer.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30); err != nil {
+				userCon.log.Errorf("Failed to set feed in inbuilt cache: %v", err)
+			}
 
 		case constants.BLOG_DELETE:
 

@@ -152,7 +152,11 @@ func (es *elasticsearchStorage) GetDraftBlogsByOwnerAccountID(ctx context.Contex
 		es.log.Errorf("GetDraftBlogsByOwnerAccountID: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetDraftBlogsByOwnerAccountID: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -284,7 +288,11 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 		es.log.Errorf("GetPublishedBlogsByOwnerAccountID: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetPublishedBlogsByOwnerAccountID: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -358,10 +366,15 @@ func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string
 		es.log.Errorf("DoesBlogExist: error executing Get request, error: %+v", err)
 		return false, nil, err
 	}
-	defer getResponse.Body.Close()
+	defer func() {
+		if err := getResponse.Body.Close(); err != nil {
+			es.log.Errorf("DoesBlogExist: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates the document exists
-	if getResponse.StatusCode == http.StatusOK {
+	switch getResponse.StatusCode {
+	case http.StatusOK:
 		// Parse the response body to extract blog details
 		bodyBytes, err := io.ReadAll(getResponse.Body)
 		if err != nil {
@@ -384,7 +397,8 @@ func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string
 
 		es.log.Infof("DoesBlogExist: blog with id %s exists", blogID)
 		return true, blogDetails, nil
-	} else if getResponse.StatusCode == http.StatusNotFound {
+
+	case http.StatusNotFound:
 		es.log.Infof("DoesBlogExist: blog with id %s does not exist", blogID)
 		return false, nil, nil
 	}
@@ -432,7 +446,11 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 		es.log.Errorf("PublishBlogById: error executing update request, error: %+v", err)
 		return updateResponse, err
 	}
-	defer updateResponse.Body.Close()
+	defer func() {
+		if err := updateResponse.Body.Close(); err != nil {
+			es.log.Errorf("PublishBlogById: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if updateResponse.IsError() {
@@ -482,8 +500,11 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 		es.log.Errorf("MoveBlogToDraft: error executing update request, error: %+v", err)
 		return updateResponse, err
 	}
-	defer updateResponse.Body.Close()
-
+	defer func() {
+		if err := updateResponse.Body.Close(); err != nil {
+			es.log.Errorf("MoveBlogToDraft: error closing response body, error: %v", err)
+		}
+	}()
 	// Check if the response indicates an error
 	if updateResponse.IsError() {
 		err = fmt.Errorf("MoveBlogToDraft: update query failed, response: %+v", updateResponse)
@@ -576,8 +597,11 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 		es.log.Errorf("GetPublishedBlogByTagsName: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
-
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetPublishedBlogByTagsName: error closing response body, error: %v", err)
+		}
+	}()
 	// Check if the response indicates an error
 	if res.IsError() {
 		err = fmt.Errorf("GetPublishedBlogByTagsName: search query failed, response: %+v", res)
@@ -680,7 +704,11 @@ func (es *elasticsearchStorage) GetPublishedBlogById(ctx context.Context, id str
 		es.log.Errorf("GetPublishedBlogById: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetPublishedBlogById: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -763,7 +791,11 @@ func (es *elasticsearchStorage) AchieveAPublishedBlogById(ctx context.Context, b
 		es.log.Errorf("AchieveAPublishedBlogById: error executing update request, error: %+v", err)
 		return updateResponse, err
 	}
-	defer updateResponse.Body.Close()
+	defer func() {
+		if err := updateResponse.Body.Close(); err != nil {
+			es.log.Errorf("AchieveAPublishedBlogById: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if updateResponse.IsError() {
@@ -796,7 +828,11 @@ func (es *elasticsearchStorage) DeleteABlogById(ctx context.Context, blogId stri
 		es.log.Errorf("DeleteABlogById: error executing delete request, error: %+v", err)
 		return deleteResponse, err
 	}
-	defer deleteResponse.Body.Close()
+	defer func() {
+		if err := deleteResponse.Body.Close(); err != nil {
+			es.log.Errorf("DeleteABlogById: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if deleteResponse.IsError() {
@@ -877,7 +913,11 @@ func (es *elasticsearchStorage) GetLast100BlogsLatestFirst(ctx context.Context) 
 		es.log.Errorf("GetLast100BlogsLatestFirst: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetLast100BlogsLatestFirst: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -1010,7 +1050,11 @@ func (es *elasticsearchStorage) GetDraftedBlogByIdAndOwner(ctx context.Context, 
 		es.log.Errorf("GetDraftedBlogByIdAndOwner: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetDraftedBlogByIdAndOwner: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -1136,7 +1180,11 @@ func (es *elasticsearchStorage) GetPublishedBlogByIdAndOwner(ctx context.Context
 		es.log.Errorf("GetPublishedBlogByIdAndOwner: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetPublishedBlogByIdAndOwner: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -1229,7 +1277,11 @@ func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds [
 		es.log.Errorf("GetBlogsByBlogIds: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsByBlogIds: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -1359,7 +1411,11 @@ func (es *elasticsearchStorage) GetDraftBlogByBlogId(ctx context.Context, blogId
 		es.log.Errorf("GetDraftedBlogById: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetDraftedBlogById: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {

@@ -131,7 +131,11 @@ func (adh *authDBHandler) insertIntoUserAccount(tx *sql.Tx, user *models.TheMonk
 		logrus.Errorf("cannot prepare statement to add user into the USER_ACCOUNT: %v", err)
 		return 0, err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to add user into the USER_ACCOUNT: %v", err)
+		}
+	}()
 
 	var userId int64
 	err = stmt.QueryRow(user.AccountId, user.Username, user.FirstName, user.LastName, user.Email, 4, 1, constants.UserPublic).Scan(&userId)
@@ -154,7 +158,11 @@ func (adh *authDBHandler) insertIntoUserAuthInfo(tx *sql.Tx, user *models.TheMon
 		logrus.Errorf("cannot prepare statement to add user into the USER_AUTH_INFO: %v", err)
 		return 0, err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to add user into the USER_AUTH_INFO: %v", err)
+		}
+	}()
 
 	var authId int64
 	err = stmt.QueryRow(userId, user.Password, user.EmailVerificationToken,
@@ -181,7 +189,11 @@ func (adh *authDBHandler) UpdatePasswordRecoveryToken(hash string, req *models.T
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to update password recovery token for %s, error: %v", req.Email, err)
+		}
+	}()
 	result := stmt.QueryRow(hash, time.Now().Add(time.Minute*5).Format(constants.DateTimeFormat), req.Id)
 	if result.Err() != nil {
 		logrus.Errorf("cannot sent the reset link for %s, error: %v", req.Email, err)
@@ -229,7 +241,11 @@ func (adh *authDBHandler) UpdatePassword(password string, user *models.TheMonkey
 		logrus.Errorf("cannot prepare statement to update password for %s error: %+v", user.Email, err)
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to update password for %s error: %+v", user.Email, err)
+		}
+	}()
 
 	var userId int64
 	err = stmt.QueryRow(password, user.Id).Scan(&userId)
@@ -273,7 +289,11 @@ func (adh *authDBHandler) CreateUserLog(user *models.TheMonkeysUser, description
 		logrus.Errorf("cannot prepare statement to add user activity into the user_account_log: %v", err)
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to add user activity into the user_account_log: %v", err)
+		}
+	}()
 
 	row, err := stmt.Exec(userId, user.IpAddress, description, clientId)
 	if err != nil {
@@ -308,7 +328,11 @@ func (adh *authDBHandler) UpdateEmailVerificationToken(req *models.TheMonkeysUse
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to update email verification token for %s, error: %v", req.Email, err)
+		}
+	}()
 	result := stmt.QueryRow(req.EmailVerificationToken, req.EmailVerificationTimeout, req.Id)
 	if result.Err() != nil {
 		logrus.Errorf("cannot sent the reset link for %s, error: %v", req.Email, err)
@@ -336,7 +360,11 @@ func (adh *authDBHandler) UpdateEmailVerificationStatus(req *models.TheMonkeysUs
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to update email verification status for %s, error: %v", req.Email, err)
+		}
+	}()
 	_, err = stmt.Exec(constants.EmailVerificationStatusVerified, time.Now(), req.Id)
 	if err != nil {
 		logrus.Errorf("cannot update the email verification status for %s, error: %v", req.Email, err)
@@ -357,7 +385,11 @@ func (adh *authDBHandler) UpdateUserName(currentUsername, newUsername string) er
 		logrus.Errorf("cannot prepare statement to update username, error: %v", err)
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("cannot close statement to update username, error: %v", err)
+		}
+	}()
 
 	res, err := stmt.Exec(newUsername, currentUsername)
 	if err != nil {

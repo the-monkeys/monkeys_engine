@@ -84,7 +84,12 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			if len(tags) == 0 {
 				req["Tags"] = []string{"untagged"}
 			}
-			go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+			go func() {
+				err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+				if err != nil {
+					blog.logger.Errorf("failed to publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+				}
+			}()
 		}
 
 		_, err = blog.osClient.SaveBlog(stream.Context(), req)

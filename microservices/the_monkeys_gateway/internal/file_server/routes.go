@@ -78,7 +78,11 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "error while getting the file"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logrus.Errorf("Error closing file: %v", err)
+		}
+	}()
 
 	// Read the file and make it slice of bytes
 	imageData, err := io.ReadAll(file)
@@ -149,7 +153,9 @@ func (asc *FileServiceClient) GetBlogFile(ctx *gin.Context) {
 	// ctx.Data(http.StatusOK, "application/octet-stream", resp.Data)
 
 	// ctx.JSON(http.StatusAccepted, "uploaded")
-	ctx.Writer.Write(resp.Data)
+	if _, err := ctx.Writer.Write(resp.Data); err != nil {
+		logrus.Errorf("error writing response data: %v", err)
+	}
 }
 
 func (asc *FileServiceClient) DeleteBlogFile(ctx *gin.Context) {
@@ -180,7 +186,11 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "error while getting the profile pic"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logrus.Errorf("Error closing file: %v", err)
+		}
+	}()
 
 	// Read the file and make it slice of bytes
 	imageData, err := io.ReadAll(file)
@@ -241,7 +251,9 @@ func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 		return
 	}
 
-	ctx.Writer.Write(resp.Data)
+	if _, err := ctx.Writer.Write(resp.Data); err != nil {
+		logrus.Errorf("error writing response data: %v", err)
+	}
 }
 
 func (asc *FileServiceClient) GetProfilePicStream(ctx *gin.Context) {

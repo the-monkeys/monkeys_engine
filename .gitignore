@@ -33,3 +33,7 @@ local/*
 profile/*
 blogs/*
 backup/*
+
+# IDE specific files
+.idea/
+.vscode/

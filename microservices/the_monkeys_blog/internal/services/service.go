@@ -70,7 +70,12 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 			req.Tags = []string{"untagged"}
 		}
 		// fmt.Printf("bx: %v\n", string(bx))
-		go blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		go func() {
+			err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+			if err != nil {
+				blog.logger.Errorf("failed to publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+			}
+		}()
 	}
 
 	_, err := blog.osClient.DraftABlog(ctx, req)

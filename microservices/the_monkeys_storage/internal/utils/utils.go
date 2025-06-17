@@ -12,7 +12,7 @@ import (
 
 func RemoveSpecialChar(val string) string {
 	// Define regular expression to match all special characters
-	reg, err := regexp.Compile("[^a-zA-Z0-9\\.]+")
+	reg, err := regexp.Compile(`[^a-zA-Z0-9\.]+`)
 	if err != nil {
 		logrus.Error("cannot compile regexp")
 	}
@@ -36,7 +36,11 @@ func ReadImageFromURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logrus.Errorf("Error closing response body: %v", err)
+		}
+	}()
 
 	// Check for successful response status code
 	if resp.StatusCode != http.StatusOK {
@@ -46,7 +50,7 @@ func ReadImageFromURL(url string) ([]byte, error) {
 	// Read the response body into a byte array
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
 	return data, nil

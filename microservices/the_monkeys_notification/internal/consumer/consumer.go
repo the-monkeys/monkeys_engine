@@ -23,7 +23,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	go func() {
 		<-sigChan
 		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
-		conn.Channel.Close()
+		if err := conn.Channel.Close(); err != nil {
+			logrus.Errorf("Failed to close RabbitMQ channel: %v", err)
+		}
 		os.Exit(0)
 	}()
 

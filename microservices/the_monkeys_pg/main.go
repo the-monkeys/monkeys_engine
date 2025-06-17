@@ -24,7 +24,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			logrus.Errorf("failed to close PostgreSQL connection: %v", err)
+		}
+	}()
 
 	// Connect to OpenSearch
 	// client, err = opensearch.NewClient(openSearchAppName)
@@ -55,15 +59,13 @@ func main() {
 
 	// Perform hourly consistency check
 	ticker := time.NewTicker(time.Hour)
-	for {
-		select {
-		case <-ticker.C:
-			// Synchronize data from PostgreSQL to OpenSearch
-			if err := sync(); err != nil {
-				log.Println(err)
-			}
+	for range ticker.C {
+		// Synchronize data from PostgreSQL to OpenSearch
+		if err := sync(); err != nil {
+			log.Println(err)
 		}
 	}
+
 }
 func sync() error {
 	logrus.Infoln("**********************************************************************88")

@@ -82,7 +82,11 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 		es.log.Errorf("GetBlogsMetadataByTags: error executing search request, error: %+v", err)
 		return nil, 0, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetBlogsMetadataByTags: error closing response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if res.IsError() {
@@ -235,8 +239,13 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 		es.log.Errorf("GetAllPublishedBlogsMetadata: error executing search request, error: %+v", err)
 		return nil, 0, err
 	}
-	defer res.Body.Close()
 
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetAllPublishedBlogsMetadata: error closing response body, error: %v", err)
+		}
+	}()
+	
 	if res.IsError() {
 		err = fmt.Errorf("GetAllPublishedBlogsMetadata: search query failed, response: %+v", res)
 		es.log.Error(err)
