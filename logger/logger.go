@@ -12,7 +12,10 @@ func GetLogger() *logrus.Logger {
 
 	logger.Out = os.Stdout
 
-	os.Setenv("APP_ENV", "production")
+	if err := os.Setenv("APP_ENV", "production"); err != nil {
+		logger := logrus.New()
+		logger.Fatalf("Failed to set APP_ENV: %v", err)
+	}
 	env := os.Getenv("APP_ENV") // Example: APP_ENV could be "production" or "development"
 
 	if env == "production" {

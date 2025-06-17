@@ -249,7 +249,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
-		as.logger.Errorf(service_types.CannotCreateToken(req.Email, err))
+		as.logger.Error(service_types.CannotCreateToken(req.Email, err))
 		return nil, status.Errorf(codes.Internal, "cannot generate the token: %v", err)
 	}
 
@@ -350,7 +350,7 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 	// Generate and return token
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
-		as.logger.Errorf(service_types.CannotCreateToken(req.Email, err))
+		as.logger.Error(service_types.CannotCreateToken(req.Email, err))
 		return nil, status.Errorf(codes.Internal, "could not create token")
 	}
 
@@ -518,7 +518,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 	if err != nil {
 		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.CurrentUsername, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.CurrentUsername))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.CurrentUsername)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -555,7 +555,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 	user.Username = req.NewUsername
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
-		as.logger.Errorf(service_types.CannotCreateToken(req.NewUsername, err))
+		as.logger.Error(service_types.CannotCreateToken(req.NewUsername, err))
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
@@ -581,7 +581,7 @@ func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.Upda
 	if err != nil {
 		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -619,7 +619,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	if err != nil {
 		as.logger.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -668,7 +668,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	user.Email = req.NewEmail
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
-		as.logger.Errorf(service_types.CannotCreateToken(user.Username, err))
+		as.logger.Error(service_types.CannotCreateToken(user.Username, err))
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}

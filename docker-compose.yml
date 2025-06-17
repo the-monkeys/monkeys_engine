@@ -106,7 +106,7 @@ services:
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -129,7 +129,7 @@ services:
 
   the_monkeys_authz:
     container_name: "the-monkeys-auth"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -147,7 +147,7 @@ services:
 
   the_monkeys_storage:
     container_name: "the_monkeys_storage"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -167,7 +167,7 @@ services:
 
   the_monkeys_user:
     container_name: "the-monkeys-user"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -185,7 +185,7 @@ services:
 
   the_monkeys_blog:
     container_name: "the-monkeys-blog"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -204,7 +204,7 @@ services:
 
   the_monkeys_notification:
     container_name: "the_monkeys_notification"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -225,7 +225,7 @@ services:
 
   the_monkeys_cache_svc:
     container_name: "the_monkeys_cache_svc"
-    image: golang:latest
+    image: golang:1.24.4
     networks:
       - monkeys-network
     depends_on:
@@ -260,17 +260,17 @@ services:
     working_dir: /app
     command: >
       bash -c "echo 'Starting setup...' && 
-              echo 'Installing requirements...' &&
-              pip install -r requirements.txt && 
-              cd /app && 
-              echo 'Generating proto files...' &&
-              cd microservices/the_monkeys_recommendations &&
-              python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto &&
-              echo 'Proto files generated successfully!' &&
-              ls -la && # Show files in directory
-              cd /app &&
-              echo 'Running main.py...' &&
-              PYTHONPATH=/app python -u microservices/the_monkeys_recommendations/main.py 2>&1"
+        echo 'Installing requirements...' &&
+        pip install -r requirements.txt && 
+        cd /app && 
+        echo 'Generating proto files...' &&
+        cd microservices/the_monkeys_recommendations &&
+        python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto &&
+        echo 'Proto files generated successfully!' &&
+        ls -la && # Show files in directory
+        cd /app &&
+        echo 'Running main.py...' &&
+        PYTHONPATH=/app python -u microservices/the_monkeys_recommendations/main.py 2>&1"
     restart: always
     environment:
       - PYTHONPATH=/app

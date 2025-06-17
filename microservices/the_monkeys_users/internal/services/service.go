@@ -48,7 +48,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 		if err != nil {
 			us.log.Errorf("error while fetching the public profile for user %s, err: %v", req.Username, err)
 			if err == sql.ErrNoRows {
-				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+				return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 			}
 			return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 		}
@@ -73,7 +73,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 	if err != nil {
 		us.log.Errorf("error while fetching the private profile for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -82,7 +82,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 	if err != nil {
 		us.log.Errorf("error while fetching the profile for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("profile for user: %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "profile for user: %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -115,7 +115,7 @@ func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityRe
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.UserName, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.UserName))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.UserName)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -132,7 +132,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -145,7 +145,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 		if err != nil {
 			us.log.Errorf("error while fetching the profile for user %s, err: %v", req.Username, err)
 			if err == sql.ErrNoRows {
-				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+				return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 			}
 			return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 		}
@@ -190,7 +190,7 @@ func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProf
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -320,7 +320,7 @@ func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*p
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -362,7 +362,7 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 	if err != nil {
 		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -389,7 +389,7 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
@@ -422,7 +422,7 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
@@ -459,7 +459,7 @@ func (us *UserSvc) GetBlogsByUserIds(ctx context.Context, req *pb.BlogsByUserIds
 		if err != nil {
 			us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
 			if err == sql.ErrNoRows {
-				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+				return nil, status.Errorf(codes.NotFound, "blogs for user %s doesn't exist", req.Username)
 			}
 
 			return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -472,7 +472,7 @@ func (us *UserSvc) GetBlogsByUserIds(ctx context.Context, req *pb.BlogsByUserIds
 		if err != nil {
 			us.log.Errorf("error while fetching blogs for user %s, err: %v", req.Username, err)
 			if err == sql.ErrNoRows {
-				return nil, status.Errorf(codes.NotFound, fmt.Sprintf("blogs for user %s doesn't exist", req.Username))
+				return nil, status.Errorf(codes.NotFound, "blogs for user %s doesn't exist", req.Username)
 			}
 
 			return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -495,7 +495,7 @@ func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq)
 	if err != nil {
 		us.log.Errorf("error while fetching co-authors for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("co-authors for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "co-authors for user %s doesn't exist", req.Username)
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -522,7 +522,7 @@ func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -552,7 +552,7 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -654,7 +654,7 @@ func (us *UserSvc) GetFollowers(ctx context.Context, req *pb.UserDetailReq) (*pb
 	if err != nil {
 		us.log.Errorf("error while fetching followers for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("followers for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "followers for user %s doesn't exist", req.Username)
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -680,7 +680,7 @@ func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb
 	if err != nil {
 		us.log.Errorf("error while fetching following for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("following for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "following for user %s doesn't exist", req.Username)
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -706,7 +706,7 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -763,7 +763,7 @@ func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.Boo
 	if err != nil {
 		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
@@ -919,7 +919,7 @@ func (us *UserSvc) GetFollowersFollowingCounts(ctx context.Context, req *pb.User
 	if err != nil {
 		us.log.Errorf("error while fetching followers and following count for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("followers and following count for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "followers and following count for user %s doesn't exist", req.Username)
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")
@@ -939,7 +939,7 @@ func (us *UserSvc) GetBookMarks(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 	if err != nil {
 		us.log.Errorf("error while fetching bookmarks for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("bookmarks for user %s doesn't exist", req.Username))
+			return nil, status.Errorf(codes.NotFound, "bookmarks for user %s doesn't exist", req.Username)
 		}
 
 		return nil, status.Errorf(codes.Internal, "something went wrong")

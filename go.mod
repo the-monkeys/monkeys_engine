@@ -1,6 +1,6 @@
 module github.com/the-monkeys/the_monkeys
 
-go 1.21.7
+go 1.24.4
 
 require (
 	github.com/gin-gonic/gin v1.10.0
