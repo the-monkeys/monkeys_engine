@@ -58,7 +58,11 @@ func GetClientIP(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot open log file"})
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logrus.Errorf("cannot close log file, error: %v", err)
+		}
+	}()
 
 	logData := map[string]string{"ip": ip}
 	completeMapData := []map[string]string{}
@@ -78,16 +82,15 @@ func GetClientIP(ctx *gin.Context) {
 }
 
 func SetMonkeysAuthCookie(ctx *gin.Context, token string) {
-	var authCookie *http.Cookie
-
-	authCookie = &http.Cookie{
+	//var authCookie *http.Cookie
+	authCookie := &http.Cookie{
 		Name:     "mat",
 		Value:    token,
 		HttpOnly: true,
 		Path:     "/",
 		MaxAge:   int(time.Duration(24*30)*time.Hour) / int(time.Second), // 30d days
 		SameSite: http.SameSiteNoneMode,
-		Secure: true,
+		Secure:   true,
 	}
 
 	http.SetCookie(ctx.Writer, authCookie)

@@ -1,9 +1,7 @@
 package recommendations_client
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -29,22 +27,15 @@ type RecommendationsClient struct {
 func NewRecommendationsClient(cfg *config.Config) pb.RecommendationServiceClient {
 	addr := cfg.Microservices.TheMonkeysRecommEngine
 
-	// Create a longer timeout for development
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-	defer cancel()
-
 	// Try connection with more detailed logging
-	cc, err := grpc.DialContext(ctx, addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
-
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("❌ Cannot dial to gRPC Recommendations server: %v", err)
+		logrus.Errorf("❌ Cannot create gRPC Recommendations client: %v", err)
 		return nil
 	}
 
 	logrus.Infof("✅ the monkeys gateway is successfully connected to Recommendations service at: %v", addr)
-	return pb.NewRecommendationServiceClient(cc)
+	return pb.NewRecommendationServiceClient(conn)
 }
 
 func RegisterRecommendationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *logrus.Logger) *RecommendationsClient {

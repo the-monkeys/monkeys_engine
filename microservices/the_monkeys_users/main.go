@@ -56,11 +56,9 @@ func main() {
 
 func BlogServiceConn(addr string) (*grpc.ClientConn, error) {
 	logrus.Infof("gRPC dialing to the blog server: %v", addr)
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
-
-	return conn, err
+	return conn, nil
 }

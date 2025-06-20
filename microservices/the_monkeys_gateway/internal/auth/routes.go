@@ -105,9 +105,10 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 
 	// check for google login
 	var loginMethod pb.RegisterUserRequest_LoginMethod
-	if body.LoginMethod == "google-oauth2" {
+	switch body.LoginMethod {
+	case "google-oauth2":
 		loginMethod = pb.RegisterUserRequest_GOOGLE_ACC
-	} else if body.LoginMethod == "the-monkeys" {
+	case "the-monkeys":
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
 	}
 
@@ -409,6 +410,9 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 
 	// If user is logged in then update the session token
 	authCookie, err := ctx.Request.Cookie("mat")
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Token expired/incorrect"})
+	}
 	if authCookie != nil {
 		if _, err := asc.Client.Validate(context.Background(), &pb.ValidateRequest{Token: authCookie.Value}); err != nil {
 			utils.SetMonkeysAuthCookie(ctx, res.Token)
@@ -623,7 +627,12 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user info"})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			asc.Log.Errorf("Failed to close response body: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close response body"})
+		}
+	}()
 
 	// Process user info (you could store it in a database or create a session)
 	var userInfo GoogleUser
@@ -660,7 +669,6 @@ func (asc *ServiceClient) Logout(ctx *gin.Context) {
 	ctx.SetSameSite(http.SameSiteNoneMode)
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{})
-	return
 }
 
 func (asc *ServiceClient) ValidateSession(ctx *gin.Context) {

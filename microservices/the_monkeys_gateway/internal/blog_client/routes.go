@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -40,13 +38,13 @@ var upgrader = websocket.Upgrader{
 }
 
 type BlogServiceClient struct {
-	Client     pb.BlogServiceClient
-	cacheMutex sync.Mutex
-	cacheTime  time.Time
-	redis      *redis.Client
-	cache1     string
-	UserCli    *user_service.UserServiceClient
-	config     *config.Config
+	Client pb.BlogServiceClient
+	//cacheMutex sync.Mutex
+	//cacheTime  time.Time
+	redis *redis.Client
+	//cache1     string
+	UserCli *user_service.UserServiceClient
+	config  *config.Config
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
@@ -1031,7 +1029,11 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logrus.Errorf("Error closing WebSocket connection: %v", err)
+		}
+	}()
 
 	// Establish a bi-directional stream with the gRPC server
 	stream, err := asc.Client.DraftBlogV2(context.Background())
@@ -1040,7 +1042,11 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	defer stream.CloseSend()
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logrus.Errorf("Error closing gRPC stream: %v", err)
+		}
+	}()
 
 	// Infinite loop to listen to WebSocket connection
 	for {

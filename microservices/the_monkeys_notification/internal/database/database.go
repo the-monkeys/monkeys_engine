@@ -73,7 +73,11 @@ func (uh *notificationDB) GetUserNotifications(username string, limit int64, off
 		uh.log.Errorf("Error fetching notifications for user ID %d, error: %+v", userID, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows for user ID %d, error: %+v", userID, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Notification structs
 	var notifications []*models.Notification
@@ -253,7 +257,11 @@ func (uh *notificationDB) GetUnseenNotifications(username string, limit int64, o
 		uh.log.Errorf("Error fetching unseen notifications for user ID %d, error: %+v", userID, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows for user ID %d, error: %+v", userID, err)
+		}
+	}()
 
 	// Step 4: Collect the results into a slice of Notification structs
 	var notifications []*models.Notification

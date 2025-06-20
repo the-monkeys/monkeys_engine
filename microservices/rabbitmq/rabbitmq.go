@@ -143,6 +143,10 @@ func (c Conn) Close() {
 		}
 	}
 	if c.Connection != nil {
-		c.Connection.Close()
+		if err := c.Connection.Close(); err != nil {
+			logrus.Errorf("Error closing RabbitMQ connection: %v", err)
+		} else {
+			logrus.Infoln("RabbitMQ connection closed")
+		}
 	}
 }

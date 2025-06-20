@@ -137,7 +137,9 @@ func (nsc *NotificationServiceClient) NotifyUser(userID string, notification []*
 	for _, conn := range conns {
 		if err := conn.WriteJSON(notification); err != nil {
 			nsc.log.Errorf("Error sending notification to user ID %s: %v", userID, err)
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				nsc.log.Errorf("Error closing WebSocket connection for user ID %s: %v", userID, err)
+			}
 			// Remove closed connection from list
 			nsc.connections[userID] = removeConn(nsc.connections[userID], conn)
 		}
@@ -180,13 +182,19 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to establish WebSocket connection"})
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			nsc.log.Errorf("Error closing WebSocket connection: %v", err)
+		}
+	}()
 
 	// Get the username from the context (assumes middleware sets this)
 	userName := ctx.GetString("userName")
 	if userName == "" {
 		nsc.log.Error("User not authenticated for WebSocket connection")
-		conn.WriteJSON(gin.H{"error": "Unauthorized"})
+		if err := conn.WriteJSON(gin.H{"error": "Unauthorized"}); err != nil {
+			nsc.log.Errorf("Error sending unauthorized message to WebSocket client: %v", err)
+		}
 		return
 	}
 
@@ -204,7 +212,9 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 		})
 		if err != nil {
 			nsc.log.Errorf("Failed to establish gRPC stream for user %s: %v", userName, err)
-			conn.WriteJSON(gin.H{"error": "Failed to establish notification stream"})
+			if err := conn.WriteJSON(gin.H{"error": "Failed to establish notification stream"}); err != nil {
+				nsc.log.Errorf("Error sending error message to WebSocket client: %v", err)
+			}
 			return
 		}
 

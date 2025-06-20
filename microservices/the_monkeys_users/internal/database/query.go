@@ -36,7 +36,11 @@ func (userDB *uDBHandler) CreateUserLog(user *models.UserLogs, description strin
 		logrus.Errorf("cannot prepare statement to add user activity into the user_account_log: %v", err)
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			logrus.Errorf("error closing statement for user_account_log: %v", err)
+		}
+	}()
 
 	row, err := stmt.Exec(userId, user.IpAddress, description, clientId)
 	if err != nil {
@@ -75,7 +79,11 @@ func (uh *uDBHandler) GetBlogsByUserName(username string) (*pb.BlogsByUserNameRe
 		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", username, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching blogs for username %s, error: %+v", username, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Blog structs
 	var blogs []*pb.Blog
@@ -126,7 +134,11 @@ func (uh *uDBHandler) GetBlogsByUserIdWithEditorAccess(accountId int64) (*pb.Blo
 		uh.log.Errorf("Error fetching blogs for user account ID %d, error: %+v", accountId, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching blogs for user account ID %d, error: %+v", accountId, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Blog structs
 	var blogs []*pb.Blog
@@ -177,7 +189,11 @@ func (uh *uDBHandler) GetBlogsByAccountId(accountId string) (*pb.BlogsByUserName
 		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching blogs for username %s, error: %+v", accountId, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Blog structs
 	var blogs []*pb.Blog
@@ -224,7 +240,9 @@ func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string
 	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userId)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch user ID for username: %s, error: %+v", username, err)
-		tx.Rollback() // rollback transaction on error
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -235,7 +253,9 @@ func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string
 		err = tx.QueryRow(`SELECT COUNT(1) FROM topics WHERE description = $1`, topic).Scan(&exists)
 		if err != nil {
 			uh.log.Errorf("Failed to check if the topic already exists: %s, error: %+v", topic, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -249,7 +269,9 @@ func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string
 		_, err = tx.Exec(`INSERT INTO topics (description, category, user_id) VALUES ($1, $2, $3)`, topic, category, userId)
 		if err != nil {
 			uh.log.Errorf("Failed to insert topic %s for username: %s, error: %+v", topic, username, err)
-			tx.Rollback() // rollback transaction on error
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -280,7 +302,11 @@ func (uh *uDBHandler) GetCoAuthorBlogsByAccountId(accountId string) (*pb.BlogsBy
 		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching blogs for username %s, error: %+v", accountId, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Blog structs
 	var blogs []*pb.Blog
@@ -397,7 +423,11 @@ func (uh *uDBHandler) GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsBy
 		uh.log.Errorf("Error fetching blogs for username %s, error: %+v", accountId, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching blogs for username %s, error: %+v", accountId, err)
+		}
+	}()
 
 	// Step 3: Collect the results into a slice of Blog structs
 	var blogs []*pb.Blog
@@ -443,7 +473,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch blog ID for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -451,7 +483,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	_, err = tx.Exec(`DELETE FROM blog_permissions WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to delete from blog_permissions for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -459,7 +493,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	_, err = tx.Exec(`DELETE FROM co_author_invites WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to delete from co_author_invites for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -467,7 +503,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	_, err = tx.Exec(`DELETE FROM co_author_permissions WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to delete from co_author_permissions for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -475,7 +513,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to delete from blog_bookmarks for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -483,7 +523,9 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 	_, err = tx.Exec(`DELETE FROM blog WHERE id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to delete blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -502,7 +544,11 @@ func (uh *uDBHandler) LikeBlog(username string, blogExtId string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logrus.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+		}
+	}()
 
 	var blogID int64
 	// Step 1: Fetch the user ID using the username
@@ -554,7 +600,11 @@ func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logrus.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+		}
+	}()
 
 	var blogID int64
 	// Step 1: Fetch the user ID using the username
@@ -697,7 +747,11 @@ func (uh *uDBHandler) FindUsersWithPagination(searchTerm string, limit int, offs
 		uh.log.Errorf("Error searching for users with term '%s': %+v", searchTerm, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after searching for users with term '%s': %+v", searchTerm, err)
+		}
+	}()
 
 	// Loop through the result rows and populate the users slice
 	for rows.Next() {
@@ -766,7 +820,9 @@ func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) erro
 	_, err = tx.Exec(`UPDATE blog SET status = $1 WHERE blog_id = $2`, status, blogId)
 	if err != nil {
 		uh.log.Errorf("Failed to update blog status to 'Draft' for blog %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -775,7 +831,9 @@ func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) erro
 	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch internal blog ID for blog %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -783,7 +841,9 @@ func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) erro
 	_, err = tx.Exec(`DELETE FROM blog_likes WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to clean up likes for blog %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -791,7 +851,9 @@ func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) erro
 	_, err = tx.Exec(`DELETE FROM blog_bookmarks WHERE blog_id = $1`, blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to clean up bookmarks for blog %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -864,7 +926,11 @@ func (uh *uDBHandler) GetBookmarkBlogsByUsername(username string) ([]models.Blog
 		uh.log.Errorf("Error fetching bookmarked blogs for username %s, error: %+v", username, err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			uh.log.Errorf("Error closing rows after fetching bookmarked blogs for username %s, error: %+v", username, err)
+		}
+	}()
 
 	// Iterate through the rows and populate the blogs slice
 	for rows.Next() {
@@ -899,7 +965,11 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 	if err != nil {
 		return fmt.Errorf("could not begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %v, rollback error: %v", err, err)
+		}
+	}()
 
 	var exists bool
 	err = tx.QueryRowContext(ctx,
