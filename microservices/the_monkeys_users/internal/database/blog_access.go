@@ -19,7 +19,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 	err = tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, inviterID).Scan(&inviterId)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch inviter ID for user: %s, error: %+v", inviterID, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -28,7 +30,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch blog ID for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -41,7 +45,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		blogIdInt, userId, permissionType).Scan(&exists)
 	if err != nil {
 		uh.log.Errorf("Error checking permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -51,7 +57,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 			blogIdInt, userId, permissionType)
 		if err != nil {
 			uh.log.Errorf("Failed to add permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-			tx.Rollback()
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -64,7 +72,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		blogIdInt, inviterId, userId).Scan(&exists)
 	if err != nil {
 		uh.log.Errorf("Error checking invite for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -74,7 +84,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 			blogIdInt, inviterId, userId)
 		if err != nil {
 			uh.log.Errorf("Failed to invite co-author for blog: %s, user: %d, error: %+v", blogId, userId, err)
-			tx.Rollback()
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -87,7 +99,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		blogIdInt, userId).Scan(&exists)
 	if err != nil {
 		uh.log.Errorf("Error checking co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -97,7 +111,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		err = tx.QueryRow(`SELECT id FROM user_role WHERE role_desc = $1`, permissionType).Scan(&roleId)
 		if err != nil {
 			uh.log.Errorf("Failed to fetch role ID for permission type: %s, error: %+v", permissionType, err)
-			tx.Rollback()
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 
@@ -106,7 +122,9 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 			blogIdInt, userId, roleId)
 		if err != nil {
 			uh.log.Errorf("Failed to grant co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-			tx.Rollback()
+			if err := tx.Rollback(); err != nil {
+				uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+			}
 			return err
 		}
 	}
@@ -134,7 +152,9 @@ func (uh *uDBHandler) RevokeBlogPermissionFromAUser(blogId string, userId int64,
 	err = tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogId).Scan(&blogIdInt)
 	if err != nil {
 		uh.log.Errorf("Failed to fetch blog ID for blog: %s, error: %+v", blogId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -143,7 +163,9 @@ func (uh *uDBHandler) RevokeBlogPermissionFromAUser(blogId string, userId int64,
 		blogIdInt, userId, permissionType)
 	if err != nil {
 		uh.log.Errorf("Failed to remove permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -152,7 +174,9 @@ func (uh *uDBHandler) RevokeBlogPermissionFromAUser(blogId string, userId int64,
 		blogIdInt, userId)
 	if err != nil {
 		uh.log.Errorf("Failed to remove co-author permission for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 
@@ -161,7 +185,9 @@ func (uh *uDBHandler) RevokeBlogPermissionFromAUser(blogId string, userId int64,
 		blogIdInt, userId)
 	if err != nil {
 		uh.log.Errorf("Failed to update co-author invites for blog: %s, user: %d, error: %+v", blogId, userId, err)
-		tx.Rollback()
+		if err := tx.Rollback(); err != nil {
+			uh.log.Errorf("Failed to rollback transaction after error: %+v", err)
+		}
 		return err
 	}
 

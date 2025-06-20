@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	mathRand "math/rand"
-
 	"github.com/google/uuid"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -20,7 +18,12 @@ func PublicIP() string {
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
+	// defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Println("Error closing response body:", closeErr)
+		}
+	}()
 
 	ip, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -89,18 +92,18 @@ func GenerateGUID() string {
 }
 
 // Function to shuffle a string
-func shuffleString(s string) string {
-	// Convert string to a slice of runes (to handle Unicode characters properly)
-	runes := []rune(s)
-
-	// Seed the random number generator
-	r := mathRand.New(mathRand.NewSource(time.Now().UnixNano())) // Uses math/rand for shuffling
-
-	// Shuffle the slice of runes
-	r.Shuffle(len(runes), func(i, j int) {
-		runes[i], runes[j] = runes[j], runes[i]
-	})
-
-	// Convert the runes slice back to a string and return
-	return string(runes)
-}
+//func shuffleString(s string) string {
+//	// Convert string to a slice of runes (to handle Unicode characters properly)
+//	runes := []rune(s)
+//
+//	// Seed the random number generator
+//	r := mathRand.New(mathRand.NewSource(time.Now().UnixNano())) // Uses math/rand for shuffling
+//
+//	// Shuffle the slice of runes
+//	r.Shuffle(len(runes), func(i, j int) {
+//		runes[i], runes[j] = runes[j], runes[i]
+//	})
+//
+//	// Convert the runes slice back to a string and return
+//	return string(runes)
+//}

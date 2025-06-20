@@ -29,7 +29,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	go func() {
 		<-sigChan
 		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
-		conn.Channel.Close()
+		if err := conn.Channel.Close(); err != nil {
+			logrus.Errorf("Error closing RabbitMQ channel: %v", err)
+		}
 		os.Exit(0)
 	}()
 
@@ -129,7 +131,11 @@ func readImageFromURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP request failed with status code %d", resp.StatusCode)
@@ -137,7 +143,7 @@ func readImageFromURL(url string) ([]byte, error) {
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %v", err)
 	}
 
 	return data, nil

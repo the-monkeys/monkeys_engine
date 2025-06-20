@@ -36,7 +36,11 @@ func NewESClient(url, username, password string) (*elasticsearch.Client, error) 
 	if err != nil || res.IsError() {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logrus.Error("Error closing response body:", err)
+		}
+	}()
 
 	logrus.Infof("✅ Elasticsearch connection established successfully")
 	return client, nil

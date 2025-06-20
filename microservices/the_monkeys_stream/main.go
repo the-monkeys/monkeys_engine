@@ -24,7 +24,11 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					log.Printf("Error closing file: %v", err)
+				}
+			}()
 
 			_, err = io.Copy(w, file)
 			return err == nil

@@ -49,7 +49,11 @@ func (es *elasticsearchStorage) DeleteBlogsByOwnerAccountID(ctx context.Context,
 		es.log.Errorf("DeleteBlogsByOwnerAccountID: error executing search request, error: %+v", err)
 		return nil, err
 	}
-	defer searchRes.Body.Close()
+	defer func() {
+		if err := searchRes.Body.Close(); err != nil {
+			es.log.Errorf("DeleteBlogsByOwnerAccountID: error closing search response body, error: %v", err)
+		}
+	}()
 
 	// Check if the response indicates an error
 	if searchRes.IsError() {
@@ -113,7 +117,11 @@ func (es *elasticsearchStorage) DeleteBlogsByOwnerAccountID(ctx context.Context,
 		es.log.Errorf("DeleteBlogsByOwnerAccountID: error executing bulk delete request, error: %+v", err)
 		return nil, err
 	}
-	defer bulkRes.Body.Close()
+	defer func() {
+		if err := bulkRes.Body.Close(); err != nil {
+			es.log.Errorf("DeleteBlogsByOwnerAccountID: error closing bulk response body, error: %v", err)
+		}
+	}()
 
 	// Check if the bulk delete response indicates an error
 	if bulkRes.IsError() {

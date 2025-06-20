@@ -53,7 +53,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to redis: %v", err)
 	}
-	defer redisClient.Close()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			log.Errorf("failed to close redis connection: %v", err)
+		}
+	}()
 
 	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{
