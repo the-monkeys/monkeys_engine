@@ -3,7 +3,6 @@ package blog_client
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
-	"github.com/the-monkeys/the_monkeys/constants"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -38,31 +36,6 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
 		return
 	}
-
-	if len(tags.Tags) == 0 {
-		logrus.Infof("✅ Fetching feed from cache service")
-		// Fetch feed from cache
-		cacheKey := fmt.Sprintf(constants.Feed, limitInt, offsetInt)
-
-		cached, _ := asc.redis.Get(context.Background(), cacheKey).Result()
-		// cacheTime, _ := asc.redis.TTL(context.Background(), cacheKey).Result()
-
-		// Check if cache is older than 10 minutes
-		// if cacheTime.Minutes() > 10 {
-		// 	logrus.Infof("Cache is older than 10 minutes, fetching from blog service")
-		// } else {
-		fmt.Printf("cached: %v\n", cached)
-		var cachedBlogs map[string]interface{}
-		if err := json.Unmarshal([]byte(cached), &cachedBlogs); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal cached blogs"})
-			return
-		}
-		ctx.JSON(http.StatusOK, cachedBlogs)
-		return
-		// }
-
-	}
-
 	logrus.Infof("✅ Fetching feed from blog service")
 
 	// Call gRPC to get blog metadata
