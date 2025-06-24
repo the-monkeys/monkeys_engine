@@ -250,14 +250,23 @@ message FeedReq {
     int32 offset = 3;
 }
 
+message SearchReq {
+    string query = 1; // Search query
+    int32 limit = 2; // Number of results to return
+    int32 offset = 3; // Offset for pagination
+    repeated string tags = 4; // Optional tags to filter results
+}
+
 service BlogService {
     // Metadata may contain the blog id, owner account id, title, first paragraph, 
     // tags, first image, publish time, author name, etc.
-    rpc GetBlogsMetadata(FeedReq) returns (stream google.protobuf.Any); 
-
+    rpc GetBlogsMetadata(FeedReq) returns (stream google.protobuf.Any);
+    rpc SearchBlogsMetadata(SearchReq) returns (stream google.protobuf.Any);
+    rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id\
+    
+    // --------------------------------------------------------------------- Deprecated APIs ---------------------------------------------------------------------
     // TODO: Remove the deprecated APIs
     rpc DraftBlog(DraftBlogRequest) returns (BlogResponse); // Migrated to DraftBlogV2
-    rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id
     rpc GetPublishedBlogById(BlogByIdReq) returns (BlogByIdRes); // One blog by blog id
     rpc GetDraftBlogById(BlogByIdReq) returns (BlogByIdRes); // One blog by blog id
     rpc ArchiveBlogById(ArchiveBlogReq) returns (ArchiveBlogResp); // One blog by blog id

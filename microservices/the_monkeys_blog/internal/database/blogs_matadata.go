@@ -245,7 +245,7 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 			es.log.Errorf("GetAllPublishedBlogsMetadata: error closing response body, error: %v", err)
 		}
 	}()
-	
+
 	if res.IsError() {
 		err = fmt.Errorf("GetAllPublishedBlogsMetadata: search query failed, response: %+v", res)
 		es.log.Error(err)
@@ -325,5 +325,162 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 	}
 
 	es.log.Infof("GetAllPublishedBlogsMetadata: successfully fetched %d blogs metadata out of %d total", len(blogsMetadata), totalCount)
+	return blogsMetadata, totalCount, nil
+}
+
+func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, queryText string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
+	if strings.TrimSpace(queryText) == "" {
+		es.log.Error("GetBlogsMetadataByQuery: queryText is empty")
+		return nil, 0, fmt.Errorf("queryText cannot be empty")
+	}
+
+	query := map[string]interface{}{
+		"from": offset,
+		"size": limit,
+		"sort": []map[string]interface{}{
+			{
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
+				},
+			},
+			{
+				"blog.time": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+		"_source": []string{
+			"blog_id",
+			"owner_account_id",
+			"blog.blocks",
+			"tags",
+			"content_type",
+			"published_time",
+		},
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"blog.blocks.data.text": queryText,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_draft": isDraft,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetBlogsMetadataByQuery: failed to marshal query, error: %v", err)
+		return nil, 0, err
+	}
+
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetBlogsMetadataByQuery: search request failed, error: %+v", err)
+		return nil, 0, err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		err = fmt.Errorf("GetBlogsMetadataByQuery: Elasticsearch returned an error: %+v", res)
+		es.log.Error(err)
+		return nil, 0, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetBlogsMetadataByQuery: error reading response body, error: %v", err)
+		return nil, 0, err
+	}
+
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetBlogsMetadataByQuery: error decoding response body, error: %v", err)
+		return nil, 0, err
+	}
+
+	totalCount := 0
+	if hitsTotal, ok := esResponse["hits"].(map[string]interface{})["total"].(map[string]interface{}); ok {
+		if value, exists := hitsTotal["value"].(float64); exists {
+			totalCount = int(value)
+		}
+	}
+
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		err := fmt.Errorf("GetBlogsMetadataByQuery: failed to parse hits from response")
+		es.log.Error(err)
+		return nil, totalCount, err
+	}
+
+	blogsMetadata := make([]map[string]interface{}, 0, len(hits))
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"].(map[string]interface{})
+		blogMetadata := map[string]interface{}{
+			"blog_id":          hitSource["blog_id"],
+			"owner_account_id": hitSource["owner_account_id"],
+			"tags":             hitSource["tags"],
+			"content_type":     hitSource["content_type"],
+			"published_time":   hitSource["published_time"],
+		}
+
+		blocks, ok := hitSource["blog"].(map[string]interface{})["blocks"].([]interface{})
+		if !ok {
+			es.log.Errorf("GetBlogsMetadataByQuery: failed to parse blog blocks")
+			continue
+		}
+
+		var title, paragraph, image string
+		for _, b := range blocks {
+			block := b.(map[string]interface{})
+			t := block["type"].(string)
+			data := block["data"].(map[string]interface{})
+
+			switch t {
+			case "header":
+				if title == "" && data["level"].(float64) == 1 {
+					title = data["text"].(string)
+				}
+			case "paragraph":
+				if paragraph == "" {
+					paragraph = data["text"].(string)
+				}
+			case "image":
+				if image == "" {
+					if file, ok := data["file"].(map[string]interface{}); ok {
+						image = file["url"].(string)
+					}
+				}
+			}
+		}
+
+		blogMetadata["title"] = title
+		blogMetadata["first_paragraph"] = paragraph
+		blogMetadata["first_image"] = image
+
+		blogsMetadata = append(blogsMetadata, blogMetadata)
+	}
+
+	es.log.Infof("GetBlogsMetadataByQuery: fetched %d blogs out of %d total", len(blogsMetadata), totalCount)
 	return blogsMetadata, totalCount, nil
 }
