@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -449,14 +450,23 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService
 func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogService_SearchBlogsMetadataServer) error {
 	blog.logger.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", req.Query, req.Limit, req.Offset)
 
-	if req.Query == "" {
+	returnData := make(map[string]interface{})
+	var searchTerms = []string{}
+
+	// Check if the req.Query has "double quote" to determine if it's a full-text search
+	if strings.TrimSpace(req.Query) == "" {
+		blog.logger.Errorf("Search query is empty")
 		return status.Errorf(codes.InvalidArgument, "Search query cannot be empty")
 	}
 
-	returnData := make(map[string]interface{})
+	if strings.HasPrefix(req.Query, "\"") && strings.HasSuffix(req.Query, "\"") {
+		searchTerms = []string{strings.TrimSpace(req.Query)}
+	} else {
+		// Split the query into words for a more flexible search
+		searchTerms = strings.Fields(req.Query)
+	}
 
-	// Get all blogs metadata first
-	blogs, count, err := blog.osClient.GetBlogsMetadataByQuery(stream.Context(), req.Query, false, req.Limit, req.Offset)
+	blogs, count, err := blog.osClient.GetBlogsMetadataByQuery(stream.Context(), searchTerms, false, req.Limit, req.Offset)
 	if err != nil {
 		blog.logger.Errorf("Error fetching blogs by query: %v", err)
 		return status.Errorf(codes.Internal, "Error fetching blogs by query: %v", err)

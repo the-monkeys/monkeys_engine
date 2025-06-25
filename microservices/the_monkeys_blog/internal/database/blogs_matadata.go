@@ -359,10 +359,10 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 	return blogsMetadata, totalCount, nil
 }
 
-func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, queryText string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
-	if strings.TrimSpace(queryText) == "" {
-		es.log.Error("GetBlogsMetadataByQuery: queryText is empty")
-		return nil, 0, fmt.Errorf("queryText cannot be empty")
+func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, queryTexts []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
+	if len(queryTexts) == 0 {
+		es.log.Error("GetBlogsMetadataByQuery: queryTexts array is empty")
+		return nil, 0, fmt.Errorf("queryTexts array cannot be empty")
 	}
 
 	query := map[string]interface{}{
@@ -394,33 +394,40 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 				"must": []map[string]interface{}{
 					{
 						"bool": map[string]interface{}{
-							"should": []map[string]interface{}{
-								{
-									"match": map[string]interface{}{
-										"blog.blocks.data.text": map[string]interface{}{
-											"query": queryText,
-											"boost": 2.0,
+							"should": func() []map[string]interface{} {
+								should := make([]map[string]interface{}, 0)
+								for _, queryText := range queryTexts {
+									// Add match on blog content
+									should = append(should, map[string]interface{}{
+										"match": map[string]interface{}{
+											"blog.blocks.data.text": map[string]interface{}{
+												"query": queryText,
+												"boost": 2.0,
+											},
 										},
-									},
-								},
-								{
-									"match": map[string]interface{}{
-										"tags": map[string]interface{}{
-											"query": queryText,
-											"boost": 2.5,
+									})
+									// Add match on tags
+									should = append(should, map[string]interface{}{
+										"match": map[string]interface{}{
+											"tags": map[string]interface{}{
+												"query": queryText,
+												"boost": 2.5,
+											},
 										},
-									},
-								},
-								{
-									"match_phrase": map[string]interface{}{
-										"blog.blocks.data.text": map[string]interface{}{
-											"query": queryText,
-											"boost": 3.0,
-											"slop":  3,
+									})
+									// Add phrase match on blog content
+									should = append(should, map[string]interface{}{
+										"match_phrase": map[string]interface{}{
+											"blog.blocks.data.text": map[string]interface{}{
+												"query": queryText,
+												"boost": 3.0,
+												"slop":  3,
+											},
 										},
-									},
-								},
-							},
+									})
+								}
+								return should
+							}(),
 							"minimum_should_match": 1,
 						},
 					},
