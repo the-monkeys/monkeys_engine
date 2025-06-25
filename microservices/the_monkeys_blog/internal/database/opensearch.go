@@ -48,7 +48,7 @@ type ElasticsearchStorage interface {
 	// -------------------------------------------------------------------------------- Metadata --------------------------------------------------------------------------------
 	GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 	GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, int, error)
-	GetBlogsMetadataByQuery(ctx context.Context, queryText string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
+	GetBlogsMetadataByQuery(ctx context.Context, queryTexts []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 }
 
 type elasticsearchStorage struct {
