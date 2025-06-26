@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/docs"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
@@ -21,7 +22,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/recommendations_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/redis_conn"
 )
 
 type Server struct {
@@ -48,16 +48,6 @@ func main() {
 	server.router.Use(gin.Recovery())
 	server.router.Use(gin.Logger())
 	server.router.MaxMultipartMemory = 8 << 20
-
-	redisClient, err := redis_conn.RedisConn(cfg)
-	if err != nil {
-		log.Fatalf("failed to connect to redis: %v", err)
-	}
-	defer func() {
-		if err := redisClient.Close(); err != nil {
-			log.Errorf("failed to close redis connection: %v", err)
-		}
-	}()
 
 	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{
@@ -86,8 +76,11 @@ func main() {
 	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
-
 	recommendations_client.RegisterRecommendationRoute(server.router, cfg, authClient, log)
+
+	// Register Swagger documentation routes
+	docs.RegisterSwaggerRoutes(server.router)
+
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
