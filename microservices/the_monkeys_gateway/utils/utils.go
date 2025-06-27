@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
+	//"os"
 	"strings"
 	"time"
 
@@ -49,37 +49,37 @@ func CheckUserRoleInContext(ctx *gin.Context, role string) bool {
 	return strings.EqualFold(userRole, role)
 }
 
-func GetClientIP(ctx *gin.Context) {
-	ip := ctx.ClientIP()
+// func GetClientIP(ctx *gin.Context) {
+// 	ip := ctx.ClientIP()
 
-	file, err := os.OpenFile("ip.json", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		logrus.Errorf("cannot open log file, error: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot open log file"})
-		return
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			logrus.Errorf("cannot close log file, error: %v", err)
-		}
-	}()
+// 	file, err := os.OpenFile("ip.json", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+// 	if err != nil {
+// 		logrus.Errorf("cannot open log file, error: %v", err)
+// 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot open log file"})
+// 		return
+// 	}
+// 	defer func() {
+// 		if err := file.Close(); err != nil {
+// 			logrus.Errorf("cannot close log file, error: %v", err)
+// 		}
+// 	}()
 
-	logData := map[string]string{"ip": ip}
-	completeMapData := []map[string]string{}
-	completeMapData = append(completeMapData, logData)
-	logBytes, err := json.Marshal(completeMapData)
-	if err != nil {
-		logrus.Errorf("cannot marshal log data, error: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot marshal log data"})
-		return
-	}
+// 	logData := map[string]string{"ip": ip}
+// 	completeMapData := []map[string]string{}
+// 	completeMapData = append(completeMapData, logData)
+// 	logBytes, err := json.Marshal(completeMapData)
+// 	if err != nil {
+// 		logrus.Errorf("cannot marshal log data, error: %v", err)
+// 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot marshal log data"})
+// 		return
+// 	}
 
-	if _, err := file.Write(append(logBytes, '\n')); err != nil {
-		logrus.Errorf("cannot write to log file, error: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
-		return
-	}
-}
+// 	if _, err := file.Write(append(logBytes, '\n')); err != nil {
+// 		logrus.Errorf("cannot write to log file, error: %v", err)
+// 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot write to log file"})
+// 		return
+// 	}
+// }
 
 func SetMonkeysAuthCookie(ctx *gin.Context, token string) {
 	//var authCookie *http.Cookie
