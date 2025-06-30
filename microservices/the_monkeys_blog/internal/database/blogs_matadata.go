@@ -11,6 +11,37 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/constants"
 )
 
+func getTagsOrDefault(tags interface{}) []string {
+	if tags == nil {
+		return []string{}
+	}
+
+	switch v := tags.(type) {
+	case []string:
+		return v
+	case []interface{}:
+		result := make([]string, 0, len(v))
+		for _, t := range v {
+			if str, ok := t.(string); ok {
+				result = append(result, str)
+			}
+		}
+		return result
+	default:
+		return []string{}
+	}
+}
+
+func getStringOrDefault(value interface{}, defaultValue string) string {
+	if value == nil {
+		return defaultValue
+	}
+	if str, ok := value.(string); ok {
+		return str
+	}
+	return defaultValue
+}
+
 // Returns metadata, total counts of blogs, and errors
 func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
 	// Ensure tags are not empty
@@ -362,8 +393,35 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{
 					{
-						"match": map[string]interface{}{
-							"blog.blocks.data.text": queryText,
+						"bool": map[string]interface{}{
+							"should": []map[string]interface{}{
+								{
+									"match": map[string]interface{}{
+										"blog.blocks.data.text": map[string]interface{}{
+											"query": queryText,
+											"boost": 2.0,
+										},
+									},
+								},
+								{
+									"match": map[string]interface{}{
+										"tags": map[string]interface{}{
+											"query": queryText,
+											"boost": 2.5,
+										},
+									},
+								},
+								{
+									"match_phrase": map[string]interface{}{
+										"blog.blocks.data.text": map[string]interface{}{
+											"query": queryText,
+											"boost": 3.0,
+											"slop":  3,
+										},
+									},
+								},
+							},
+							"minimum_should_match": 1,
 						},
 					},
 					{
@@ -439,44 +497,54 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 		blogMetadata := map[string]interface{}{
 			"blog_id":          hitSource["blog_id"],
 			"owner_account_id": hitSource["owner_account_id"],
-			"tags":             hitSource["tags"],
-			"content_type":     hitSource["content_type"],
+			"tags":             getTagsOrDefault(hitSource["tags"]),
+			"content_type":     getStringOrDefault(hitSource["content_type"], "editor"),
 			"published_time":   hitSource["published_time"],
+			"bookmark_count":   0,
+			"like_count":       0,
 		}
 
-		blocks, ok := hitSource["blog"].(map[string]interface{})["blocks"].([]interface{})
-		if !ok {
-			es.log.Errorf("GetBlogsMetadataByQuery: failed to parse blog blocks")
-			continue
-		}
+		blogMetadata["title"] = "" // Initialize with empty string
+		blogMetadata["first_paragraph"] = ""
+		blogMetadata["first_image"] = ""
 
-		var title, paragraph, image string
-		for _, b := range blocks {
-			block := b.(map[string]interface{})
-			t := block["type"].(string)
-			data := block["data"].(map[string]interface{})
-
-			switch t {
-			case "header":
-				if title == "" && data["level"].(float64) == 1 {
-					title = data["text"].(string)
-				}
-			case "paragraph":
-				if paragraph == "" {
-					paragraph = data["text"].(string)
-				}
-			case "image":
-				if image == "" {
-					if file, ok := data["file"].(map[string]interface{}); ok {
-						image = file["url"].(string)
+		// Try to extract content from blocks if available
+		if blog, ok := hitSource["blog"].(map[string]interface{}); ok {
+			if blocks, ok := blog["blocks"].([]interface{}); ok {
+				for _, b := range blocks {
+					if block, ok := b.(map[string]interface{}); ok {
+						if t, ok := block["type"].(string); ok {
+							if data, ok := block["data"].(map[string]interface{}); ok {
+								switch t {
+								case "header":
+									if blogMetadata["title"] == "" {
+										if level, ok := data["level"].(float64); ok && level == 1 {
+											if text, ok := data["text"].(string); ok {
+												blogMetadata["title"] = text
+											}
+										}
+									}
+								case "paragraph":
+									if blogMetadata["first_paragraph"] == "" {
+										if text, ok := data["text"].(string); ok {
+											blogMetadata["first_paragraph"] = text
+										}
+									}
+								case "image":
+									if blogMetadata["first_image"] == "" {
+										if file, ok := data["file"].(map[string]interface{}); ok {
+											if url, ok := file["url"].(string); ok {
+												blogMetadata["first_image"] = url
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
 		}
-
-		blogMetadata["title"] = title
-		blogMetadata["first_paragraph"] = paragraph
-		blogMetadata["first_image"] = image
 
 		blogsMetadata = append(blogsMetadata, blogMetadata)
 	}

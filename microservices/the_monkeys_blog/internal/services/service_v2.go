@@ -445,3 +445,40 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService
 
 	return nil
 }
+
+func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogService_SearchBlogsMetadataServer) error {
+	blog.logger.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", req.Query, req.Limit, req.Offset)
+
+	if req.Query == "" {
+		return status.Errorf(codes.InvalidArgument, "Search query cannot be empty")
+	}
+
+	returnData := make(map[string]interface{})
+
+	// Get all blogs metadata first
+	blogs, count, err := blog.osClient.GetBlogsMetadataByQuery(stream.Context(), req.Query, false, req.Limit, req.Offset)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by query: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by query: %v", err)
+	}
+
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+
+}
