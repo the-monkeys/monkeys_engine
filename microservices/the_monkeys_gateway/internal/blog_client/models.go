@@ -26,6 +26,10 @@ type Tags struct {
 	Tags []string `json:"tags"`
 }
 
+type Query struct {
+	SearchQuery string `json:"search_query"`
+}
+
 type TableData struct {
 	WithHeadings bool       `json:"withHeadings"`
 	Stretched    bool       `json:"stretched"`
