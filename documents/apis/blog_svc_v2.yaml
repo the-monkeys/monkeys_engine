@@ -46,12 +46,6 @@ paths:
                 type: string
                 description: Search text to find in blog content or titles
                 example: "docker kubernetes"
-              tags:
-                type: array
-                items:
-                  type: string
-                description: Optional tags to filter blogs
-                example: ["tech", "cloud"]
             required:
               - searchQuery
       responses:
@@ -157,12 +151,6 @@ paths:
           required: false
           schema:
             type: object
-            properties:
-              tags:
-                type: array
-                items:
-                  type: string
-                description: Optional tags to filter blogs
       responses:
         '200':
           description: Successful operation
