@@ -97,7 +97,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -120,7 +119,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -138,7 +136,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -158,7 +155,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -177,7 +173,6 @@ services:
       - db-migrations
       - the_monkeys_db
       - elasticsearch-node1
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -198,7 +193,6 @@ services:
       - elasticsearch-node1
       - the_monkeys_blog
       - the_monkeys_user
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -215,7 +209,6 @@ services:
     depends_on:
       - rabbitmq
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/app
     ports:
