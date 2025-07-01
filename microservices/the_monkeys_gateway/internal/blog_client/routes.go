@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -19,7 +18,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/redis_conn"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
@@ -41,7 +39,6 @@ type BlogServiceClient struct {
 	Client pb.BlogServiceClient
 	//cacheMutex sync.Mutex
 	//cacheTime  time.Time
-	redis *redis.Client
 	//cache1     string
 	UserCli *user_service.UserServiceClient
 	config  *config.Config
@@ -62,35 +59,19 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	mware := auth.InitAuthMiddleware(authClient)
 
-	redisClient, err := redis_conn.RedisConn(cfg)
-	if err != nil {
-		logrus.Fatalf("cannot connect to redis: %v", err)
-	}
-
 	blogClient := &BlogServiceClient{
 		Client:  NewBlogServiceClient(cfg),
 		UserCli: userClient,
 		config:  cfg,
-		redis:   redisClient,
 	}
+
+	// -------------------------------------------------- V1 API in use --------------------------------------------------
 	routes := router.Group("/api/v1/blog")
-	routes.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
-	// routes.GET("/latest", rateLimiter, blogClient.GetLatest100Blogs) Deprecating
-	// routes.GET("/:blog_id", blogClient.GetPublishedBlogById) Deprecating
-	// routes.POST("/tags", blogClient.GetBlogsByTagsName) Deprecating
-	// routes.GET("/all/publishes/:username", blogClient.AllPublishesByUserName) Deprecating
-	// routes.GET("/published/:acc_id/:blog_id", blogClient.GetPublishedBlogByAccId) Deprecating
-	// routes.GET("/news1", rateLimiter, blogClient.GetNews1) Deprecating
-	// routes.GET("/news2", rateLimiter, blogClient.GetNews2) Deprecating
-	// routes.GET("/news3", rateLimiter, blogClient.GetNews3) Deprecating
 
 	// Use AuthRequired for basic authorization
 	routes.Use(mware.AuthRequired)
-
-	// Use AuthzRequired for routes needing access control
-	// routes.GET("/draft/:blog_id", mware.AuthzRequired, blogClient.DraftABlog)
-
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
+
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
 	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/all-col/:acc_id", blogClient.AllCollabBlogs)
@@ -105,11 +86,13 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	// -------------------------------------------------- V2 --------------------------------------------------
 	routesV2 := router.Group("/api/v2/blog")
-
 	// Public APIs
 	{
+		routesV2.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
 		// Get all blogs
 		routesV2.GET("/feed", rateLimiter, blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
+		// Search blogs with query and optional tags
+		routesV2.POST("/search", rateLimiter, blogClient.SearchBlogs) // Search blogs with query parameter
 		// Get blogs by tags, as users can filter the blogs using multiple tags
 		routesV2.POST("/tags", rateLimiter, blogClient.GetBlogsByTags) // Get blogs by tags
 		// Get blogs by username, not auth required as it is public and can be visible at users profile
@@ -146,163 +129,6 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	return blogClient
 }
-
-// func (asc *BlogServiceClient) DraftABlog(ctx *gin.Context) {
-// 	id := ctx.Param("blog_id")
-
-// 	// logrus.Infof("Traffic is coming from IP: %v", ctx.ClientIP())
-// 	ipAddress := ctx.Request.Header.Get("IP")
-// 	client := ctx.Request.Header.Get("Client")
-
-// 	// Check if the blog exists
-// 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
-// 		BlogId: id,
-// 	})
-// 	if err != nil {
-// 		if status, ok := status.FromError(err); ok {
-// 			switch status.Code() {
-// 			case codes.InvalidArgument:
-// 				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
-// 				return
-// 			case codes.Internal:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
-// 				return
-// 			default:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unknown error"})
-// 				return
-// 			}
-// 		}
-// 	}
-
-// 	var action string
-// 	var initialLogDone bool
-
-// 	if resp.BlogExists {
-// 		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
-// 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
-// 			return
-// 		}
-// 		action = constants.BLOG_UPDATE
-// 	} else {
-// 		action = constants.BLOG_CREATE
-// 	}
-
-// 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
-// 	if err != nil {
-// 		logrus.Errorf("Error upgrading connection: %v", err)
-// 		ctx.AbortWithStatus(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	defer conn.Close()
-
-// 	// Infinite loop to listen to WebSocket connection
-// 	for {
-// 		_, msg, err := conn.ReadMessage()
-// 		if err != nil {
-// 			logrus.Errorf("Error reading the message: %v", err)
-// 			return
-// 		}
-
-// 		// Save the incoming message for debugging purposes
-// 		// os.WriteFile("draft.json", msg, 0644)
-
-// 		// Step 1: Unmarshal into a generic map
-// 		var genericMap map[string]interface{}
-// 		err = json.Unmarshal(msg, &genericMap)
-// 		if err != nil {
-// 			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
-// 			return
-// 		}
-
-// 		// Step 2: Process "blog.blocks" for table-specific data
-// 		if blog, ok := genericMap["blog"].(map[string]interface{}); ok {
-// 			if blocks, ok := blog["blocks"].([]interface{}); ok {
-// 				for _, block := range blocks {
-// 					blockMap, ok := block.(map[string]interface{})
-// 					if !ok {
-// 						continue
-// 					}
-
-// 					// Process "table" blocks
-// 					if blockMap["type"] == "table" {
-// 						data, ok := blockMap["data"].(map[string]interface{})
-// 						if !ok {
-// 							continue
-// 						}
-
-// 						// if withBorder, ok := data["withBorder"].([]interface{}); ok {
-// 						// 	withBorderBool, ok := withBorder[0].(bool)
-// 						// }
-
-// 						// Transform "content" into pb.TableRow structure
-// 						if content, ok := data["content"].([]interface{}); ok {
-// 							var tableContent []*pb.TableRow
-// 							for _, row := range content {
-// 								rowSlice, ok := row.([]interface{})
-// 								if !ok {
-// 									continue
-// 								}
-// 								var cells []string
-// 								for _, cell := range rowSlice {
-// 									if cellStr, ok := cell.(string); ok {
-// 										cells = append(cells, cellStr)
-// 									}
-// 								}
-// 								tableContent = append(tableContent, &pb.TableRow{Cells: cells})
-// 							}
-// 							data["table_content"] = tableContent
-// 							delete(data, "content") // Remove the original field
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-
-// 		// Step 3: Marshal back into JSON
-// 		updatedJSON, err := json.Marshal(genericMap)
-// 		if err != nil {
-// 			logrus.Errorf("Error marshalling updated JSON: %v", err)
-// 			return
-// 		}
-
-// 		// Step 4: Unmarshal into pb.DraftBlogRequest
-// 		var draftBlog pb.DraftBlogRequest
-// 		err = json.Unmarshal(updatedJSON, &draftBlog)
-// 		if err != nil {
-// 			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
-// 			return
-// 		}
-
-// 		draftBlog.BlogId = id
-// 		draftBlog.Ip = ipAddress
-// 		draftBlog.Client = client
-
-// 		// Only set the action and log the initial creation or update once
-// 		if !initialLogDone {
-// 			draftBlog.Action = action
-// 			initialLogDone = true
-// 		}
-
-// 		// Send the draft blog to the gRPC service
-// 		resp, err := asc.Client.DraftBlog(context.Background(), &draftBlog)
-// 		if err != nil {
-// 			logrus.Errorf("Error while creating draft blog: %v", err)
-// 			return
-// 		}
-
-// 		// Marshal and send the response back to the WebSocket client
-// 		response, err := json.Marshal(resp)
-// 		if err != nil {
-// 			logrus.Errorf("Error marshalling response message: %v", err)
-// 			return
-// 		}
-
-// 		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
-// 			logrus.Errorf("Error returning the response message: %v", err)
-// 			return
-// 		}
-// 	}
-// }
 
 func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 	// Check permissions:
@@ -456,50 +282,6 @@ func (asc *BlogServiceClient) AllPublishesByAccountId(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-func (asc *BlogServiceClient) AllPublishesByUserName(ctx *gin.Context) {
-	userName := ctx.Param("username")
-
-	// Get the account_id from the username
-	userInfo, err := asc.UserCli.GetUserDetails(userName)
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the user details"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
-
-	res, err := asc.Client.GetPublishedBlogsByAccID(context.Background(), &pb.BlogByIdReq{
-		OwnerAccountId: userInfo.AccountId,
-	})
-
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the draft blogs"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
-
-	ctx.JSON(http.StatusOK, res)
-}
-
 func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 	// Check permissions:
 	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
@@ -539,48 +321,6 @@ func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 	}
 
 	// Return the drafted blog as a JSON response
-	ctx.JSON(http.StatusOK, blog)
-}
-
-func (asc *BlogServiceClient) GetPublishedBlogByAccId(ctx *gin.Context) {
-	// Extract account_id and blog_id from URL parameters
-	accID := ctx.Param("acc_id")
-	blogID := ctx.Param("blog_id")
-
-	// Ensure acc_id and blog_id are not empty
-	if accID == "" || blogID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "account id and blog id are required"})
-		return
-	}
-
-	// Fetch the published blog by blog_id and owner_account_id
-	blog, err := asc.Client.GetPublishedBlogByIdAndOwnerId(ctx, &pb.BlogByIdReq{
-		BlogId:         blogID,
-		OwnerAccountId: accID,
-	})
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "published blog not found"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "failed to fetch published blog"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
-
-	// If no blog is found, return a 404
-	if blog == nil {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "published blog not found"})
-		return
-	}
-
-	// Return the published blog as a JSON response
 	ctx.JSON(http.StatusOK, blog)
 }
 
@@ -626,40 +366,6 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, resp)
-}
-
-func (asc *BlogServiceClient) GetBlogsByTagsName(ctx *gin.Context) {
-	tags := Tags{}
-	if err := ctx.BindJSON(&tags); err != nil {
-		logrus.Errorf("error while marshalling tags: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "tags aren't properly formatted"})
-		return
-	}
-
-	req := &pb.GetBlogsByTagsNameReq{}
-	req.TagNames = append(req.TagNames, tags.Tags...)
-
-	resp, err := asc.Client.GetPublishedBlogsByTagsName(context.Background(), req)
-	if err != nil {
-		logrus.Errorf("error while fetching the blog: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs"})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, resp)
-}
-
-func (svc *BlogServiceClient) GetPublishedBlogById(ctx *gin.Context) {
-	id := ctx.Param("blog_id")
-
-	res, err := svc.Client.GetPublishedBlogById(context.Background(), &pb.BlogByIdReq{BlogId: id})
-	if err != nil {
-		logrus.Errorf("cannot get the blog, error: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs"})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, res)
 }
 
 func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {

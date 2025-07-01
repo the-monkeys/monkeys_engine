@@ -88,22 +88,6 @@ services:
       retries: 5
     restart: always
 
-  the_monkeys_cache:
-    container_name: "the_monkeys_cache"
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    networks:
-      - monkeys-network
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-    restart: always
-
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
     image: golang:1.24.4
@@ -113,7 +97,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -136,7 +119,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -154,7 +136,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -174,7 +155,6 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -193,7 +173,6 @@ services:
       - db-migrations
       - the_monkeys_db
       - elasticsearch-node1
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
@@ -214,34 +193,12 @@ services:
       - elasticsearch-node1
       - the_monkeys_blog
       - the_monkeys_user
-      - the_monkeys_cache
     volumes:
       - .:/go/src/app
     ports:
       - "50055:50055"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_notification/main.go
-    restart: always
-
-  the_monkeys_cache_svc:
-    container_name: "the_monkeys_cache_svc"
-    image: golang:1.24.4
-    networks:
-      - monkeys-network
-    depends_on:
-      - rabbitmq
-      - db-migrations
-      - the_monkeys_db
-      - elasticsearch-node1
-      - the_monkeys_blog
-      - the_monkeys_user
-      - the_monkeys_cache
-    volumes:
-      - .:/go/src/app
-    ports:
-      - "50056:50056"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_cache/main.go
     restart: always
 
   the_monkeys_recomm_engine:
@@ -252,7 +209,6 @@ services:
     depends_on:
       - rabbitmq
       - the_monkeys_db
-      - the_monkeys_cache
     volumes:
       - .:/app
     ports:
@@ -286,4 +242,4 @@ volumes:
   rabbitmq_data:
   elasticsearch-data1:
     driver: local
-  redis_data:
+

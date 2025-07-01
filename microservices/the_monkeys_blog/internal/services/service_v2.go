@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
@@ -444,4 +445,50 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService
 	}
 
 	return nil
+}
+
+func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogService_SearchBlogsMetadataServer) error {
+	blog.logger.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", req.Query, req.Limit, req.Offset)
+
+	returnData := make(map[string]interface{})
+	var searchTerms = []string{}
+
+	// Check if the req.Query has "double quote" to determine if it's a full-text search
+	if strings.TrimSpace(req.Query) == "" {
+		blog.logger.Errorf("Search query is empty")
+		return status.Errorf(codes.InvalidArgument, "Search query cannot be empty")
+	}
+
+	if strings.HasPrefix(req.Query, "\"") && strings.HasSuffix(req.Query, "\"") {
+		searchTerms = []string{strings.TrimSpace(req.Query)}
+	} else {
+		// Split the query into words for a more flexible search
+		searchTerms = strings.Fields(req.Query)
+	}
+
+	blogs, count, err := blog.osClient.GetBlogsMetadataByQuery(stream.Context(), searchTerms, false, req.Limit, req.Offset)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by query: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by query: %v", err)
+	}
+
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+
 }
