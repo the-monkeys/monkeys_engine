@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/docs"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
@@ -77,9 +76,6 @@ func main() {
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
 	recommendations_client.RegisterRecommendationRoute(server.router, cfg, authClient, log)
-
-	// Register Swagger documentation routes
-	docs.RegisterSwaggerRoutes(server.router)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {

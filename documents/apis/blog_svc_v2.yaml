@@ -1,0 +1,680 @@
+swagger: "2.0"
+info:
+  title: The Monkeys Blog API
+  description: API documentation for The Monkeys Blog Service v2
+  version: 2.0.0
+  contact:
+    name: The Monkeys Team
+basePath: /api/v2
+tags:
+  - name: Blog
+    description: Blog management endpoints
+consumes:
+  - application/json
+produces:
+  - application/json
+  
+paths:
+  /blog/search:
+    post:
+      tags:
+        - Blog
+      summary: Search blogs
+      description: Search blogs using query text
+      operationId: searchBlogs
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+        - name: body
+          in: body
+          description: Search query
+          required: true
+          schema:
+            type: object
+            properties:
+              searchQuery:
+                type: string
+                description: Search text to find in blog content or titles
+                example: "docker kubernetes"
+              tags:
+                type: array
+                items:
+                  type: string
+                description: Optional tags to filter blogs
+                example: ["tech", "cloud"]
+            required:
+              - searchQuery
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              total_blogs:
+                type: integer
+                description: Total number of blogs matching the search criteria
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/BlogMetadata'
+        '400':
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /blog/tags:
+    post:
+      tags:
+        - Blog
+      summary: Get blogs by tags
+      description: Retrieve blogs that match the specified tags
+      operationId: getBlogsByTags
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+        - name: body
+          in: body
+          description: Tags to filter blogs
+          required: true
+          schema:
+            type: object
+            properties:
+              tags:
+                type: array
+                items:
+                  type: string
+                description: Tags to filter blogs
+                example: ["tech", "cloud"]
+            required:
+              - tags
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              total_blogs:
+                type: integer
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/BlogMetadata'
+        '400':
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /blog/meta-feed:
+    post:
+      tags:
+        - Blog
+      summary: Get feed posts metadata
+      description: Get metadata for blog feed posts
+      operationId: getFeedPostsMeta
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+        - name: body
+          in: body
+          required: false
+          schema:
+            type: object
+            properties:
+              tags:
+                type: array
+                items:
+                  type: string
+                description: Optional tags to filter blogs
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              total_blogs:
+                type: integer
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/BlogMetadata'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /blog/feed:
+    get:
+      tags:
+        - Blog
+      summary: Get latest blogs
+      description: Get the latest published blogs
+      operationId: getLatestBlogs
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              total_blogs:
+                type: integer
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /blog/all/{username}:
+    get:
+      tags:
+        - Blog
+      summary: Get user's public blogs
+      description: Get all published blogs by a specific username
+      operationId: getUsersBlogs
+      parameters:
+        - name: username
+          in: path
+          description: Username to get blogs for
+          required: true
+          type: string
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '404':
+          description: User not found
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /blog/{blog_id}:
+    get:
+      tags:
+        - Blog
+      summary: Get published blog by ID
+      description: Get a published blog by its ID
+      operationId: getPublishedBlogByBlogId
+      parameters:
+        - name: blog_id
+          in: path
+          description: ID of the blog to retrieve
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            $ref: '#/definitions/Blog'
+        '404':
+          description: Blog not found
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+
+  # Protected APIs (require authentication)
+  /blog/following:
+    get:
+      tags:
+        - Blog
+      summary: Get blogs from accounts the user follows
+      description: Get blogs from accounts the user follows (requires authentication)
+      operationId: followingBlogsFeed
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  /blog/my-drafts:
+    get:
+      tags:
+        - Blog
+      summary: Get user's draft blogs
+      description: Get all draft blogs for the authenticated user
+      operationId: myDraftBlogs
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  /blog/my-published:
+    get:
+      tags:
+        - Blog
+      summary: Get user's published blogs
+      description: Get all published blogs for the authenticated user
+      operationId: myPublishedBlogs
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  /blog/my-bookmarks:
+    get:
+      tags:
+        - Blog
+      summary: Get user's bookmarked blogs
+      description: Get all bookmarked blogs for the authenticated user
+      operationId: myBookmarks
+      parameters:
+        - name: limit
+          in: query
+          description: Number of blogs to return
+          required: false
+          type: integer
+          default: 20
+        - name: offset
+          in: query
+          description: Number of blogs to skip for pagination
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              blogs:
+                type: array
+                items:
+                  $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  # Authorization required APIs
+  /blog/draft/{blog_id}:
+    get:
+      tags:
+        - Blog
+      summary: Get draft blog for editing
+      description: Get a draft blog for editing (requires authorization)
+      operationId: writeBlog
+      parameters:
+        - name: blog_id
+          in: path
+          description: ID of the draft blog to edit
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '403':
+          description: Forbidden - User doesn't have edit access
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Blog not found
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  /blog/to-draft/{blog_id}:
+    post:
+      tags:
+        - Blog
+      summary: Move a published blog back to draft
+      description: Move a published blog back to draft status (requires authorization)
+      operationId: moveBlogToDraft
+      parameters:
+        - name: blog_id
+          in: path
+          description: ID of the blog to move to draft
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Blog moved to draft successfully"
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '403':
+          description: Forbidden - User doesn't have edit access
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Blog not found
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+  /blog/my-draft/{blog_id}:
+    get:
+      tags:
+        - Blog
+      summary: Get specific draft blog
+      description: Get a specific draft blog by ID (requires authorization)
+      operationId: getDraftBlogByBlogIdV2
+      parameters:
+        - name: blog_id
+          in: path
+          description: ID of the draft blog to retrieve
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Successful operation
+          schema:
+            $ref: '#/definitions/Blog'
+        '401':
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Error'
+        '403':
+          description: Forbidden - User doesn't have edit access
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Blog not found
+          schema:
+            $ref: '#/definitions/Error'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/Error'
+      security:
+        - Bearer: []
+
+definitions:
+  BlogMetadata:
+    type: object
+    properties:
+      blog_id:
+        type: string
+        description: Unique identifier for the blog
+      owner_account_id:
+        type: string
+        description: Account ID of the blog owner
+      title:
+        type: string
+        description: Blog title
+      first_paragraph:
+        type: string
+        description: First paragraph of the blog content
+      first_image:
+        type: string
+        description: URL of the first image in the blog
+      content_type:
+        type: string
+        description: Type of the blog content (e.g., "editor")
+      published_time:
+        type: string
+        format: date-time
+        description: Time when the blog was published
+      tags:
+        type: array
+        items:
+          type: string
+        description: List of tags associated with the blog
+      like_count:
+        type: integer
+        description: Number of likes on the blog
+      bookmark_count:
+        type: integer
+        description: Number of times the blog has been bookmarked
+
+  Blog:
+    type: object
+    properties:
+      blog_id:
+        type: string
+        description: Unique identifier for the blog
+      owner_account_id:
+        type: string
+        description: Account ID of the blog owner
+      blog:
+        type: object
+        properties:
+          time:
+            type: string
+            format: date-time
+          blocks:
+            type: array
+            items:
+              $ref: '#/definitions/Block'
+      tags:
+        type: array
+        items:
+          type: string
+        description: List of tags associated with the blog
+      is_draft:
+        type: boolean
+        description: Whether the blog is a draft or published
+      content_type:
+        type: string
+        description: Type of the blog content (e.g., "editor")
+      published_time:
+        type: string
+        format: date-time
+        description: Time when the blog was published
+
+  Block:
+    type: object
+    properties:
+      type:
+        type: string
+        description: Type of the block (e.g., "header", "paragraph", "image")
+      data:
+        type: object
+        description: Data content of the block
+        properties:
+          text:
+            type: string
+            description: Text content for paragraphs and headers
+          level:
+            type: integer
+            description: Heading level (for header blocks)
+          file:
+            type: object
+            properties:
+              url:
+                type: string
+                description: URL of the file (for image blocks)
+
+  Error:
+    type: object
+    properties:
+      message:
+        type: string
+        description: Error message
+
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: JWT token prefixed with "Bearer "
