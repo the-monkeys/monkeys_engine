@@ -152,13 +152,13 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		newsSection.GET("/humor", rateLimiter, blogClient.GetHumorNews)
 
 		// Generic category endpoint
-		newsSection.GET("/category/:category", rateLimiter, func(ctx *gin.Context) {
-			category := ctx.Param("category")
-			blogClient.getNewsByCategory(ctx, category)
-		})
+		// newsSection.GET("/category/:category", rateLimiter, func(ctx *gin.Context) {
+		// 	category := ctx.Param("category")
+		// 	blogClient.getNewsByCategory(ctx, category)
+		// })
 
 		// Mixed section endpoint that ensures no duplicates across multiple categories
-		newsSection.POST("/sections", rateLimiter, blogClient.GetNewsBySections)
+		// newsSection.POST("/sections", rateLimiter, blogClient.GetNewsBySections)
 	}
 
 	// -------------------------------------------------- End Section-based News APIs --------------------------------------------------
@@ -1856,139 +1856,6 @@ func (asc *BlogServiceClient) GetTrendingNews(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"trending_news": newsList})
-}
-
-func (asc *BlogServiceClient) GetBusinessNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "business")
-}
-
-func (asc *BlogServiceClient) GetTechnologyNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "technology")
-}
-
-func (asc *BlogServiceClient) GetScienceNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "science")
-}
-
-func (asc *BlogServiceClient) GetHealthNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "health")
-}
-
-func (asc *BlogServiceClient) GetSportsNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "sports")
-}
-
-func (asc *BlogServiceClient) GetEntertainmentNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "entertainment")
-}
-
-func (asc *BlogServiceClient) GetTravelNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "travel")
-}
-
-func (asc *BlogServiceClient) GetFoodNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "food")
-}
-
-func (asc *BlogServiceClient) GetLifestyleNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "lifestyle")
-}
-
-func (asc *BlogServiceClient) GetEducationNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "education")
-}
-
-func (asc *BlogServiceClient) GetSpaceNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "space")
-}
-
-func (asc *BlogServiceClient) GetPsychologyNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "psychology")
-}
-
-func (asc *BlogServiceClient) GetHumorNews(ctx *gin.Context) {
-	asc.getNewsByCategory(ctx, "humor")
-}
-
-func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, category string) {
-	// Get Limits and offset
-	limit := ctx.DefaultQuery("limit", "500")
-	offset := ctx.DefaultQuery("offset", "0")
-	// Convert to int
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		limitInt = 100
-	}
-
-	offsetInt, err := strconv.Atoi(offset)
-	if err != nil {
-		offsetInt = 0
-	}
-
-	// Use category as a tag to filter blogs
-	var tags []string
-	if category != "" {
-		tags = []string{category}
-	}
-
-	stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.FeedReq{
-		Tags:   tags,
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
-	})
-
-	if err != nil {
-		logrus.Errorf("cannot get the news by category, error: %v", err)
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no news found for this category"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the news by category"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
-
-	var newsList []map[string]interface{}
-	for {
-		news, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				switch status.Code() {
-				case codes.NotFound:
-					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no news found"})
-					return
-				case codes.Internal:
-					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving news from stream"})
-					return
-				default:
-					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-					return
-				}
-			}
-		}
-
-		var newsMap map[string]interface{}
-		if err := json.Unmarshal(news.Value, &newsMap); err != nil {
-			logrus.Errorf("cannot unmarshal the news, error: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the news"})
-			return
-		}
-		newsList = append(newsList, newsMap)
-	}
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"category": category,
-		"news":     newsList,
-	})
 }
 
 // GetNewsBySections handles POST request for multiple sections with deduplication
