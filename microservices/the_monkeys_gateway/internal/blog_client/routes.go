@@ -89,6 +89,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// Public APIs
 	{
 		routesV2.POST("/meta-feed", rateLimiter, blogClient.GetFeedPostsMeta)
+		routesV2.GET("/meta-feed", rateLimiter, blogClient.GetsMetaFeed)
 		// Get all blogs
 		routesV2.GET("/feed", rateLimiter, blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
 		// Search blogs with query and optional tags
