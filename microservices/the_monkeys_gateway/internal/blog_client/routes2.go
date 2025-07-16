@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -280,6 +281,180 @@ func (asc *BlogServiceClient) SearchBlogs(ctx *gin.Context) {
 		"query":       queryString.SearchQuery,
 		"limit":       limitInt,
 		"offset":      offsetInt,
+	}
+
+	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+func (asc *BlogServiceClient) GetBusinessNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Business)
+}
+
+func (asc *BlogServiceClient) GetTechnologyNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Technology)
+}
+
+func (asc *BlogServiceClient) GetScienceNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Science)
+}
+
+func (asc *BlogServiceClient) GetHealthNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Health)
+}
+
+func (asc *BlogServiceClient) GetSportsNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Sports)
+}
+
+func (asc *BlogServiceClient) GetEntertainmentNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Entertainment)
+}
+
+func (asc *BlogServiceClient) GetTravelNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Travel)
+}
+
+func (asc *BlogServiceClient) GetFoodNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Food)
+}
+
+func (asc *BlogServiceClient) GetLifestyleNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Lifestyle)
+}
+
+func (asc *BlogServiceClient) GetEducationNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Education)
+}
+
+func (asc *BlogServiceClient) GetSpaceNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Space)
+}
+
+func (asc *BlogServiceClient) GetPsychologyNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.PhilosophyAndPsychology)
+}
+
+func (asc *BlogServiceClient) GetHumorNews(ctx *gin.Context) {
+	asc.getNewsByCategory(ctx, constants.Humor)
+}
+
+func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string) {
+	// Get Limits and offset
+	limit := ctx.DefaultQuery("limit", "500")
+	offset := ctx.DefaultQuery("offset", "0")
+	// Convert to int
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		limitInt = 100
+	}
+
+	offsetInt, err := strconv.Atoi(offset)
+	if err != nil {
+		offsetInt = 0
+	}
+
+	// Call gRPC to get blog metadata
+	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.FeedReq{
+		Limit:  int32(limitInt),
+		Offset: int32(offsetInt),
+		Tags:   tags,
+	})
+
+	if err != nil {
+		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the blogs for the given tags"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs by tags"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var allBlogs []map[string]interface{}
+	var totalBlogs int // Store total number of blogs
+
+	for {
+		blog, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if status, ok := status.FromError(err); ok {
+				switch status.Code() {
+				case codes.NotFound:
+					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
+					return
+				case codes.Internal:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+					return
+				default:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+					return
+				}
+			}
+		}
+
+		// Unmarshal into a map since response structure has changed
+		var blogMap map[string]interface{}
+		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
+			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+			return
+		}
+
+		// Extract "total_blogs" if present
+		if total, ok := blogMap["total_blogs"].(float64); ok { // JSON numbers default to float64
+			totalBlogs = int(total)
+		}
+
+		// Extract the "blogs" array safely
+		blogsData, ok := blogMap["blogs"]
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "missing blogs data in response"})
+			return
+		}
+
+		// Convert blogsData to []map[string]interface{}
+		blogList, ok := blogsData.([]interface{})
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "invalid blogs format in response"})
+			return
+		}
+
+		// Convert []interface{} to []map[string]interface{}
+		for _, b := range blogList {
+			if blogEntry, valid := b.(map[string]interface{}); valid {
+				allBlogs = append(allBlogs, blogEntry)
+			}
+		}
+	}
+
+	// Add additional metadata (like & bookmark count) for each blog
+	for _, blog := range allBlogs {
+		blogID, ok := blog["blog_id"].(string)
+		if !ok {
+			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			continue
+		}
+
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
+		blog["like_count"] = likeCount
+
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
+		blog["bookmark_count"] = bookmarkCount
+	}
+
+	// Final response including total blogs count
+	responseBlogs := map[string]interface{}{
+		"total_blogs": totalBlogs,
+		"blogs":       allBlogs,
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
