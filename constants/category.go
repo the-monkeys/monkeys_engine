@@ -1,6 +1,9 @@
 package constants
 
 var Business = []string{
+	"Business",
+	"Finance",
+	"Economy",
 	"Nova Chemicals",
 	"Corporate Layoffs",
 	"Chinese automakers",
@@ -183,7 +186,6 @@ var Technology = []string{
 	"Meta",
 	"SpaceX",
 	"Mastodon",
-	"NASA",
 	"Google Tensor",
 	"Binance",
 	"Perplexity AI",
@@ -262,6 +264,7 @@ var Technology = []string{
 	"Go Tools",
 	"IOS Development",
 	"Programming",
+	"Tech",
 }
 
 var Sports = []string{
@@ -345,6 +348,7 @@ var Sports = []string{
 }
 
 var Science = []string{
+	"Science",
 	"Jezero Crater",
 	"Archaeology",
 	"Space Exploration",
@@ -372,21 +376,8 @@ var Science = []string{
 	"Genetics",
 	"Ecology",
 	"OSIRIS-REx",
-	"Astrophysics",
 	"Tectonic plates",
 	"Chemistry",
-	"Orbex",
-	"Astronomy",
-	"CosmicMystery",
-	"Indian Ocean gravity hole",
-	"Psychology",
-	"Elephants Foot",
-	"Mars",
-	"Earth’s gravitational anomaly",
-	"Light Pollution",
-	"Blue Origin",
-	"Asteroid Bennu",
-	"Space Programs",
 	"Research",
 	"Nuclear Disaster",
 	"SpaceX",
@@ -400,6 +391,7 @@ var Science = []string{
 }
 
 var Health = []string{
+	"Health",
 	"Fitness",
 	"Sleep",
 	"Stillbirth",
@@ -451,7 +443,6 @@ var Entertainment = []string{
 	"Ashton Kutcher",
 	"Pop Culture",
 	"The Ranch TV Show",
-	"Comedy",
 	"Kaley Cuoco",
 	"Humour",
 	"Jim Parsons",
@@ -529,10 +520,12 @@ var Travel = []string{
 	"Tourism",
 	"Tourism Analysis",
 	"Travel Trends",
+	"Travel",
+	"Immigration",
 }
 
 var Food = []string{
-	"food",
+	"Food",
 	"Global coffee rankings",
 	"Tea",
 	"Coffee",
@@ -550,11 +543,9 @@ var Food = []string{
 }
 
 var Lifestyle = []string{
-	"lifestyle",
+	"Lifestyle",
 	"Vibe",
 	"Fashion",
-	"Traveling",
-	"Expat life",
 }
 
 var Education = []string{
@@ -573,7 +564,7 @@ var Education = []string{
 }
 
 var Space = []string{
-	"space",
+	"Space",
 	"space science",
 	"NASA",
 	"ISS",
@@ -591,6 +582,18 @@ var Space = []string{
 	"HumanInSpace",
 	"International Space Station",
 	"Astrophysics",
+	"Orbex",
+	"Astronomy",
+	"Astrophysics",
+	"CosmicMystery",
+	"Indian Ocean gravity hole",
+	"Elephants Foot",
+	"Mars",
+	"Earth’s gravitational anomaly",
+	"Light Pollution",
+	"Blue Origin",
+	"Asteroid Bennu",
+	"Space Programs",
 }
 
 var PhilosophyAndPsychology = []string{
@@ -617,4 +620,13 @@ var Humor = []string{
 	"Jokes",
 	"Meme",
 	"Memes",
+}
+
+var BlackListedTopics = []string{
+	"Politics",
+	"Religion",
+	"Violence",
+	"Sexual Content",
+	"Illegal Activities",
+	"Discrimination",
 }
