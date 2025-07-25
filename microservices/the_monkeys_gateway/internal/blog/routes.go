@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -438,27 +439,6 @@ func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-// func (asc *BlogServiceClient) GetLatest100Blogs(ctx *gin.Context) {
-// 	res, err := asc.Client.GetLatest100Blogs(context.Background(), &pb.GetBlogsByTagsNameReq{})
-// 	if err != nil {
-// 		if status, ok := status.FromError(err); ok {
-// 			switch status.Code() {
-// 			case codes.NotFound:
-// 				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blogs do not exist"})
-// 				return
-// 			case codes.Internal:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot find the latest blogs"})
-// 				return
-// 			default:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-// 				return
-// 			}
-// 		}
-// 	}
-
-// 	ctx.JSON(http.StatusOK, res)
-// }
-
 func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 	// Check permissions to Delete
 	if !utils.CheckUserAccessInContext(ctx, "Delete") {
@@ -660,6 +640,12 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		}
 	}
 
+	// Check if the user has already 5 blogs in draft then do not allow to create more
+	// if resp.DraftCount >= 5 {
+	// 	ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "You cannot create more than 5 draft blogs"})
+	// 	return
+	// }
+
 	var action string
 	var initialLogDone bool
 
@@ -678,12 +664,30 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		return
 	}
 
+	// Configure WebSocket upgrader with better settings
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true // Configure appropriately for production
+	}
+	upgrader.HandshakeTimeout = 10 * time.Second
+	upgrader.ReadBufferSize = 1024 * 4  // 4KB
+	upgrader.WriteBufferSize = 1024 * 4 // 4KB
+
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		logrus.Errorf("Error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+
+	// Set connection timeouts and limits
+	conn.SetReadLimit(1024 * 1024)                         // 1MB max message size
+	conn.SetReadDeadline(time.Now().Add(70 * time.Second)) // Slightly longer than client heartbeat
+	conn.SetPongHandler(func(string) error {
+		logrus.Debug("Received pong from client")
+		conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+		return nil
+	})
+
 	defer func() {
 		if err := conn.Close(); err != nil {
 			logrus.Errorf("Error closing WebSocket connection: %v", err)
@@ -694,7 +698,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	stream, err := asc.Client.DraftBlogV2(context.Background())
 	if err != nil {
 		logrus.Errorf("Error establishing gRPC stream: %v", err)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
+		conn.WriteMessage(websocket.TextMessage, []byte(`{"error": "Failed to establish server connection"}`))
 		return
 	}
 	defer func() {
@@ -703,89 +707,187 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		}
 	}()
 
-	// Infinite loop to listen to WebSocket connection
+	// Send initial connection success message
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type": "connected", "status": "ready"}`)); err != nil {
+		logrus.Errorf("Error sending initial connection message: %v", err)
+		return
+	}
+
+	// Start heartbeat routine
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
+
+	// Channel to handle graceful shutdown
+	done := make(chan struct{})
+	defer close(done)
+
+	// Goroutine to handle periodic heartbeat
+	go func() {
+		for {
+			select {
+			case <-heartbeatTicker.C:
+				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					logrus.Errorf("Error sending ping: %v", err)
+					return
+				}
+				logrus.Debug("Sent ping to client")
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	// Main message handling loop with improved error handling
 	for {
-		_, msg, err := conn.ReadMessage()
+		// Set read deadline for each message
+		conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+
+		messageType, msg, err := conn.ReadMessage()
 		if err != nil {
-			logrus.Errorf("Error reading the message: %v", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+				logrus.Errorf("Unexpected WebSocket close error: %v", err)
+			} else if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				logrus.Info("WebSocket connection closed normally")
+			} else {
+				logrus.Errorf("Error reading WebSocket message: %v", err)
+			}
 			return
 		}
 
-		// Save the incoming message for debugging purposes
-		// os.WriteFile("draft.json", msg, 0644)
-
-		// Step 1: Unmarshal into a generic map
-		var genericMap map[string]interface{}
-		err = json.Unmarshal(msg, &genericMap)
-		if err != nil {
-			logrus.Errorf("Error unmarshalling message into generic map: %v", err)
+		// Handle different message types
+		switch messageType {
+		case websocket.TextMessage:
+			if err := asc.handleTextMessage(msg, conn, stream, id, ipAddress, client, action, &initialLogDone); err != nil {
+				logrus.Errorf("Error handling text message: %v", err)
+				// Send error response but don't close connection
+				errorMsg := map[string]interface{}{
+					"type":  "error",
+					"error": "Failed to process message",
+				}
+				if errorResponse, marshalErr := json.Marshal(errorMsg); marshalErr == nil {
+					conn.WriteMessage(websocket.TextMessage, errorResponse)
+				}
+				continue // Continue to next message instead of breaking
+			}
+		case websocket.PingMessage:
+			logrus.Debug("Received ping from client")
+			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+				logrus.Errorf("Error sending pong: %v", err)
+				return
+			}
+		case websocket.PongMessage:
+			logrus.Debug("Received pong from client")
+			// Reset read deadline on pong
+			conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+		case websocket.CloseMessage:
+			logrus.Info("Received close message from client")
 			return
-		}
-
-		// Step 3: Marshal back into JSON
-		updatedJSON, err := json.Marshal(genericMap)
-		if err != nil {
-			logrus.Errorf("Error marshalling updated JSON: %v", err)
-			return
-		}
-
-		// Step 4: Unmarshal into pb.DraftBlogRequest
-		var draftBlog map[string]interface{}
-		err = json.Unmarshal(updatedJSON, &draftBlog)
-		if err != nil {
-			logrus.Errorf("Error unmarshalling updated JSON into pb.DraftBlogRequest: %v", err)
-			return
-		}
-
-		draftBlog["blog_id"] = id
-		draftBlog["Ip"] = ipAddress
-		draftBlog["Client"] = client
-
-		// Only set the action and log the initial creation or update once
-		if !initialLogDone {
-			draftBlog["Action"] = action
-			initialLogDone = true
-		}
-
-		// Convert draftBlog to google.protobuf.Any
-		draftStruct, err := structpb.NewStruct(draftBlog)
-		if err != nil {
-			logrus.Errorf("Error converting draftBlog to Any: %v", err)
-			return
-		}
-
-		// Wrap *structpb.Struct in *anypb.Any
-		anyMsg, err := anypb.New(draftStruct)
-		if err != nil {
-			logrus.Errorf("Error wrapping structpb.Struct in anypb.Any: %v", err)
-			return
-		}
-
-		// Send the draft blog to the gRPC service
-		if err := stream.Send(anyMsg); err != nil {
-			logrus.Errorf("Error sending draft blog to gRPC stream: %v", err)
-			return
-		}
-
-		// Receive the response from the gRPC service
-		resp, err := stream.Recv()
-		if err != nil {
-			logrus.Errorf("Error receiving response from gRPC stream: %v", err)
-			return
-		}
-
-		// Marshal and send the response back to the WebSocket client
-		response, err := json.Marshal(resp)
-		if err != nil {
-			logrus.Errorf("Error marshalling response message: %v", err)
-			return
-		}
-
-		if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
-			logrus.Errorf("Error returning the response message: %v", err)
-			return
+		default:
+			logrus.Warnf("Received unexpected message type: %d", messageType)
 		}
 	}
+}
+
+// Helper function to handle text messages
+func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn, stream pb.BlogService_DraftBlogV2Client, id, ipAddress, client, action string, initialLogDone *bool) error {
+	// Handle ping/pong messages from client
+	var messageCheck map[string]interface{}
+	if err := json.Unmarshal(msg, &messageCheck); err == nil {
+		if msgType, exists := messageCheck["type"]; exists {
+			switch msgType {
+			case "ping":
+				logrus.Debug("Received application-level ping")
+				pongResponse := map[string]interface{}{
+					"type":      "pong",
+					"timestamp": time.Now().Unix(),
+				}
+				if pongMsg, err := json.Marshal(pongResponse); err == nil {
+					conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+					return conn.WriteMessage(websocket.TextMessage, pongMsg)
+				}
+				return nil
+			case "pong":
+				logrus.Debug("Received application-level pong")
+				return nil
+			}
+		}
+	}
+
+	// Save the incoming message for debugging purposes
+	// os.WriteFile("draft.json", msg, 0644)
+
+	// Step 1: Unmarshal into a generic map
+	var genericMap map[string]interface{}
+	if err := json.Unmarshal(msg, &genericMap); err != nil {
+		return fmt.Errorf("error unmarshalling message into generic map: %w", err)
+	}
+
+	// Step 3: Marshal back into JSON
+	updatedJSON, err := json.Marshal(genericMap)
+	if err != nil {
+		return fmt.Errorf("error marshalling updated JSON: %w", err)
+	}
+
+	// Step 4: Unmarshal into pb.DraftBlogRequest
+	var draftBlog map[string]interface{}
+	if err := json.Unmarshal(updatedJSON, &draftBlog); err != nil {
+		return fmt.Errorf("error unmarshalling updated JSON into pb.DraftBlogRequest: %w", err)
+	}
+
+	draftBlog["blog_id"] = id
+	draftBlog["Ip"] = ipAddress
+	draftBlog["Client"] = client
+
+	// Only set the action and log the initial creation or update once
+	if !*initialLogDone {
+		draftBlog["Action"] = action
+		*initialLogDone = true
+	}
+
+	// Convert draftBlog to google.protobuf.Any
+	draftStruct, err := structpb.NewStruct(draftBlog)
+	if err != nil {
+		return fmt.Errorf("error converting draftBlog to structpb.Struct: %w", err)
+	}
+
+	// Wrap *structpb.Struct in *anypb.Any
+	anyMsg, err := anypb.New(draftStruct)
+	if err != nil {
+		return fmt.Errorf("error wrapping structpb.Struct in anypb.Any: %w", err)
+	}
+
+	// Send the draft blog to the gRPC service
+	if err := stream.Send(anyMsg); err != nil {
+		return fmt.Errorf("error sending draft blog to gRPC stream: %w", err)
+	}
+
+	// Receive the response from the gRPC service
+	grpcResp, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("error receiving response from gRPC stream: %w", err)
+	}
+
+	// Create success response
+	response := map[string]interface{}{
+		"type":      "success",
+		"timestamp": time.Now().Unix(),
+		"data":      grpcResp,
+	}
+
+	// Marshal and send the response back to the WebSocket client
+	responseBytes, err := json.Marshal(response)
+	if err != nil {
+		return fmt.Errorf("error marshalling response message: %w", err)
+	}
+
+	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	if err := conn.WriteMessage(websocket.TextMessage, responseBytes); err != nil {
+		return fmt.Errorf("error sending response message: %w", err)
+	}
+
+	return nil
 }
 
 func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
