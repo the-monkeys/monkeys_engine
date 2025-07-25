@@ -13,6 +13,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/constants"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -84,6 +85,16 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	{
 		routes.POST("/topics", usc.CreateNewTopics)
+	}
+
+	// Admin routes for user management (localhost only)
+	adminRoutes := router.Group("/api/v1/admin/user")
+	adminRoutes.Use(middleware.LocalhostOnlyMiddleware())
+	{
+		adminRoutes.DELETE("/force-delete/:id", usc.AdminDeleteUserProfile)
+		adminRoutes.DELETE("/force-delete/email/:email", usc.AdminDeleteUserByEmail)
+		adminRoutes.POST("/suspend/:id", usc.AdminSuspendUser)
+		adminRoutes.POST("/ban/:id", usc.AdminBanUser)
 	}
 
 	return usc
@@ -984,4 +995,99 @@ func (asc *UserServiceClient) ConnectionCount(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, res)
+}
+
+// AdminDeleteUserProfile force deletes a user account without consent (Admin only)
+func (usc *UserServiceClient) AdminDeleteUserProfile(ctx *gin.Context) {
+	username := ctx.Param("id")
+	reason := ctx.DefaultQuery("reason", "Admin action - no reason provided")
+
+	logrus.Warnf("Admin force delete requested for user: %s, reason: %s", username, reason)
+
+	res, err := usc.Client.DeleteUserAccount(context.Background(), &pb.DeleteUserProfileReq{
+		Username: username,
+	})
+
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, ReturnMessage{Message: "user not found"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't delete user account"})
+			return
+		}
+	}
+
+	logrus.Infof("Admin successfully deleted user account: %s", username)
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":  "User account successfully deleted",
+		"username": username,
+		"reason":   reason,
+		"result":   res,
+	})
+}
+
+// AdminDeleteUserByEmail force deletes a user account by email (Admin only)
+func (usc *UserServiceClient) AdminDeleteUserByEmail(ctx *gin.Context) {
+	email := ctx.Param("email")
+	reason := ctx.DefaultQuery("reason", "Admin action - no reason provided")
+
+	logrus.Warnf("Admin force delete by email requested for: %s, reason: %s", email, reason)
+
+	// Create a request to delete by email - you may need to modify the protobuf
+	res, err := usc.Client.DeleteUserAccount(context.Background(), &pb.DeleteUserProfileReq{
+		Username: email, // Using email as identifier for now
+	})
+
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			ctx.AbortWithStatusJSON(http.StatusNotFound, ReturnMessage{Message: "user not found"})
+			return
+		} else {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ReturnMessage{Message: "couldn't delete user account"})
+			return
+		}
+	}
+
+	logrus.Infof("Admin successfully deleted user account by email: %s", email)
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "User account successfully deleted",
+		"email":   email,
+		"reason":  reason,
+		"result":  res,
+	})
+}
+
+// AdminSuspendUser suspends a user account (Admin only)
+func (usc *UserServiceClient) AdminSuspendUser(ctx *gin.Context) {
+	username := ctx.Param("id")
+	reason := ctx.DefaultQuery("reason", "Admin action - no reason provided")
+	duration := ctx.DefaultQuery("duration", "24h") // Default 24 hours
+
+	logrus.Warnf("Admin suspend requested for user: %s, reason: %s, duration: %s", username, reason, duration)
+
+	// Note: This assumes the user service has a SuspendUser method
+	// You may need to implement this in the user service protobuf and service
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":  "User suspension functionality not yet implemented in user service",
+		"username": username,
+		"reason":   reason,
+		"duration": duration,
+	})
+}
+
+// AdminBanUser permanently bans a user account (Admin only)
+func (usc *UserServiceClient) AdminBanUser(ctx *gin.Context) {
+	username := ctx.Param("id")
+	reason := ctx.DefaultQuery("reason", "Admin action - no reason provided")
+
+	logrus.Warnf("Admin ban requested for user: %s, reason: %s", username, reason)
+
+	// Note: This assumes the user service has a BanUser method
+	// You may need to implement this in the user service protobuf and service
+	ctx.JSON(http.StatusOK, gin.H{
+		"message":  "User ban functionality not yet implemented in user service",
+		"username": username,
+		"reason":   reason,
+	})
 }
