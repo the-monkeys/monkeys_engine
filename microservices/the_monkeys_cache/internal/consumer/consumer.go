@@ -199,7 +199,7 @@ func (u *UserDbConn) GetUserPublishedBlogs(username string, limit, offset int32)
 }
 
 func (u *UserDbConn) Feed(limit, offset int32) interface{} {
-	stream, err := u.blogClient.GetBlogsMetadata(context.Background(), &blogPkg.FeedReq{
+	stream, err := u.blogClient.GetBlogsMetadata(context.Background(), &blogPkg.BlogListReq{
 		Limit:  limit,
 		Offset: offset,
 	})

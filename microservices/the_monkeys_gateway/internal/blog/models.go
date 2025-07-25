@@ -1,4 +1,4 @@
-package blog_client
+package blog
 
 type Blog struct {
 	Time   int64   `json:"time"`
