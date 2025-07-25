@@ -93,7 +93,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// Get all blogs
 		routesV2.GET("/feed", rateLimiter, blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
 		// Search blogs with query and optional tags
-		routesV2.POST("/search", rateLimiter, blogClient.SearchBlogs) // Search blogs with query parameter
+		routesV2.POST("/search", rateLimiter, blogClient.SearchBlogs)     // Search blogs with query parameter
+		routesV2.GET("/search", rateLimiter, blogClient.SearchBlogsQuery) // Search blogs with query parameter
 		// Get blogs by tags, as users can filter the blogs using multiple tags
 		routesV2.POST("/tags", rateLimiter, blogClient.GetBlogsByTags) // Get blogs by tags
 		// Get blogs by username, not auth required as it is public and can be visible at users profile
