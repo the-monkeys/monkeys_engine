@@ -96,7 +96,6 @@ func (es *elasticsearchStorage) DraftABlog(ctx context.Context, blog *pb.DraftBl
 		return insertResponse, err
 	}
 
-	es.log.Infof("DraftABlog: successfully created blog for user: %s, response: %+v", blog.OwnerAccountId, insertResponse)
 	return insertResponse, nil
 }
 

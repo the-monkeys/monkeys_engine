@@ -223,16 +223,6 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 
 	}()
 
-	go func() {
-		// Enqueue publish message to cache service asynchronously
-		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[5], bx)
-		if err != nil {
-			blog.logger.Errorf(`failed to publish blog publish message to RabbitMQ:
-			 exchange=%s, routing_key=%s, error=%v`, blog.config.RabbitMQ.Exchange,
-				blog.config.RabbitMQ.RoutingKeys[5], err)
-		}
-	}()
-
 	return &pb.PublishBlogResp{
 		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
 	}, nil

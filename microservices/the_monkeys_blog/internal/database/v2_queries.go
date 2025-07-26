@@ -21,7 +21,6 @@ func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]in
 	document := strings.NewReader(string(bs))
 
 	blogId := blog["blog_id"].(string)
-	ownerAccountId := blog["owner_account_id"].(string)
 	req := esapi.IndexRequest{
 		Index:      constants.ElasticsearchBlogIndex,
 		DocumentID: blogId,
@@ -40,7 +39,6 @@ func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]in
 		return insertResponse, err
 	}
 
-	es.log.Infof("DraftABlog: successfully created blog for user: %s, response: %+v", ownerAccountId, insertResponse)
 	return insertResponse, nil
 }
 
