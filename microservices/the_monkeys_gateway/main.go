@@ -14,7 +14,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog_client"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 
@@ -72,7 +72,7 @@ func main() {
 	})
 
 	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient)
-	blog_client.RegisterBlogRouter(server.router, cfg, authClient, userClient)
+	blog.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
 	recommendations_client.RegisterRecommendationRoute(server.router, cfg, authClient, log)

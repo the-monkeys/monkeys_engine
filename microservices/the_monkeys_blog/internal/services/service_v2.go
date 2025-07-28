@@ -326,7 +326,7 @@ func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.A
 	}, nil
 }
 
-func (blog *BlogService) GetFeedBlogs(req *pb.FeedReq, stream pb.BlogService_GetFeedBlogsServer) error {
+func (blog *BlogService) GetFeedBlogs(req *pb.BlogListReq, stream pb.BlogService_GetFeedBlogsServer) error {
 	var blogs []map[string]interface{}
 	// Find blog by tags
 	if len(req.Tags) > 0 {
@@ -387,7 +387,7 @@ func (blog *BlogService) GetFeedBlogs(req *pb.FeedReq, stream pb.BlogService_Get
 	return nil
 }
 
-func (blog *BlogService) GetBlogsMetadata(req *pb.FeedReq, stream pb.BlogService_GetBlogsMetadataServer) error {
+func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogService_GetBlogsMetadataServer) error {
 	returnData := make(map[string]interface{})
 	var blogs []map[string]interface{}
 
@@ -491,4 +491,53 @@ func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogSe
 
 	return nil
 
+}
+
+func (blog *BlogService) GetUsersBlogs(req *pb.BlogListReq, stream pb.BlogService_GetUsersBlogsServer) error {
+	blog.logger.Debugf("Received request for user's blogs: %v", req)
+
+	returnData := make(map[string]interface{})
+	var blogs []map[string]interface{}
+	var count int
+	if req.AccountId == "" {
+		return status.Errorf(codes.InvalidArgument, "Account ID cannot be empty")
+	}
+
+	var err error
+
+	if req.IsDraft {
+		blog.logger.Debug("Fetching draft blogs by account ID")
+		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, req.Limit, req.Offset)
+	} else {
+		blog.logger.Debug("Fetching published blogs by account ID")
+		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, false, req.Limit, req.Offset)
+	}
+
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by account ID: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by account ID: %v", err)
+	}
+
+	removeKeyFromBlogs(blogs, "action")
+	removeKeyFromBlogs(blogs, "Ip")
+	removeKeyFromBlogs(blogs, "Client")
+
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }

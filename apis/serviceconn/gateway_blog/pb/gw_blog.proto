@@ -244,10 +244,12 @@ message BlogResp {
     string error = 2;
 }
 
-message FeedReq {
+message BlogListReq {
     repeated string tags = 1;
     int32 limit = 2;
     int32 offset = 3;
+    string accountId = 4; // Optional: filter by account ID
+    bool isDraft = 5; // Optional: filter by draft status
 }
 
 message SearchReq {
@@ -260,7 +262,7 @@ message SearchReq {
 service BlogService {
     // Metadata may contain the blog id, owner account id, title, first paragraph, 
     // tags, first image, publish time, author name, etc.
-    rpc GetBlogsMetadata(FeedReq) returns (stream google.protobuf.Any);
+    rpc GetBlogsMetadata(BlogListReq) returns (stream google.protobuf.Any);
     rpc SearchBlogsMetadata(SearchReq) returns (stream google.protobuf.Any);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id\
     
@@ -294,5 +296,6 @@ service BlogService {
     rpc GetBlog(BlogReq) returns (google.protobuf.Any); // By blog id
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
     rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
-    rpc GetFeedBlogs(FeedReq) returns (stream google.protobuf.Any);
+    rpc GetFeedBlogs(BlogListReq) returns (stream google.protobuf.Any);
+    rpc GetUsersBlogs(BlogListReq) returns (stream google.protobuf.Any);
 }
