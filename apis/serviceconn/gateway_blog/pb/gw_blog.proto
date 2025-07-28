@@ -250,6 +250,7 @@ message BlogListReq {
     int32 offset = 3;
     string accountId = 4; // Optional: filter by account ID
     bool isDraft = 5; // Optional: filter by draft status
+    repeated string blog_ids = 6; // Optional: filter by specific blog IDs
 }
 
 message SearchReq {
@@ -296,6 +297,7 @@ service BlogService {
     rpc GetBlog(BlogReq) returns (google.protobuf.Any); // By blog id
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
     rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
-    rpc GetFeedBlogs(BlogListReq) returns (stream google.protobuf.Any);
-    rpc GetUsersBlogs(BlogListReq) returns (stream google.protobuf.Any);
+    rpc MetaGetFeedBlogs(BlogListReq) returns (stream google.protobuf.Any);
+    rpc MetaGetUsersBlogs(BlogListReq) returns (stream google.protobuf.Any);
+    rpc MetaGetBlogsByBlogIds(BlogListReq) returns (stream google.protobuf.Any);
 }
