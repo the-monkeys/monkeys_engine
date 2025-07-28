@@ -116,7 +116,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// Users can get their blogs (published)
 		routesV2.GET("/my-published", rateLimiter, blogClient.MyPublishedBlogs) // Get all my published blogs
 		// Users can get the blogs they bookmarked (published)
-		routesV2.GET("/my-bookmarks", rateLimiter, blogClient.MyBookmarks) // Update of blogClient.GetBookmarks
+		routesV2.GET("/my-bookmarks", rateLimiter, blogClient.MyBookmarks)       // Update of blogClient.GetBookmarks
+		routesV2.GET("/in-my-bookmark", rateLimiter, blogClient.MetaMyBookmarks) // Get my bookmark blog by id
 		// My feed blogs, contains blogs from people I follow + my own blogs + topics I follow
 		// routesV2.GET("/my-feed", blogClient.MyFeedBlogs) // Get my feed blogs
 	}
@@ -1033,7 +1034,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
-	stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.BlogListReq{
+	stream, err := asc.Client.MetaGetFeedBlogs(context.Background(), &pb.BlogListReq{
 		Limit:  int32(limitInt),
 		Offset: int32(offsetInt),
 	})
@@ -1743,7 +1744,7 @@ func (asc *BlogServiceClient) GetLatestNews(ctx *gin.Context) {
 	}
 
 	// Use GetFeedBlogs with empty tags to get latest blogs from all categories
-	stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.BlogListReq{
+	stream, err := asc.Client.MetaGetFeedBlogs(context.Background(), &pb.BlogListReq{
 		Tags:   []string{}, // Empty tags means all categories
 		Limit:  int32(limitInt),
 		Offset: int32(offsetInt),
@@ -1816,7 +1817,7 @@ func (asc *BlogServiceClient) GetTrendingNews(ctx *gin.Context) {
 	}
 
 	// Use GetFeedBlogs for trending (assuming backend provides trending by default order)
-	stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.BlogListReq{
+	stream, err := asc.Client.MetaGetFeedBlogs(context.Background(), &pb.BlogListReq{
 		Tags:   []string{}, // Empty tags means all categories
 		Limit:  int32(limitInt),
 		Offset: int32(offsetInt),
@@ -1901,7 +1902,7 @@ func (asc *BlogServiceClient) GetNewsBySections(ctx *gin.Context) {
 
 	for _, section := range request.Sections {
 		// Get news by category using existing method
-		stream, err := asc.Client.GetFeedBlogs(context.Background(), &pb.BlogListReq{
+		stream, err := asc.Client.MetaGetFeedBlogs(context.Background(), &pb.BlogListReq{
 			Tags:   []string{section},
 			Limit:  int32(request.Limit),
 			Offset: int32(request.Offset),
