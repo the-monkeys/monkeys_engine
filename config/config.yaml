@@ -26,6 +26,7 @@ postgresql:
     db_name: the_monkeys_user_dev
 jwt:
   secret_key: Secret
+  admin_secret_key: Secret
 opensearch:
   address: http://localhost:9200
   os_host: http://elasticsearch-node1:9200

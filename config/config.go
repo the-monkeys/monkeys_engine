@@ -33,7 +33,8 @@ type Postgresql struct {
 }
 
 type JWT struct {
-	SecretKey string `mapstructure:"secret_key"`
+	SecretKey      string `mapstructure:"secret_key"`
+	AdminSecretKey string `mapstructure:"admin_secret_key"`
 }
 
 type Opensearch struct {

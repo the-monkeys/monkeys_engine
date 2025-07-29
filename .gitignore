@@ -37,3 +37,4 @@ backup/*
 # IDE specific files
 .idea/
 .vscode/
+config/config.yaml
