@@ -326,7 +326,7 @@ func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.A
 	}, nil
 }
 
-func (blog *BlogService) GetFeedBlogs(req *pb.BlogListReq, stream pb.BlogService_GetFeedBlogsServer) error {
+func (blog *BlogService) MetaGetFeedBlogs(req *pb.BlogListReq, stream pb.BlogService_MetaGetFeedBlogsServer) error {
 	var blogs []map[string]interface{}
 	// Find blog by tags
 	if len(req.Tags) > 0 {
@@ -493,7 +493,7 @@ func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogSe
 
 }
 
-func (blog *BlogService) GetUsersBlogs(req *pb.BlogListReq, stream pb.BlogService_GetUsersBlogsServer) error {
+func (blog *BlogService) MetaGetUsersBlogs(req *pb.BlogListReq, stream pb.BlogService_MetaGetUsersBlogsServer) error {
 	blog.logger.Debugf("Received request for user's blogs: %v", req)
 
 	returnData := make(map[string]interface{})
@@ -532,6 +532,62 @@ func (blog *BlogService) GetUsersBlogs(req *pb.BlogListReq, stream pb.BlogServic
 	}
 
 	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (blog *BlogService) MetaGetBlogsByBlogIds(req *pb.BlogListReq, stream pb.BlogService_MetaGetBlogsByBlogIdsServer) error {
+	blog.logger.Debugf("Received request for blogs by slice: %v", req)
+
+	if len(req.BlogIds) == 0 {
+		return status.Errorf(codes.InvalidArgument, "No blog ids provided")
+	}
+
+	blogsIds := []string{}
+	for _, blogId := range req.BlogIds {
+		exist, blogInfo, err := blog.osClient.DoesBlogExist(stream.Context(), blogId)
+		if err != nil {
+			blog.logger.Errorf("Error checking if blog exists: %v", err)
+			return status.Errorf(codes.Internal, "Error checking if blog exists: %v", err)
+		}
+
+		idDraft, ok := blogInfo["is_draft"].(bool)
+		if !ok {
+			idDraft = false
+		}
+
+		if exist && !idDraft {
+			blogsIds = append(blogsIds, blogId)
+		}
+	}
+
+	blogs, count, err := blog.osClient.GetBlogsMetaByBlogIdsV2(stream.Context(), blogsIds, false, req.Limit, req.Offset)
+	if err != nil {
+		blog.logger.Errorf("Error fetching blogs by slice: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching blogs by slice: %v", err)
+	}
+
+	removeKeyFromBlogs(blogs, "action")
+	removeKeyFromBlogs(blogs, "Action")
+	removeKeyFromBlogs(blogs, "Ip")
+	removeKeyFromBlogs(blogs, "Client")
+
+	returnData := make(map[string]interface{})
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
 	if err := stream.Send(&anypb.Any{
 		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
 		Value:   blogBytes,
