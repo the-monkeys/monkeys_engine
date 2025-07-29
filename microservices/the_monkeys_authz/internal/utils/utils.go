@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,7 +58,27 @@ func ValidateRegisterUserRequest(req *pb.RegisterUserRequest) error {
 	if req.Email == "" || req.FirstName == "" || req.Password == "" {
 		return fmt.Errorf("incomplete information: email, first name and password are required")
 	}
+
+	// Check for disposable email
+	if IsDisposableEmail(req.Email) {
+		return fmt.Errorf("disposable email addresses are not allowed")
+	}
+
 	return nil
+}
+
+// IsDisposableEmail checks if the email domain is a known disposable email provider
+func IsDisposableEmail(email string) bool {
+	// Extract domain from email
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return false // Invalid email format
+	}
+
+	domain := strings.ToLower(strings.TrimSpace(parts[1]))
+
+	// Check against our disposable domains list
+	return constants.DisposableEmailDomains[domain]
 }
 
 func IpClientConvert(ip, client string) (string, string) {

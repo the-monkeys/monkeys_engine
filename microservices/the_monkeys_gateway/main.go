@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/admin"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
@@ -76,6 +77,9 @@ func main() {
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
 	recommendations_client.RegisterRecommendationRoute(server.router, cfg, authClient, log)
+
+	// Register admin routes (restricted to local network)
+	admin.RegisterAdminRouter(server.router, cfg)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {
