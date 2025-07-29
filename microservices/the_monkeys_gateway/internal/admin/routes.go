@@ -104,9 +104,6 @@ func AdminKeyMiddleware(adminKey string) gin.HandlerFunc {
 }
 
 func RegisterAdminRouter(router *gin.Engine, cfg *config.Config) *AdminServiceClient {
-	// Admin key from environment variable or default
-	adminKey := "monkeys-admin-2024-secure-key" // Default admin key - should be changed in production
-
 	asc := &AdminServiceClient{
 		Client: NewAdminServiceClient(cfg),
 		logger: logrus.New(),
@@ -115,7 +112,7 @@ func RegisterAdminRouter(router *gin.Engine, cfg *config.Config) *AdminServiceCl
 	// Admin routes group with local network restriction and admin key validation
 	adminRoutes := router.Group("/admin/api/v1")
 	adminRoutes.Use(LocalNetworkMiddleware())
-	adminRoutes.Use(AdminKeyMiddleware(adminKey))
+	adminRoutes.Use(AdminKeyMiddleware(cfg.JWT.AdminSecretKey))
 
 	// User management routes
 	{
