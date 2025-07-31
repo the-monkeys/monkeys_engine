@@ -103,8 +103,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// Get published blog by blog_id
 		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
 
-		// WordCloud API
-		routesV2.GET("/wordcloud/:username", rateLimiter, blogClient.GetWordCloud) // Get word cloud of blogs
+		// User Tags API
+		routesV2.GET("/user-tags/:username", rateLimiter, blogClient.GetUserTags) // Get user tags
 	}
 
 	routesV2.Use(mware.AuthRequired)
