@@ -1149,11 +1149,11 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, responseBlogs)
 }
 
-func (asc *BlogServiceClient) GetWordCloud(ctx *gin.Context) {
+func (asc *BlogServiceClient) GetUserTags(ctx *gin.Context) {
 	username := ctx.Param("username")
 
 	// Get the account_id from the username to verify user exists
-	_, err := asc.UserCli.GetUserDetails(username)
+	userInfo, err := asc.UserCli.GetUserDetails(username)
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
@@ -1170,10 +1170,23 @@ func (asc *BlogServiceClient) GetWordCloud(ctx *gin.Context) {
 		}
 	}
 
-	// Generate random word cloud with up to 40 words
-	wordCloud := generateRandomWordCloud(40)
+	resp, err := asc.Client.UsersBlogData(context.Background(), &pb.BlogReq{
+		AccountId: userInfo.AccountId,
+	})
+	if err != nil {
+		logrus.Errorf("cannot fetch user blog data, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch user blog data"})
+		return
+	}
 
-	ctx.JSON(http.StatusOK, gin.H{"word_cloud": wordCloud})
+	var respMap map[string]interface{}
+	if err := json.Unmarshal(resp.Value, &respMap); err != nil {
+		logrus.Errorf("cannot unmarshal the blog response, error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog response"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"tags": respMap})
 }
 
 // generateRandomWordCloud creates a random word cloud with up to maxWords

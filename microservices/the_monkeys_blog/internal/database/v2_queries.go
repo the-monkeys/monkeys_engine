@@ -158,7 +158,7 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetBlogsOfUsersByAccountIds: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetBlogsOfUsersByAccountIds: blog retrieval operation completed")
 	return blogs, nil
 }
 
@@ -280,7 +280,7 @@ func (es *elasticsearchStorage) GetBlogsByTagsAccId(ctx context.Context, account
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetBlogsByTags: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetBlogsByTags: blog retrieval by tags completed")
 	return blogs, nil
 }
 
@@ -393,7 +393,7 @@ func (es *elasticsearchStorage) GetBlogsByAccountId(ctx context.Context, account
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetBlogsByAccountId: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetBlogsByAccountId: account-specific blog retrieval completed")
 	return blogs, nil
 }
 
@@ -480,7 +480,7 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 	// Extract the hits from the response
 	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
 	if !ok || len(hits) == 0 {
-		es.log.Infof("GetBlogByBlogId: no blog found with blogId: %s", blogId)
+		es.log.Debug("GetBlogByBlogId: no blog found matching criteria")
 		return nil, nil
 	}
 
@@ -492,7 +492,7 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 		return nil, fmt.Errorf("failed to cast hit source to map")
 	}
 
-	es.log.Infof("GetBlogByBlogId: successfully fetched blog with blogId: %s", blogId)
+	es.log.Debug("GetBlogByBlogId: blog retrieval completed successfully")
 	return blog, nil
 }
 
@@ -588,7 +588,7 @@ func (es *elasticsearchStorage) GetABlogByBlogIdAccId(ctx context.Context, blogI
 	// Extract the hits from the response
 	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
 	if !ok || len(hits) == 0 {
-		es.log.Infof("GetABlogByBlogIdAccId: no blog found with blogId: %s and accountId: %s", blogId, accountId)
+		es.log.Debug("GetABlogByBlogIdAccId: no blog found matching criteria")
 		return nil, nil
 	}
 
@@ -600,7 +600,7 @@ func (es *elasticsearchStorage) GetABlogByBlogIdAccId(ctx context.Context, blogI
 		return nil, fmt.Errorf("failed to cast hit source to map")
 	}
 
-	es.log.Infof("GetABlogByBlogIdAccId: successfully fetched blog with blogId: %s and accountId: %s", blogId, accountId)
+	es.log.Debug("GetABlogByBlogIdAccId: blog retrieval completed successfully")
 	return blog, nil
 }
 
@@ -713,7 +713,7 @@ func (es *elasticsearchStorage) GetBlogsByTags(ctx context.Context, tags []strin
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetBlogsByTagsWithoutAccId: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetBlogsByTagsWithoutAccId: tag-based blog retrieval completed")
 	return blogs, nil
 }
 
@@ -821,7 +821,7 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetBlogsByBlogIds: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetBlogsByBlogIds: blog ID-based retrieval completed")
 	return blogs, nil
 }
 
@@ -921,160 +921,123 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Cont
 		blogs = append(blogs, blog)
 	}
 
-	es.log.Infof("GetAllPublishedBlogsLatestFirst: successfully fetched %d blogs", len(blogs))
+	es.log.Debug("GetAllPublishedBlogsLatestFirst: published blog retrieval completed")
 	return blogs, nil
 }
 
-// // Blog Metadata queries
-// func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, error) {
-// 	// Ensure tags are not empty
-// 	if len(tags) == 0 {
-// 		es.log.Error("GetBlogsMetadataByTags: tags array is empty")
-// 		return nil, fmt.Errorf("tags array cannot be empty")
-// 	}
+func (es *elasticsearchStorage) GetAllTagsFromUserPublishedBlogs(ctx context.Context, accountID string) ([]string, error) {
+	// Ensure accountID is not empty
+	if accountID == "" {
+		es.log.Error("GetAllTagsFromUserPublishedBlogs: accountID is empty")
+		return nil, fmt.Errorf("accountID cannot be empty")
+	}
 
-// 	// Build the query to get blogs by tags with sorting by latest first
-// 	query := map[string]interface{}{
-// 		"sort": []map[string]interface{}{
-// 			{
-// 				"blog.time": map[string]string{
-// 					"order": "desc",
-// 				},
-// 			},
-// 		},
-// 		"from": offset,
-// 		"size": limit,
-// 		"_source": []string{
-// 			"blog_id",
-// 			"owner_account_id",
-// 			"blog.blocks", // To extract title, first paragraph, and first image
-// 			"tags",
-// 			"content_type",
-// 			"published_time",
-// 		},
-// 		"query": map[string]interface{}{
-// 			"bool": map[string]interface{}{
-// 				"must": []map[string]interface{}{
-// 					{
-// 						"terms": map[string]interface{}{
-// 							"tags.keyword": tags,
-// 						},
-// 					},
-// 					{
-// 						"term": map[string]interface{}{
-// 							"is_draft": isDraft,
-// 						},
-// 					},
-// 				},
-// 				"must_not": []map[string]interface{}{
-// 					{
-// 						"term": map[string]interface{}{
-// 							"is_archived": true,
-// 						},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
+	// Build the query to get all published blogs by accountID and fetch only tags field
+	query := map[string]interface{}{
+		"_source": []string{"tags"}, // Only fetch tags field for performance
+		"size":    10000,            // Get a large number of blogs to fetch all tags
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"owner_account_id.keyword": accountID,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_draft": false,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+			},
+		},
+	}
 
-// 	// Marshal the query to JSON
-// 	bs, err := json.Marshal(query)
-// 	if err != nil {
-// 		es.log.Errorf("GetBlogsMetadataByTags: cannot marshal the query, error: %v", err)
-// 		return nil, err
-// 	}
+	// Marshal the query to JSON
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetAllTagsFromUserPublishedBlogs: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
 
-// 	// Create a new search request with the query
-// 	req := esapi.SearchRequest{
-// 		Index: []string{constants.ElasticsearchBlogIndex},
-// 		Body:  strings.NewReader(string(bs)),
-// 	}
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
 
-// 	// Execute the search request
-// 	res, err := req.Do(ctx, es.client)
-// 	if err != nil {
-// 		es.log.Errorf("GetBlogsMetadataByTags: error executing search request, error: %+v", err)
-// 		return nil, err
-// 	}
-// 	defer res.Body.Close()
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetAllTagsFromUserPublishedBlogs: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetAllTagsFromUserPublishedBlogs: error closing response body, error: %v", err)
+		}
+	}()
 
-// 	// Check if the response indicates an error
-// 	if res.IsError() {
-// 		err = fmt.Errorf("GetBlogsMetadataByTags: search query failed, response: %+v", res)
-// 		es.log.Error(err)
-// 		return nil, err
-// 	}
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetAllTagsFromUserPublishedBlogs: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
 
-// 	// Read the response body
-// 	bodyBytes, err := io.ReadAll(res.Body)
-// 	if err != nil {
-// 		es.log.Errorf("GetBlogsMetadataByTags: error reading response body, error: %v", err)
-// 		return nil, err
-// 	}
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetAllTagsFromUserPublishedBlogs: error reading response body, error: %v", err)
+		return nil, err
+	}
 
-// 	// Parse the response body
-// 	var esResponse map[string]interface{}
-// 	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
-// 		es.log.Errorf("GetBlogsMetadataByTags: error decoding response body, error: %v", err)
-// 		return nil, err
-// 	}
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetAllTagsFromUserPublishedBlogs: error decoding response body, error: %v", err)
+		return nil, err
+	}
 
-// 	// Extract the hits from the response
-// 	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
-// 	if !ok {
-// 		err := fmt.Errorf("GetBlogsMetadataByTags: failed to parse hits from response")
-// 		es.log.Error(err)
-// 		return nil, err
-// 	}
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		err := fmt.Errorf("GetAllTagsFromUserPublishedBlogs: failed to parse hits from response")
+		es.log.Error(err)
+		return nil, err
+	}
 
-// 	// Prepare the result
-// 	blogsMetadata := make([]map[string]interface{}, 0, len(hits))
-// 	for _, hit := range hits {
-// 		hitSource := hit.(map[string]interface{})["_source"].(map[string]interface{})
-// 		blogMetadata := map[string]interface{}{
-// 			"blog_id":          hitSource["blog_id"],
-// 			"owner_account_id": hitSource["owner_account_id"],
-// 			"tags":             hitSource["tags"],
-// 			"content_type":     hitSource["content_type"],
-// 			"published_time":   hitSource["published_time"],
-// 		}
+	// Collect all tags from all blogs (including duplicates)
+	var allTags []string
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"]
+		source, ok := hitSource.(map[string]interface{})
+		if !ok {
+			es.log.Errorf("GetAllTagsFromUserPublishedBlogs: failed to cast hit source to map")
+			continue
+		}
 
-// 		// Extract title, first paragraph, and first image from blog.blocks
-// 		blocks, ok := hitSource["blog"].(map[string]interface{})["blocks"].([]interface{})
-// 		if !ok {
-// 			es.log.Errorf("GetBlogsMetadataByTags: failed to parse blog blocks")
-// 			continue
-// 		}
+		// Extract tags field
+		if tagsInterface, exists := source["tags"]; exists {
+			if tagsArray, ok := tagsInterface.([]interface{}); ok {
+				// Convert interface{} slice to string slice
+				for _, tag := range tagsArray {
+					if tagStr, ok := tag.(string); ok {
+						allTags = append(allTags, tagStr)
+					}
+				}
+			}
+		}
+	}
 
-// 		var title, firstParagraph, firstImage string
-// 		for _, block := range blocks {
-// 			blockMap := block.(map[string]interface{})
-// 			blockType := blockMap["type"].(string)
-// 			blockData := blockMap["data"].(map[string]interface{})
-
-// 			switch blockType {
-// 			case "header":
-// 				if title == "" && blockData["level"].(float64) == 1 {
-// 					title = blockData["text"].(string)
-// 				}
-// 			case "paragraph":
-// 				if firstParagraph == "" {
-// 					firstParagraph = blockData["text"].(string)
-// 				}
-// 			case "image":
-// 				if firstImage == "" {
-// 					firstImage = blockData["file"].(map[string]interface{})["url"].(string)
-// 				}
-// 			}
-// 		}
-
-// 		blogMetadata["title"] = title
-// 		blogMetadata["first_paragraph"] = firstParagraph
-// 		blogMetadata["first_image"] = firstImage
-
-// 		blogsMetadata = append(blogsMetadata, blogMetadata)
-// 	}
-
-// 	es.log.Infof("GetBlogsMetadataByTags: successfully fetched %d blogs metadata", len(blogsMetadata))
-// 	return blogsMetadata, nil
-// }
+	es.log.Debug("GetAllTagsFromUserPublishedBlogs: tag extraction operation completed")
+	return allTags, nil
+}
