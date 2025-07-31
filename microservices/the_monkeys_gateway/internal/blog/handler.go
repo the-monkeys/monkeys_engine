@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -1145,4 +1147,84 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+func (asc *BlogServiceClient) GetWordCloud(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	// Get the account_id from the username to verify user exists
+	_, err := asc.UserCli.GetUserDetails(username)
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the user does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch the user details"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	// Generate random word cloud with up to 40 words
+	wordCloud := generateRandomWordCloud(40)
+
+	ctx.JSON(http.StatusOK, gin.H{"word_cloud": wordCloud})
+}
+
+// generateRandomWordCloud creates a random word cloud with up to maxWords
+func generateRandomWordCloud(maxWords int) map[string]int {
+	// Predefined list of words for the word cloud
+	allWords := []string{
+		"technology", "health", "business", "science", "lifestyle", "travel",
+		"entertainment", "food", "education", "space", "psychology", "philosophy",
+		"innovation", "research", "development", "artificial", "intelligence",
+		"machine", "learning", "data", "analytics", "programming", "software",
+		"hardware", "networking", "security", "blockchain", "cryptocurrency",
+		"finance", "investment", "economics", "marketing", "design", "creativity",
+		"art", "music", "literature", "history", "culture", "society",
+		"environment", "sustainability", "climate", "energy", "renewable",
+		"medicine", "fitness", "nutrition", "wellness", "mindfulness",
+		"meditation", "productivity", "leadership", "management", "teamwork",
+		"communication", "writing", "reading", "knowledge", "wisdom",
+		"discovery", "exploration", "adventure", "nature", "wildlife",
+		"photography", "video", "gaming", "sports", "competition",
+		"achievement", "success", "motivation", "inspiration", "goals",
+		"dreams", "future", "progress", "evolution", "transformation",
+	}
+
+	// Seed random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Determine actual number of words to include (random between 15-40)
+	numWords := rand.Intn(26) + 15 // Random between 15 and 40
+
+	if numWords > maxWords {
+		numWords = maxWords
+	}
+
+	if numWords > len(allWords) {
+		numWords = len(allWords)
+	}
+
+	// Shuffle the words array
+	shuffledWords := make([]string, len(allWords))
+	copy(shuffledWords, allWords)
+	rand.Shuffle(len(shuffledWords), func(i, j int) {
+		shuffledWords[i], shuffledWords[j] = shuffledWords[j], shuffledWords[i]
+	})
+
+	// Create word cloud with random frequencies
+	wordCloud := make(map[string]int)
+	for i := 0; i < numWords; i++ {
+		// Random frequency between 1 and 20
+		frequency := rand.Intn(20) + 1
+		wordCloud[shuffledWords[i]] = frequency
+	}
+
+	return wordCloud
 }
