@@ -33,6 +33,13 @@ opensearch:
   os_username: admin
   os_password: "a!Too5hortPassword@1"
 email:
+  email_api_key:   # This is also the SMTP username for ZeptoMail
+  smtp_address: ""
+  smtp_mail: ""
+  smtp_password: ""
+  smtp_host: ""
+
+gmail:
   smtp_address: ""
   smtp_mail: ""
   smtp_password: ""
