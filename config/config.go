@@ -51,6 +51,13 @@ type Email struct {
 	SMTPHost     string `mapstructure:"smtp_host"`
 }
 
+type Gmail struct {
+	SMTPAddress  string `mapstructure:"smtp_address"`
+	SMTPMail     string `mapstructure:"smtp_mail"`
+	SMTPPassword string `mapstructure:"smtp_password"`
+	SMTPHost     string `mapstructure:"smtp_host"`
+}
+
 type Authentication struct {
 	EmailVerificationAddr string `mapstructure:"email_verification_addr"`
 }
@@ -101,6 +108,7 @@ type Config struct {
 	JWT               JWT               `mapstructure:"jwt"`
 	Opensearch        Opensearch        `mapstructure:"opensearch"`
 	Email             Email             `mapstructure:"email"`
+	Gmail             Gmail             `mapstructure:"gmail"`
 	Authentication    Authentication    `mapstructure:"authentication"`
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 	Keys              Keys              `mapstructure:"keys"`
