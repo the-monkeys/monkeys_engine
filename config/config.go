@@ -33,7 +33,8 @@ type Postgresql struct {
 }
 
 type JWT struct {
-	SecretKey string `mapstructure:"secret_key"`
+	SecretKey      string `mapstructure:"secret_key"`
+	AdminSecretKey string `mapstructure:"admin_secret_key"`
 }
 
 type Opensearch struct {
@@ -44,6 +45,13 @@ type Opensearch struct {
 }
 
 type Email struct {
+	SMTPAddress  string `mapstructure:"smtp_address"`
+	SMTPMail     string `mapstructure:"smtp_mail"`
+	SMTPPassword string `mapstructure:"smtp_password"`
+	SMTPHost     string `mapstructure:"smtp_host"`
+}
+
+type Gmail struct {
 	SMTPAddress  string `mapstructure:"smtp_address"`
 	SMTPMail     string `mapstructure:"smtp_mail"`
 	SMTPPassword string `mapstructure:"smtp_password"`
@@ -100,6 +108,7 @@ type Config struct {
 	JWT               JWT               `mapstructure:"jwt"`
 	Opensearch        Opensearch        `mapstructure:"opensearch"`
 	Email             Email             `mapstructure:"email"`
+	Gmail             Gmail             `mapstructure:"gmail"`
 	Authentication    Authentication    `mapstructure:"authentication"`
 	RabbitMQ          RabbitMQ          `mapstructure:"rabbitMQ"`
 	Keys              Keys              `mapstructure:"keys"`
