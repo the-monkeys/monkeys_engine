@@ -98,3 +98,18 @@ func RateLimiterMiddleware(limit string) gin.HandlerFunc {
 
 	return limiterGin.NewMiddleware(instance)
 }
+
+// LocalhostOnlyMiddleware ensures the request comes from localhost
+func LocalhostOnlyMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		clientIP := ctx.ClientIP()
+		if clientIP != "127.0.0.1" && clientIP != "::1" && clientIP != "localhost" {
+			logrus.Warnf("Admin API access denied from IP: %s", clientIP)
+			ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"message": "Admin API access is restricted to localhost only",
+			})
+			return
+		}
+		ctx.Next()
+	}
+}

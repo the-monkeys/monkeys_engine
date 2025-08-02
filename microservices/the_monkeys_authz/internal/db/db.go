@@ -49,6 +49,7 @@ func NewAuthDBHandler(cfg *config.Config) (AuthDBHandler, error) {
 		cfg.Postgresql.PrimaryDB.DBName,
 	)
 
+	logrus.Debugf("Attempting to connect to PostgreSQL at %s:%d", cfg.Postgresql.PrimaryDB.DBHost, cfg.Postgresql.PrimaryDB.DBPort)
 	dbPsql, err := sql.Open("postgres", url)
 	if err != nil {
 		logrus.Fatalf("cannot connect psql using sql driver, error:, %+v", err)
@@ -84,7 +85,7 @@ func (adh *authDBHandler) CheckIfEmailExist(email string) (*models.TheMonkeysUse
         `, email).
 		Scan(&tmu.Id, &tmu.AccountId, &tmu.Username, &tmu.FirstName, &tmu.LastName, &tmu.Email, &tmu.Password,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken, &tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with email %s, error: %+v", email, err)
+		logrus.Debugf("user not found for provided email, error: %+v", err)
 		return nil, err
 	}
 
@@ -117,7 +118,7 @@ func (adh *authDBHandler) RegisterUser(user *models.TheMonkeysUser) (int64, erro
 	}
 
 	if userId != authId {
-		logrus.Warnf("we are detecting some data inconsistency for user %s", user.Email)
+		logrus.Debugf("data inconsistency detected for user registration")
 	}
 
 	return userId, nil
@@ -185,24 +186,24 @@ func (adh *authDBHandler) UpdatePasswordRecoveryToken(hash string, req *models.T
 	stmt, err := tx.Prepare(`UPDATE user_auth_info SET password_recovery_token=$1,
 	password_recovery_timeout=$2 WHERE user_id=$3;`)
 	if err != nil {
-		logrus.Errorf("cannot prepare the reset link for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot prepare password recovery token update statement, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			logrus.Errorf("cannot close statement to update password recovery token for %s, error: %v", req.Email, err)
+			logrus.Errorf("cannot close password recovery token update statement, error: %v", err)
 		}
 	}()
 	result := stmt.QueryRow(hash, time.Now().Add(time.Minute*5).Format(constants.DateTimeFormat), req.Id)
 	if result.Err() != nil {
-		logrus.Errorf("cannot sent the reset link for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot execute password recovery token update, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the password recovery token for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot commit password recovery token update, error: %v", err)
 		return err
 	}
 	return nil
@@ -223,7 +224,7 @@ func (adh *authDBHandler) CheckIfUsernameExist(username string) (*models.TheMonk
 			&tmu.Password, &tmu.PasswordVerificationToken, &tmu.PasswordVerificationTimeout,
 			&tmu.EmailVerificationStatus, &tmu.UserStatus, &tmu.EmailVerificationToken,
 			&tmu.EmailVerificationTimeout); err != nil {
-		logrus.Errorf("can't find a user existing with username %s, error: %+v", username, err)
+		logrus.Debugf("user not found for provided username, error: %+v", err)
 		return nil, err
 	}
 
@@ -238,19 +239,19 @@ func (adh *authDBHandler) UpdatePassword(password string, user *models.TheMonkey
 
 	stmt, err := tx.Prepare(`UPDATE user_auth_info SET password_hash=$1 WHERE user_id=$2 RETURNING user_id;`)
 	if err != nil {
-		logrus.Errorf("cannot prepare statement to update password for %s error: %+v", user.Email, err)
+		logrus.Errorf("cannot prepare statement to update password, error: %+v", err)
 		return err
 	}
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			logrus.Errorf("cannot close statement to update password for %s error: %+v", user.Email, err)
+			logrus.Errorf("cannot close statement to update password, error: %+v", err)
 		}
 	}()
 
 	var userId int64
 	err = stmt.QueryRow(password, user.Id).Scan(&userId)
 	if err != nil {
-		logrus.Errorf("cannot update the password for %s, error: %v", user.Email, err)
+		logrus.Errorf("cannot update password, error: %v", err)
 		return err
 	}
 
@@ -259,7 +260,7 @@ func (adh *authDBHandler) UpdatePassword(password string, user *models.TheMonkey
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the password update for %s, error: %v", user.Email, err)
+		logrus.Errorf("cannot commit password update, error: %v", err)
 		return err
 	}
 	return nil
@@ -273,14 +274,14 @@ func (adh *authDBHandler) CreateUserLog(user *models.TheMonkeysUser, description
 	//From username find user id
 	if err = adh.db.QueryRow(`
 			SELECT id FROM user_account WHERE account_id = $1;`, user.AccountId).Scan(&userId); err != nil {
-		logrus.Errorf("can't get id by using account_id %s, error: %v", user.AccountId, err)
+		logrus.Errorf("cannot get user id by account_id, error: %v", err)
 		return err
 	}
 
 	//From client name find client id
 	if err := adh.db.QueryRow(`
 			SELECT id FROM clients WHERE c_name = $1;`, user.Client).Scan(&clientId); err != nil {
-		logrus.Errorf("can't get id by using client name %s, error: %+v", user.Client, err)
+		logrus.Errorf("cannot get client id by name, error: %+v", err)
 		return err
 	}
 
@@ -324,24 +325,24 @@ func (adh *authDBHandler) UpdateEmailVerificationToken(req *models.TheMonkeysUse
 	stmt, err := tx.Prepare(`UPDATE user_auth_info SET email_validation_token=$1,
 	email_verification_timeout=$2 WHERE user_id=$3;`)
 	if err != nil {
-		logrus.Errorf("cannot prepare the reset link for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot prepare email verification token update statement, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			logrus.Errorf("cannot close statement to update email verification token for %s, error: %v", req.Email, err)
+			logrus.Errorf("cannot close email verification token update statement, error: %v", err)
 		}
 	}()
 	result := stmt.QueryRow(req.EmailVerificationToken, req.EmailVerificationTimeout, req.Id)
 	if result.Err() != nil {
-		logrus.Errorf("cannot sent the reset link for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot execute email verification token update, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the password recovery token for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot commit email verification token update, error: %v", err)
 		return err
 	}
 	return nil
@@ -356,24 +357,24 @@ func (adh *authDBHandler) UpdateEmailVerificationStatus(req *models.TheMonkeysUs
 	stmt, err := tx.Prepare(`UPDATE user_auth_info SET email_validation_status=(SELECT id FROM email_validation_status WHERE status=$1),
 	email_validation_time=$2 WHERE user_id=$3;`)
 	if err != nil {
-		logrus.Errorf("cannot prepare the reset link for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot prepare email verification status update statement, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			logrus.Errorf("cannot close statement to update email verification status for %s, error: %v", req.Email, err)
+			logrus.Errorf("cannot close email verification status update statement, error: %v", err)
 		}
 	}()
 	_, err = stmt.Exec(constants.EmailVerificationStatusVerified, time.Now(), req.Id)
 	if err != nil {
-		logrus.Errorf("cannot update the email verification status for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot update email verification status, error: %v", err)
 		return status.Errorf(codes.Internal, "internal server error, error: %v", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("cannot commit the email verification status update for %s, error: %v", req.Email, err)
+		logrus.Errorf("cannot commit email verification status update, error: %v", err)
 		return err
 	}
 	return nil
@@ -415,7 +416,7 @@ func (adh *authDBHandler) UpdateEmailId(emailId string, user *models.TheMonkeysU
 		return errors.New("both emailId and username are required")
 	}
 
-	logrus.Infof("emailId: %v, username: %v", emailId, user.Username)
+	logrus.Debugf("updating email for user")
 
 	// Begin a transaction
 	tx, err := adh.db.Begin()

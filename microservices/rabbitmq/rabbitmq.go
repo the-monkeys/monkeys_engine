@@ -22,6 +22,7 @@ type Conn struct {
 func GetConn(conf config.RabbitMQ) (Conn, error) {
 	connString := fmt.Sprintf("amqp://%s:%s@%s:%s/%s", conf.Username, conf.Password, conf.Host, conf.Port, conf.VirtualHost)
 
+	logrus.Debugf("Attempting to connect to RabbitMQ at %s:%s", conf.Host, conf.Port)
 	conn, err := amqp.DialConfig(connString, amqp.Config{
 		Heartbeat: 10 * time.Second, // Set the heartbeat interval to 10 seconds
 	})
@@ -46,7 +47,7 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 		logrus.Fatalf("Queues or RoutingKeys are not configured properly")
 	}
 
-	logrus.Infof("Creating the exchange: %s", conf.Exchange)
+	logrus.Debugf("Creating the exchange: %s", conf.Exchange)
 	err = connection.Channel.ExchangeDeclare(conf.Exchange, "direct", true, false, false, false, nil)
 	if err != nil {
 		connection.Close()
@@ -54,14 +55,14 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 	}
 
 	for i, queue := range conf.Queues {
-		logrus.Infof("Creating a queue: %s", queue)
+		logrus.Debugf("Creating a queue: %s", queue)
 		_, err = connection.Channel.QueueDeclare(queue, true, false, false, false, nil)
 		if err != nil {
 			connection.Close()
 			return Conn{}, fmt.Errorf("failed to declare queue: %w", err)
 		}
 
-		logrus.Infof("Binding the queue %s with exchange %s using routing key %s", queue, conf.Exchange, conf.RoutingKeys[i])
+		logrus.Debugf("Binding the queue %s with exchange %s using routing key %s", queue, conf.Exchange, conf.RoutingKeys[i])
 		err = connection.Channel.QueueBind(queue, conf.RoutingKeys[i], conf.Exchange, false, nil)
 		if err != nil {
 			connection.Close()
@@ -98,7 +99,7 @@ func (c Conn) PublishMessage(exchangeName, routingKey string, message []byte) er
 	if err != nil {
 		return fmt.Errorf("error publishing message: %w", err)
 	}
-	logrus.Infoln("Message published")
+	logrus.Debugf("Message published to exchange: %s, routing key: %s", exchangeName, routingKey)
 	return nil
 }
 
@@ -121,12 +122,12 @@ func (c Conn) ReceiveData(queueName string) error {
 
 	go func() {
 		for d := range msgs {
-			logrus.Infof("Received a message: %s", d.Body)
+			logrus.Debugf("Received message from queue: %s, size: %d bytes", queueName, len(d.Body))
 			// Handle your message here
 		}
 	}()
 
-	logrus.Infoln("Waiting for messages. To exit press CTRL+C")
+	logrus.Infof("Consumer started for queue: %s. To exit press CTRL+C", queueName)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh

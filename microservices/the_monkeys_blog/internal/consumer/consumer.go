@@ -72,7 +72,13 @@ func handleUserAction(user models.InterServiceMessage, log *logrus.Logger, db da
 			log.Errorf("Failed to delete blogs for user: %s, error: %v", user.AccountId, err)
 			return
 		}
-		log.Infof("Deleted blogs for user: %s, response: %v", user.AccountId, resp.StatusCode)
+
+		// Check if response is nil (no blogs found to delete)
+		if resp == nil {
+			log.Infof("No blogs found for user: %s, deletion complete", user.AccountId)
+		} else {
+			log.Infof("Deleted blogs for user: %s, response status: %d", user.AccountId, resp.StatusCode)
+		}
 
 	default:
 		log.Errorf("Unknown action by: %s", user.AccountId)
