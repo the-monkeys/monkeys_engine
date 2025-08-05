@@ -18,6 +18,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/file_server"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/systems"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/recommendations_client"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
@@ -80,6 +81,9 @@ func main() {
 
 	// Register admin routes (restricted to local network)
 	admin.RegisterAdminRouter(server.router, cfg)
+
+	// Register system routes (restricted with system key)
+	systems.RegisterSystemRouter(server.router, cfg)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {
