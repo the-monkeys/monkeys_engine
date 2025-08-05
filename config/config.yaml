@@ -8,7 +8,7 @@ microservices:
   the_monkeys_storage: the_monkeys_storage:50054    # To run on the local replace with 0.0.0.0:50054
   the_monkeys_notification: the_monkeys_notification:50055   # To run on the local replace with
   the_monkeys_cache: the_monkeys_cache_svc:50056   # To run on the local replace with 0.0.0.0:50056
-  the_monkeys_recomm_engine: the_monkeys_recomm_engine:50057 
+  the_monkeys_ai_engine: the_monkeys_ai_engine:50057
 postgresql:
   primary_db:
     db_username: root
