@@ -33,8 +33,7 @@ type Postgresql struct {
 }
 
 type JWT struct {
-	SecretKey      string `mapstructure:"secret_key"`
-	AdminSecretKey string `mapstructure:"admin_secret_key"`
+	SecretKey string `mapstructure:"secret_key"`
 }
 
 type Opensearch struct {
@@ -78,6 +77,9 @@ type Keys struct {
 	MediaStack     string `mapstructure:"mediastack"`
 	NewsApi        string `mapstructure:"newsapi"`
 	HindustanTimes string `mapstructure:"hindustantimes"`
+	GitHubToken    string `mapstructure:"github_token"`
+	AdminSecretKey string `mapstructure:"admin_secret_key"`
+	SystemKey      string `mapstructure:"system_key"` // Key for system-level operations
 }
 
 type GoogleOAuth2 struct {

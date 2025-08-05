@@ -38,3 +38,5 @@ backup/*
 .idea/
 .vscode/
 config/config.yaml
+elasticsearch_snapshots/*
+postgres_backup/*
