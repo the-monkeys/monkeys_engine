@@ -98,10 +98,13 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// Get blogs by tags, as users can filter the blogs using multiple tags
 		routesV2.POST("/tags", rateLimiter, blogClient.GetBlogsByTags) // Get blogs by tags
 		// Get blogs by username, not auth required as it is public and can be visible at users profile
-		routesV2.GET("/all/:username", rateLimiter, blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
+		// routesV2.GET("/all/:username", rateLimiter, blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
 		routesV2.GET("/user/:username", rateLimiter, blogClient.MetaUsersPublished) // Get metadata of user's published blogs
 		// Get published blog by blog_id
 		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
+
+		// User Tags API
+		routesV2.GET("/user-tags/:username", rateLimiter, blogClient.GetUserTags) // Get user tags
 	}
 
 	routesV2.Use(mware.AuthRequired)
@@ -111,12 +114,12 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// Get blogs of following users
 		routesV2.GET("/following", rateLimiter, blogClient.FollowingBlogsFeed) // Blogs for following feed
 		// User can get their blogs (draft)
-		routesV2.GET("/my-drafts", rateLimiter, blogClient.MyDraftBlogs)       // Get all my draft blogs
+		// routesV2.GET("/my-drafts", rateLimiter, blogClient.MyDraftBlogs)       // Get all my draft blogs
 		routesV2.GET("/in-my-draft", rateLimiter, blogClient.MetaMyDraftBlogs) // Get my draft blog by id
 		// Users can get their blogs (published)
 		routesV2.GET("/my-published", rateLimiter, blogClient.MyPublishedBlogs) // Get all my published blogs
 		// Users can get the blogs they bookmarked (published)
-		routesV2.GET("/my-bookmarks", rateLimiter, blogClient.MyBookmarks)       // Update of blogClient.GetBookmarks
+		// routesV2.GET("/my-bookmarks", rateLimiter, blogClient.MyBookmarks)       // Update of blogClient.GetBookmarks
 		routesV2.GET("/in-my-bookmark", rateLimiter, blogClient.MetaMyBookmarks) // Get my bookmark blog by id
 		// My feed blogs, contains blogs from people I follow + my own blogs + topics I follow
 		// routesV2.GET("/my-feed", blogClient.MyFeedBlogs) // Get my feed blogs

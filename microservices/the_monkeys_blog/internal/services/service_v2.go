@@ -597,3 +597,32 @@ func (blog *BlogService) MetaGetBlogsByBlogIds(req *pb.BlogListReq, stream pb.Bl
 
 	return nil
 }
+
+func (blog *BlogService) UsersBlogData(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
+	blog.logger.Debugf("Received request for user blog data: %v", req)
+
+	// Fetch user blog data from the database
+	blogData, err := blog.osClient.GetAllTagsFromUserPublishedBlogs(ctx, req.AccountId)
+	if err != nil {
+		blog.logger.Errorf("Error fetching user blog data: %v", err)
+		return nil, status.Errorf(codes.Internal, "Error fetching user blog data: %v", err)
+	}
+
+	// Count the no of unique tags into a map
+	tagCount := make(map[string]int)
+	for _, tag := range blogData {
+		tagCount[tag]++
+
+	}
+	// Marshal the blog data into a protobuf Any message
+	blogBytes, err := json.Marshal(tagCount)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blog data: %v", err)
+		return nil, status.Errorf(codes.Internal, "Error marshalling blog data: %v", err)
+	}
+
+	return &anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}, nil
+}

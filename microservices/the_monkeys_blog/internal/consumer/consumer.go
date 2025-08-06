@@ -23,9 +23,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 
 	go func() {
 		<-sigChan
-		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
+		logrus.Info("Graceful shutdown initiated - closing RabbitMQ connections")
 		if err := conn.Channel.Close(); err != nil {
-			logrus.Errorf("Failed to close RabbitMQ channel: %v", err)
+			logrus.Errorf("RabbitMQ channel closure failed: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -48,14 +48,14 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 		nil,       // args
 	)
 	if err != nil {
-		logrus.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
+		logrus.Errorf("Queue consumer registration failed for '%s': %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.InterServiceMessage{}
 		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+			logrus.Errorf("Message deserialization failed: %v", err)
 			continue
 		}
 
@@ -66,15 +66,20 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 func handleUserAction(user models.InterServiceMessage, log *logrus.Logger, db database.ElasticsearchStorage) {
 	switch user.Action {
 	case constants.USER_ACCOUNT_DELETE:
-		log.Infof("Deleting all blogs for user: %s", user.AccountId)
+		log.Debug("Processing user account deletion request")
 		resp, err := db.DeleteBlogsByOwnerAccountID(context.Background(), user.AccountId)
 		if err != nil {
-			log.Errorf("Failed to delete blogs for user: %s, error: %v", user.AccountId, err)
+			log.Errorf("Blog deletion operation failed: %v", err)
 			return
 		}
-		log.Infof("Deleted blogs for user: %s, response: %v", user.AccountId, resp.StatusCode)
+		// Check if response is nil (no blogs found to delete)
+		if resp == nil {
+			log.Info("User account deletion completed - no associated blogs found")
+		} else {
+			log.Infof("User account deletion completed successfully - blogs removed (status: %d)", resp.StatusCode)
+		}
 
 	default:
-		log.Errorf("Unknown action by: %s", user.AccountId)
+		log.Warnf("Received unsupported action type: %s", user.Action)
 	}
 }

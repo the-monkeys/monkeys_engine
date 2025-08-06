@@ -2779,7 +2779,7 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = []byte{
 	0x01, 0x28, 0x05, 0x52, 0x05, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x66,
 	0x66, 0x73, 0x65, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x6f, 0x66, 0x66, 0x73,
 	0x65, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x61, 0x67, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x09,
-	0x52, 0x04, 0x74, 0x61, 0x67, 0x73, 0x32, 0x89, 0x0e, 0x0a, 0x0b, 0x42, 0x6c, 0x6f, 0x67, 0x53,
+	0x52, 0x04, 0x74, 0x61, 0x67, 0x73, 0x32, 0xc3, 0x0e, 0x0a, 0x0b, 0x42, 0x6c, 0x6f, 0x67, 0x53,
 	0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x41, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x42, 0x6c, 0x6f,
 	0x67, 0x73, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x15, 0x2e, 0x62, 0x6c, 0x6f,
 	0x67, 0x5f, 0x73, 0x76, 0x63, 0x2e, 0x42, 0x6c, 0x6f, 0x67, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65,
@@ -2892,9 +2892,13 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = []byte{
 	0x49, 0x64, 0x73, 0x12, 0x15, 0x2e, 0x62, 0x6c, 0x6f, 0x67, 0x5f, 0x73, 0x76, 0x63, 0x2e, 0x42,
 	0x6c, 0x6f, 0x67, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x71, 0x1a, 0x14, 0x2e, 0x67, 0x6f, 0x6f,
 	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79,
-	0x30, 0x01, 0x42, 0x24, 0x5a, 0x22, 0x2e, 0x2f, 0x61, 0x70, 0x69, 0x73, 0x2f, 0x73, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x63, 0x6f, 0x6e, 0x6e, 0x2f, 0x67, 0x61, 0x74, 0x65, 0x77, 0x61, 0x79,
-	0x5f, 0x62, 0x6c, 0x6f, 0x67, 0x2f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x30, 0x01, 0x12, 0x38, 0x0a, 0x0d, 0x55, 0x73, 0x65, 0x72, 0x73, 0x42, 0x6c, 0x6f, 0x67, 0x44,
+	0x61, 0x74, 0x61, 0x12, 0x11, 0x2e, 0x62, 0x6c, 0x6f, 0x67, 0x5f, 0x73, 0x76, 0x63, 0x2e, 0x42,
+	0x6c, 0x6f, 0x67, 0x52, 0x65, 0x71, 0x1a, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x42, 0x24, 0x5a, 0x22,
+	0x2e, 0x2f, 0x61, 0x70, 0x69, 0x73, 0x2f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x63, 0x6f,
+	0x6e, 0x6e, 0x2f, 0x67, 0x61, 0x74, 0x65, 0x77, 0x61, 0x79, 0x5f, 0x62, 0x6c, 0x6f, 0x67, 0x2f,
+	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2989,33 +2993,35 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_depIdxs = []int32{
 	32, // 38: blog_svc.BlogService.MetaGetFeedBlogs:input_type -> blog_svc.BlogListReq
 	32, // 39: blog_svc.BlogService.MetaGetUsersBlogs:input_type -> blog_svc.BlogListReq
 	32, // 40: blog_svc.BlogService.MetaGetBlogsByBlogIds:input_type -> blog_svc.BlogListReq
-	34, // 41: blog_svc.BlogService.GetBlogsMetadata:output_type -> google.protobuf.Any
-	34, // 42: blog_svc.BlogService.SearchBlogsMetadata:output_type -> google.protobuf.Any
-	11, // 43: blog_svc.BlogService.PublishBlog:output_type -> blog_svc.PublishBlogResp
-	1,  // 44: blog_svc.BlogService.DraftBlog:output_type -> blog_svc.BlogResponse
-	13, // 45: blog_svc.BlogService.GetPublishedBlogById:output_type -> blog_svc.BlogByIdRes
-	13, // 46: blog_svc.BlogService.GetDraftBlogById:output_type -> blog_svc.BlogByIdRes
-	15, // 47: blog_svc.BlogService.ArchiveBlogById:output_type -> blog_svc.ArchiveBlogResp
-	18, // 48: blog_svc.BlogService.GetPublishedBlogsByTagsName:output_type -> blog_svc.GetBlogsByTagsNameRes
-	20, // 49: blog_svc.BlogService.GetDraftBlogsByAccId:output_type -> blog_svc.GetDraftBlogsRes
-	21, // 50: blog_svc.BlogService.GetPublishedBlogsByAccID:output_type -> blog_svc.GetPublishedBlogsRes
-	18, // 51: blog_svc.BlogService.GetLatest100Blogs:output_type -> blog_svc.GetBlogsByTagsNameRes
-	13, // 52: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:output_type -> blog_svc.BlogByIdRes
-	26, // 53: blog_svc.BlogService.GetAllBlogsByBlogIds:output_type -> blog_svc.GetBlogsRes
-	22, // 54: blog_svc.BlogService.CheckIfBlogsExist:output_type -> blog_svc.BlogExistsRes
-	24, // 55: blog_svc.BlogService.DeleteABlogByBlogId:output_type -> blog_svc.DeleteBlogResp
-	13, // 56: blog_svc.BlogService.GetDraftBlogByBlogId:output_type -> blog_svc.BlogByIdRes
-	34, // 57: blog_svc.BlogService.DraftBlogV2:output_type -> google.protobuf.Any
-	34, // 58: blog_svc.BlogService.BlogsOfFollowingAccounts:output_type -> google.protobuf.Any
-	34, // 59: blog_svc.BlogService.GetBlogs:output_type -> google.protobuf.Any
-	34, // 60: blog_svc.BlogService.GetBlog:output_type -> google.protobuf.Any
-	31, // 61: blog_svc.BlogService.MoveBlogToDraftStatus:output_type -> blog_svc.BlogResp
-	34, // 62: blog_svc.BlogService.GetBlogsBySlice:output_type -> google.protobuf.Any
-	34, // 63: blog_svc.BlogService.MetaGetFeedBlogs:output_type -> google.protobuf.Any
-	34, // 64: blog_svc.BlogService.MetaGetUsersBlogs:output_type -> google.protobuf.Any
-	34, // 65: blog_svc.BlogService.MetaGetBlogsByBlogIds:output_type -> google.protobuf.Any
-	41, // [41:66] is the sub-list for method output_type
-	16, // [16:41] is the sub-list for method input_type
+	30, // 41: blog_svc.BlogService.UsersBlogData:input_type -> blog_svc.BlogReq
+	34, // 42: blog_svc.BlogService.GetBlogsMetadata:output_type -> google.protobuf.Any
+	34, // 43: blog_svc.BlogService.SearchBlogsMetadata:output_type -> google.protobuf.Any
+	11, // 44: blog_svc.BlogService.PublishBlog:output_type -> blog_svc.PublishBlogResp
+	1,  // 45: blog_svc.BlogService.DraftBlog:output_type -> blog_svc.BlogResponse
+	13, // 46: blog_svc.BlogService.GetPublishedBlogById:output_type -> blog_svc.BlogByIdRes
+	13, // 47: blog_svc.BlogService.GetDraftBlogById:output_type -> blog_svc.BlogByIdRes
+	15, // 48: blog_svc.BlogService.ArchiveBlogById:output_type -> blog_svc.ArchiveBlogResp
+	18, // 49: blog_svc.BlogService.GetPublishedBlogsByTagsName:output_type -> blog_svc.GetBlogsByTagsNameRes
+	20, // 50: blog_svc.BlogService.GetDraftBlogsByAccId:output_type -> blog_svc.GetDraftBlogsRes
+	21, // 51: blog_svc.BlogService.GetPublishedBlogsByAccID:output_type -> blog_svc.GetPublishedBlogsRes
+	18, // 52: blog_svc.BlogService.GetLatest100Blogs:output_type -> blog_svc.GetBlogsByTagsNameRes
+	13, // 53: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:output_type -> blog_svc.BlogByIdRes
+	26, // 54: blog_svc.BlogService.GetAllBlogsByBlogIds:output_type -> blog_svc.GetBlogsRes
+	22, // 55: blog_svc.BlogService.CheckIfBlogsExist:output_type -> blog_svc.BlogExistsRes
+	24, // 56: blog_svc.BlogService.DeleteABlogByBlogId:output_type -> blog_svc.DeleteBlogResp
+	13, // 57: blog_svc.BlogService.GetDraftBlogByBlogId:output_type -> blog_svc.BlogByIdRes
+	34, // 58: blog_svc.BlogService.DraftBlogV2:output_type -> google.protobuf.Any
+	34, // 59: blog_svc.BlogService.BlogsOfFollowingAccounts:output_type -> google.protobuf.Any
+	34, // 60: blog_svc.BlogService.GetBlogs:output_type -> google.protobuf.Any
+	34, // 61: blog_svc.BlogService.GetBlog:output_type -> google.protobuf.Any
+	31, // 62: blog_svc.BlogService.MoveBlogToDraftStatus:output_type -> blog_svc.BlogResp
+	34, // 63: blog_svc.BlogService.GetBlogsBySlice:output_type -> google.protobuf.Any
+	34, // 64: blog_svc.BlogService.MetaGetFeedBlogs:output_type -> google.protobuf.Any
+	34, // 65: blog_svc.BlogService.MetaGetUsersBlogs:output_type -> google.protobuf.Any
+	34, // 66: blog_svc.BlogService.MetaGetBlogsByBlogIds:output_type -> google.protobuf.Any
+	34, // 67: blog_svc.BlogService.UsersBlogData:output_type -> google.protobuf.Any
+	42, // [42:68] is the sub-list for method output_type
+	16, // [16:42] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
 	16, // [16:16] is the sub-list for extension extendee
 	0,  // [0:16] is the sub-list for field type_name
