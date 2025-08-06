@@ -184,7 +184,6 @@ var Technology = []string{
 	"SU7 Ultra",
 	"Microsoft",
 	"Meta",
-	"SpaceX",
 	"Mastodon",
 	"Google Tensor",
 	"Binance",
@@ -265,6 +264,13 @@ var Technology = []string{
 	"IOS Development",
 	"Programming",
 	"Tech",
+	"AI Agents",
+	"Data Engineering",
+	"Automation",
+	"Machine Learning",
+	"Google Cloud",
+	"BigQuery",
+	"Google Gemini",
 }
 
 var Sports = []string{
@@ -350,7 +356,6 @@ var Sports = []string{
 var Science = []string{
 	"Science",
 	"Jezero Crater",
-	"Archaeology",
 	"Space Exploration",
 	"MultiverseTheory",
 	"BigBangTheory",
@@ -380,7 +385,6 @@ var Science = []string{
 	"Chemistry",
 	"Research",
 	"Nuclear Disaster",
-	"SpaceX",
 	"Maths",
 	"Physics",
 	"UniverseInsideBlackHole",
@@ -594,6 +598,7 @@ var Space = []string{
 	"Blue Origin",
 	"Asteroid Bennu",
 	"Space Programs",
+	"SpaceX",
 }
 
 var PhilosophyAndPsychology = []string{
