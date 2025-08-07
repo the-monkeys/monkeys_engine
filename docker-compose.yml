@@ -35,7 +35,7 @@ services:
     restart: on-failure
 
   elasticsearch-node1:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
     container_name: elasticsearch-node1
     environment:
       - discovery.type=single-node
@@ -44,6 +44,7 @@ services:
       - ELASTIC_PASSWORD=a!Too5hortPassword@1
       - xpack.security.enabled=false
       - xpack.security.transport.ssl.enabled=false
+      - path.repo=/usr/share/elasticsearch/snapshots
     ulimits:
       memlock:
         soft: -1
@@ -53,6 +54,7 @@ services:
         hard: 65536
     volumes:
       - elasticsearch-data1:/usr/share/elasticsearch/data
+      - ./elasticsearch_snapshots:/usr/share/elasticsearch/snapshots
     ports:
       - 9200:9200
       - 9300:9300

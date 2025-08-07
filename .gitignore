@@ -40,3 +40,11 @@ backup/*
 config/config.yaml
 elasticsearch_snapshots/*
 postgres_backup/*
+action.md
+microservices/the_monkeys_recommendations/__pycache__/*
+
+
+# Temporary files
+bc
+es.json
+es.prod.json
