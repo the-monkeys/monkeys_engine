@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: Secret
       POSTGRES_USER: root
       POSTGRES_DB: the_monkeys_user_dev
+      POSTGRESQL_ENABLE_LDAP: no
     ports:
       - 1234:5432
     networks:
@@ -14,6 +15,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
+      - ./postgres_backup:/backup_source
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/99-restore-backup.sh
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U root" ]
       interval: 5s
