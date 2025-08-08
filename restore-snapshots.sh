@@ -121,7 +121,6 @@ elif echo "$SNAPSHOTS_RESPONSE" | grep -q '"snapshots"'; then
             "ignore_unavailable": true,
             "include_global_state": false
         }'
-
         if curl -s -X POST "http://localhost:9200/_snapshot/backup_repo/$LATEST_SNAPSHOT/_restore?pretty" \
              -H "Content-Type: application/json" \
              -d "$RESTORE_BODY" > /dev/null; then
@@ -134,7 +133,6 @@ elif echo "$SNAPSHOTS_RESPONSE" | grep -q '"snapshots"'; then
             echo -e "${CYAN}Checking available indices...${NC}"
             INDICES_OUTPUT=$(curl -s "http://localhost:9200/_cat/indices?v")
             echo -e "${WHITE}$INDICES_OUTPUT${NC}"
-
             echo -e "${GREEN}Snapshot restoration process completed!${NC}"
             echo -e "${GREEN}Your Elasticsearch data should now be available!${NC}"
         else
