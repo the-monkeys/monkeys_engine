@@ -20,7 +20,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/systems"
 
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/recommendations_client"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/monkeys_ai"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
 )
@@ -77,7 +77,7 @@ func main() {
 	blog.RegisterBlogRouter(server.router, cfg, authClient, userClient)
 	file_server.RegisterFileStorageRouter(server.router, cfg, authClient)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
-	recommendations_client.RegisterRecommendationRoute(server.router, cfg, authClient, log)
+	monkeys_ai.RegisterRecommendationRoute(server.router, cfg, authClient, log)
 
 	// Register admin routes (restricted to local network)
 	admin.RegisterAdminRouter(server.router, cfg)

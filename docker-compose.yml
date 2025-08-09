@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: Secret
       POSTGRES_USER: root
       POSTGRES_DB: the_monkeys_user_dev
+      POSTGRESQL_ENABLE_LDAP: no
     ports:
       - 1234:5432
     networks:
@@ -14,6 +15,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backup:/backup
+      - ./postgres_backup:/backup_source
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U root" ]
       interval: 5s
@@ -35,7 +37,7 @@ services:
     restart: on-failure
 
   elasticsearch-node1:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
     container_name: elasticsearch-node1
     environment:
       - discovery.type=single-node
@@ -44,6 +46,7 @@ services:
       - ELASTIC_PASSWORD=a!Too5hortPassword@1
       - xpack.security.enabled=false
       - xpack.security.transport.ssl.enabled=false
+      - path.repo=/usr/share/elasticsearch/snapshots
     ulimits:
       memlock:
         soft: -1
@@ -53,6 +56,7 @@ services:
         hard: 65536
     volumes:
       - elasticsearch-data1:/usr/share/elasticsearch/data
+      - ./elasticsearch_snapshots:/usr/share/elasticsearch/snapshots
     ports:
       - 9200:9200
       - 9300:9300
@@ -201,8 +205,8 @@ services:
     command: go run microservices/the_monkeys_notification/main.go
     restart: always
 
-  the_monkeys_recomm_engine:
-    container_name: "the_monkeys_recomm_engine"
+  the_monkeys_ai_engine:
+    container_name: "the_monkeys_ai_engine"
     image: python:3.10
     networks:
       - monkeys-network
@@ -213,23 +217,32 @@ services:
       - .:/app
     ports:
       - "50057:50057"
+      - "51057:51057"  # Health check endpoint (gRPC port + 1000)
     working_dir: /app
     command: >
       bash -c "echo 'Starting setup...' && 
+        echo 'Installing system dependencies...' &&
+        apt-get update && apt-get install -y curl &&
         echo 'Installing requirements...' &&
         pip install -r requirements.txt && 
         cd /app && 
         echo 'Generating proto files...' &&
-        cd microservices/the_monkeys_recommendations &&
+        cd microservices/the_monkeys_ai &&
         python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto &&
         echo 'Proto files generated successfully!' &&
         ls -la && # Show files in directory
         cd /app &&
         echo 'Running main.py...' &&
-        PYTHONPATH=/app python -u microservices/the_monkeys_recommendations/main.py 2>&1"
+        PYTHONPATH=/app python -u microservices/the_monkeys_ai/main.py 2>&1"
     restart: always
     environment:
       - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:51057/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   monkeys-network:

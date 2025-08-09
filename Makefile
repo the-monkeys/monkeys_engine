@@ -38,10 +38,10 @@ proto-gen:
        
     # To Generate Python Recommendation Server code
 	python -m grpc_tools.protoc \
-    -I=microservices/the_monkeys_recommendations \
-    --python_out=microservices/the_monkeys_recommendations \
-    --grpc_python_out=microservices/the_monkeys_recommendations \
-    microservices/the_monkeys_recommendations/gw_recom.proto
+    -I=microservices/the_monkeys_ai \
+    --python_out=microservices/the_monkeys_ai \
+    --grpc_python_out=microservices/the_monkeys_ai \
+    microservices/the_monkeys_ai/gw_recom.proto
 
 
 freeze:
