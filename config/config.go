@@ -92,6 +92,7 @@ type GoogleOAuth2 struct {
 
 type Cors struct {
 	AllowedOriginExp string `mapstructure:"allowed_origin_regexp"`
+	UseTempCors      bool   `mapstructure:"use_temp_cors"`
 }
 
 type Redis struct {
