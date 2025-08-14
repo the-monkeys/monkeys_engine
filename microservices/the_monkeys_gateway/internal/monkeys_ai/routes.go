@@ -1,4 +1,4 @@
-package recommendations_client
+package monkeys_ai
 
 import (
 	"net/http"
@@ -25,7 +25,7 @@ type RecommendationsClient struct {
 }
 
 func NewRecommendationsClient(cfg *config.Config) pb.RecommendationServiceClient {
-	addr := cfg.Microservices.TheMonkeysRecommEngine
+	addr := cfg.Microservices.TheMonkeysAIEngine
 
 	// Try connection with more detailed logging
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
