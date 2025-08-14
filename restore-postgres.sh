@@ -97,70 +97,65 @@ if [ "$confirmation" != "y" ] && [ "$confirmation" != "Y" ]; then
     exit 0
 fi
 
-# Create a temporary database for restoration
-TEMP_DB_NAME="${DATABASE_NAME}_restore_temp_$(date +%Y%m%d_%H%M%S)"
-echo -e "${CYAN}Creating temporary database '$TEMP_DB_NAME'...${NC}"
+# Terminate connections to the target database
+echo -e "${CYAN}Terminating connections to database '$DATABASE_NAME'...${NC}"
 
-if ! docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "CREATE DATABASE \"$TEMP_DB_NAME\";" > /dev/null 2>&1; then
-    echo -e "${RED}Failed to create temporary database${NC}"
-    exit 1
-fi
+# Simple connection termination without permission-dependent commands
+for i in {1..3}; do
+    echo -e "${GRAY}   Termination attempt $i/3...${NC}"
+    # Terminate all existing connections
+    TERMINATE_RESULT=$(docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DATABASE_NAME' AND pid <> pg_backend_pid();" 2>&1 || true)
+    sleep 2
 
-# Restore backup to temporary database
-echo -e "${CYAN}Restoring backup to temporary database...${NC}"
+    # Check remaining connections
+    REMAINING_CONNECTIONS=$(docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -t -c "SELECT COUNT(*) FROM pg_stat_activity WHERE datname = '$DATABASE_NAME';" 2>/dev/null | tr -d ' ' || echo "0")
+
+    if [ "$REMAINING_CONNECTIONS" -eq 0 ] 2>/dev/null; then
+        echo -e "${GREEN}   All connections terminated successfully${NC}"
+        break
+    else
+        echo -e "${YELLOW}   $REMAINING_CONNECTIONS connections still active, retrying...${NC}"
+        if [ $i -eq 3 ]; then
+            echo -e "${YELLOW}   Some connections still active, but proceeding with restore...${NC}"
+        fi
+    fi
+done
+
+# Drop all existing data in the database
+echo -e "${CYAN}Dropping existing data in database '$DATABASE_NAME'...${NC}"
+docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d "$DATABASE_NAME" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" > /dev/null 2>&1
+
+# Restore backup directly to the target database
+echo -e "${CYAN}Restoring backup to database '$DATABASE_NAME'...${NC}"
 BACKUP_PATH="/backup_source/$BACKUP_NAME"
 
 # Check if backup file exists in container
 if ! docker exec "$CONTAINER_NAME" test -f "$BACKUP_PATH" > /dev/null 2>&1; then
     echo -e "${RED}Error: Backup file not found in container at path: $BACKUP_PATH${NC}"
-    # Clean up temporary database
-    docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "DROP DATABASE \"$TEMP_DB_NAME\";" > /dev/null 2>&1
     exit 1
 fi
 
 # Restore the backup
 echo -e "${YELLOW}Restoring backup... This may take several minutes...${NC}"
-RESTORE_OUTPUT=$(docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" pg_restore -U "$USERNAME" -d "$TEMP_DB_NAME" --no-owner --verbose "$BACKUP_PATH" 2>&1)
+RESTORE_OUTPUT=$(docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" pg_restore -U "$USERNAME" -d "$DATABASE_NAME" --no-owner --verbose "$BACKUP_PATH" 2>&1)
 RESTORE_EXIT_CODE=$?
 
 # Check if restore had critical errors (not just warnings)
 CRITICAL_ERRORS=$(echo "$RESTORE_OUTPUT" | grep "error:" | grep -v "role.*does not exist" | grep -v "DEFAULT PRIVILEGES")
 
 if [ $RESTORE_EXIT_CODE -ne 0 ] && [ -n "$CRITICAL_ERRORS" ]; then
-    echo -e "${RED}Failed to restore backup to temporary database${NC}"
+    echo -e "${RED}Failed to restore backup to database${NC}"
     echo -e "${RED}Critical errors found:${NC}"
     echo "$CRITICAL_ERRORS" | while read -r error; do
         echo -e "${RED}  $error${NC}"
     done
-    # Clean up temporary database
-    docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "DROP DATABASE \"$TEMP_DB_NAME\";" > /dev/null 2>&1
     exit 1
 elif echo "$RESTORE_OUTPUT" | grep -q "warning:"; then
     WARNING_COUNT=$(echo "$RESTORE_OUTPUT" | grep -c "warning:")
     echo -e "${YELLOW}Restore completed with $WARNING_COUNT warnings (mostly about role ownership - this is expected)${NC}"
 fi
 
-echo -e "${GREEN}Backup restored successfully to temporary database!${NC}"
-
-# Terminate connections to the target database
-echo -e "${CYAN}Terminating connections to database '$DATABASE_NAME'...${NC}"
-TERMINATE_QUERY="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DATABASE_NAME' AND pid <> pg_backend_pid();"
-docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "$TERMINATE_QUERY" > /dev/null 2>&1
-
-# Drop the old database and rename the temporary one
-echo -e "${CYAN}Replacing old database with restored data...${NC}"
-
-if ! docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "DROP DATABASE IF EXISTS \"$DATABASE_NAME\";" > /dev/null 2>&1; then
-    echo -e "${RED}Failed to drop old database${NC}"
-    # Clean up temporary database
-    docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "DROP DATABASE \"$TEMP_DB_NAME\";" > /dev/null 2>&1
-    exit 1
-fi
-
-if ! docker exec -e PGPASSWORD="$PASSWORD" "$CONTAINER_NAME" psql -U "$USERNAME" -d postgres -c "ALTER DATABASE \"$TEMP_DB_NAME\" RENAME TO \"$DATABASE_NAME\";" > /dev/null 2>&1; then
-    echo -e "${RED}Failed to rename temporary database${NC}"
-    exit 1
-fi
+echo -e "${GREEN}Backup restored successfully to database '$DATABASE_NAME'!${NC}"
 
 # Verify restoration
 echo -e "${CYAN}Verifying database restoration...${NC}"
