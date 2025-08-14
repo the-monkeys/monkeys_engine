@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -23,16 +22,19 @@ func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func CORSMiddleware(allowedOriginExp string) gin.HandlerFunc {
-	fmt.Printf("allowedOriginExp: %v\n", allowedOriginExp)
 	return func(c *gin.Context) {
 		requestOrigin := c.Request.Header.Get("Origin")
-		fmt.Printf("Request Origin: %v\n", requestOrigin)
-
 		if match, _ := regexp.Match(allowedOriginExp, []byte(requestOrigin)); match {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
-			fmt.Printf("CORS allowed for origin: %v\n", requestOrigin)
+			logrus.WithFields(logrus.Fields{
+				"origin": requestOrigin,
+				"method": c.Request.Method,
+			}).Debug("CORS request allowed")
 		} else {
-			fmt.Printf("CORS blocked for origin: %v\n", requestOrigin)
+			logrus.WithFields(logrus.Fields{
+				"origin": requestOrigin,
+				"method": c.Request.Method,
+			}).Warn("CORS request blocked - origin not allowed")
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -59,7 +61,10 @@ func TmpCORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		if origin != "" {
-			fmt.Printf("TmpCORS: Allowing origin: %v\n", origin)
+			logrus.WithFields(logrus.Fields{
+				"origin": origin,
+				"method": c.Request.Method,
+			}).Debug("Temporary CORS middleware - allowing all origins")
 		}
 		corsMiddleware(c)
 	}
