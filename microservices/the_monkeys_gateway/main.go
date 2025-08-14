@@ -59,8 +59,14 @@ func main() {
 		ReferrerPolicy:        "strict-origin-when-cross-origin",
 	}))
 
-	// Enable CORS
-	server.router.Use(middleware.CORSMiddleware(cfg.Cors.AllowedOriginExp))
+	// Enable CORS - conditionally use temp CORS or strict CORS based on config
+	if cfg.Cors.UseTempCors {
+		logrus.Info("Using temporary CORS middleware (allows all origins)")
+		server.router.Use(middleware.TmpCORSMiddleware())
+	} else {
+		logrus.Info("Using strict CORS middleware with regex pattern")
+		server.router.Use(middleware.CORSMiddleware(cfg.Cors.AllowedOriginExp))
+	}
 
 	// Log request body
 	server.router.Use(middleware.LogRequestBody())

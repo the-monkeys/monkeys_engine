@@ -24,9 +24,17 @@ func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
 func CORSMiddleware(allowedOriginExp string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestOrigin := c.Request.Header.Get("Origin")
-
 		if match, _ := regexp.Match(allowedOriginExp, []byte(requestOrigin)); match {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", requestOrigin)
+			logrus.WithFields(logrus.Fields{
+				"origin": requestOrigin,
+				"method": c.Request.Method,
+			}).Debug("CORS request allowed")
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"origin": requestOrigin,
+				"method": c.Request.Method,
+			}).Warn("CORS request blocked - origin not allowed")
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -47,7 +55,19 @@ func TmpCORSMiddleware() gin.HandlerFunc {
 		AllowHeaders:     []string{"*"},                                                // Allow all headers
 		AllowCredentials: true,
 	}
-	return cors.New(config)
+
+	corsMiddleware := cors.New(config)
+
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		if origin != "" {
+			logrus.WithFields(logrus.Fields{
+				"origin": origin,
+				"method": c.Request.Method,
+			}).Debug("Temporary CORS middleware - allowing all origins")
+		}
+		corsMiddleware(c)
+	}
 }
 
 func NewCorsMiddleware() gin.HandlerFunc {
