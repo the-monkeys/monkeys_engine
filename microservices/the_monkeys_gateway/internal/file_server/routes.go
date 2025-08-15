@@ -25,7 +25,8 @@ type FileServiceClient struct {
 }
 
 func NewFileServiceClient(cfg *config.Config) pb.UploadBlogFileClient {
-	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysFileStore,
+	storageService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
+	cc, err := grpc.NewClient(storageService,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(constants.MaxMsgSize),
@@ -37,7 +38,7 @@ func NewFileServiceClient(cfg *config.Config) pb.UploadBlogFileClient {
 		logrus.Errorf("cannot dial to grpc file server: %v", err)
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the file rpc server at: %v", cfg.Microservices.TheMonkeysFileStore)
+	logrus.Infof("✅ the monkeys gateway is dialing to the file rpc server at: %v", storageService)
 	return pb.NewUploadBlogFileClient(cc)
 }
 

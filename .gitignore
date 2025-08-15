@@ -47,3 +47,12 @@ microservices/the_monkeys_ai/__pycache__/*
 bc
 es.json
 es.prod.json
+
+# Environment files - NEVER COMMIT THESE!
+.env
+.env.local
+.env.production
+.env.staging
+
+# Keep the example file
+!.env.example

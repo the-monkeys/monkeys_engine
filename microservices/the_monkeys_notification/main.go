@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -26,9 +27,10 @@ func main() {
 		log.Fatalln("failed to connect to the database:", err)
 	}
 
-	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysNotification)
+	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
+	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysNotification, err)
+		log.Errorf("failed to listen at port %v, error: %+v", host, err)
 	}
 
 	// Connect to rabbitmq server

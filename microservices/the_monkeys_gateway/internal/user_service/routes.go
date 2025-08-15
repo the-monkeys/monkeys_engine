@@ -2,6 +2,7 @@ package user_service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -25,11 +26,12 @@ type UserServiceClient struct {
 }
 
 func NewUserServiceClient(cfg *config.Config) pb.UserServiceClient {
-	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysUser, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	userService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysUser, cfg.Microservices.UserPort)
+	cc, err := grpc.NewClient(userService, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to grpc user server: %v", err)
 	}
-	logrus.Infof("✅ the monkeys gateway is dialing to user rpc server at: %v", cfg.Microservices.TheMonkeysUser)
+	logrus.Infof("✅ the monkeys gateway is dialing to user rpc server at: %v", userService)
 	return pb.NewUserServiceClient(cc)
 }
 

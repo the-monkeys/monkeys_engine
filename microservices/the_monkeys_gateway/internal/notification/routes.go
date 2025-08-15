@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -39,12 +40,13 @@ type NotificationServiceClient struct {
 
 // NewNotificationServiceClient creates a new instance of NotificationServiceClient
 func NewNotificationServiceClient(cfg *config.Config) pb.NotificationServiceClient {
-	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysNotification, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	notificationSvc := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
+	cc, err := grpc.NewClient(notificationSvc, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("Cannot dial to gRPC notification server: %v", err)
 		return nil
 	}
-	logrus.Debugf("✅ The monkeys gateway is dialing to notification service at: %v", cfg.Microservices.TheMonkeysNotification)
+	logrus.Debugf("✅ The monkeys gateway is dialing to notification service at: %v", notificationSvc)
 	return pb.NewNotificationServiceClient(cc)
 }
 
