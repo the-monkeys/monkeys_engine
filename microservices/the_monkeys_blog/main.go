@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -22,10 +23,11 @@ func main() {
 		return
 	}
 
-	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysBlog)
+	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
+	lis, err := net.Listen("tcp", host)
 	if err != nil {
 		log.Fatalf("article and service server failed to listen at port %v, error: %v",
-			cfg.Microservices.TheMonkeysBlog, err)
+			host, err)
 		return
 	}
 
@@ -48,7 +50,7 @@ func main() {
 	pb.RegisterBlogServiceServer(grpcServer, blogService)
 	// isv.RegisterBlogServiceServer(grpcServer, interservice)
 
-	logrus.Info("✅ the blog server started at: ", cfg.Microservices.TheMonkeysBlog)
+	logrus.Info("✅ the blog server started at: ", host)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalln("Failed to serve:", err)
 		return

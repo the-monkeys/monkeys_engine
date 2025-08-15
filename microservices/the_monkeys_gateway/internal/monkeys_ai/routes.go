@@ -1,6 +1,7 @@
 package monkeys_ai
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,7 @@ type RecommendationsClient struct {
 }
 
 func NewRecommendationsClient(cfg *config.Config) pb.RecommendationServiceClient {
-	addr := cfg.Microservices.TheMonkeysAIEngine
+	addr := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAIEngine, cfg.Microservices.AIEnginePort)
 
 	// Try connection with more detailed logging
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))

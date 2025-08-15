@@ -46,12 +46,13 @@ type BlogServiceClient struct {
 }
 
 func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
-	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysBlog, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	blogService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
+	cc, err := grpc.NewClient(blogService, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to blog server: %v", err)
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the blog rpc server at: %v", cfg.Microservices.TheMonkeysBlog)
+	logrus.Infof("✅ the monkeys gateway is dialing to the blog rpc server at: %v", blogService)
 	return pb.NewBlogServiceClient(cc)
 }
 

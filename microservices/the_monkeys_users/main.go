@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -26,7 +27,7 @@ func main() {
 		log.Fatalln("failed to connect to the database:", err)
 	}
 
-	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysUser)
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysUser, cfg.Microservices.UserPort))
 	if err != nil {
 		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysUser, err)
 	}
@@ -48,7 +49,7 @@ func main() {
 
 	pb.RegisterUserServiceServer(grpcServer, userService)
 
-	log.Infof("✅ the user service started at: %v", cfg.Microservices.TheMonkeysUser)
+	log.Infof("✅ the user service started at: %v", cfg.Microservices.TheMonkeysUser+":"+fmt.Sprint(cfg.Microservices.UserPort))
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalln("Failed to serve:", err)
 	}

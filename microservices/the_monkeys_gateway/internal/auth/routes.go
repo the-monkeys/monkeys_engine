@@ -30,13 +30,14 @@ type ServiceClient struct {
 
 // InitServiceClient initializes the gRPC connection to the auth service.
 func InitServiceClient(cfg *config.Config) pb.AuthServiceClient {
-	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysAuthz, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAuthz, cfg.Microservices.AuthzPort)
+	cc, err := grpc.NewClient(authService, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Errorf("cannot dial to grpc auth server: %v", err)
 		return nil
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the auth rpc server at: %v", cfg.Microservices.TheMonkeysAuthz)
+	logrus.Infof("✅ the monkeys gateway is dialing to the auth rpc server at: %v", authService)
 	return pb.NewAuthServiceClient(cc)
 }
 

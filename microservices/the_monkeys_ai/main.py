@@ -3,7 +3,8 @@ import grpc
 from concurrent import futures
 from gw_recom_pb2 import RecommendationRes
 import gw_recom_pb2_grpc
-import yaml
+import os
+from dotenv import load_dotenv
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -67,45 +68,64 @@ def serve():
     global server_start_time
     server_start_time = time.time()
     
-    # Read the config.yaml file
+    # Load environment variables from .env file
     try:
-        with open("config/config.yaml", "r") as file:
-            config = yaml.safe_load(file)
-            
-            # Extract the recommendation engine address from config
-            recomm_address = config["microservices"]["the_monkeys_ai_engine"]
-            # Split host and port for Docker compatibility
-            host, port = recomm_address.split(":")
-            grpc_port = int(port)
-            
-            # Use gRPC port + 1000 for health check (e.g., 50057 -> 51057)
-            health_port = grpc_port + 1000
-            
-            # Bind to 0.0.0.0 inside Docker container
-            server_address = f"0.0.0.0:{port}"
-            print(f"✅ Starting recommendation engine server on {server_address} (config: {recomm_address})")
+        # Try to load .env file from project root
+        env_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            print(f"✅ Loaded environment variables from {env_path}")
+        else:
+            print("⚠️  .env file not found, using system environment variables")
+        
+        # Get ports directly from environment variables
+        grpc_port = int(os.getenv("MICROSERVICES_AI_ENGINE_INTERNAL_PORT", "50057"))
+        health_port = int(os.getenv("MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT", "51057"))
+        
+        # Server addresses - bind to 0.0.0.0 inside Docker container
+        server_address = f"0.0.0.0:{grpc_port}"
+        
+        print(f"✅ Starting recommendation engine server on {server_address}")
+        print(f"🏥 Health check will be available on port {health_port}")
 
-            # Start health check server in background thread
-            health_thread = threading.Thread(target=start_health_server, args=(health_port,), daemon=True)
-            health_thread.start()
+        # Start health check server in background thread
+        health_thread = threading.Thread(target=start_health_server, args=(health_port,), daemon=True)
+        health_thread.start()
 
-            # Create and start the gRPC server
-            server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-            gw_recom_pb2_grpc.add_RecommendationServiceServicer_to_server(
-                RecommendationServiceServicer(), server
-            )
-            server.add_insecure_port(server_address)  # Use 0.0.0.0 for Docker
-            print(f"🚀 gRPC server is running on {recomm_address}...")
-            print(f"🏥 Health check available at http://0.0.0.0:{health_port}/health")
-            server.start()
-            server.wait_for_termination()
-            
-    except FileNotFoundError:
-        print("Error: 'config/config.yaml' file not found. Please ensure the file exists.")
-        return
-    except KeyError as e:
-        print(f"Error: Missing key in configuration: {e}")
-        return
+        # Create and start the gRPC server
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        gw_recom_pb2_grpc.add_RecommendationServiceServicer_to_server(
+            RecommendationServiceServicer(), server
+        )
+        server.add_insecure_port(server_address)
+        print(f"🚀 gRPC server is running on {server_address}")
+        print(f"🏥 Health check available at http://0.0.0.0:{health_port}/health")
+        server.start()
+        server.wait_for_termination()
+        
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
+        print("Using default configuration...")
+        # Fallback to default values
+        server_address = "0.0.0.0:50057"
+        health_port = 51057
+        
+        print(f"✅ Starting recommendation engine server on {server_address} (default)")
+
+        # Start health check server in background thread
+        health_thread = threading.Thread(target=start_health_server, args=(health_port,), daemon=True)
+        health_thread.start()
+
+        # Create and start the gRPC server
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        gw_recom_pb2_grpc.add_RecommendationServiceServicer_to_server(
+            RecommendationServiceServicer(), server
+        )
+        server.add_insecure_port(server_address)
+        print(f"🚀 gRPC server is running on {server_address}...")
+        print(f"🏥 Health check available at http://0.0.0.0:{health_port}/health")
+        server.start()
+        server.wait_for_termination()
 
 if __name__ == "__main__":
     try:

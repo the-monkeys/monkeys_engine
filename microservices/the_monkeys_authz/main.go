@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -31,9 +32,10 @@ func main() {
 		ExpirationHours: 24 * 365,
 	}
 
-	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysAuthz)
+	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAuthz, cfg.Microservices.AuthzPort)
+	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		logrus.Fatalf("auth service cannot listen at address %s, error: %v", cfg.Microservices.TheMonkeysAuthz, err)
+		logrus.Fatalf("auth service cannot listen at address %s, error: %v", host, err)
 	}
 
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
@@ -44,7 +46,7 @@ func main() {
 
 	pb.RegisterAuthServiceServer(grpcServer, authServer)
 
-	logrus.Info("✅ the authentication server started at address: ", cfg.Microservices.TheMonkeysAuthz)
+	logrus.Info("✅ the authentication server started at address: ", host)
 	if err := grpcServer.Serve(lis); err != nil {
 		logrus.Fatalf("gRPC auth server cannot start, error: %v", err)
 	}
