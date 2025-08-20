@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 
@@ -57,9 +58,10 @@ func main() {
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
 
-	lis, err := net.Listen("tcp", cfg.Microservices.TheMonkeysFileStore)
+	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
+	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Errorf("File server failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysFileStore, err)
+		log.Errorf("File server failed to listen at port %v, error: %+v", host, err)
 	}
 
 	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir)

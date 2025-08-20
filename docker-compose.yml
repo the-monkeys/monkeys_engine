@@ -4,12 +4,12 @@ services:
     image: bitnami/postgresql:latest
     restart: always
     environment:
-      POSTGRES_PASSWORD: Secret
-      POSTGRES_USER: root
-      POSTGRES_DB: the_monkeys_user_dev
+      POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
+      POSTGRES_USER: ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}
+      POSTGRES_DB: ${POSTGRESQL_PRIMARY_DB_DB_NAME}
       POSTGRESQL_ENABLE_LDAP: no
     ports:
-      - 1234:5432
+      - "${POSTGRESQL_PRIMARY_DB_DB_PORT}:${POSTGRESQL_PRIMARY_DB_INTERNAL_PORT}"
     networks:
       - monkeys-network
     volumes:
@@ -17,7 +17,7 @@ services:
       - ./backup:/backup
       - ./postgres_backup:/backup_source
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U root" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,7 +29,7 @@ services:
       - ./schema:/migrations
     networks:
       - monkeys-network
-    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://root:Secret@the_monkeys_db:5432/the_monkeys_user_dev?sslmode=disable" ]
+    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://${POSTGRESQL_PRIMARY_DB_DB_USERNAME}:${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}@${POSTGRESQL_PRIMARY_DB_DB_HOST}:5432/${POSTGRESQL_PRIMARY_DB_DB_NAME}?sslmode=disable" ]
     command: [ "up" ]
     depends_on:
       the_monkeys_db:
@@ -43,7 +43,7 @@ services:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-      - ELASTIC_PASSWORD=a!Too5hortPassword@1
+      - ELASTIC_PASSWORD=${OPENSEARCH_OS_PASSWORD}
       - xpack.security.enabled=false
       - xpack.security.transport.ssl.enabled=false
       - path.repo=/usr/share/elasticsearch/snapshots
@@ -58,12 +58,12 @@ services:
       - elasticsearch-data1:/usr/share/elasticsearch/data
       - ./elasticsearch_snapshots:/usr/share/elasticsearch/snapshots
     ports:
-      - 9200:9200
-      - 9300:9300
+      - "${OPENSEARCH_HTTP_PORT}:${OPENSEARCH_HTTP_INTERNAL_PORT}"
+      - "${OPENSEARCH_TRANSPORT_PORT}:${OPENSEARCH_TRANSPORT_INTERNAL_PORT}"
     networks:
       - monkeys-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:${OPENSEARCH_HTTP_INTERNAL_PORT}" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -73,13 +73,13 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: the-monkeys-rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBITMQ_PORT}:${RABBITMQ_INTERNAL_PORT}"
+      - "${RABBITMQ_MANAGEMENT_PORT}:${RABBITMQ_MANAGEMENT_INTERNAL_PORT}"
     networks:
       - monkeys-network
     environment:
-      RABBITMQ_DEFAULT_USER: myuser
-      RABBITMQ_DEFAULT_PASS: mypassword
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
       RABBITMQ_DISK_FREE_LIMIT: "50MB"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -104,12 +104,14 @@ services:
     volumes:
       - .:/go/src/app
     ports:
-      - "8081:8081"
+      - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_gateway/main.go
     restart: always
+    env_file:
+      - .env
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/healthz" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
       interval: 300s
       timeout: 10s
       retries: 3
@@ -126,10 +128,12 @@ services:
     volumes:
       - .:/go/src/app
     ports:
-      - "50051:50051"
+      - "${MICROSERVICES_AUTHZ_PORT}:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_authz/main.go
     restart: always
+    env_file:
+      - .env
 
   the_monkeys_storage:
     container_name: "the_monkeys_storage"
@@ -145,10 +149,12 @@ services:
       - the_monkeys_profile:/profile
       - blogs_volume:/blogs
     ports:
-      - "50054:50054"
+      - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_storage/main.go
     restart: always
+    env_file:
+      - .env
 
   the_monkeys_user:
     container_name: "the-monkeys-user"
@@ -162,10 +168,12 @@ services:
     volumes:
       - .:/go/src/app
     ports:
-      - "50053:50053"
+      - "${MICROSERVICES_USER_PORT}:${MICROSERVICES_USER_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_users/main.go
     restart: always
+    env_file:
+      - .env
 
   the_monkeys_blog:
     container_name: "the-monkeys-blog"
@@ -180,10 +188,12 @@ services:
     volumes:
       - .:/go/src/app
     ports:
-      - "50052:50052"
+      - "${MICROSERVICES_BLOG_PORT}:${MICROSERVICES_BLOG_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_blog/main.go
     restart: always
+    env_file:
+      - .env
 
   the_monkeys_notification:
     container_name: "the_monkeys_notification"
@@ -200,10 +210,12 @@ services:
     volumes:
       - .:/go/src/app
     ports:
-      - "50055:50055"
+      - "${MICROSERVICES_NOTIFICATION_PORT}:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"
     working_dir: /go/src/app
     command: go run microservices/the_monkeys_notification/main.go
     restart: always
+    env_file:
+      - .env
 
   the_monkeys_ai_engine:
     container_name: "the_monkeys_ai_engine"
@@ -216,8 +228,8 @@ services:
     volumes:
       - .:/app
     ports:
-      - "50057:50057"
-      - "51057:51057"  # Health check endpoint (gRPC port + 1000)
+      - "${MICROSERVICES_AI_ENGINE_PORT}:${MICROSERVICES_AI_ENGINE_INTERNAL_PORT}"
+      - "${MICROSERVICES_AI_ENGINE_HEALTH_PORT}:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}"  # Health check endpoint (gRPC port + 1000)
     working_dir: /app
     command: >
       bash -c "echo 'Starting setup...' && 
@@ -235,10 +247,12 @@ services:
         echo 'Running main.py...' &&
         PYTHONPATH=/app python -u microservices/the_monkeys_ai/main.py 2>&1"
     restart: always
+    env_file:
+      - .env
     environment:
       - PYTHONPATH=/app
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:51057/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
