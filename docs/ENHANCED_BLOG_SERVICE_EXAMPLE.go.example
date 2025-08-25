@@ -1,0 +1,139 @@
+// Example enhancement for blog service to utilize title and description fields
+// This shows how the new fields could be integrated into blog creation/update workflows
+
+package services
+
+import (
+	"context"
+	"strings"
+	
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
+)
+
+// Example function showing how to enhance blog drafting with title/description
+func (blog *BlogService) EnhancedDraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
+	// Existing validation logic...
+	
+	// Auto-populate title and description if not provided
+	if req.Blog != nil {
+		if req.Blog.Title == "" || req.Blog.Description == "" {
+			blog.populateTitleAndDescription(req.Blog)
+		}
+		
+		// Validate title and description
+		if err := blog.validateTitleAndDescription(req.Blog); err != nil {
+			return nil, err
+		}
+	}
+	
+	// Continue with existing drafting logic...
+	return blog.DraftBlog(ctx, req)
+}
+
+// populateTitleAndDescription extracts title and description from blocks if not explicitly set
+func (blog *BlogService) populateTitleAndDescription(blogData *pb.Blog) {
+	if blogData.Title == "" {
+		// Extract title from first header block
+		for _, block := range blogData.Blocks {
+			if block.Type == "header" && block.Data != nil && block.Data.Level == 1 {
+				if block.Data.Text != "" {
+					blogData.Title = block.Data.Text
+					break
+				}
+			}
+		}
+	}
+	
+	if blogData.Description == "" {
+		// Extract description from first paragraph block
+		for _, block := range blogData.Blocks {
+			if block.Type == "paragraph" && block.Data != nil {
+				if block.Data.Text != "" {
+					// Truncate to reasonable description length
+					description := block.Data.Text
+					if len(description) > 300 {
+						description = description[:297] + "..."
+					}
+					blogData.Description = description
+					break
+				}
+			}
+		}
+	}
+}
+
+// validateTitleAndDescription validates the title and description fields
+func (blog *BlogService) validateTitleAndDescription(blogData *pb.Blog) error {
+	if blogData.Title != "" {
+		// Title validation
+		if len(blogData.Title) > 200 {
+			return status.Errorf(codes.InvalidArgument, "title cannot exceed 200 characters")
+		}
+		
+		// Remove HTML tags if any
+		blogData.Title = strings.TrimSpace(blog.stripHTMLTags(blogData.Title))
+	}
+	
+	if blogData.Description != "" {
+		// Description validation
+		if len(blogData.Description) > 500 {
+			return status.Errorf(codes.InvalidArgument, "description cannot exceed 500 characters")
+		}
+		
+		// Remove HTML tags if any
+		blogData.Description = strings.TrimSpace(blog.stripHTMLTags(blogData.Description))
+	}
+	
+	return nil
+}
+
+// stripHTMLTags removes basic HTML tags from text (basic implementation)
+func (blog *BlogService) stripHTMLTags(text string) string {
+	// Simple HTML tag removal - in production, use a proper HTML sanitizer
+	text = strings.ReplaceAll(text, "<", "&lt;")
+	text = strings.ReplaceAll(text, ">", "&gt;")
+	return text
+}
+
+// Example API enhancement for explicitly setting title and description
+type SetBlogMetadataRequest struct {
+	BlogId      string `json:"blog_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+func (blog *BlogService) SetBlogMetadata(ctx context.Context, req *SetBlogMetadataRequest) error {
+	// Validate request
+	if req.BlogId == "" {
+		return status.Errorf(codes.InvalidArgument, "blog_id is required")
+	}
+	
+	// Validate title and description lengths
+	if len(req.Title) > 200 {
+		return status.Errorf(codes.InvalidArgument, "title cannot exceed 200 characters")
+	}
+	
+	if len(req.Description) > 500 {
+		return status.Errorf(codes.InvalidArgument, "description cannot exceed 500 characters")
+	}
+	
+	// Get existing blog
+	existingBlog, err := blog.osClient.GetBlogByBlogId(ctx, req.BlogId, true) // Check draft first
+	if err != nil {
+		existingBlog, err = blog.osClient.GetBlogByBlogId(ctx, req.BlogId, false) // Then check published
+		if err != nil {
+			return status.Errorf(codes.NotFound, "blog not found")
+		}
+	}
+	
+	// Update title and description
+	if blogData, ok := existingBlog["blog"].(map[string]interface{}); ok {
+		blogData["title"] = req.Title
+		blogData["description"] = req.Description
+		
+		// Save updated blog back to Elasticsearch
+		// Implementation would depend on existing update patterns
+	}
+	
+	return nil
+}
