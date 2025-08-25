@@ -29,6 +29,8 @@ message BlogResponse {
 message Blog {
     int64 time = 1;
     repeated Block blocks = 2;
+    string title = 3;          // Dedicated title field for the blog
+    string description = 4;    // Dedicated description field for the blog
 }
 
 message Block {

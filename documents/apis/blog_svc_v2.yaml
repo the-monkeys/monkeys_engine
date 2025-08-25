@@ -610,6 +610,12 @@ definitions:
           time:
             type: string
             format: date-time
+          title:
+            type: string
+            description: Dedicated title for the blog
+          description:
+            type: string
+            description: Dedicated description/summary for the blog
           blocks:
             type: array
             items:

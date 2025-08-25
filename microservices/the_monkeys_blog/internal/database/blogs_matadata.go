@@ -42,6 +42,57 @@ func getStringOrDefault(value interface{}, defaultValue string) string {
 	return defaultValue
 }
 
+// extractBlogMetadata extracts title, description, and first image from blog data
+// Prioritizes dedicated title/description fields over content extraction
+func extractBlogMetadata(hitSource map[string]interface{}) (title, description, firstImage string) {
+	// First, try to get dedicated title and description from blog object
+	if blog, ok := hitSource["blog"].(map[string]interface{}); ok {
+		if dedicatedTitle, ok := blog["title"].(string); ok && dedicatedTitle != "" {
+			title = dedicatedTitle
+		}
+		if dedicatedDesc, ok := blog["description"].(string); ok && dedicatedDesc != "" {
+			description = dedicatedDesc
+		}
+		
+		// Extract from blocks only if dedicated fields are not available
+		if blocks, ok := blog["blocks"].([]interface{}); ok {
+			for _, block := range blocks {
+				if blockMap, ok := block.(map[string]interface{}); ok {
+					if blockType, ok := blockMap["type"].(string); ok {
+						if blockData, ok := blockMap["data"].(map[string]interface{}); ok {
+							switch blockType {
+							case "header":
+								if title == "" {
+									if level, ok := blockData["level"].(float64); ok && level == 1 {
+										if text, ok := blockData["text"].(string); ok {
+											title = text
+										}
+									}
+								}
+							case "paragraph":
+								if description == "" {
+									if text, ok := blockData["text"].(string); ok {
+										description = text
+									}
+								}
+							case "image":
+								if firstImage == "" {
+									if file, ok := blockData["file"].(map[string]interface{}); ok {
+										if url, ok := file["url"].(string); ok {
+											firstImage = url
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return title, description, firstImage
+}
+
 // Returns metadata, total counts of blogs, and errors
 func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
 	// Ensure tags are not empty
@@ -64,7 +115,9 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 		"_source": []string{
 			"blog_id",
 			"owner_account_id",
-			"blog.blocks", // To extract title, first paragraph, and first image
+			"blog.blocks",     // To extract title, first paragraph, and first image
+			"blog.title",      // Dedicated title field
+			"blog.description", // Dedicated description field
 			"tags",
 			"content_type",
 			"published_time",
@@ -169,33 +222,7 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 		}
 
 		// Extract title, first paragraph, and first image from blog.blocks
-		blocks, ok := hitSource["blog"].(map[string]interface{})["blocks"].([]interface{})
-		if !ok {
-			es.log.Errorf("GetBlogsMetadataByTags: failed to parse blog blocks")
-			continue
-		}
-
-		var title, firstParagraph, firstImage string
-		for _, block := range blocks {
-			blockMap := block.(map[string]interface{})
-			blockType := blockMap["type"].(string)
-			blockData := blockMap["data"].(map[string]interface{})
-
-			switch blockType {
-			case "header":
-				if title == "" && blockData["level"].(float64) == 1 {
-					title = blockData["text"].(string)
-				}
-			case "paragraph":
-				if firstParagraph == "" {
-					firstParagraph = blockData["text"].(string)
-				}
-			case "image":
-				if firstImage == "" {
-					firstImage = blockData["file"].(map[string]interface{})["url"].(string)
-				}
-			}
-		}
+		title, firstParagraph, firstImage := extractBlogMetadata(hitSource)
 
 		blogMetadata["title"] = title
 		blogMetadata["first_paragraph"] = firstParagraph
@@ -229,7 +256,9 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 		"_source": []string{
 			"blog_id",
 			"owner_account_id",
-			"blog.blocks", // To extract title, first paragraph, and first image
+			"blog.blocks",     // To extract title, first paragraph, and first image
+			"blog.title",      // Dedicated title field
+			"blog.description", // Dedicated description field
 			"tags",
 			"content_type",
 			"published_time",
@@ -320,33 +349,8 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 			"published_time":   hitSource["published_time"],
 		}
 
-		blocks, ok := hitSource["blog"].(map[string]interface{})["blocks"].([]interface{})
-		if !ok {
-			es.log.Errorf("GetAllPublishedBlogsMetadata: failed to parse blog blocks")
-			continue
-		}
-
-		var title, firstParagraph, firstImage string
-		for _, block := range blocks {
-			blockMap := block.(map[string]interface{})
-			blockType := blockMap["type"].(string)
-			blockData := blockMap["data"].(map[string]interface{})
-
-			switch blockType {
-			case "header":
-				if title == "" && blockData["level"].(float64) == 1 {
-					title = blockData["text"].(string)
-				}
-			case "paragraph":
-				if firstParagraph == "" {
-					firstParagraph = blockData["text"].(string)
-				}
-			case "image":
-				if firstImage == "" {
-					firstImage = blockData["file"].(map[string]interface{})["url"].(string)
-				}
-			}
-		}
+		// Extract title, first paragraph, and first image from blog data
+		title, firstParagraph, firstImage := extractBlogMetadata(hitSource)
 
 		blogMetadata["title"] = title
 		blogMetadata["first_paragraph"] = firstParagraph
@@ -511,47 +515,11 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 			"like_count":       0,
 		}
 
-		blogMetadata["title"] = "" // Initialize with empty string
-		blogMetadata["first_paragraph"] = ""
-		blogMetadata["first_image"] = ""
-
-		// Try to extract content from blocks if available
-		if blog, ok := hitSource["blog"].(map[string]interface{}); ok {
-			if blocks, ok := blog["blocks"].([]interface{}); ok {
-				for _, b := range blocks {
-					if block, ok := b.(map[string]interface{}); ok {
-						if t, ok := block["type"].(string); ok {
-							if data, ok := block["data"].(map[string]interface{}); ok {
-								switch t {
-								case "header":
-									if blogMetadata["title"] == "" {
-										if level, ok := data["level"].(float64); ok && level == 1 {
-											if text, ok := data["text"].(string); ok {
-												blogMetadata["title"] = text
-											}
-										}
-									}
-								case "paragraph":
-									if blogMetadata["first_paragraph"] == "" {
-										if text, ok := data["text"].(string); ok {
-											blogMetadata["first_paragraph"] = text
-										}
-									}
-								case "image":
-									if blogMetadata["first_image"] == "" {
-										if file, ok := data["file"].(map[string]interface{}); ok {
-											if url, ok := file["url"].(string); ok {
-												blogMetadata["first_image"] = url
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		// Extract title, first paragraph, and first image from blog data
+		title, firstParagraph, firstImage := extractBlogMetadata(hitSource)
+		blogMetadata["title"] = title
+		blogMetadata["first_paragraph"] = firstParagraph
+		blogMetadata["first_image"] = firstImage
 
 		blogsMetadata = append(blogsMetadata, blogMetadata)
 	}
@@ -587,7 +555,9 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 		"_source": []string{
 			"blog_id",
 			"owner_account_id",
-			"blog.blocks", // To extract title, first paragraph, and first image
+			"blog.blocks",     // To extract title, first paragraph, and first image
+			"blog.title",      // Dedicated title field
+			"blog.description", // Dedicated description field
 			"tags",
 			"content_type",
 			"published_time",
@@ -691,48 +661,11 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 			"published_time":   hitSource["published_time"],
 		}
 
-		// Initialize metadata fields
-		blogMetadata["title"] = ""
-		blogMetadata["first_paragraph"] = ""
-		blogMetadata["first_image"] = ""
-
-		// Extract title, first paragraph, and first image from blog.blocks
-		if blog, ok := hitSource["blog"].(map[string]interface{}); ok {
-			if blocks, ok := blog["blocks"].([]interface{}); ok {
-				for _, b := range blocks {
-					if block, ok := b.(map[string]interface{}); ok {
-						if blockType, ok := block["type"].(string); ok {
-							if blockData, ok := block["data"].(map[string]interface{}); ok {
-								switch blockType {
-								case "header":
-									if blogMetadata["title"] == "" {
-										if level, ok := blockData["level"].(float64); ok && level == 1 {
-											if text, ok := blockData["text"].(string); ok {
-												blogMetadata["title"] = text
-											}
-										}
-									}
-								case "paragraph":
-									if blogMetadata["first_paragraph"] == "" {
-										if text, ok := blockData["text"].(string); ok {
-											blogMetadata["first_paragraph"] = text
-										}
-									}
-								case "image":
-									if blogMetadata["first_image"] == "" {
-										if file, ok := blockData["file"].(map[string]interface{}); ok {
-											if url, ok := file["url"].(string); ok {
-												blogMetadata["first_image"] = url
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		// Extract title, first paragraph, and first image from blog data
+		title, firstParagraph, firstImage := extractBlogMetadata(hitSource)
+		blogMetadata["title"] = title
+		blogMetadata["first_paragraph"] = firstParagraph
+		blogMetadata["first_image"] = firstImage
 
 		blogsMetadata = append(blogsMetadata, blogMetadata)
 	}
@@ -768,7 +701,9 @@ func (es *elasticsearchStorage) GetBlogsMetaByBlogIdsV2(ctx context.Context, blo
 		"_source": []string{
 			"blog_id",
 			"owner_account_id",
-			"blog.blocks", // To extract title, first paragraph, and first image
+			"blog.blocks",     // To extract title, first paragraph, and first image
+			"blog.title",      // Dedicated title field
+			"blog.description", // Dedicated description field
 			"tags",
 			"content_type",
 			"published_time",
@@ -872,48 +807,11 @@ func (es *elasticsearchStorage) GetBlogsMetaByBlogIdsV2(ctx context.Context, blo
 			"published_time":   hitSource["published_time"],
 		}
 
-		// Initialize metadata fields
-		blogMetadata["title"] = ""
-		blogMetadata["first_paragraph"] = ""
-		blogMetadata["first_image"] = ""
-
-		// Extract title, first paragraph, and first image from blog.blocks
-		if blog, ok := hitSource["blog"].(map[string]interface{}); ok {
-			if blocks, ok := blog["blocks"].([]interface{}); ok {
-				for _, b := range blocks {
-					if block, ok := b.(map[string]interface{}); ok {
-						if blockType, ok := block["type"].(string); ok {
-							if blockData, ok := block["data"].(map[string]interface{}); ok {
-								switch blockType {
-								case "header":
-									if blogMetadata["title"] == "" {
-										if level, ok := blockData["level"].(float64); ok && level == 1 {
-											if text, ok := blockData["text"].(string); ok {
-												blogMetadata["title"] = text
-											}
-										}
-									}
-								case "paragraph":
-									if blogMetadata["first_paragraph"] == "" {
-										if text, ok := blockData["text"].(string); ok {
-											blogMetadata["first_paragraph"] = text
-										}
-									}
-								case "image":
-									if blogMetadata["first_image"] == "" {
-										if file, ok := blockData["file"].(map[string]interface{}); ok {
-											if url, ok := file["url"].(string); ok {
-												blogMetadata["first_image"] = url
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		// Extract title, first paragraph, and first image from blog data
+		title, firstParagraph, firstImage := extractBlogMetadata(hitSource)
+		blogMetadata["title"] = title
+		blogMetadata["first_paragraph"] = firstParagraph
+		blogMetadata["first_image"] = firstImage
 
 		blogsMetadata = append(blogsMetadata, blogMetadata)
 	}
