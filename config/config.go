@@ -116,6 +116,16 @@ type GoogleOAuth2 struct {
 	Endpoint     string   `mapstructure:"endpoint"`
 }
 
+// Minio holds object storage configuration
+type Minio struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	Bucket    string `mapstructure:"bucket_name"`
+	UseSSL    bool   `mapstructure:"use_ssl"`
+	CDNURL    string `mapstructure:"cdn_url"`
+}
+
 type Cors struct {
 	AllowedOriginExp string `mapstructure:"allowed_origin_regexp"`
 	UseTempCors      bool   `mapstructure:"use_temp_cors"`
@@ -144,6 +154,7 @@ type Config struct {
 	GoogleOAuth2      GoogleOAuth2      `mapstructure:"google_oauth2"`
 	Cors              Cors              `mapstructure:"cors"`
 	Redis             Redis             `mapstructure:"redis"`
+	Minio             Minio             `mapstructure:"minio"`
 }
 
 func GetConfig() (*Config, error) {
@@ -174,8 +185,8 @@ func GetConfig() (*Config, error) {
 	// Comment out YAML config reading for testing
 	// Binding struct to config
 	// if err := viper.ReadInConfig(); err != nil {
-	// 	logrus.Errorf("Error reading config file, %v", err)
-	// 	return config, err
+	//  logrus.Errorf("Error reading config file, %v", err)
+	//  return config, err
 	// }
 
 	if err := viper.Unmarshal(config); err != nil {
@@ -298,6 +309,14 @@ func bindEnvVars() {
 	viper.BindEnv("redis.db", "REDIS_DB")
 	viper.BindEnv("redis.pool_size", "REDIS_POOL_SIZE")
 	viper.BindEnv("redis.max_idle", "REDIS_MAX_IDLE")
+
+	// MinIO
+	viper.BindEnv("minio.endpoint", "MINIO_ENDPOINT")
+	viper.BindEnv("minio.access_key", "MINIO_ACCESS_KEY")
+	viper.BindEnv("minio.secret_key", "MINIO_SECRET_KEY")
+	viper.BindEnv("minio.bucket_name", "MINIO_BUCKET_NAME")
+	viper.BindEnv("minio.use_ssl", "MINIO_USE_SSL")
+	viper.BindEnv("minio.cdn_url", "MINIO_CDN_URL")
 }
 
 // handleArrayEnvVars manually handles array environment variables
