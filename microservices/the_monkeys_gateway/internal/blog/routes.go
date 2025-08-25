@@ -57,7 +57,7 @@ func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
 }
 
 func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient) *BlogServiceClient {
-	rateLimiter := middleware.RateLimiterMiddleware("5-S") // 5 requests per second for mins do 1-M
+	rateLimiter := middleware.RateLimiterMiddleware("50-S") // 50 requests per second for landing page
 
 	mware := auth.InitAuthMiddleware(authClient)
 
