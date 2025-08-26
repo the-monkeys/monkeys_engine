@@ -1,11 +1,21 @@
 package storage_v2
 
 import (
+	"bytes"
 	"context"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"net/http"
 	"path"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/bbrks/go-blurhash"
+	"golang.org/x/image/webp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -67,6 +77,11 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 	// Public reads (CDN-style). We may later gate or sign URLs as needed.
 	v2.GET("/posts/:id/:fileName", svc.GetPostFile)
 	v2.GET("/profiles/:user_id/profile", svc.GetProfileImage)
+	// Fast-load helpers (public): metadata + presigned/CDN URL
+	v2.GET("/posts/:id/:fileName/meta", svc.GetPostFileMeta)
+	v2.GET("/profiles/:user_id/profile/meta", svc.GetProfileMeta)
+	v2.GET("/posts/:id/:fileName/url", svc.GetPostFileURL)
+	v2.GET("/profiles/:user_id/profile/url", svc.GetProfileURL)
 
 	// Auth-required writes and deletes (and management)
 	v2.Use(mw.AuthRequired)
@@ -95,6 +110,51 @@ func uniqueName(original string) string {
 	return uuid.NewString() + ext
 }
 
+// Additional helpers for image optimization and URLs
+func metaValue(m map[string]string, key string) string {
+	for k, v := range m {
+		if strings.EqualFold(k, key) {
+			return v
+		}
+	}
+	return ""
+}
+
+func (s *Service) computeImageMetadata(contentType string, data []byte) (hash string, w, h int, ok bool) {
+	var img image.Image
+	if strings.Contains(contentType, "image/webp") {
+		m, err := webp.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", 0, 0, false
+		}
+		img = m
+	} else {
+		m, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", 0, 0, false
+		}
+		img = m
+	}
+	hash, err := blurhash.Encode(4, 3, img)
+	if err != nil {
+		return "", 0, 0, false
+	}
+	b := img.Bounds()
+	return hash, b.Dx(), b.Dy(), true
+}
+
+func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expiry time.Duration) (string, error) {
+	if s.cdnURL != "" {
+		// Treat as public CDN origin; return deterministic URL
+		return strings.TrimRight(s.cdnURL, "/") + "/" + objectName, nil
+	}
+	u, err := s.mc.PresignedGetObject(ctx, s.bucket, objectName, expiry, nil)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
 // Handlers (Create/Read/Update/Delete)
 
 // Blog content
@@ -113,10 +173,29 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 	objectName := "posts/" + blogID + "/" + fname
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, file, fileHeader.Size, minio.PutObjectOptions{
+	// Read into memory once so we can compute image metadata (BlurHash) and upload
+	data, err := io.ReadAll(file)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	reader := bytes.NewReader(data)
+
+	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
-	})
+	}
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+			opts.UserMetadata = map[string]string{
+				"x-blurhash": hash,
+				"x-width":    strconv.Itoa(w),
+				"x-height":   strconv.Itoa(h),
+			}
+		}
+	}
+
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
 		logrus.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
@@ -186,6 +265,17 @@ func (s *Service) HeadPostFile(ctx *gin.Context) {
 	if cc := info.Metadata.Get("Cache-Control"); cc != "" {
 		ctx.Header("Cache-Control", cc)
 	}
+	if info.UserMetadata != nil {
+		if bh := metaValue(info.UserMetadata, "x-blurhash"); bh != "" {
+			ctx.Header("X-Blurhash", bh)
+		}
+		if w := metaValue(info.UserMetadata, "x-width"); w != "" {
+			ctx.Header("X-Image-Width", w)
+		}
+		if h := metaValue(info.UserMetadata, "x-height"); h != "" {
+			ctx.Header("X-Image-Height", h)
+		}
+	}
 
 	ctx.Status(http.StatusOK)
 }
@@ -204,10 +294,28 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, file, fileHeader.Size, minio.PutObjectOptions{
+	data, err := io.ReadAll(file)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	reader := bytes.NewReader(data)
+
+	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
-	})
+	}
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+			opts.UserMetadata = map[string]string{
+				"x-blurhash": hash,
+				"x-width":    strconv.Itoa(w),
+				"x-height":   strconv.Itoa(h),
+			}
+		}
+	}
+
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
 		logrus.Errorf("minio PutObject (update) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
@@ -255,6 +363,17 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 	if cc := stat.Metadata.Get("Cache-Control"); cc != "" {
 		ctx.Header("Cache-Control", cc)
 	}
+	if stat.UserMetadata != nil {
+		if bh := metaValue(stat.UserMetadata, "x-blurhash"); bh != "" {
+			ctx.Header("X-Blurhash", bh)
+		}
+		if w := metaValue(stat.UserMetadata, "x-width"); w != "" {
+			ctx.Header("X-Image-Width", w)
+		}
+		if h := metaValue(stat.UserMetadata, "x-height"); h != "" {
+			ctx.Header("X-Image-Height", h)
+		}
+	}
 
 	// Stream body
 	if _, err := io.Copy(ctx.Writer, obj); err != nil {
@@ -298,10 +417,28 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 	objectName := "profiles/" + userID + "/profile" // single canonical key for profile image
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, file, fileHeader.Size, minio.PutObjectOptions{
+	data, err := io.ReadAll(file)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	reader := bytes.NewReader(data)
+
+	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
-	})
+	}
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+			opts.UserMetadata = map[string]string{
+				"x-blurhash": hash,
+				"x-width":    strconv.Itoa(w),
+				"x-height":   strconv.Itoa(h),
+			}
+		}
+	}
+
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
 		logrus.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
@@ -339,6 +476,17 @@ func (s *Service) HeadProfileImage(ctx *gin.Context) {
 	if cc := info.Metadata.Get("Cache-Control"); cc != "" {
 		ctx.Header("Cache-Control", cc)
 	}
+	if info.UserMetadata != nil {
+		if bh := metaValue(info.UserMetadata, "x-blurhash"); bh != "" {
+			ctx.Header("X-Blurhash", bh)
+		}
+		if w := metaValue(info.UserMetadata, "x-width"); w != "" {
+			ctx.Header("X-Image-Width", w)
+		}
+		if h := metaValue(info.UserMetadata, "x-height"); h != "" {
+			ctx.Header("X-Image-Height", h)
+		}
+	}
 
 	ctx.Status(http.StatusOK)
 }
@@ -356,10 +504,28 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 	objectName := "profiles/" + userID + "/profile"
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, file, fileHeader.Size, minio.PutObjectOptions{
+	data, err := io.ReadAll(file)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	reader := bytes.NewReader(data)
+
+	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
-	})
+	}
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+			opts.UserMetadata = map[string]string{
+				"x-blurhash": hash,
+				"x-width":    strconv.Itoa(w),
+				"x-height":   strconv.Itoa(h),
+			}
+		}
+	}
+
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
 		logrus.Errorf("minio PutObject (update) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
@@ -405,6 +571,17 @@ func (s *Service) GetProfileImage(ctx *gin.Context) {
 	if cc := stat.Metadata.Get("Cache-Control"); cc != "" {
 		ctx.Header("Cache-Control", cc)
 	}
+	if stat.UserMetadata != nil {
+		if bh := metaValue(stat.UserMetadata, "x-blurhash"); bh != "" {
+			ctx.Header("X-Blurhash", bh)
+		}
+		if w := metaValue(stat.UserMetadata, "x-width"); w != "" {
+			ctx.Header("X-Image-Width", w)
+		}
+		if h := metaValue(stat.UserMetadata, "x-height"); h != "" {
+			ctx.Header("X-Image-Height", h)
+		}
+	}
 
 	if _, err := io.Copy(ctx.Writer, obj); err != nil {
 		logrus.Errorf("stream write error: %v", err)
@@ -428,4 +605,143 @@ func (s *Service) DeleteProfileImage(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "deleted", "object": objectName})
+}
+
+// Fast-load metadata endpoints
+func (s *Service) GetPostFileMeta(ctx *gin.Context) {
+	blogID := ctx.Param("id")
+	fileName := ctx.Param("fileName")
+	objectName := "posts/" + blogID + "/" + fileName
+
+	info, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "file not found"})
+		return
+	}
+
+	bh := ""
+	w := 0
+	h := 0
+	if info.UserMetadata != nil {
+		bh = metaValue(info.UserMetadata, "x-blurhash")
+		if ws := metaValue(info.UserMetadata, "x-width"); ws != "" {
+			if vi, err := strconv.Atoi(ws); err == nil {
+				w = vi
+			}
+		}
+		if hs := metaValue(info.UserMetadata, "x-height"); hs != "" {
+			if vi, err := strconv.Atoi(hs); err == nil {
+				h = vi
+			}
+		}
+	}
+
+	urlStr, _ := s.presignedOrCDNURL(ctx.Request.Context(), objectName, 10*time.Minute)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"object":       objectName,
+		"etag":         info.ETag,
+		"size":         info.Size,
+		"contentType":  info.ContentType,
+		"lastModified": info.LastModified,
+		"cacheControl": info.Metadata.Get("Cache-Control"),
+		"blurhash":     bh,
+		"width":        w,
+		"height":       h,
+		"url":          urlStr,
+	})
+}
+
+func (s *Service) GetProfileMeta(ctx *gin.Context) {
+	userID := ctx.Param("user_id")
+	objectName := "profiles/" + userID + "/profile"
+
+	info, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
+	}
+
+	bh := ""
+	w := 0
+	h := 0
+	if info.UserMetadata != nil {
+		bh = metaValue(info.UserMetadata, "x-blurhash")
+		if ws := metaValue(info.UserMetadata, "x-width"); ws != "" {
+			if vi, err := strconv.Atoi(ws); err == nil {
+				w = vi
+			}
+		}
+		if hs := metaValue(info.UserMetadata, "x-height"); hs != "" {
+			if vi, err := strconv.Atoi(hs); err == nil {
+				h = vi
+			}
+		}
+	}
+
+	urlStr, _ := s.presignedOrCDNURL(ctx.Request.Context(), objectName, 10*time.Minute)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"object":       objectName,
+		"etag":         info.ETag,
+		"size":         info.Size,
+		"contentType":  info.ContentType,
+		"lastModified": info.LastModified,
+		"cacheControl": info.Metadata.Get("Cache-Control"),
+		"blurhash":     bh,
+		"width":        w,
+		"height":       h,
+		"url":          urlStr,
+	})
+}
+
+// Presigned/CDN URL endpoints
+func (s *Service) GetPostFileURL(ctx *gin.Context) {
+	blogID := ctx.Param("id")
+	fileName := ctx.Param("fileName")
+	objectName := "posts/" + blogID + "/" + fileName
+
+	expires := 600
+	if qs := ctx.Query("expires"); qs != "" {
+		if vi, err := strconv.Atoi(qs); err == nil {
+			if vi > 0 {
+				// cap at 7 days
+				if vi > int((7*24*time.Hour)/time.Second) {
+					vi = int((7 * 24 * time.Hour) / time.Second)
+				}
+				expires = vi
+			}
+		}
+	}
+
+	urlStr, err := s.presignedOrCDNURL(ctx.Request.Context(), objectName, time.Duration(expires)*time.Second)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "could not generate url"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"url": urlStr, "expiresIn": expires})
+}
+
+func (s *Service) GetProfileURL(ctx *gin.Context) {
+	userID := ctx.Param("user_id")
+	objectName := "profiles/" + userID + "/profile"
+
+	expires := 600
+	if qs := ctx.Query("expires"); qs != "" {
+		if vi, err := strconv.Atoi(qs); err == nil {
+			if vi > 0 {
+				if vi > int((7*24*time.Hour)/time.Second) {
+					vi = int((7 * 24 * time.Hour) / time.Second)
+				}
+				expires = vi
+			}
+		}
+	}
+
+	urlStr, err := s.presignedOrCDNURL(ctx.Request.Context(), objectName, time.Duration(expires)*time.Second)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "could not generate url"})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"url": urlStr, "expiresIn": expires})
 }
