@@ -10,6 +10,9 @@ info:
       The response returns `fileName` you must use for subsequent GET/HEAD/PUT/DELETE requests.
     - Profile image is a single canonical object per user at `profiles/{userId}/profile`.
     - Public reads are allowed for GET operations; writes and deletes require Bearer auth.
+    - Fast-load: image uploads store BlurHash and intrinsic dimensions. GET/HEAD include
+      X-Blurhash, X-Image-Width, X-Image-Height headers. Use `/meta` to fetch JSON with these,
+      and `/url` to fetch a presigned/CDN URL for direct delivery.
 host: themonkeys.tech
 basePath: /api/v2/storage
 schemes:
@@ -115,6 +118,13 @@ paths:
           description: File stream
           schema:
             type: file
+          headers:
+            ETag: { type: string }
+            Last-Modified: { type: string }
+            Cache-Control: { type: string }
+            X-Blurhash: { type: string, description: BlurHash placeholder string }
+            X-Image-Width: { type: string, description: intrinsic width }
+            X-Image-Height: { type: string, description: intrinsic height }
         '404': { description: Not found }
         '500': { description: Server error }
     head:
@@ -138,12 +148,12 @@ paths:
         '200':
           description: Metadata available in response headers
           headers:
-            ETag:
-              type: string
-            Last-Modified:
-              type: string
-            Cache-Control:
-              type: string
+            ETag: { type: string }
+            Last-Modified: { type: string }
+            Cache-Control: { type: string }
+            X-Blurhash: { type: string }
+            X-Image-Width: { type: string }
+            X-Image-Height: { type: string }
         '401': { description: Unauthorized }
         '404': { description: Not found }
       security:
@@ -208,6 +218,53 @@ paths:
       security:
         - BearerAuth: []
 
+  /posts/{id}/{fileName}/meta:
+    get:
+      tags: [Fast load]
+      summary: Get JSON metadata for a blog file (BlurHash, size, url)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+        - in: path
+          name: fileName
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/FileMetaResponse'
+        '404': { description: Not found }
+
+  /posts/{id}/{fileName}/url:
+    get:
+      tags: [Fast load]
+      summary: Get a presigned or CDN URL for a blog file
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: string
+        - in: path
+          name: fileName
+          required: true
+          type: string
+        - in: query
+          name: expires
+          required: false
+          type: integer
+          format: int32
+          description: Expiry in seconds (default 600, max 604800)
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/UrlResponse'
+        '404': { description: Not found }
+        '500': { description: Server error }
+
   /profiles/{userId}/profile:
     get:
       tags: [Profile pic v2]
@@ -227,6 +284,13 @@ paths:
           description: Image stream
           schema:
             type: file
+          headers:
+            ETag: { type: string }
+            Last-Modified: { type: string }
+            Cache-Control: { type: string }
+            X-Blurhash: { type: string }
+            X-Image-Width: { type: string }
+            X-Image-Height: { type: string }
         '404': { description: Not found }
         '500': { description: Server error }
     head:
@@ -246,12 +310,12 @@ paths:
         '200':
           description: Metadata available in response headers
           headers:
-            ETag:
-              type: string
-            Last-Modified:
-              type: string
-            Cache-Control:
-              type: string
+            ETag: { type: string }
+            Last-Modified: { type: string }
+            Cache-Control: { type: string }
+            X-Blurhash: { type: string }
+            X-Image-Width: { type: string }
+            X-Image-Height: { type: string }
         '401': { description: Unauthorized }
         '404': { description: Not found }
       security:
@@ -336,6 +400,45 @@ paths:
       security:
         - BearerAuth: []
 
+  /profiles/{userId}/profile/meta:
+    get:
+      tags: [Fast load]
+      summary: Get JSON metadata for profile image (BlurHash, size, url)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/FileMetaResponse'
+        '404': { description: Not found }
+
+  /profiles/{userId}/profile/url:
+    get:
+      tags: [Fast load]
+      summary: Get a presigned or CDN URL for profile image
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          type: string
+        - in: query
+          name: expires
+          required: false
+          type: integer
+          format: int32
+          description: Expiry in seconds (default 600, max 604800)
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/UrlResponse'
+        '404': { description: Not found }
+        '500': { description: Server error }
+
 definitions:
   ObjectWriteResponse:
     type: object
@@ -382,3 +485,21 @@ definitions:
             lastModified:
               type: string
               format: date-time
+  FileMetaResponse:
+    type: object
+    properties:
+      object: { type: string }
+      etag: { type: string }
+      size: { type: integer, format: int64 }
+      contentType: { type: string }
+      lastModified: { type: string, format: date-time }
+      cacheControl: { type: string }
+      blurhash: { type: string }
+      width: { type: integer, format: int32 }
+      height: { type: integer, format: int32 }
+      url: { type: string }
+  UrlResponse:
+    type: object
+    properties:
+      url: { type: string }
+      expiresIn: { type: integer, format: int32 }
