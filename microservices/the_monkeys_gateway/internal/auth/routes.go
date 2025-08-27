@@ -476,16 +476,21 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
 
-	var updateUsername UpdateUsername
+	var newUsername UpdateUsername
 
-	if err := ctx.BindJSON(&updateUsername); err != nil {
+	if err := ctx.BindJSON(&newUsername); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if newUsername.Username == "" {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "username cannot be empty"})
 		return
 	}
 
 	resp, err := asc.Client.UpdateUsername(context.Background(), &pb.UpdateUsernameReq{
 		CurrentUsername: currentUsername,
-		NewUsername:     updateUsername.Username,
+		NewUsername:     newUsername.Username,
 		Client:          client,
 		Ip:              ipAddress,
 	})
