@@ -106,12 +106,12 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 		v2.GET("/profiles/:user_id/profile/url", svc.GetProfileURL)
 	}
 	{
-		// GET /api/v2/storage/posts/:id/:fileName -> Stream a blog file (public). Uses object key posts/{id}/{fileName}.
+		// Stream a blog file (public). Uses object key posts/{id}/{fileName}.
 		v2.GET("/posts/:id/:fileName", svc.GetPostFile)
 		// Fast-load helpers (public): metadata + presigned/CDN URL
-		// GET /api/v2/storage/posts/:id/:fileName/meta -> JSON with etag, size, contentType, lastModified, cacheControl, blurhash, width, height, url.
+		// JSON with etag, size, contentType, lastModified, cacheControl, blurhash, width, height, url.
 		v2.GET("/posts/:id/:fileName/meta", svc.GetPostFileMeta)
-		// GET /api/v2/storage/posts/:id/:fileName/url -> Returns presigned or CDN URL for direct delivery. Optional ?expires=seconds.
+		// Returns presigned or CDN URL for direct delivery. Optional ?expires=seconds.
 		v2.GET("/posts/:id/:fileName/url", svc.GetPostFileURL)
 	}
 
@@ -119,15 +119,15 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 	v2.Use(mw.AuthRequired)
 	// Blog content CRUD
 	{
-		// POST /api/v2/storage/posts/:id -> Upload multipart form field `file`. Stores under posts/{id}/<uuid+ext>. Returns JSON with object info.
+		// Upload multipart form field `file`. Stores under posts/{id}/<uuid+ext>. Returns JSON with object info.
 		v2.POST("/posts/:id", svc.UploadPostFile)
-		// GET /api/v2/storage/posts/:id -> List all objects under posts/{id}/ (auth required).
+		// List all objects under posts/{id}/ (auth required).
 		v2.GET("/posts/:id", svc.ListPostFiles)
-		// HEAD /api/v2/storage/posts/:id/:fileName -> Return metadata in headers (ETag, Last-Modified, Cache-Control, X-Blurhash, X-Image-Width, X-Image-Height).
+		// Return metadata in headers (ETag, Last-Modified, Cache-Control, X-Blurhash, X-Image-Width, X-Image-Height).
 		v2.HEAD("/posts/:id/:fileName", svc.HeadPostFile)
-		// PUT /api/v2/storage/posts/:id/:fileName -> Replace an existing file with multipart field `file`. Updates metadata for images.
+		// Replace an existing file with multipart field `file`. Updates metadata for images.
 		v2.PUT("/posts/:id/:fileName", svc.UpdatePostFile)
-		// DELETE /api/v2/storage/posts/:id/:fileName -> Delete an object.
+		// Delete an object.
 		v2.DELETE("/posts/:id/:fileName", svc.DeletePostFile)
 	}
 
@@ -146,7 +146,6 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 	return svc
 }
 
-// Helpers
 // uniqueName generates a UUID-based filename preserving the original extension.
 func uniqueName(original string) string {
 	ext := filepath.Ext(original)
