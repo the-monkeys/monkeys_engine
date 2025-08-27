@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,11 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -21,7 +25,6 @@ import (
 )
 
 func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger) {
-
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -35,15 +38,31 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 		os.Exit(0)
 	}()
 
+	// Load config and init a single MinIO client for all handlers
+	cfg, err := config.GetConfig()
+	if err != nil {
+		log.Errorf("Failed to load storage config: %v", err)
+	}
+	var mc *minio.Client
+	if cfg != nil {
+		mc, err = minio.New(cfg.Minio.Endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.Minio.AccessKey, cfg.Minio.SecretKey, ""),
+			Secure: cfg.Minio.UseSSL,
+		})
+		if err != nil {
+			log.Errorf("Failed to initialize MinIO client: %v", err)
+		}
+	}
+
 	// Consume from both queue[0] and queue[2] in separate goroutines
-	go consumeQueue(conn, conf.Queues[0], log)
-	go consumeQueue(conn, conf.Queues[2], log)
+	go consumeQueue(conn, conf.Queues[0], log, cfg, mc)
+	go consumeQueue(conn, conf.Queues[2], log, cfg, mc)
 
 	// Keep the main function running to allow goroutines to process messages
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger) {
+func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, cfg *config.Config, mc *minio.Client) {
 	msgs, err := conn.Channel.Consume(
 		queueName, // queue
 		"",        // consumer
@@ -65,11 +84,11 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger) {
 			continue
 		}
 
-		handleUserAction(user, log)
+		handleUserAction(user, log, cfg, mc)
 	}
 }
 
-func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger) {
+func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, cfg *config.Config, mc *minio.Client) {
 	switch user.Action {
 	case constants.USER_REGISTER:
 		log.Infof("Creating user folder: %s", user.Username)
@@ -77,21 +96,42 @@ func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger) {
 			log.Errorf("Failed to create user folder: %v", err)
 		}
 	case constants.USERNAME_UPDATE:
+		// TODO: WHEN minio is in place completely then remove this block
 		log.Infof("Updating user folder: %s", user.Username)
 		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
-			log.Errorf("Failed to update user folder: %v", err)
+			log.Errorf("Failed to update user folder (filesystem): %v", err)
+		}
+
+		// Rename the MinIO folder (prefix) used by v2 storage
+		if mc != nil && cfg != nil {
+			if err := UpdateMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username, user.NewUsername); err != nil {
+				log.Errorf("Failed to update MinIO profile folder: %v", err)
+			}
 		}
 	case constants.USER_ACCOUNT_DELETE:
+		// TODO: WHEN minio is in place completely then remove this block
 		log.Infof("Deleting user folder: %s", user.Username)
 		if err := DeleteUserFolder(user.Username); err != nil {
 			log.Errorf("Failed to delete user folder: %v", err)
 		}
+		// Delete profile objects from MinIO as well
+		if mc != nil && cfg != nil {
+			if err := DeleteMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username); err != nil {
+				log.Errorf("Failed to delete MinIO profile folder: %v", err)
+			}
+		}
 	case constants.BLOG_DELETE:
+		// TODO: WHEN minio is in place completely then remove this block
 		log.Infof("Deleting blog folder: %s", user.BlogId)
 		if err := DeleteBlogFolder(user.BlogId); err != nil {
 			log.Errorf("Failed to delete user folder: %v", err)
 		}
-
+		// Delete blog post objects (prefix posts/{blogId}/) from MinIO
+		if mc != nil && cfg != nil {
+			if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, user.BlogId); err != nil {
+				log.Errorf("Failed to delete MinIO blog folder: %v", err)
+			}
+		}
 	default:
 		log.Errorf("Unknown action: %s", user.Action)
 	}
@@ -183,6 +223,60 @@ func UpdateUserFolder(currentName, newName string) error {
 	}
 
 	return nil
+}
+
+// UpdateMinioProfileFolder renames the object prefix in MinIO from
+// profiles/{oldName}/ -> profiles/{newName}/ by copying each object then deleting the old one.
+func UpdateMinioProfileFolder(ctx context.Context, mc *minio.Client, bucket, oldName, newName string) error {
+	oldPrefix := "profiles/" + strings.Trim(oldName, "/") + "/"
+	newPrefix := "profiles/" + strings.Trim(newName, "/") + "/"
+	if oldPrefix == newPrefix {
+		return nil
+	}
+	// List all objects under the old prefix
+	for obj := range mc.ListObjects(ctx, bucket, minio.ListObjectsOptions{Prefix: oldPrefix, Recursive: true}) {
+		if obj.Err != nil {
+			return fmt.Errorf("list objects failed: %w", obj.Err)
+		}
+		srcKey := obj.Key
+		dstKey := strings.Replace(srcKey, oldPrefix, newPrefix, 1)
+		// Copy to destination key
+		_, err := mc.CopyObject(ctx,
+			minio.CopyDestOptions{Bucket: bucket, Object: dstKey},
+			minio.CopySrcOptions{Bucket: bucket, Object: srcKey},
+		)
+		if err != nil {
+			return fmt.Errorf("copy %s -> %s failed: %w", srcKey, dstKey, err)
+		}
+		// Remove the old object
+		if err := mc.RemoveObject(ctx, bucket, srcKey, minio.RemoveObjectOptions{}); err != nil {
+			return fmt.Errorf("remove old object %s failed: %w", srcKey, err)
+		}
+	}
+	return nil
+}
+
+// DeleteMinioPrefix removes all objects under the given prefix.
+func DeleteMinioPrefix(ctx context.Context, mc *minio.Client, bucket, prefix string) error {
+	for obj := range mc.ListObjects(ctx, bucket, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if obj.Err != nil {
+			return fmt.Errorf("list objects failed: %w", obj.Err)
+		}
+		if err := mc.RemoveObject(ctx, bucket, obj.Key, minio.RemoveObjectOptions{}); err != nil {
+			return fmt.Errorf("remove object %s failed: %w", obj.Key, err)
+		}
+	}
+	return nil
+}
+
+func DeleteMinioProfileFolder(ctx context.Context, mc *minio.Client, bucket, username string) error {
+	prefix := "profiles/" + strings.Trim(username, "/") + "/"
+	return DeleteMinioPrefix(ctx, mc, bucket, prefix)
+}
+
+func DeleteMinioBlogFolder(ctx context.Context, mc *minio.Client, bucket, blogId string) error {
+	prefix := "posts/" + strings.Trim(blogId, "/") + "/"
+	return DeleteMinioPrefix(ctx, mc, bucket, prefix)
 }
 
 func DeleteUserFolder(userName string) error {

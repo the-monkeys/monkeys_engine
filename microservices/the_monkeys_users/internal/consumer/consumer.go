@@ -80,7 +80,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 
 		switch user.Action {
 		case constants.BLOG_CREATE:
-			log.Infof("Creating blog: %v", user)
+			log.Debugf("Creating blog: %+v", user)
 			if err := userCon.dbConn.AddBlogWithId(user); err != nil {
 				userCon.log.Errorf("Error creating blog: %v", err)
 			}
