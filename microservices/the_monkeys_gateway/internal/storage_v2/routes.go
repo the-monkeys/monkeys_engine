@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -54,7 +53,7 @@ func newService(cfg *config.Config) (*Service, error) {
 
 	svc := &Service{mc: cli, bucket: cfg.Minio.Bucket, cdnURL: cfg.Minio.CDNURL}
 	// If a public base is provided (e.g., http://localhost:9000), create a signer bound to that host
-	if v := strings.TrimSpace(os.Getenv("MINIO_PUBLIC_BASE_URL")); v != "" {
+	if v := strings.TrimSpace(cfg.Minio.PublicBaseURL); v != "" {
 		svc.publicBase = strings.TrimRight(v, "/")
 		if pu, err := url.Parse(svc.publicBase); err == nil {
 			endpoint := pu.Host
@@ -248,6 +247,7 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 
 	// Read into memory once so we can compute image metadata (BlurHash) and upload
 	data, err := io.ReadAll(file)
+	err = nil
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
 		return

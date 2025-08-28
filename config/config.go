@@ -118,12 +118,13 @@ type GoogleOAuth2 struct {
 
 // Minio holds object storage configuration
 type Minio struct {
-	Endpoint  string `mapstructure:"endpoint"`
-	AccessKey string `mapstructure:"access_key"`
-	SecretKey string `mapstructure:"secret_key"`
-	Bucket    string `mapstructure:"bucket_name"`
-	UseSSL    bool   `mapstructure:"use_ssl"`
-	CDNURL    string `mapstructure:"cdn_url"`
+	Endpoint      string `mapstructure:"endpoint"`
+	AccessKey     string `mapstructure:"access_key"`
+	SecretKey     string `mapstructure:"secret_key"`
+	Bucket        string `mapstructure:"bucket_name"`
+	UseSSL        bool   `mapstructure:"use_ssl"`
+	CDNURL        string `mapstructure:"cdn_url"`
+	PublicBaseURL string `mapstructure:"public_base_url"`
 }
 
 type Cors struct {
@@ -317,6 +318,7 @@ func bindEnvVars() {
 	viper.BindEnv("minio.bucket_name", "MINIO_BUCKET_NAME")
 	viper.BindEnv("minio.use_ssl", "MINIO_USE_SSL")
 	viper.BindEnv("minio.cdn_url", "MINIO_CDN_URL")
+	viper.BindEnv("minio.public_base_url", "MINIO_PUBLIC_BASE_URL")
 }
 
 // handleArrayEnvVars manually handles array environment variables
