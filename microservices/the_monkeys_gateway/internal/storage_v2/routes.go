@@ -247,7 +247,6 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 
 	// Read into memory once so we can compute image metadata (BlurHash) and upload
 	data, err := io.ReadAll(file)
-	err = nil
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
 		return
@@ -879,7 +878,7 @@ func (s *Service) DeleteProfileImage(ctx *gin.Context) {
 	loggedInUser := ctx.GetString("userName")
 
 	if userID != loggedInUser {
-		ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "cannot upload profile for another user"})
+		ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "cannot delete profile for another user"})
 		return
 	}
 

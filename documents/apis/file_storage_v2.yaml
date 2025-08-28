@@ -66,6 +66,7 @@ paths:
               contentType: image/png
         '400': { description: Bad request }
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - insufficient permissions }
         '500': { description: Server error }
       security:
         - BearerAuth: []
@@ -186,6 +187,7 @@ paths:
           schema:
             $ref: '#/definitions/ObjectWriteResponse'
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - insufficient permissions }
         '404': { description: Not found }
         '500': { description: Server error }
       security:
@@ -213,6 +215,7 @@ paths:
           schema:
             $ref: '#/definitions/DeleteResponse'
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - insufficient permissions }
         '404': { description: Not found }
         '500': { description: Server error }
       security:
@@ -265,7 +268,7 @@ paths:
         '404': { description: Not found }
         '500': { description: Server error }
 
-  /profiles/{userId}/profile:
+  /profiles/{user_id}/profile:
     get:
       tags: [Profile pic v2]
       summary: Get profile image
@@ -276,7 +279,7 @@ paths:
         - image/webp
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
       responses:
@@ -298,7 +301,7 @@ paths:
       summary: Get metadata (HEAD) for profile image
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
         - in: header
@@ -326,7 +329,7 @@ paths:
       consumes: [multipart/form-data]
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
         - in: header
@@ -342,9 +345,10 @@ paths:
         '201':
           description: Created
           schema:
-            $ref: '#/definitions/ObjectWriteResponse'
+            $ref: '#/definitions/ProfileWriteResponse'
         '400': { description: Bad request }
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - cannot upload profile for another user }
         '500': { description: Server error }
       security:
         - BearerAuth: []
@@ -354,7 +358,7 @@ paths:
       consumes: [multipart/form-data]
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
         - in: header
@@ -370,8 +374,9 @@ paths:
         '200':
           description: Updated
           schema:
-            $ref: '#/definitions/ObjectWriteResponse'
+            $ref: '#/definitions/ProfileWriteResponse'
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - cannot update profile for another user }
         '404': { description: Not found }
         '500': { description: Server error }
       security:
@@ -381,7 +386,7 @@ paths:
       summary: Delete profile image
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
         - in: header
@@ -395,18 +400,19 @@ paths:
           schema:
             $ref: '#/definitions/DeleteResponse'
         '401': { description: Unauthorized }
+        '403': { description: Forbidden - cannot delete profile for another user }
         '404': { description: Not found }
         '500': { description: Server error }
       security:
         - BearerAuth: []
 
-  /profiles/{userId}/profile/meta:
+  /profiles/{user_id}/profile/meta:
     get:
       tags: [Fast load]
       summary: Get JSON metadata for profile image (BlurHash, size, url)
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
       responses:
@@ -416,13 +422,13 @@ paths:
             $ref: '#/definitions/FileMetaResponse'
         '404': { description: Not found }
 
-  /profiles/{userId}/profile/url:
+  /profiles/{user_id}/profile/url:
     get:
       tags: [Fast load]
       summary: Get a presigned or CDN URL for profile image
       parameters:
         - in: path
-          name: userId
+          name: user_id
           required: true
           type: string
         - in: query
@@ -450,7 +456,22 @@ definitions:
         description: Full object key in the bucket
       fileName:
         type: string
-        description: Unique stored filename (for blog uploads)
+        description: Unique stored filename (for blog uploads only, not present for profiles)
+      etag:
+        type: string
+      size:
+        type: integer
+        format: int64
+      contentType:
+        type: string
+  ProfileWriteResponse:
+    type: object
+    properties:
+      bucket:
+        type: string
+      object:
+        type: string
+        description: Full object key in the bucket
       etag:
         type: string
       size:
