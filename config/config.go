@@ -125,6 +125,11 @@ type Minio struct {
 	UseSSL        bool   `mapstructure:"use_ssl"`
 	CDNURL        string `mapstructure:"cdn_url"`
 	PublicBaseURL string `mapstructure:"public_base_url"`
+	// Sync settings
+	SyncToRemote   bool   `mapstructure:"sync_to_remote"`
+	RemoteHost     string `mapstructure:"remote_host"`
+	RemoteUser     string `mapstructure:"remote_user"`
+	RemoteBasePath string `mapstructure:"remote_base_path"`
 }
 
 type Cors struct {
@@ -319,6 +324,10 @@ func bindEnvVars() {
 	viper.BindEnv("minio.use_ssl", "MINIO_USE_SSL")
 	viper.BindEnv("minio.cdn_url", "MINIO_CDN_URL")
 	viper.BindEnv("minio.public_base_url", "MINIO_PUBLIC_BASE_URL")
+	viper.BindEnv("minio.sync_to_remote", "MINIO_SYNC_TO_REMOTE")
+	viper.BindEnv("minio.remote_host", "MINIO_REMOTE_HOST")
+	viper.BindEnv("minio.remote_user", "MINIO_REMOTE_USER")
+	viper.BindEnv("minio.remote_base_path", "MINIO_REMOTE_BASE_PATH")
 }
 
 // handleArrayEnvVars manually handles array environment variables

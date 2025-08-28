@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	// Start periodic sync for filesystem to MinIO migration
 	if mc != nil && cfg != nil {
 		go startPeriodicSync(cfg, mc, log)
+		go startMinioToFileSystemSync(cfg, mc, log)
 	}
 
 	// Keep the main function running to allow goroutines to process messages
@@ -492,4 +494,226 @@ func getContentType(fileName string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+// startMinioToFileSystemSync runs MinIO to filesystem sync every 24 hours
+func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+
+	// Run initial sync after 2 minutes (offset from filesystem->minio sync)
+	time.Sleep(2 * time.Minute)
+	syncMinioToFileSystem(cfg, mc, log)
+
+	for range ticker.C {
+		syncMinioToFileSystem(cfg, mc, log)
+	}
+}
+
+// syncMinioToFileSystem syncs MinIO objects to filesystem (local or remote via SSH)
+func syncMinioToFileSystem(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+	ctx := context.Background()
+
+	log.Info("Starting MinIO to filesystem sync")
+
+	// Sync posts from MinIO to filesystem
+	syncMinioPostsToFileSystem(ctx, cfg, mc, log)
+
+	// Sync profiles from MinIO to filesystem
+	syncMinioProfilesToFileSystem(ctx, cfg, mc, log)
+
+	log.Info("Completed MinIO to filesystem sync")
+}
+
+// syncMinioPostsToFileSystem syncs posts/{blogID}/ objects to blogs/{blogID}/ filesystem
+func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+	log.Info("Syncing MinIO posts to filesystem...")
+
+	// List all objects with posts/ prefix
+	opts := minio.ListObjectsOptions{Prefix: "posts/", Recursive: true}
+	for obj := range mc.ListObjects(ctx, cfg.Minio.Bucket, opts) {
+		if obj.Err != nil {
+			log.Errorf("Error listing MinIO objects: %v", obj.Err)
+			continue
+		}
+
+		// Skip empty folders
+		if strings.HasSuffix(obj.Key, "/") {
+			continue
+		}
+
+		// Extract blog ID and filename from object key: posts/{blogID}/{fileName}
+		parts := strings.SplitN(strings.TrimPrefix(obj.Key, "posts/"), "/", 2)
+		if len(parts) != 2 {
+			log.Warnf("Unexpected object key format: %s", obj.Key)
+			continue
+		}
+
+		blogID := parts[0]
+		fileName := parts[1]
+		localPath := filepath.Join(constant.BlogDir, blogID, fileName)
+
+		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
+			log.Errorf("Failed to sync %s: %v", obj.Key, err)
+		}
+	}
+}
+
+// syncMinioProfilesToFileSystem syncs profiles/{username}/ objects to filesystem
+func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+	log.Info("Syncing MinIO profiles to filesystem...")
+
+	// List all objects with profiles/ prefix
+	opts := minio.ListObjectsOptions{Prefix: "profiles/", Recursive: true}
+	for obj := range mc.ListObjects(ctx, cfg.Minio.Bucket, opts) {
+		if obj.Err != nil {
+			log.Errorf("Error listing MinIO objects: %v", obj.Err)
+			continue
+		}
+
+		// Skip empty folders
+		if strings.HasSuffix(obj.Key, "/") {
+			continue
+		}
+
+		// Extract username and filename from object key: profiles/{username}/{fileName}
+		parts := strings.SplitN(strings.TrimPrefix(obj.Key, "profiles/"), "/", 2)
+		if len(parts) != 2 {
+			log.Warnf("Unexpected object key format: %s", obj.Key)
+			continue
+		}
+
+		username := parts[0]
+		fileName := parts[1]
+		localPath := filepath.Join(constant.ProfileDir, username, fileName)
+
+		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
+			log.Errorf("Failed to sync %s: %v", obj.Key, err)
+		}
+	}
+}
+
+// syncMinioObjectToFile downloads a MinIO object to local filesystem if it doesn't exist or is different
+func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger, objectKey, localPath string) error {
+	// Check if we should sync to remote instead
+	if cfg.Minio.SyncToRemote && cfg.Minio.RemoteHost != "" && cfg.Minio.RemoteUser != "" {
+		remotePath := filepath.Join(cfg.Minio.RemoteBasePath, localPath)
+		return syncMinioObjectToRemote(ctx, cfg, mc, log, objectKey, remotePath, cfg.Minio.RemoteHost, cfg.Minio.RemoteUser)
+	}
+
+	// Local filesystem sync
+	// Check if local file exists and compare with MinIO object
+	if fileInfo, err := os.Stat(localPath); err == nil {
+		// File exists, check if it's different from MinIO object
+		objInfo, err := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to stat MinIO object %s: %v", objectKey, err)
+		}
+
+		// Compare size and modification time
+		if fileInfo.Size() == objInfo.Size && !objInfo.LastModified.After(fileInfo.ModTime()) {
+			// File is up to date, skip
+			return nil
+		}
+	}
+
+	// Download from MinIO
+	log.Infof("Syncing from MinIO: %s -> %s", objectKey, localPath)
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Get object from MinIO
+	obj, err := mc.GetObject(ctx, cfg.Minio.Bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get object from MinIO: %v", err)
+	}
+	defer obj.Close()
+
+	// Create local file
+	file, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local file: %v", err)
+	}
+	defer file.Close()
+
+	// Copy data
+	if _, err := io.Copy(file, obj); err != nil {
+		return fmt.Errorf("failed to copy data: %v", err)
+	}
+
+	log.Infof("Successfully synced: %s", localPath)
+	return nil
+}
+
+// syncMinioObjectToRemote syncs a MinIO object to remote filesystem via SSH/SCP
+func syncMinioObjectToRemote(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger, objectKey, remotePath, sshHost, sshUser string) error {
+	log.Infof("Syncing from MinIO to remote: %s -> %s@%s:%s", objectKey, sshUser, sshHost, remotePath)
+
+	// Get object from MinIO
+	obj, err := mc.GetObject(ctx, cfg.Minio.Bucket, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get object from MinIO: %v", err)
+	}
+	defer obj.Close()
+
+	// Create temp file locally first
+	tempFile, err := os.CreateTemp("", "minio_sync_*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Copy MinIO object to temp file
+	if _, err := io.Copy(tempFile, obj); err != nil {
+		return fmt.Errorf("failed to copy data to temp file: %v", err)
+	}
+	tempFile.Close()
+
+	// Use SCP to copy to remote (requires scp command and SSH keys)
+	remoteDir := filepath.Dir(remotePath)
+
+	// Create remote directory first
+	mkdirCmd := fmt.Sprintf(`ssh %s@%s "mkdir -p %s"`, sshUser, sshHost, remoteDir)
+	if err := executeCommand(mkdirCmd, log); err != nil {
+		return fmt.Errorf("failed to create remote directory: %v", err)
+	}
+
+	// Copy file via SCP
+	scpCmd := fmt.Sprintf(`scp %s %s@%s:%s`, tempFile.Name(), sshUser, sshHost, remotePath)
+	if err := executeCommand(scpCmd, log); err != nil {
+		return fmt.Errorf("failed to copy file via SCP: %v", err)
+	}
+
+	log.Infof("Successfully synced to remote: %s", remotePath)
+	return nil
+}
+
+// executeCommand executes a shell command
+func executeCommand(cmd string, log *logrus.Logger) error {
+	log.Debugf("Executing command: %s", cmd)
+
+	// This is a simple implementation - in production you'd want better error handling
+	// Execute the SSH/SCP command
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return fmt.Errorf("empty command")
+	}
+
+	// Execute the command
+	execCmd := exec.Command(parts[0], parts[1:]...)
+	output, err := execCmd.CombinedOutput()
+	if err != nil {
+		log.Errorf("Command failed: %s, output: %s, error: %v", cmd, string(output), err)
+		return fmt.Errorf("command execution failed: %v", err)
+	}
+
+	log.Infof("Successfully executed: %s", cmd)
+	if len(output) > 0 {
+		log.Debugf("Command output: %s", string(output))
+	}
+	return nil
 }
