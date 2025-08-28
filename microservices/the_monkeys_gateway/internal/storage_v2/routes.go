@@ -27,7 +27,9 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 )
 
 // Router groups and handlers for /api/v2/storage
@@ -117,18 +119,19 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 
 	// Auth-required writes and deletes (and management)
 	v2.Use(mw.AuthRequired)
+
 	// Blog content CRUD
 	{
 		// Upload multipart form field `file`. Stores under posts/{id}/<uuid+ext>. Returns JSON with object info.
-		v2.POST("/posts/:id", svc.UploadPostFile)
+		v2.POST("/posts/:id", mw.AuthorizationByID, svc.UploadPostFile)
 		// List all objects under posts/{id}/ (auth required).
 		v2.GET("/posts/:id", svc.ListPostFiles)
 		// Return metadata in headers (ETag, Last-Modified, Cache-Control, X-Blurhash, X-Image-Width, X-Image-Height).
 		v2.HEAD("/posts/:id/:fileName", svc.HeadPostFile)
 		// Replace an existing file with multipart field `file`. Updates metadata for images.
-		v2.PUT("/posts/:id/:fileName", svc.UpdatePostFile)
+		v2.PUT("/posts/:id/:fileName", mw.AuthorizationByID, svc.UpdatePostFile)
 		// Delete an object.
-		v2.DELETE("/posts/:id/:fileName", svc.DeletePostFile)
+		v2.DELETE("/posts/:id/:fileName", mw.AuthorizationByID, svc.DeletePostFile)
 	}
 
 	// Profile image CRUD (single resource)
@@ -225,6 +228,11 @@ func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expi
 // Response: 201 JSON { bucket, object, fileName, etag, size, contentType }
 func (s *Service) UploadPostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
+		return
+	}
 
 	file, fileHeader, err := ctx.Request.FormFile("file")
 	if err != nil {
@@ -361,6 +369,12 @@ func (s *Service) HeadPostFile(ctx *gin.Context) {
 // Response: 200 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
+		return
+	}
+
 	fileName := ctx.Param("fileName")
 	objectName := "posts/" + blogID + "/" + fileName
 
@@ -471,6 +485,12 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 // Response: 200 JSON { message: "deleted", object }
 func (s *Service) DeletePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
+		return
+	}
+
 	fileName := ctx.Param("fileName")
 	objectName := "posts/" + blogID + "/" + fileName
 
@@ -498,6 +518,12 @@ func (s *Service) DeletePostFile(ctx *gin.Context) {
 // Response: 201 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UploadProfileImage(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
+	loggedInUser := ctx.GetString("userName")
+
+	if userID != loggedInUser {
+		ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "cannot upload profile for another user"})
+		return
+	}
 
 	file, fileHeader, err := ctx.Request.FormFile("profile_pic")
 	if err != nil {
@@ -593,6 +619,12 @@ func (s *Service) HeadProfileImage(ctx *gin.Context) {
 // Response: 200 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
+	loggedInUser := ctx.GetString("userName")
+
+	if userID != loggedInUser {
+		ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "cannot update profile for another user"})
+		return
+	}
 
 	file, fileHeader, err := ctx.Request.FormFile("profile_pic")
 	if err != nil {
@@ -844,6 +876,13 @@ func (s *Service) GetProfileImage(ctx *gin.Context) {
 func (s *Service) DeleteProfileImage(ctx *gin.Context) {
 	// Deletes the user's profile image (auth required)
 	userID := ctx.Param("user_id")
+	loggedInUser := ctx.GetString("userName")
+
+	if userID != loggedInUser {
+		ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "cannot upload profile for another user"})
+		return
+	}
+
 	objectName := "profiles/" + userID + "/profile"
 
 	// Check existence first for clearer 404
