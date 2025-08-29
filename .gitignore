@@ -56,3 +56,5 @@ es.prod.json
 
 # Keep the example file
 !.env.example
+# Logs
+logs/*
