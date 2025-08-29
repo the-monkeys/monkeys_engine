@@ -72,7 +72,7 @@ func main() {
 	pb.RegisterUploadBlogFileServer(grpcServer, fileService)
 	// fs.RegisterFileServiceServer(grpcServer, newFileServer)
 
-	log.Infof("✅ the file storage server started at: %v", cfg.Microservices.TheMonkeysFileStore)
+	log.Infof("✅ the file storage server started at: %v:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalln("Failed to serve:", err)
