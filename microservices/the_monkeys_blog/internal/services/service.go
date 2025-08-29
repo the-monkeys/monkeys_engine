@@ -62,10 +62,12 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 			IpAddress:  req.Ip,
 			Client:     req.Client,
 		})
+
 		if err != nil {
 			blog.logger.Errorf("cannot marshal the message for blog: %s, error: %v", req.BlogId, err)
 			return nil, status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
 		}
+
 		if len(req.Tags) == 0 {
 			req.Tags = []string{"untagged"}
 		}

@@ -117,18 +117,15 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 }
 
 // Middleware to check authorization with specific access level
-func (c *AuthMiddlewareConfig) BlogsAuthorization(ctx *gin.Context) {
+func (c *AuthMiddlewareConfig) AuthorizationByID(ctx *gin.Context) {
 	res, err := c.validateToken(ctx)
 	if err != nil {
 		return
 	}
 
-	blogID := ctx.Param("blog_id")
+	blogID := ctx.Param("id")
 	userName := res.UserName
 	email := ctx.Param("email")
-	// ids := ctx.Query("ids")
-	// blogIds := strings.Split(ids, ",")
-
 	accessResp, err := c.svc.Client.CheckAccessLevel(context.Background(), &pb.AccessCheckReq{
 		// Token:     res,
 		Email:     email,
@@ -151,6 +148,7 @@ func (c *AuthMiddlewareConfig) BlogsAuthorization(ctx *gin.Context) {
 	}
 
 	// fmt.Printf("res: %+v\n", accessResp)
+
 	ctx.Set("accountId", res.AccountId)
 	ctx.Set("user_access_level", accessResp.Access)
 	ctx.Set("user_role", accessResp.Role)
