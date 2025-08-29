@@ -551,7 +551,7 @@ func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *min
 
 		blogID := parts[0]
 		fileName := parts[1]
-		localPath := filepath.Join(constant.BlogDir, blogID, fileName)
+		localPath := filepath.Join(constant.LocalPostsDir, blogID, fileName)
 
 		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
 			log.Errorf("Failed to sync %s: %v", obj.Key, err)
@@ -585,7 +585,7 @@ func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *
 
 		username := parts[0]
 		fileName := parts[1]
-		localPath := filepath.Join(constant.ProfileDir, username, fileName)
+		localPath := filepath.Join(constant.LocalProfileDir, username, fileName)
 
 		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
 			log.Errorf("Failed to sync %s: %v", obj.Key, err)
