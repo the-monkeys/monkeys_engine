@@ -1,4 +1,74 @@
 services:
+  the_monkeys_db:
+    container_name: "the-monkeys-psql"
+    image: bitnami/postgresql:latest
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
+      POSTGRES_USER: ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}
+      POSTGRES_DB: ${POSTGRESQL_PRIMARY_DB_DB_NAME}
+      POSTGRESQL_ENABLE_LDAP: no
+    ports:
+      - "${POSTGRESQL_PRIMARY_DB_DB_PORT}:${POSTGRESQL_PRIMARY_DB_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backup:/backup
+      - ./postgres_backup:/backup_source
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db-migrations:
+    container_name: "the-monkeys-migrate"
+    image: migrate/migrate:v4.15.2
+    volumes:
+      - ./schema:/migrations
+    networks:
+      - monkeys-network
+    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://${POSTGRESQL_PRIMARY_DB_DB_USERNAME}:${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}@${POSTGRESQL_PRIMARY_DB_DB_HOST}:5432/${POSTGRESQL_PRIMARY_DB_DB_NAME}?sslmode=disable" ]
+    command: [ "up" ]
+    depends_on:
+      the_monkeys_db:
+        condition: service_healthy
+    restart: on-failure
+
+  elasticsearch-node1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    container_name: elasticsearch-node1
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - ELASTIC_PASSWORD=${OPENSEARCH_OS_PASSWORD}
+      - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - path.repo=/usr/share/elasticsearch/snapshots
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch-data1:/usr/share/elasticsearch/data
+      - ./elasticsearch_snapshots:/usr/share/elasticsearch/snapshots
+    ports:
+      - "${OPENSEARCH_HTTP_PORT}:${OPENSEARCH_HTTP_INTERNAL_PORT}"
+      - "${OPENSEARCH_TRANSPORT_PORT}:${OPENSEARCH_TRANSPORT_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${OPENSEARCH_HTTP_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: the-monkeys-rabbitmq
@@ -16,7 +86,7 @@ services:
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -50,6 +120,8 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - db-migrations
+      - the_monkeys_db
       - minio
     volumes:
       - .:/go/src/app
@@ -73,6 +145,8 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
     ports:
@@ -90,7 +164,8 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
-      - minio
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
       - the_monkeys_profile:/profile
@@ -110,6 +185,8 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - db-migrations
+      - the_monkeys_db
     volumes:
       - .:/go/src/app
     ports:
@@ -127,6 +204,9 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - elasticsearch-node1
     volumes:
       - .:/go/src/app
     ports:
@@ -144,6 +224,9 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - elasticsearch-node1
       - the_monkeys_blog
       - the_monkeys_user
     volumes:
@@ -163,6 +246,7 @@ services:
       - monkeys-network
     depends_on:
       - rabbitmq
+      - the_monkeys_db
     volumes:
       - .:/app
     ports:
@@ -201,8 +285,11 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
   the_monkeys_profile:
   blogs_volume:
   rabbitmq_data:
+  elasticsearch-data1:
+    driver: local
   minio_data:
     driver: local
