@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/ulule/limiter/v3 v3.11.2
 	golang.org/x/crypto v0.39.0
-	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
+	golang.org/x/image v0.18.0
 	google.golang.org/grpc v1.66.2
 	google.golang.org/protobuf v1.36.6
 )
