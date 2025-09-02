@@ -84,7 +84,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	as.logger.Infof("registering the user with email %v", req.Email)
+	as.logger.Debugf("registering the user with email %v", req.Email)
 	userId, err := as.dbConn.RegisterUser(user)
 	if err != nil {
 		as.logger.Errorf("cannot register the user %s, error: %v", user.Email, err)
@@ -98,12 +98,12 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		if err != nil {
 			log.Printf("Failed to send mail post registration: %v", err)
 		}
-		as.logger.Info("Email Sent!")
+		as.logger.Debug("Email Sent!")
 	}()
 
 	go cache.AddUserLog(as.dbConn, user, constants.Register, constants.ServiceAuth, constants.EventRegister, as.logger)
 
-	as.logger.Infof("user %s is successfully registered.", user.Email)
+	as.logger.Debugf("user %s is successfully registered.", user.Email)
 
 	// Generate and return token
 	token, err := as.jwt.GenerateToken(user)
@@ -167,7 +167,7 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 		return nil, status.Errorf(codes.NotFound, "email does not exist")
 	}
 
-	as.logger.Infof("User with email %s successfully verified!", claims.Email)
+	as.logger.Debugf("User with email %s successfully verified!", claims.Email)
 	return &pb.ValidateResponse{
 		StatusCode: http.StatusOK,
 		UserId:     user.Id,
@@ -203,7 +203,7 @@ func (as *AuthzSvc) DecodeSignedJWT(ctx context.Context, req *pb.DecodeSignedJWT
 }
 
 func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq) (*pb.AccessCheckRes, error) {
-	as.logger.Infof("checking access of user %s for blog %s", req.AccountId, req.BlogId)
+	as.logger.Debugf("checking access of user %s for blog %s", req.AccountId, req.BlogId)
 	if req.AccountId == "" || req.BlogId == "" {
 		return nil, status.Errorf(codes.Unauthenticated, "unauthorized to perform this action")
 	}
@@ -220,7 +220,7 @@ func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq
 		return nil, status.Errorf(codes.Unauthenticated, "unauthorized to perform this action")
 	}
 
-	as.logger.Infof("user %s has the following permissions: %v", req.AccountId, resp)
+	as.logger.Debugf("user %s has the following permissions: %v", req.AccountId, resp)
 	// Return the access level
 	return &pb.AccessCheckRes{
 		Access:     resp,
@@ -230,7 +230,7 @@ func (as *AuthzSvc) CheckAccessLevel(ctx context.Context, req *pb.AccessCheckReq
 }
 
 func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
-	as.logger.Infof("user has requested to login with email: %s", req.Email)
+	as.logger.Debugf("user has requested to login with email: %s", req.Email)
 	// Check if the user is existing the db or not
 	user, err := as.dbConn.CheckIfEmailExist(req.Email)
 	if err != nil {
@@ -269,7 +269,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 }
 
 func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordReq) (*pb.ForgotPasswordRes, error) {
-	as.logger.Infof("User %s has forgotten their password", req.Email)
+	as.logger.Debugf("User %s has forgotten their password", req.Email)
 
 	// Check if the user exists in the database
 	user, err := as.dbConn.CheckIfEmailExist(req.Email)
@@ -314,7 +314,7 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 }
 
 func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq) (*pb.ResetPasswordRes, error) {
-	as.logger.Infof("user %s has requested to reset their password", req.Username)
+	as.logger.Debugf("user %s has requested to reset their password", req.Username)
 
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
@@ -343,7 +343,7 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 		return nil, status.Errorf(codes.Unauthenticated, "token didn't match")
 	}
 
-	as.logger.Infof("Assigning a token to the user: %s having email: %s to reset their password", user.Username, user.Email)
+	as.logger.Debugf("Assigning a token to the user: %s having email: %s to reset their password", user.Username, user.Email)
 	// Generate and return token
 	token, err := as.jwt.GenerateToken(user)
 	if err != nil {
@@ -368,7 +368,7 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 }
 
 func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordReq) (*pb.UpdatePasswordRes, error) {
-	as.logger.Infof("updating password for: %+v", req)
+	as.logger.Debugf("updating password for: %+v", req)
 
 	// Check if the username exists in the database
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
@@ -391,7 +391,7 @@ func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordRe
 		return nil, status.Errorf(codes.Internal, "could not update the password")
 	}
 
-	as.logger.Infof("updated password for: %+v", req.Email)
+	as.logger.Debugf("updated password for: %+v", req.Email)
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
@@ -406,15 +406,15 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 	if req.Email == "" {
 		return nil, constants.ErrBadRequest
 	}
-	as.logger.Infof("user %v has requested for email verification", req.Email)
+	as.logger.Debugf("user %v has requested for email verification", req.Email)
 
 	user, err := as.dbConn.CheckIfEmailExist(req.Email)
 	if err != nil {
-		as.logger.Infof("user %v doesn't exist, error: %v", req.Email, err)
+		as.logger.Errorf("user %v doesn't exist, error: %v", req.Email, err)
 		return nil, status.Errorf(codes.NotFound, "User doesn't exist")
 	}
 
-	as.logger.Infof("generating verification email token for: %s", req.GetEmail())
+	as.logger.Debugf("generating verification email token for: %s", req.GetEmail())
 	hash := string(utils.GenHash())
 	encHash := utils.HashPassword(hash)
 
@@ -425,12 +425,12 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 	}
 
 	if err := as.dbConn.UpdateEmailVerificationToken(user); err != nil {
-		as.logger.Infof("error occurred while updating email verification token: %v", err)
+		as.logger.Errorf("error occurred while updating email verification token: %v", err)
 		return nil, status.Errorf(codes.Internal, "error occurred while updating email verification token")
 	}
 
 	emailBody := utils.EmailVerificationHTML(user.FirstName, user.LastName, user.Username, hash)
-	as.logger.Infof("Sending verification email to: %s", req.GetEmail())
+	as.logger.Debugf("Sending verification email to: %s", req.GetEmail())
 
 	// TODO: Handle error of the go routine
 	go func() {
@@ -439,7 +439,7 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 			// Handle error
 			log.Printf("Failed to send mail for password recovery: %v", err)
 		}
-		as.logger.Info("Email Sent!")
+		as.logger.Debug("Email Sent!")
 	}()
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
@@ -488,7 +488,7 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 		return nil, status.Errorf(codes.Internal, "Couldn't update email verification token")
 	}
 
-	as.logger.Infof("Verified email: %s", user.Email)
+	as.logger.Debugf("Verified email: %s", user.Email)
 
 	// Set default IP address and client if not provided
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
@@ -571,7 +571,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 }
 
 func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.UpdatePasswordWithPasswordReq) (*pb.UpdatePasswordWithPasswordRes, error) {
-	as.logger.Infof("updating password of user: %s", req.Username)
+	as.logger.Debugf("updating password of user: %s", req.Username)
 
 	// Check if the user exists
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
@@ -610,7 +610,7 @@ func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.Upda
 }
 
 func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq) (*pb.UpdateEmailIdRes, error) {
-	as.logger.Infof("updating email of user: %s", req.Username)
+	as.logger.Debugf("updating email of user: %s", req.Username)
 
 	user, err := as.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
@@ -625,7 +625,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	_, err = as.dbConn.CheckIfEmailExist(req.NewEmail)
 	if err == nil {
 		if err == sql.ErrNoRows {
-			as.logger.Infof("updating a new email: %v", req.NewEmail)
+			as.logger.Debugf("updating a new email: %v", req.NewEmail)
 		} else {
 			return nil, status.Errorf(codes.AlreadyExists, "The user with email %s already in use", req.NewEmail)
 		}
@@ -654,7 +654,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 		if err != nil {
 			log.Printf("Failed to send mail post registration: %v", err)
 		}
-		as.logger.Info("Email Sent!")
+		as.logger.Debug("Email Sent!")
 	}()
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)

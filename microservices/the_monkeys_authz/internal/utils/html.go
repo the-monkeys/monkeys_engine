@@ -1,19 +1,20 @@
 package utils
 
 import (
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 )
 
 var Address string
 
 func init() {
+	log := logger.ZapForService("tm-authz")
 	cfg, err := config.GetConfig()
 	if err != nil {
-		logrus.Errorf("cannot load the config: %v", err)
+		log.Errorf("cannot load the config: %v", err)
 	}
 	Address = cfg.Authentication.EmailVerificationAddr
-	logrus.Infof("✅ the email verification address is: %v", Address)
+	log.Infof("✅ the email verification address is: %v", Address)
 }
 
 func ResetPasswordTemplate(firstName, lastName, secret string, username string) string {

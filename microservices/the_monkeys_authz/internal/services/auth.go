@@ -57,6 +57,6 @@ func (srv *AuthzSvc) SendMail(email, emailBody string) error {
 		return err
 	}
 
-	srv.logger.Infow("verification email sent", "to", email)
+	srv.logger.Debugw("verification email sent", "to", email)
 	return nil
 }
