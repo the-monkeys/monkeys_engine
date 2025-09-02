@@ -37,10 +37,7 @@ var upgrader = websocket.Upgrader{
 }
 
 type BlogServiceClient struct {
-	Client pb.BlogServiceClient
-	//cacheMutex sync.Mutex
-	//cacheTime  time.Time
-	//cache1     string
+	Client  pb.BlogServiceClient
 	UserCli *user_service.UserServiceClient
 	config  *config.Config
 }
@@ -379,8 +376,8 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 
 	accId := ctx.GetString("accountId")
 	// Bind tags from request body
-	var tags Tags
-	if err := ctx.ShouldBindBodyWithJSON(&tags); err != nil {
+	var publishBody PublishBlogReq
+	if err := ctx.ShouldBindBodyWithJSON(&publishBody); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
 		return
 	}
@@ -391,7 +388,8 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 		AccountId: accId,
 		Ip:        ctx.Request.Header.Get("IP"),
 		Client:    ctx.Request.Header.Get("Client"),
-		Tags:      tags.Tags,
+		Tags:      publishBody.Tags,
+		Slug:      publishBody.Slug,
 	})
 
 	if err != nil {
@@ -525,38 +523,6 @@ func (asc *BlogServiceClient) GetBookmarks(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, resp)
 }
-
-// TODO: Add access control over this function for all blogs
-// func (asc *BlogServiceClient) GetAllBlogsByBlogIds(ctx *gin.Context) {
-// 	ids := ctx.Query("ids")
-// 	idSlice := strings.Split(ids, ",")
-
-// 	if len(idSlice) == 0 {
-// 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "please provide blog ids"})
-// 		return
-// 	}
-
-// 	resp, err := asc.Client.GetAllBlogsByBlogIds(context.Background(), &pb.GetBlogsByBlogIds{
-// 		BlogIds: idSlice,
-// 	})
-// 	if err != nil {
-// 		if status, ok := status.FromError(err); ok {
-// 			switch status.Code() {
-// 			case codes.InvalidArgument:
-// 				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "incomplete request, please provide correct input parameters"})
-// 				return
-// 			case codes.Internal:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't delete the blog due to some internal error"})
-// 				return
-// 			default:
-// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-// 				return
-// 			}
-// 		}
-// 	}
-
-// 	ctx.JSON(http.StatusOK, resp)
-// }
 
 func (asc *BlogServiceClient) GetDraftBlogByBlogId(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
