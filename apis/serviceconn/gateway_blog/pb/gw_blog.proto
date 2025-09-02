@@ -99,6 +99,7 @@ message PublishBlogReq {
     string ip = 3;
     string client = 4;
     repeated string tags = 5;
+    string slug = 6;
 }
 
 message PublishBlogResp {
