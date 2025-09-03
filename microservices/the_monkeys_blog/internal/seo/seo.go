@@ -19,6 +19,8 @@ import (
 
 type SEOManager interface {
 	HandleSEOForBlog(ctx context.Context, blogId, slug string) error
+	ShareBlogToTelegram(ctx context.Context, blogId, slug string) error
+	ShareBlogToDiscord(ctx context.Context, blogId, slug string) error
 }
 
 type seoManager struct {
@@ -201,4 +203,18 @@ func (s *seoManager) verifyURLIndexing(blogURL string) {
 	}
 
 	s.log.Warnf("[SEO verify] metadata still not available after retries for %s", blogURL)
+}
+
+func (s *seoManager) ShareBlogToTelegram(ctx context.Context, blogId, slug string) error {
+	// Placeholder implementation
+	s.log.Infof("Sharing blog %s to Telegram with slug: %s", blogId, slug)
+	// Implement actual Telegram sharing logic here
+	return nil
+}
+
+func (s *seoManager) ShareBlogToDiscord(ctx context.Context, blogId, slug string) error {
+	// Placeholder implementation
+	s.log.Infof("Sharing blog %s to Discord with slug: %s", blogId, slug)
+	// Implement actual Discord sharing logic here
+	return nil
 }
