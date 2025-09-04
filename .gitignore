@@ -58,3 +58,6 @@ es.prod.json
 !.env.example
 # Logs
 logs/*
+local_blogs/*
+local_profiles/*
+monkeys-seo-cred.json

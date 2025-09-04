@@ -108,6 +108,15 @@ type Keys struct {
 	SystemKey      string `mapstructure:"system_key"` // Key for system-level operations
 }
 
+type SEO struct {
+	Enabled                 bool   `mapstructure:"enabled"`
+	GoogleIndexingAPIKey    string `mapstructure:"google_indexing_api_key"`
+	GoogleIndexingAPI       string `mapstructure:"google_indexing_api"`
+	SearchConsoleSitemapURL string `mapstructure:"search_console_sitemap_url"`
+	BaseURL                 string `mapstructure:"base_url"`
+	GoogleCredentialsFile   string `mapstructure:"google_credentials_file"`
+}
+
 type GoogleOAuth2 struct {
 	RedirectURL  string   `mapstructure:"redirect_url"`
 	ClientID     string   `mapstructure:"client_id"`
@@ -161,6 +170,7 @@ type Config struct {
 	Cors              Cors              `mapstructure:"cors"`
 	Redis             Redis             `mapstructure:"redis"`
 	Minio             Minio             `mapstructure:"minio"`
+	SEO               SEO               `mapstructure:"seo"`
 }
 
 func GetConfig() (*Config, error) {
@@ -328,6 +338,14 @@ func bindEnvVars() {
 	viper.BindEnv("minio.remote_host", "MINIO_REMOTE_HOST")
 	viper.BindEnv("minio.remote_user", "MINIO_REMOTE_USER")
 	viper.BindEnv("minio.remote_base_path", "MINIO_REMOTE_BASE_PATH")
+
+	// SEO
+	viper.BindEnv("seo.enabled", "SEO_ENABLED")
+	viper.BindEnv("seo.google_indexing_api_key", "SEO_GOOGLE_INDEXING_API_KEY")
+	viper.BindEnv("seo.google_indexing_api", "SEO_GOOGLE_INDEXING_API")
+	viper.BindEnv("seo.search_console_sitemap_url", "SEO_SEARCH_CONSOLE_SITEMAP_URL")
+	viper.BindEnv("seo.base_url", "SEO_BASE_URL")
+	viper.BindEnv("seo.google_credentials_file", "SEO_GOOGLE_CREDENTIALS_FILE")
 }
 
 // handleArrayEnvVars manually handles array environment variables
