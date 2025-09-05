@@ -5,43 +5,40 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-
 	"log"
 	"math/rand"
 	"net/http"
 	"time"
 
-	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
-
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/service_types"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/utils"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/utils"
 )
 
 type AuthzSvc struct {
 	dbConn db.AuthDBHandler
 	jwt    utils.JwtWrapper
 	config *config.Config
-	logger *logrus.Logger
+	logger *zap.SugaredLogger
 	qConn  rabbitmq.Conn
 	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn rabbitmq.Conn) *AuthzSvc {
+func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn rabbitmq.Conn, logger *zap.SugaredLogger) *AuthzSvc {
 	return &AuthzSvc{
 		dbConn: dbCli,
 		jwt:    jwt,
 		config: config,
-		logger: logrus.New(),
+		logger: logger,
 		qConn:  qConn,
 	}
 }
