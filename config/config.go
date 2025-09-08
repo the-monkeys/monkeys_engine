@@ -171,6 +171,7 @@ type Config struct {
 	Redis             Redis             `mapstructure:"redis"`
 	Minio             Minio             `mapstructure:"minio"`
 	SEO               SEO               `mapstructure:"seo"`
+	AppEnv            string            `mapstructure:"app_env"`
 }
 
 func GetConfig() (*Config, error) {
@@ -224,6 +225,7 @@ func bindEnvVars() {
 	viper.BindEnv("the_monkeys_gateway.HTTP", "THE_MONKEYS_GATEWAY_HTTP")
 	viper.BindEnv("the_monkeys_gateway.http_port", "THE_MONKEYS_GATEWAY_HTTP_PORT")
 	viper.BindEnv("the_monkeys_gateway.internal_port", "THE_MONKEYS_GATEWAY_INTERNAL_PORT")
+	viper.BindEnv("app_env", "APP_ENV")
 
 	// Microservices
 	viper.BindEnv("microservices.the_monkeys_authz", "MICROSERVICES_THE_MONKEYS_AUTHZ")

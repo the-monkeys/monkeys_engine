@@ -11,9 +11,9 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/constants"
+	"go.uber.org/zap"
 )
 
 type ElasticsearchStorage interface {
@@ -56,26 +56,22 @@ type ElasticsearchStorage interface {
 
 type elasticsearchStorage struct {
 	client *elasticsearch.Client
-	log    *logrus.Logger
+	log    *zap.SugaredLogger
 }
 
-func NewElasticsearchClient(url, username, password string, log *logrus.Logger) (ElasticsearchStorage, error) {
-	client, err := NewESClient(url, username, password)
+func NewElasticsearchClient(url, username, password string, log *zap.SugaredLogger) (ElasticsearchStorage, error) {
+	client, err := NewESClient(url, username, password, log)
 	if err != nil {
-		log.Errorf("Failed to connect to Elasticsearch instance, error: %+v", err)
+		log.Errorw("elasticsearch connect failed", "err", err)
 		return nil, err
 	}
-
-	return &elasticsearchStorage{
-		client: client,
-		log:    log,
-	}, nil
+	return &elasticsearchStorage{client: client, log: log}, nil
 }
 
 func (es *elasticsearchStorage) DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*esapi.Response, error) {
 	bs, err := json.Marshal(blog)
 	if err != nil {
-		es.log.Errorf("DraftABlog: cannot marshal the blog, error: %v", err)
+		es.log.Errorw("draft marshal failed", "err", err)
 		return nil, err
 	}
 

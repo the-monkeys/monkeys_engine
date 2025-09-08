@@ -7,15 +7,28 @@ import (
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/seo"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/services"
 
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+func printBanner(host, env string) {
+	banner := "\n" +
+		"┌──────────────────────────────────────────────────────────┐\n" +
+		"│   🐒  The Monkeys Blog Service                            │\n" +
+		"│   Status   : ONLINE                                       │\n" +
+		fmt.Sprintf("│   Host     : %-44s│\n", host) +
+		fmt.Sprintf("│   Env      : %-44s│\n", env) +
+		"│   Logs     : zap (structured)                             │\n" +
+		"│   Tip      : Set LOG_LEVEL=debug for verbose output       │\n" +
+		"└──────────────────────────────────────────────────────────┘\n"
+	fmt.Printf("service online", "banner", banner, "host", host, "env", env)
+}
 
 func main() {
 	cfg, err := config.GetConfig()
@@ -24,38 +37,34 @@ func main() {
 		return
 	}
 
+	logg := logger.ZapForService("blog")
+	defer logger.Sync()
+
 	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
 	lis, err := net.Listen("tcp", host)
 	if err != nil {
-		log.Fatalf("article and service server failed to listen at port %v, error: %v",
-			host, err)
+		logg.Fatalf("failed to listen", "host", host, "err", err)
 		return
 	}
 
-	logger := logrus.New()
-
-	osClient, err := database.NewElasticsearchClient(cfg.Opensearch.Host, cfg.Opensearch.Username, cfg.Opensearch.Password, logger)
+	osClient, err := database.NewElasticsearchClient(cfg.Opensearch.Host, cfg.Opensearch.Username, cfg.Opensearch.Password, logg)
 	if err != nil {
-		logger.Fatalf("cannot get the opensearch client, error: %v", err)
+		logg.Fatalf("cannot get the opensearch client", "err", err)
 		return
 	}
 
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
-	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, logger, osClient)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, logg, osClient)
 
-	seoManager := seo.NewSEOManager(logger, cfg)
-
-	blogService := services.NewBlogService(osClient, seoManager, logger, cfg, qConn)
-	// interservice := services.NewInterservice(*osClient, logger)
+	seoManager := seo.NewSEOManager(logg, cfg)
+	blogService := services.NewBlogService(osClient, seoManager, logg, cfg, qConn)
 
 	grpcServer := grpc.NewServer()
-
 	pb.RegisterBlogServiceServer(grpcServer, blogService)
-	// isv.RegisterBlogServiceServer(grpcServer, interservice)
 
-	logrus.Info("✅ the blog server started at: ", host)
+	printBanner(host, cfg.AppEnv)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		logg.Fatalw("failed to serve", "err", err)
 		return
 	}
 }
