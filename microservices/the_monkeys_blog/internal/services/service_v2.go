@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/models"
@@ -24,13 +23,13 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		reqAny, err := stream.Recv()
 		if err == io.EOF {
 			// Client has closed the stream
-			blog.logger.Debugf("Client closed the stream")
+			blog.logger.Debug("client closed stream")
 			// Send message to the user service to update the blog status
 			return nil
 		}
 		if err != nil {
-			blog.logger.Errorf("Error receiving message from stream: %v", err)
-			return status.Errorf(codes.Internal, "Error receiving message: %v", err)
+			blog.logger.Errorw("stream recv failed", "err", err)
+			return status.Errorf(codes.Internal, "error receiving message")
 		}
 
 		// Unmarshal the incoming Any message into a struct
@@ -43,7 +42,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		// Convert the struct to a map for further processing
 		req := reqStruct.AsMap()
 
-		blog.logger.Infof("Received a blog containing id: %v", req["blog_id"])
+		blog.logger.Debugw("draft blog v2", "blog_id", req["blog_id"], "owner", req["owner_account_id"])
 		req["is_draft"] = true
 
 		blogId := req["blog_id"].(string)
@@ -66,10 +65,10 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 
 		exists, _, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
 		if exists {
-			blog.logger.Infof("Updating the blog with id: %s", blogId)
+			blog.logger.Debugw("update blog v2", "blog_id", blogId)
 			// Additional logic for existing blog handling
 		} else {
-			blog.logger.Infof("Creating the blog with id: %s for author: %s", blogId, ownerAccountId)
+			blog.logger.Debugw("create blog v2", "blog_id", blogId, "owner", ownerAccountId)
 			bx, err := json.Marshal(models.InterServiceMessage{
 				AccountId:  ownerAccountId,
 				BlogId:     blogId,
@@ -112,7 +111,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		// TODO: Change the return data to the actual response
 		anyMsg, err := anypb.New(reqStruct)
 		if err != nil {
-			logrus.Errorf("Error wrapping structpb.Struct in anypb.Any: %v", err)
+			blog.logger.Errorf("Error wrapping structpb.Struct in anypb.Any: %v", err)
 			return status.Errorf(codes.Internal, "Failed to wrap struct in Any: %v", err)
 		}
 

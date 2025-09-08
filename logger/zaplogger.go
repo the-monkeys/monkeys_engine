@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/the-monkeys/the_monkeys/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -39,6 +40,11 @@ func firstNonEmpty(values ...string) string {
 func initZap() {
 	zapOnce.Do(func() {
 		env := firstNonEmpty(os.Getenv(EnvAppEnv), os.Getenv("GO_ENV"), os.Getenv("ENV"))
+		if env == "" {
+			if cfg, err := config.GetConfig(); err == nil && strings.TrimSpace(cfg.AppEnv) != "" {
+				env = cfg.AppEnv
+			}
+		}
 		if env == "" {
 			env = "development"
 		}
@@ -158,6 +164,11 @@ func ZapSugar() *zap.SugaredLogger { return Zap().Sugar() }
 func ZapForService(service string) *zap.SugaredLogger {
 	initZap()
 	env := firstNonEmpty(os.Getenv(EnvAppEnv), os.Getenv("GO_ENV"), os.Getenv("ENV"))
+	if env == "" {
+		if cfg, err := config.GetConfig(); err == nil && strings.TrimSpace(cfg.AppEnv) != "" {
+			env = cfg.AppEnv
+		}
+	}
 	if env == "" {
 		env = "development"
 	}
