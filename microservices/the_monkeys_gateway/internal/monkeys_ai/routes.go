@@ -5,54 +5,47 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_recom/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// var upgrader = websocket.Upgrader{
-// 	CheckOrigin: func(r *http.Request) bool {
-// 		return true // Consider restricting this based on your use case
-// 	},
-// }
-
 type RecommendationsClient struct {
 	Client pb.RecommendationServiceClient
-	log    *logrus.Logger
+	log    *zap.SugaredLogger
 	pb.UnimplementedRecommendationServiceServer
 }
 
-func NewRecommendationsClient(cfg *config.Config) pb.RecommendationServiceClient {
+func NewRecommendationsClient(cfg *config.Config, lg *zap.SugaredLogger) pb.RecommendationServiceClient {
 	addr := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAIEngine, cfg.Microservices.AIEnginePort)
 
-	// Try connection with more detailed logging
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("❌ Cannot create gRPC Recommendations client: %v", err)
+		lg.Errorw("cannot create gRPC recommendations client", "err", err, "addr", addr)
 		return nil
 	}
 
-	logrus.Infof("✅ the monkeys gateway is successfully connected to Recommendations service at: %v", addr)
+	lg.Debugw("connected to recommendations service", "addr", addr)
 	return pb.NewRecommendationServiceClient(conn)
 }
 
-func RegisterRecommendationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *logrus.Logger) *RecommendationsClient {
+func RegisterRecommendationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, lg *zap.SugaredLogger) *RecommendationsClient {
 	// mware := auth.InitAuthMiddleware(authClient)
 
-	nsc := &RecommendationsClient{
-		Client: NewRecommendationsClient(cfg),
-		log:    log,
+	client := &RecommendationsClient{
+		Client: NewRecommendationsClient(cfg, lg),
+		log:    lg,
 	}
 
-	routes := router.Group("/api/v1/recommendations")
-	// routes.Use(mware.AuthRequired)
+	group := router.Group("/api/v1/recommendations")
+	// group.Use(mware.AuthRequired)
 
-	routes.GET("/by-username/:username", nsc.GetRecommendations)
+	group.GET("/by-username/:username", client.GetRecommendations)
 
-	return nsc
+	return client
 }
 
 func (rc *RecommendationsClient) GetRecommendations(ctx *gin.Context) {
@@ -64,6 +57,7 @@ func (rc *RecommendationsClient) GetRecommendations(ctx *gin.Context) {
 
 	resp, err := rc.Client.GetRecommendations(ctx.Request.Context(), &pb.UserProfileReq{Username: id})
 	if err != nil {
+		rc.log.Errorw("get recommendations failed", "user", id, "err", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get recommendations"})
 		return
 	}

@@ -11,8 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -40,28 +40,30 @@ type BlogServiceClient struct {
 	Client  pb.BlogServiceClient
 	UserCli *user_service.UserServiceClient
 	config  *config.Config
+	log     *zap.SugaredLogger
 }
 
-func NewBlogServiceClient(cfg *config.Config) pb.BlogServiceClient {
+func NewBlogServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.BlogServiceClient {
 	blogService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
 	cc, err := grpc.NewClient(blogService, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("cannot dial to blog server: %v", err)
+		log.Errorf("cannot dial to blog server: %v", err)
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the blog rpc server at: %v", blogService)
+	log.Infof("✅ the monkeys gateway is dialing to the blog rpc server at: %v", blogService)
 	return pb.NewBlogServiceClient(cc)
 }
 
-func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient) *BlogServiceClient {
+func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, userClient *user_service.UserServiceClient, log *zap.SugaredLogger) *BlogServiceClient {
 	rateLimiter := middleware.RateLimiterMiddleware("100-S") // 100 requests per second for landing page
 
-	mware := auth.InitAuthMiddleware(authClient)
+	mware := auth.InitAuthMiddleware(authClient, log)
 
 	blogClient := &BlogServiceClient{
-		Client:  NewBlogServiceClient(cfg),
+		Client:  NewBlogServiceClient(cfg, log),
 		UserCli: userClient,
 		config:  cfg,
+		log:     log,
 	}
 
 	// -------------------------------------------------- V1 API in use --------------------------------------------------
@@ -224,7 +226,7 @@ func (asc *BlogServiceClient) AllCollabBlogs(ctx *gin.Context) {
 	// Get all the drafted blogs
 	uc, err := asc.UserCli.GetBlogsIds(accId, "colab")
 	if err != nil {
-		logrus.Errorf("cannot get the colab blogs, error: %v", err)
+		asc.log.Errorf("cannot get the colab blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -480,7 +482,7 @@ func (asc *BlogServiceClient) GetBookmarks(ctx *gin.Context) {
 	// Get all the drafted blogs
 	uc, err := asc.UserCli.GetBlogsIds(tokenAccountId, "bookmark")
 	if err != nil {
-		logrus.Errorf("cannot get the bookmarked blogs, error: %v", err)
+		asc.log.Errorf("cannot get the bookmarked blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -645,7 +647,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		logrus.Errorf("Error upgrading connection: %v", err)
+		asc.log.Errorf("Error upgrading connection: %v", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -654,33 +656,33 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	conn.SetReadLimit(1024 * 1024)                         // 1MB max message size
 	conn.SetReadDeadline(time.Now().Add(70 * time.Second)) // Slightly longer than client heartbeat
 	conn.SetPongHandler(func(string) error {
-		logrus.Debug("Received pong from client")
+		asc.log.Debug("Received pong from client")
 		conn.SetReadDeadline(time.Now().Add(70 * time.Second))
 		return nil
 	})
 
 	defer func() {
 		if err := conn.Close(); err != nil {
-			logrus.Errorf("Error closing WebSocket connection: %v", err)
+			asc.log.Errorf("Error closing WebSocket connection: %v", err)
 		}
 	}()
 
 	// Establish a bi-directional stream with the gRPC server
 	stream, err := asc.Client.DraftBlogV2(context.Background())
 	if err != nil {
-		logrus.Errorf("Error establishing gRPC stream: %v", err)
+		asc.log.Errorf("Error establishing gRPC stream: %v", err)
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"error": "Failed to establish server connection"}`))
 		return
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logrus.Errorf("Error closing gRPC stream: %v", err)
+			asc.log.Errorf("Error closing gRPC stream: %v", err)
 		}
 	}()
 
 	// Send initial connection success message
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type": "connected", "status": "ready"}`)); err != nil {
-		logrus.Errorf("Error sending initial connection message: %v", err)
+		asc.log.Errorf("Error sending initial connection message: %v", err)
 		return
 	}
 
@@ -699,10 +701,10 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 			case <-heartbeatTicker.C:
 				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					logrus.Errorf("Error sending ping: %v", err)
+					asc.log.Errorf("Error sending ping: %v", err)
 					return
 				}
-				logrus.Debug("Sent ping to client")
+				asc.log.Debug("Sent ping to client")
 			case <-done:
 				return
 			}
@@ -717,11 +719,11 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		messageType, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-				logrus.Errorf("Unexpected WebSocket close error: %v", err)
+				asc.log.Errorf("Unexpected WebSocket close error: %v", err)
 			} else if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-				logrus.Info("WebSocket connection closed normally")
+				asc.log.Info("WebSocket connection closed normally")
 			} else {
-				logrus.Errorf("Error reading WebSocket message: %v", err)
+				asc.log.Errorf("Error reading WebSocket message: %v", err)
 			}
 			return
 		}
@@ -730,7 +732,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		switch messageType {
 		case websocket.TextMessage:
 			if err := asc.handleTextMessage(msg, conn, stream, id, ipAddress, client, action, &initialLogDone); err != nil {
-				logrus.Errorf("Error handling text message: %v", err)
+				asc.log.Errorf("Error handling text message: %v", err)
 				// Send error response but don't close connection
 				errorMsg := map[string]interface{}{
 					"type":  "error",
@@ -742,21 +744,21 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 				continue // Continue to next message instead of breaking
 			}
 		case websocket.PingMessage:
-			logrus.Debug("Received ping from client")
+			asc.log.Debug("Received ping from client")
 			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
-				logrus.Errorf("Error sending pong: %v", err)
+				asc.log.Errorf("Error sending pong: %v", err)
 				return
 			}
 		case websocket.PongMessage:
-			logrus.Debug("Received pong from client")
+			asc.log.Debug("Received pong from client")
 			// Reset read deadline on pong
 			conn.SetReadDeadline(time.Now().Add(70 * time.Second))
 		case websocket.CloseMessage:
-			logrus.Info("Received close message from client")
+			asc.log.Info("Received close message from client")
 			return
 		default:
-			logrus.Warnf("Received unexpected message type: %d", messageType)
+			asc.log.Warnf("Received unexpected message type: %d", messageType)
 		}
 	}
 }
@@ -769,7 +771,7 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 		if msgType, exists := messageCheck["type"]; exists {
 			switch msgType {
 			case "ping":
-				logrus.Debug("Received application-level ping")
+				asc.log.Debug("Received application-level ping")
 				pongResponse := map[string]interface{}{
 					"type":      "pong",
 					"timestamp": time.Now().Unix(),
@@ -780,7 +782,7 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 				}
 				return nil
 			case "pong":
-				logrus.Debug("Received application-level pong")
+				asc.log.Debug("Received application-level pong")
 				return nil
 			}
 		}
@@ -867,7 +869,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	// Get Accounts I am following
 	followings, err := asc.UserCli.GetFollowingAccounts(myUsername)
 	if err != nil {
-		logrus.Errorf("cannot get the following accounts, error: %v", err)
+		asc.log.Errorf("cannot get the following accounts, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -915,7 +917,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the following blogs, error: %v", err)
+		asc.log.Errorf("cannot get the following blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -955,7 +957,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -965,7 +967,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1010,7 +1012,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1050,7 +1052,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1060,7 +1062,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1082,7 +1084,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 	tags := Tags{}
 	if err := ctx.BindJSON(&tags); err != nil {
-		logrus.Errorf("error while marshalling tags: %v", err)
+		asc.log.Errorf("error while marshalling tags: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "tags aren't properly formatted"})
 		return
 	}
@@ -1109,7 +1111,7 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1149,7 +1151,7 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1159,7 +1161,7 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1189,7 +1191,7 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1229,7 +1231,7 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1239,7 +1241,7 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1282,7 +1284,7 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1322,7 +1324,7 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1332,7 +1334,7 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1393,7 +1395,7 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1433,7 +1435,7 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1443,7 +1445,7 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1518,7 +1520,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	blogResp, err := asc.UserCli.GetUsersBookmarks(tokenAccountId)
 
 	if err != nil {
-		logrus.Errorf("cannot get the bookmarks, error: %v", err)
+		asc.log.Errorf("cannot get the bookmarks, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the bookmarks"})
 		return
 	}
@@ -1536,7 +1538,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1576,7 +1578,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 
 		var blogMaps []map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -1586,7 +1588,7 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1630,7 +1632,7 @@ func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 
 	var blogMap map[string]interface{}
 	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
-		logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+		asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 		return
 	}
@@ -1682,7 +1684,7 @@ func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
 
 	var blogMap map[string]interface{}
 	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
-		logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+		asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 		return
 	}
@@ -1721,7 +1723,7 @@ func (asc *BlogServiceClient) GetLatestNews(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the latest news, error: %v", err)
+		asc.log.Errorf("cannot get the latest news, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1761,7 +1763,7 @@ func (asc *BlogServiceClient) GetLatestNews(ctx *gin.Context) {
 
 		var newsMap map[string]interface{}
 		if err := json.Unmarshal(news.Value, &newsMap); err != nil {
-			logrus.Errorf("cannot unmarshal the news, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the news, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the news"})
 			return
 		}
@@ -1794,7 +1796,7 @@ func (asc *BlogServiceClient) GetTrendingNews(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the trending news, error: %v", err)
+		asc.log.Errorf("cannot get the trending news, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -1834,7 +1836,7 @@ func (asc *BlogServiceClient) GetTrendingNews(ctx *gin.Context) {
 
 		var newsMap map[string]interface{}
 		if err := json.Unmarshal(news.Value, &newsMap); err != nil {
-			logrus.Errorf("cannot unmarshal the news, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the news, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the news"})
 			return
 		}
@@ -1879,7 +1881,7 @@ func (asc *BlogServiceClient) GetNewsBySections(ctx *gin.Context) {
 		})
 
 		if err != nil {
-			logrus.Errorf("cannot get news for section %s, error: %v", section, err)
+			asc.log.Errorf("cannot get news for section %s, error: %v", section, err)
 			continue // Continue with other sections
 		}
 
@@ -1890,13 +1892,13 @@ func (asc *BlogServiceClient) GetNewsBySections(ctx *gin.Context) {
 				break
 			}
 			if err != nil {
-				logrus.Errorf("error receiving news from stream for section %s, error: %v", section, err)
+				asc.log.Errorf("error receiving news from stream for section %s, error: %v", section, err)
 				break
 			}
 
 			var newsMap map[string]interface{}
 			if err := json.Unmarshal(news.Value, &newsMap); err != nil {
-				logrus.Errorf("cannot unmarshal news for section %s, error: %v", section, err)
+				asc.log.Errorf("cannot unmarshal news for section %s, error: %v", section, err)
 				continue
 			}
 
