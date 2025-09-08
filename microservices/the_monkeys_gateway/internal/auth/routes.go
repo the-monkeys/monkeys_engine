@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
@@ -24,28 +24,28 @@ import (
 
 type ServiceClient struct {
 	Client            pb.AuthServiceClient
-	Log               logrus.Logger
+	Log               *zap.SugaredLogger
 	googleOauthConfig *oauth2.Config
 }
 
 // InitServiceClient initializes the gRPC connection to the auth service.
-func InitServiceClient(cfg *config.Config) pb.AuthServiceClient {
+func InitServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.AuthServiceClient {
 	authService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAuthz, cfg.Microservices.AuthzPort)
 	cc, err := grpc.NewClient(authService, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("cannot dial to grpc auth server: %v", err)
+		log.Errorf("cannot dial to grpc auth server: %v", err)
 		return nil
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the auth rpc server at: %v", authService)
+	log.Infof("✅ the monkeys gateway is dialing to the auth rpc server at: %v", authService)
 	return pb.NewAuthServiceClient(cc)
 }
 
-func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
+func RegisterAuthRouter(router *gin.Engine, cfg *config.Config, log *zap.SugaredLogger) *ServiceClient {
 
 	asc := &ServiceClient{
-		Client: InitServiceClient(cfg),
-		Log:    *logrus.New(),
+		Client: InitServiceClient(cfg, log),
+		Log:    log,
 		googleOauthConfig: &oauth2.Config{
 			RedirectURL:  cfg.GoogleOAuth2.RedirectURL,
 			ClientID:     cfg.GoogleOAuth2.ClientID,     // Replace with your Google Client ID
@@ -75,7 +75,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config) *ServiceClient {
 	routes.GET("/validate-session", asc.ValidateSession)
 
 	// Authentication Point
-	mware := InitAuthMiddleware(asc)
+	mware := InitAuthMiddleware(asc, log)
 	routes.Use(mware.AuthRequired)
 
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
@@ -154,7 +154,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 func (asc *ServiceClient) Login(ctx *gin.Context) {
 	body := LoginRequestBody{}
 
-	logrus.Infof("traffic is coming from ip: %v", ctx.ClientIP())
+	asc.Log.Infof("traffic is coming from ip: %v", ctx.ClientIP())
 
 	if err := ctx.BindJSON(&body); err != nil {
 		asc.Log.Errorf("json body is not correct, error: %v", err)

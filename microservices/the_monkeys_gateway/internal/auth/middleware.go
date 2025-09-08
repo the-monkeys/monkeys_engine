@@ -7,18 +7,19 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type AuthMiddlewareConfig struct {
 	svc *ServiceClient
+	log *zap.SugaredLogger
 }
 
-func InitAuthMiddleware(svc *ServiceClient) AuthMiddlewareConfig {
-	return AuthMiddlewareConfig{svc}
+func InitAuthMiddleware(svc *ServiceClient, log *zap.SugaredLogger) AuthMiddlewareConfig {
+	return AuthMiddlewareConfig{svc, log}
 }
 
 // Extracts the token from the Authorization header or query parameter
@@ -159,6 +160,6 @@ func (c *AuthMiddlewareConfig) AuthorizationByID(ctx *gin.Context) {
 
 func (c *AuthMiddlewareConfig) CheckWriteAccess(ctx *gin.Context) {
 	// TODO: Check if the user can publish access
-	logrus.Infof("The user has write/edit access to the blog!")
+	c.log.Infof("The user has write/edit access to the blog!")
 	ctx.Next()
 }
