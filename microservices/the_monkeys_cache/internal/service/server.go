@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type CacheItem struct {
@@ -18,10 +18,10 @@ type CacheItem struct {
 
 type CacheServer struct {
 	items sync.Map
-	log   *logrus.Logger
+	log   *zap.SugaredLogger
 }
 
-func NewCacheServer(log *logrus.Logger) *CacheServer {
+func NewCacheServer(log *zap.SugaredLogger) *CacheServer {
 	cache := &CacheServer{
 		log: log,
 	}

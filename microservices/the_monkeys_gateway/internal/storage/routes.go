@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -22,9 +22,10 @@ import (
 
 type FileServiceClient struct {
 	Client pb.UploadBlogFileClient
+	log    *zap.SugaredLogger
 }
 
-func NewFileServiceClient(cfg *config.Config) pb.UploadBlogFileClient {
+func NewFileServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.UploadBlogFileClient {
 	storageService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
 	cc, err := grpc.NewClient(storageService,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -35,18 +36,19 @@ func NewFileServiceClient(cfg *config.Config) pb.UploadBlogFileClient {
 	)
 
 	if err != nil {
-		logrus.Errorf("cannot dial to grpc file server: %v", err)
+		log.Errorf("cannot dial to grpc file server: %v", err)
 	}
 
-	logrus.Infof("✅ the monkeys gateway is dialing to the file rpc server at: %v", storageService)
+	log.Infof("✅ the monkeys gateway is dialing to the file rpc server at: %v", storageService)
 	return pb.NewUploadBlogFileClient(cc)
 }
 
-func RegisterFileStorageRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient) *FileServiceClient {
-	mware := auth.InitAuthMiddleware(authClient)
+func RegisterFileStorageRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *FileServiceClient {
+	mware := auth.InitAuthMiddleware(authClient, log)
 
 	usc := &FileServiceClient{
-		Client: NewFileServiceClient(cfg),
+		Client: NewFileServiceClient(cfg, log),
+		log:    log,
 	}
 	routes := router.Group("/api/v1/files")
 
@@ -81,7 +83,7 @@ func (asc *FileServiceClient) UploadBlogFile(ctx *gin.Context) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logrus.Errorf("Error closing file: %v", err)
+			asc.log.Errorf("Error closing file: %v", err)
 		}
 	}()
 
@@ -126,14 +128,14 @@ func (asc *FileServiceClient) GetBlogFile(ctx *gin.Context) {
 		FileName: fileName,
 	})
 	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		asc.log.Errorf("cannot connect to user rpc server, error: %v", err)
 		_ = ctx.AbortWithError(http.StatusBadGateway, err)
 		return
 	}
 
 	resp, err := stream.Recv()
 	if err == io.EOF {
-		logrus.Info("received the complete stream")
+		asc.log.Info("received the complete stream")
 	}
 	if err != nil {
 		// Check for gRPC error code
@@ -155,7 +157,7 @@ func (asc *FileServiceClient) GetBlogFile(ctx *gin.Context) {
 
 	// ctx.JSON(http.StatusAccepted, "uploaded")
 	if _, err := ctx.Writer.Write(resp.Data); err != nil {
-		logrus.Errorf("error writing response data: %v", err)
+		asc.log.Errorf("error writing response data: %v", err)
 	}
 }
 
@@ -169,7 +171,7 @@ func (asc *FileServiceClient) DeleteBlogFile(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		asc.log.Errorf("cannot connect to user rpc server, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error while deleting the file"})
 		return
 	}
@@ -189,7 +191,7 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logrus.Errorf("Error closing file: %v", err)
+			asc.log.Errorf("Error closing file: %v", err)
 		}
 	}()
 
@@ -232,7 +234,7 @@ func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 		FileName: "profile.png",
 	})
 	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		asc.log.Errorf("cannot connect to user rpc server, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": "cannot connect to user rpc server"})
 		return
 	}
@@ -253,7 +255,7 @@ func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 	}
 
 	if _, err := ctx.Writer.Write(resp.Data); err != nil {
-		logrus.Errorf("error writing response data: %v", err)
+		asc.log.Errorf("error writing response data: %v", err)
 	}
 }
 
@@ -265,7 +267,7 @@ func (asc *FileServiceClient) GetProfilePicStream(ctx *gin.Context) {
 		FileName: "profile.png",
 	})
 	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		asc.log.Errorf("cannot connect to user rpc server, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"message": "cannot connect to user rpc server"})
 		return
 	}
@@ -312,7 +314,7 @@ func (asc *FileServiceClient) DeleteProfilePic(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot connect to user rpc server, error: %v", err)
+		asc.log.Errorf("cannot connect to user rpc server, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error while deleting the profile pic"})
 		return
 	}

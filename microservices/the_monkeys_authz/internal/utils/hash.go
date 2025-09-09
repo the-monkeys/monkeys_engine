@@ -3,25 +3,27 @@ package utils
 import (
 	"math/rand"
 
-	"github.com/sirupsen/logrus"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var alphaNumRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+var (
+	alphaNumRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+	authzLog      = logger.ZapForService("tm-authz")
+)
 
 func HashPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		logrus.Errorf("bcrypt cannot compare hash, error %+v", err)
+		authzLog.Errorf("bcrypt cannot generate hash, error %+v", err)
 		return ""
 	}
 	return string(bytes)
 }
 
 func CheckPasswordHash(password string, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	if err != nil {
-		logrus.Errorf("bcrypt cannot compare hash, error %+v", err)
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		authzLog.Errorf("bcrypt cannot compare hash, error %+v", err)
 		return false
 	}
 	return true
@@ -30,9 +32,7 @@ func CheckPasswordHash(password string, hash string) bool {
 func GenHash() []rune {
 	randomHash := make([]rune, 64)
 	for i := 0; i < 64; i++ {
-		// Intn() returns, as an int, a non-negative pseudo-random number in [0,n).
 		randomHash[i] = alphaNumRunes[rand.Intn(len(alphaNumRunes)-1)]
 	}
-
 	return randomHash
 }

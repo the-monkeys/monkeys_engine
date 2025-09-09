@@ -3,13 +3,14 @@ package utils
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 )
 
 // MapUserUpdateData maps the user update request data to the database model.
 func MapUserUpdateDataPatch(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
+	log := logger.ZapForService("tm_users")
 	if req.Username != "" {
 		dbUserInfo.Username = req.Username
 	}
@@ -24,9 +25,9 @@ func MapUserUpdateDataPatch(req *pb.UpdateUserProfileReq, dbUserInfo *models.Use
 	}
 	parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
 	if err != nil {
-		logrus.Errorf("couldn't parse date of birth to time.Time: %v", err)
+		log.Errorf("couldn't parse date of birth to time.Time: %v", err)
 	} else {
-		logrus.Infof("Parsed date of birth: %v", parsedTime)
+		log.Debugf("Parsed date of birth: %v", parsedTime)
 		dbUserInfo.DateOfBirth.Time = parsedTime
 	}
 	if req.Address != "" {
@@ -52,15 +53,16 @@ func MapUserUpdateDataPatch(req *pb.UpdateUserProfileReq, dbUserInfo *models.Use
 }
 
 func MapUserUpdateDataPut(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserProfileRes) *models.UserProfileRes {
+	log := logger.ZapForService("tm_users")
 	dbUserInfo.Username = req.Username
 	dbUserInfo.FirstName = req.FirstName
 	dbUserInfo.LastName = req.LastName
 	dbUserInfo.Bio.String = req.Bio
 	parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
 	if err != nil {
-		logrus.Errorf("couldn't parse date of birth to time.Time: %v", err)
+		log.Errorf("couldn't parse date of birth to time.Time: %v", err)
 	} else {
-		logrus.Infof("Parsed date of birth: %v", parsedTime)
+		log.Debugf("Parsed date of birth: %v", parsedTime)
 		dbUserInfo.DateOfBirth.Time = parsedTime
 	}
 	dbUserInfo.Address.String = req.Address

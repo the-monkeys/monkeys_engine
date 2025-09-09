@@ -3,9 +3,9 @@ package main
 import (
 	"net"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_cache/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	log := logrus.New()
+	log := logger.ZapForService("tm_cache")
 
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -39,7 +39,7 @@ func main() {
 
 	reflection.Register(s)
 
-	log.Infof("✅ the monkey's cache server started at: %v", cfg.Microservices.TheMonkeysCache)
+	log.Debugf("✅ the monkey's cache server started at: %v", cfg.Microservices.TheMonkeysCache)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

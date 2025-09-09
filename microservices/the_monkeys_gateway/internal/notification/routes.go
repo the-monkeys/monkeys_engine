@@ -10,10 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_notification/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -35,29 +35,29 @@ type NotificationServiceClient struct {
 	Client      pb.NotificationServiceClient
 	mu          sync.Mutex
 	connections map[string][]*websocket.Conn // Map user ID to WebSocket connections
-	log         *logrus.Logger
+	log         *zap.SugaredLogger
 }
 
 // NewNotificationServiceClient creates a new instance of NotificationServiceClient
-func NewNotificationServiceClient(cfg *config.Config) pb.NotificationServiceClient {
+func NewNotificationServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.NotificationServiceClient {
 	notificationSvc := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
 	cc, err := grpc.NewClient(notificationSvc, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("Cannot dial to gRPC notification server: %v", err)
+		lg.Errorw("cannot dial gRPC notification server", "err", err, "addr", notificationSvc)
 		return nil
 	}
-	logrus.Debugf("✅ The monkeys gateway is dialing to notification service at: %v", notificationSvc)
+	lg.Debugw("dialing notification service", "addr", notificationSvc)
 	return pb.NewNotificationServiceClient(cc)
 }
 
 // RegisterNotificationRoute sets up the notification routes
-func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *logrus.Logger) *NotificationServiceClient {
-	mware := auth.InitAuthMiddleware(authClient)
+func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, lg *zap.SugaredLogger) *NotificationServiceClient {
+	mware := auth.InitAuthMiddleware(authClient, lg)
 
 	nsc := &NotificationServiceClient{
-		Client:      NewNotificationServiceClient(cfg),
+		Client:      NewNotificationServiceClient(cfg, lg),
 		connections: make(map[string][]*websocket.Conn), // Map of user ID to WebSocket connections
-		log:         log,
+		log:         lg,
 	}
 
 	routes := router.Group("/api/v1/notification")
@@ -109,7 +109,7 @@ func (nsc *NotificationServiceClient) GetNotifications(ctx *gin.Context) {
 		Offset:   offsetInt,
 	})
 	if err != nil {
-		nsc.log.Errorf("Error fetching notifications for user ID %s: %v", userName, err)
+		nsc.log.Errorw("fetch notifications failed", "user", userName, "err", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return
 	}
@@ -131,16 +131,16 @@ func (nsc *NotificationServiceClient) NotifyUser(userID string, notification []*
 	// Step 1: Check if the user has active WebSocket connections
 	conns, ok := nsc.connections[userID]
 	if !ok {
-		nsc.log.Debugf("No active WebSocket connections for user ID: %s", userID)
+		nsc.log.Debugw("no active websocket connections", "user", userID)
 		return
 	}
 
 	// Step 2: Send the notification to each active connection
 	for _, conn := range conns {
 		if err := conn.WriteJSON(notification); err != nil {
-			nsc.log.Errorf("Error sending notification to user ID %s: %v", userID, err)
+			nsc.log.Errorw("send ws notification failed", "user", userID, "err", err)
 			if err := conn.Close(); err != nil {
-				nsc.log.Errorf("Error closing WebSocket connection for user ID %s: %v", userID, err)
+				nsc.log.Errorw("close ws conn failed", "user", userID, "err", err)
 			}
 			// Remove closed connection from list
 			nsc.connections[userID] = removeConn(nsc.connections[userID], conn)
@@ -168,7 +168,7 @@ func (nsc *NotificationServiceClient) ViewNotification(ctx *gin.Context) {
 	// Step 2: Mark the notification as seen in the database
 	_, err := nsc.Client.NotificationSeen(context.Background(), &req)
 	if err != nil {
-		nsc.log.Errorf("Error marking notification as seen: %v", err)
+		nsc.log.Errorw("mark notification seen failed", "err", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notification as seen"})
 		return
 	}
@@ -180,27 +180,24 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 	// Upgrade the HTTP connection to a WebSocket connection
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		nsc.log.Errorf("Failed to upgrade to WebSocket: %v", err)
+		nsc.log.Errorw("upgrade to websocket failed", "err", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to establish WebSocket connection"})
 		return
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
-			nsc.log.Errorf("Error closing WebSocket connection: %v", err)
+			nsc.log.Errorw("close websocket failed", "err", err)
 		}
 	}()
 
 	// Get the username from the context (assumes middleware sets this)
 	userName := ctx.GetString("userName")
 	if userName == "" {
-		nsc.log.Error("User not authenticated for WebSocket connection")
-		if err := conn.WriteJSON(gin.H{"error": "Unauthorized"}); err != nil {
-			nsc.log.Errorf("Error sending unauthorized message to WebSocket client: %v", err)
-		}
+		nsc.log.Errorw("unauthenticated websocket connection")
+		_ = conn.WriteJSON(gin.H{"error": "Unauthorized"})
 		return
 	}
-
-	nsc.log.Debugf("WebSocket connection established for user: %s", userName)
+	nsc.log.Debugw("websocket connection established", "user", userName)
 
 	// Track the last notification ID to avoid sending duplicates
 	var lastNotificationID string
@@ -213,10 +210,8 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 			Offset:   0,
 		})
 		if err != nil {
-			nsc.log.Errorf("Failed to establish gRPC stream for user %s: %v", userName, err)
-			if err := conn.WriteJSON(gin.H{"error": "Failed to establish notification stream"}); err != nil {
-				nsc.log.Errorf("Error sending error message to WebSocket client: %v", err)
-			}
+			nsc.log.Errorw("create gRPC stream failed", "user", userName, "err", err)
+			_ = conn.WriteJSON(gin.H{"error": "Failed to establish notification stream"})
 			return
 		}
 
@@ -224,7 +219,7 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 		for {
 			notification, err := stream.Recv()
 			if err != nil {
-				nsc.log.Debugf("No new notifications or gRPC stream closed for user: %s", userName)
+				nsc.log.Debugw("no new notifications or stream closed", "user", userName)
 				break // Exit inner loop if no new notifications or error occurs
 			}
 
@@ -235,10 +230,10 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 
 				// Forward the notification to the WebSocket client
 				if err := conn.WriteJSON(notification); err != nil {
-					nsc.log.Errorf("Error sending notification to WebSocket client for user %s: %v", userName, err)
+					nsc.log.Errorw("forward notification to ws client failed", "user", userName, "err", err)
 					return
 				}
-				nsc.log.Debugf("New notification sent to WebSocket client for user: %s", userName)
+				nsc.log.Debugw("notification forwarded", "user", userName)
 			}
 		}
 
@@ -247,7 +242,7 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 		case <-time.After(5 * time.Second): // Poll every 5 seconds
 			continue
 		case <-ctx.Done(): // Exit if the client disconnects
-			logrus.Debugf("WebSocket connection closed by user: %s", userName)
+			nsc.log.Debugw("websocket connection closed by user", "user", userName)
 			return
 		}
 	}

@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	blogPkg "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	userPkg "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -19,30 +18,30 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_cache/internal/service"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type UserDbConn struct {
-	log        *logrus.Logger
+	log        *zap.SugaredLogger
 	config     *config.Config
 	blogClient blogPkg.BlogServiceClient
 	userClient userPkg.UserServiceClient
 }
 
-func NewUserDb(log *logrus.Logger, config *config.Config) *UserDbConn {
+func NewUserDb(log *zap.SugaredLogger, config *config.Config) *UserDbConn {
 	cc, err := grpc.NewClient(config.Microservices.TheMonkeysUser, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("cannot dial to grpc user server: %v", err)
+		log.Errorf("cannot dial to grpc user server: %v", err)
 	}
-	logrus.Infof("✅ the monkeys cache server is dialing to user rpc server at: %v", config.Microservices.TheMonkeysUser)
+	log.Debugf("✅ the monkeys cache server is dialing to user rpc server at: %v", config.Microservices.TheMonkeysUser)
 
 	blogCon, err := grpc.NewClient(config.Microservices.TheMonkeysBlog, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("cannot dial to blog server: %v", err)
+		log.Errorf("cannot dial to blog server: %v", err)
 	}
-
-	logrus.Infof("✅ the monkeys cache server is dialing to the blog rpc server at: %v", config.Microservices.TheMonkeysBlog)
+	log.Debugf("✅ the monkeys cache server is dialing to the blog rpc server at: %v", config.Microservices.TheMonkeysBlog)
 
 	return &UserDbConn{
 		log:        log,
@@ -52,14 +51,14 @@ func NewUserDb(log *logrus.Logger, config *config.Config) *UserDbConn {
 	}
 }
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logger) {
+func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredLogger) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
-		log.Infoln("Received termination signal. Closing connection and exiting gracefully.")
+		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
 		if err := conn.Channel.Close(); err != nil {
 			log.Errorf("Error closing RabbitMQ channel: %v", err)
 		}
@@ -76,12 +75,12 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		nil,                     // args
 	)
 	if err != nil {
-		logrus.Errorf("Failed to register a consumer: %v", err)
+		log.Errorf("Failed to register a consumer: %v", err)
 		return
 	}
 
 	cacheServer := service.NewCacheServer(log)
-	context := context.Background()
+	ctx := context.Background()
 
 	userCon := NewUserDb(log, conf)
 	redis, err := db.RedisConn(conf, log)
@@ -93,7 +92,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err = json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
+			log.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
 			return
 		}
 
@@ -103,7 +102,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 		case constants.BLOG_UPDATE:
 
 		case constants.BLOG_PUBLISH:
-			userCon.log.Infof("User published a blog: %+v", user)
+			userCon.log.Debugf("User published a blog: %+v", user)
 			// TODO: Update Users profile published and draft blogs
 
 			// Update feed
@@ -116,7 +115,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 				return
 			}
 
-			status := redis.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30).Err()
+			status := redis.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30).Err()
 			if status != nil {
 				userCon.log.Errorf("Failed to set feed in cache: %v", status)
 			} else {
@@ -124,7 +123,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *logrus.Logge
 			}
 
 			// Inbuilt cache
-			if err := cacheServer.Set(context, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30); err != nil {
+			if err := cacheServer.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30); err != nil {
 				userCon.log.Errorf("Failed to set feed in inbuilt cache: %v", err)
 			}
 
@@ -179,7 +178,7 @@ func (u *UserDbConn) GetUserPublishedBlogs(username string, limit, offset int32)
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			u.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -205,7 +204,7 @@ func (u *UserDbConn) Feed(limit, offset int32) interface{} {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		u.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		return nil
 	}
 
@@ -224,7 +223,7 @@ func (u *UserDbConn) Feed(limit, offset int32) interface{} {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			u.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			return nil
 		}
 
@@ -257,7 +256,7 @@ func (u *UserDbConn) Feed(limit, offset int32) interface{} {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			u.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 

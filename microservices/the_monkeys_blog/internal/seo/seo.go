@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -24,11 +24,11 @@ type SEOManager interface {
 }
 
 type seoManager struct {
-	log    *logrus.Logger
+	log    *zap.SugaredLogger
 	config *config.Config
 }
 
-func NewSEOManager(log *logrus.Logger, config *config.Config) SEOManager {
+func NewSEOManager(log *zap.SugaredLogger, config *config.Config) SEOManager {
 	return &seoManager{
 		log:    log,
 		config: config,
@@ -49,11 +49,10 @@ type urlNotificationsMetadata struct {
 
 func (s *seoManager) HandleSEOForBlog(ctx context.Context, blogId, slug string) error {
 	if !s.config.SEO.Enabled {
-		s.log.Infof("SEO is disabled, skipping for blog: %s", blogId)
+		s.log.Debugw("SEO disabled", "blog_id", blogId)
 		return nil
 	}
-
-	s.log.Infof("Handling SEO for blog: %s with slug: %s", blogId, slug)
+	s.log.Debugw("handling SEO", "blog_id", blogId, "slug", slug)
 
 	// Use a detached context with timeout so it isn't cancelled when the request returns
 	cctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

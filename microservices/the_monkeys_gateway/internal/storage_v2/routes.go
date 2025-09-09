@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/bbrks/go-blurhash"
+	"go.uber.org/zap"
 	"golang.org/x/image/webp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -40,9 +40,10 @@ type Service struct {
 	cdnURL       string
 	publicBase   string // optional public base (scheme+host) to generate presigned URLs for
 	publicSigner *minio.Client
+	log          *zap.SugaredLogger
 }
 
-func newService(cfg *config.Config) (*Service, error) {
+func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
 	cli, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.Minio.AccessKey, cfg.Minio.SecretKey, ""),
 		Secure: cfg.Minio.UseSSL,
@@ -51,7 +52,7 @@ func newService(cfg *config.Config) (*Service, error) {
 		return nil, err
 	}
 
-	svc := &Service{mc: cli, bucket: cfg.Minio.Bucket, cdnURL: cfg.Minio.CDNURL}
+	svc := &Service{mc: cli, bucket: cfg.Minio.Bucket, cdnURL: cfg.Minio.CDNURL, log: log}
 	// If a public base is provided (e.g., http://localhost:9000), create a signer bound to that host
 	if v := strings.TrimSpace(cfg.Minio.PublicBaseURL); v != "" {
 		svc.publicBase = strings.TrimRight(v, "/")
@@ -64,7 +65,7 @@ func newService(cfg *config.Config) (*Service, error) {
 				Region: "us-east-1",
 			})
 			if psErr != nil {
-				logrus.Warnf("failed to init public signer for presigned URLs: %v", psErr)
+				log.Warnf("failed to init public signer for presigned URLs: %v", psErr)
 			} else {
 				svc.publicSigner = ps
 			}
@@ -81,18 +82,18 @@ func newService(cfg *config.Config) (*Service, error) {
 		if err := svc.mc.MakeBucket(ctx, svc.bucket, minio.MakeBucketOptions{}); err != nil {
 			return nil, err
 		}
-		logrus.Infof("Created MinIO bucket: %s", svc.bucket)
+		log.Infof("Created MinIO bucket: %s", svc.bucket)
 	}
 
 	return svc, nil
 }
 
-func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient) *Service {
-	mw := auth.InitAuthMiddleware(authClient)
+func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *Service {
+	mw := auth.InitAuthMiddleware(authClient, log)
 
-	svc, err := newService(cfg)
+	svc, err := newService(cfg, log)
 	if err != nil {
-		logrus.Fatalf("failed to initialize MinIO client: %v", err)
+		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
 
 	v2 := router.Group("/api/v2/storage")
@@ -209,7 +210,7 @@ func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expi
 			return u.String(), nil
 		}
 		// fall back to default client on error
-		logrus.Warnf("public presign failed, falling back to internal presign: %v", err)
+		s.log.Warnf("public presign failed, falling back to internal presign: %v", err)
 	}
 	u, err := s.mc.PresignedGetObject(ctx, s.bucket, objectName, expiry, nil)
 	if err != nil {
@@ -269,7 +270,7 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
-		logrus.Errorf("minio PutObject error: %v", err)
+		s.log.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
 		return
 	}
@@ -298,7 +299,7 @@ func (s *Service) ListPostFiles(ctx *gin.Context) {
 	files := make([]gin.H, 0, 8)
 	for obj := range ch {
 		if obj.Err != nil {
-			logrus.Errorf("list object error: %v", obj.Err)
+			s.log.Errorf("list object error: %v", obj.Err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "list failed"})
 			return
 		}
@@ -409,7 +410,7 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
-		logrus.Errorf("minio PutObject (update) error: %v", err)
+		s.log.Errorf("minio PutObject (update) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
 		return
 	}
@@ -435,7 +436,7 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 
 	obj, err := s.mc.GetObject(ctx.Request.Context(), s.bucket, objectName, minio.GetObjectOptions{})
 	if err != nil {
-		logrus.Errorf("minio GetObject error: %v", err)
+		s.log.Errorf("minio GetObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "read failed"})
 		return
 	}
@@ -474,7 +475,7 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 
 	// Stream body
 	if _, err := io.Copy(ctx.Writer, obj); err != nil {
-		logrus.Errorf("stream write error: %v", err)
+		s.log.Errorf("stream write error: %v", err)
 	}
 }
 
@@ -502,7 +503,7 @@ func (s *Service) DeletePostFile(ctx *gin.Context) {
 
 	err := s.mc.RemoveObject(ctx.Request.Context(), s.bucket, objectName, minio.RemoveObjectOptions{})
 	if err != nil {
-		logrus.Errorf("minio RemoveObject error: %v", err)
+		s.log.Errorf("minio RemoveObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "delete failed"})
 		return
 	}
@@ -557,7 +558,7 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
-		logrus.Errorf("minio PutObject error: %v", err)
+		s.log.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
 		return
 	}
@@ -658,7 +659,7 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
 	if err != nil {
-		logrus.Errorf("minio PutObject (update) error: %v", err)
+		s.log.Errorf("minio PutObject (update) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
 		return
 	}
@@ -831,7 +832,7 @@ func (s *Service) GetProfileImage(ctx *gin.Context) {
 
 	obj, err := s.mc.GetObject(ctx.Request.Context(), s.bucket, objectName, minio.GetObjectOptions{})
 	if err != nil {
-		logrus.Errorf("minio GetObject (profile) error: %v", err)
+		s.log.Errorf("minio GetObject (profile) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "read failed"})
 		return
 	}
@@ -868,7 +869,7 @@ func (s *Service) GetProfileImage(ctx *gin.Context) {
 	}
 
 	if _, err := io.Copy(ctx.Writer, obj); err != nil {
-		logrus.Errorf("stream write error (profile): %v", err)
+		s.log.Errorf("stream write error (profile): %v", err)
 	}
 }
 
@@ -892,7 +893,7 @@ func (s *Service) DeleteProfileImage(ctx *gin.Context) {
 	}
 
 	if err := s.mc.RemoveObject(ctx.Request.Context(), s.bucket, objectName, minio.RemoveObjectOptions{}); err != nil {
-		logrus.Errorf("minio RemoveObject (profile) error: %v", err)
+		s.log.Errorf("minio RemoveObject (profile) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "delete failed"})
 		return
 	}

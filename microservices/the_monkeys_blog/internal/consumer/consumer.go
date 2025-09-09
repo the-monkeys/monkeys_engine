@@ -7,15 +7,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/models"
+	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger, db database.ElasticsearchStorage) {
+func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -23,9 +23,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 
 	go func() {
 		<-sigChan
-		logrus.Info("Graceful shutdown initiated - closing RabbitMQ connections")
+		log.Debug("Graceful shutdown initiated - closing RabbitMQ connections")
 		if err := conn.Channel.Close(); err != nil {
-			logrus.Errorf("RabbitMQ channel closure failed: %v", err)
+			log.Errorf("RabbitMQ channel closure failed: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -37,7 +37,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db database.ElasticsearchStorage) {
+func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
 	msgs, err := conn.Channel.Consume(
 		queueName, // queue
 		"",        // consumer
@@ -48,14 +48,14 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 		nil,       // args
 	)
 	if err != nil {
-		logrus.Errorf("Queue consumer registration failed for '%s': %v", queueName, err)
+		log.Errorf("Queue consumer registration failed for '%s': %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.InterServiceMessage{}
 		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Message deserialization failed: %v", err)
+			log.Errorf("Message deserialization failed: %v", err)
 			continue
 		}
 
@@ -63,7 +63,7 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 	}
 }
 
-func handleUserAction(user models.InterServiceMessage, log *logrus.Logger, db database.ElasticsearchStorage) {
+func handleUserAction(user models.InterServiceMessage, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
 	switch user.Action {
 	case constants.USER_ACCOUNT_DELETE:
 		log.Debug("Processing user account deletion request")

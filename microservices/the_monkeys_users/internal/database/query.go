@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
@@ -20,42 +19,42 @@ func (userDB *uDBHandler) CreateUserLog(user *models.UserLogs, description strin
 	//From username find user id
 	if err = userDB.db.QueryRow(`
 			SELECT id FROM user_account WHERE account_id = $1;`, user.AccountId).Scan(&userId); err != nil {
-		logrus.Errorf("can't get id by using account_id %s, error: %v", user.AccountId, err)
+		userDB.log.Errorf("can't get id by using account_id %s, error: %v", user.AccountId, err)
 		return err
 	}
 
 	//From client name find client id
 	if err := userDB.db.QueryRow(`
 			SELECT id FROM clients WHERE c_name = $1;`, user.Client).Scan(&clientId); err != nil {
-		logrus.Errorf("can't get id by using client name %s, error: %+v", user.Client, err)
+		userDB.log.Errorf("can't get id by using client name %s, error: %+v", user.Client, err)
 		return err
 	}
 
 	stmt, err := userDB.db.Prepare(`INSERT INTO user_account_log (user_id, ip_address, description, client_id) VALUES ($1, $2, $3, $4);`)
 	if err != nil {
-		logrus.Errorf("cannot prepare statement to add user activity into the user_account_log: %v", err)
+		userDB.log.Errorf("cannot prepare statement to add user activity into the user_account_log: %v", err)
 		return err
 	}
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			logrus.Errorf("error closing statement for user_account_log: %v", err)
+			userDB.log.Errorf("error closing statement for user_account_log: %v", err)
 		}
 	}()
 
 	row, err := stmt.Exec(userId, user.IpAddress, description, clientId)
 	if err != nil {
-		logrus.Errorf("cannot execute query to add user to the user_account_log: %v", err)
+		userDB.log.Errorf("cannot execute query to add user to the user_account_log: %v", err)
 		return err
 	}
 
 	affectedRow, err := row.RowsAffected()
 	if err != nil {
-		logrus.Errorf("error finding affected rows for user_account_log: %v", err)
+		userDB.log.Errorf("error finding affected rows for user_account_log: %v", err)
 		return err
 	}
 
 	if affectedRow == 0 {
-		logrus.Errorf("cannot create a record in the log table for user_account_log: %v", err)
+		userDB.log.Errorf("cannot create a record in the log table for user_account_log: %v", err)
 		return errors.New("cannot create a record in the log table")
 	}
 
@@ -111,7 +110,7 @@ func (uh *uDBHandler) GetBlogsByUserName(username string) (*pb.BlogsByUserNameRe
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blogs for user: %s", username)
+	uh.log.Debugf("Successfully fetched blogs for user: %s", username)
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
@@ -166,7 +165,7 @@ func (uh *uDBHandler) GetBlogsByUserIdWithEditorAccess(accountId int64) (*pb.Blo
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blogs with Editor access for user account ID: %d", accountId)
+	uh.log.Debugf("Successfully fetched blogs with Editor access for user account ID: %d", accountId)
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
@@ -221,7 +220,7 @@ func (uh *uDBHandler) GetBlogsByAccountId(accountId string) (*pb.BlogsByUserName
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	uh.log.Debugf("Successfully fetched blogs for user: %s", accountId)
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
@@ -261,7 +260,7 @@ func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string
 
 		// If the user is already following the interest, skip the insert and log it
 		if exists > 0 {
-			uh.log.Infof("Topic %s already exists", topic)
+			uh.log.Debugf("Topic %s already exists", topic)
 			continue
 		}
 
@@ -282,7 +281,7 @@ func (uh *uDBHandler) CreateNewTopics(topics []string, category, username string
 		return err
 	}
 
-	uh.log.Infof("Successfully added new interests for user: %s", username)
+	uh.log.Debugf("Successfully added new interests for user: %s", username)
 	return nil
 }
 
@@ -334,7 +333,7 @@ func (uh *uDBHandler) GetCoAuthorBlogsByAccountId(accountId string) (*pb.BlogsBy
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	uh.log.Debugf("Successfully fetched blogs for user: %s", accountId)
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
@@ -356,7 +355,7 @@ func (uh *uDBHandler) BookMarkABlog(blogId string, userId int64) error {
 	}
 
 	if exists > 0 {
-		uh.log.Infof("bookmark already exists")
+		uh.log.Debugf("bookmark already exists")
 		return nil
 	}
 
@@ -370,7 +369,7 @@ func (uh *uDBHandler) BookMarkABlog(blogId string, userId int64) error {
 		return err
 	}
 
-	uh.log.Infof("Successfully bookmarked blog %s for user %d", blogId, userId)
+	uh.log.Debugf("Successfully bookmarked blog %s for user %d", blogId, userId)
 	return nil
 }
 
@@ -392,7 +391,7 @@ func (uh *uDBHandler) RemoveBookmarkFromBlog(blogId string, userId int64) error 
 		return err
 	}
 
-	uh.log.Infof("Successfully removed bookmark from blog %s for user %d", blogId, userId)
+	uh.log.Debugf("Successfully removed bookmark from blog %s for user %d", blogId, userId)
 	return nil
 }
 
@@ -452,7 +451,7 @@ func (uh *uDBHandler) GetBookmarkBlogsByAccountId(accountId string) (*pb.BlogsBy
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blogs for user: %s", accountId)
+	uh.log.Debugf("Successfully fetched blogs for user: %s", accountId)
 	return &pb.BlogsByUserNameRes{
 		Blogs: blogs,
 	}, nil
@@ -535,7 +534,7 @@ func (uh *uDBHandler) DeleteBlogAndReferences(blogId string) error {
 		return err
 	}
 
-	uh.log.Infof("Successfully deleted blog: %s and its references", blogId)
+	uh.log.Debugf("Successfully deleted blog: %s and its references", blogId)
 	return nil
 }
 
@@ -546,21 +545,21 @@ func (uh *uDBHandler) LikeBlog(username string, blogExtId string) error {
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			logrus.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+			uh.log.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
 		}
 	}()
 
 	var blogID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogExtId).Scan(&blogID); err != nil {
-		logrus.Errorf("Can't get ID for blog id %s, error: %+v", blogExtId, err)
+		uh.log.Errorf("Can't get ID for blog id %s, error: %+v", blogExtId, err)
 		return err
 	}
 
 	var userID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
-		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		uh.log.Errorf("Can't get ID for username %s, error: %+v", username, err)
 		return err
 	}
 
@@ -568,30 +567,30 @@ func (uh *uDBHandler) LikeBlog(username string, blogExtId string) error {
 	var exists bool
 	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM blog_likes WHERE user_id = $1 AND blog_id = $2)`, userID, blogID).Scan(&exists)
 	if err != nil {
-		logrus.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		uh.log.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
 		return err
 	}
 
 	if exists {
-		logrus.Infof("User %s has already liked blog ID %d", username, blogID)
+		uh.log.Debugf("User %s has already liked blog ID %d", username, blogID)
 		return nil
 	}
 
 	// Step 3: Insert like relationship
 	_, err = tx.Exec(`INSERT INTO blog_likes (user_id, blog_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP)`, userID, blogID)
 	if err != nil {
-		logrus.Errorf("Failed to insert like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		uh.log.Errorf("Failed to insert like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
 		return err
 	}
 
 	// Commit the transaction
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("Failed to commit transaction for liking blog ID %d by user %s, error: %+v", blogID, username, err)
+		uh.log.Errorf("Failed to commit transaction for liking blog ID %d by user %s, error: %+v", blogID, username, err)
 		return err
 	}
 
-	logrus.Infof("Successfully liked blog ID %d by user: %s", blogID, username)
+	uh.log.Debugf("Successfully liked blog ID %d by user: %s", blogID, username)
 	return nil
 }
 
@@ -602,21 +601,21 @@ func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			logrus.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+			uh.log.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
 		}
 	}()
 
 	var blogID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM blog WHERE blog_id = $1`, blogExtId).Scan(&blogID); err != nil {
-		logrus.Errorf("Can't get ID for blog id %s, error: %+v", username, err)
+		uh.log.Errorf("Can't get ID for blog id %s, error: %+v", username, err)
 		return err
 	}
 
 	var userID int64
 	// Step 1: Fetch the user ID using the username
 	if err := tx.QueryRow(`SELECT id FROM user_account WHERE username = $1`, username).Scan(&userID); err != nil {
-		logrus.Errorf("Can't get ID for username %s, error: %+v", username, err)
+		uh.log.Errorf("Can't get ID for username %s, error: %+v", username, err)
 		return err
 	}
 
@@ -624,30 +623,30 @@ func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 	var exists bool
 	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM blog_likes WHERE user_id = $1 AND blog_id = $2)`, userID, blogID).Scan(&exists)
 	if err != nil {
-		logrus.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		uh.log.Errorf("Failed to check like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
 		return err
 	}
 
 	if !exists {
-		logrus.Infof("User %s has not liked blog ID %d", username, blogID)
+		uh.log.Debugf("User %s has not liked blog ID %d", username, blogID)
 		return nil
 	}
 
 	// Step 3: Delete like relationship
 	_, err = tx.Exec(`DELETE FROM blog_likes WHERE user_id = $1 AND blog_id = $2`, userID, blogID)
 	if err != nil {
-		logrus.Errorf("Failed to delete like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
+		uh.log.Errorf("Failed to delete like relationship between user ID %d and blog ID %d, error: %+v", userID, blogID, err)
 		return err
 	}
 
 	// Commit the transaction
 	err = tx.Commit()
 	if err != nil {
-		logrus.Errorf("Failed to commit transaction for unliking blog ID %d by user %s, error: %+v", blogID, username, err)
+		uh.log.Errorf("Failed to commit transaction for unliking blog ID %d by user %s, error: %+v", blogID, username, err)
 		return err
 	}
 
-	logrus.Infof("Successfully unliked blog ID %d by user: %s", blogID, username)
+	uh.log.Debugf("Successfully unliked blog ID %d by user: %s", blogID, username)
 	return nil
 }
 
@@ -807,7 +806,7 @@ func (uh *uDBHandler) GetFollowersAndFollowingsCounts(username string) (int, int
 }
 
 func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) error {
-	uh.log.Infof("Setting blog %v to Draft and cleaning up associated likes and bookmarks", blogId)
+	uh.log.Debugf("Setting blog %v to Draft and cleaning up associated likes and bookmarks", blogId)
 
 	// Start a transaction
 	tx, err := uh.db.Begin()
@@ -864,12 +863,12 @@ func (uh *uDBHandler) UpdateBlogStatusToDraft(blogId string, status string) erro
 		return err
 	}
 
-	uh.log.Infof("Successfully set blog %v to Draft and cleaned up likes and bookmarks", blogId)
+	uh.log.Debugf("Successfully set blog %v to Draft and cleaned up likes and bookmarks", blogId)
 	return nil
 }
 
 func (uh *uDBHandler) GetBlogByBlogId(blogId string) (*models.Blog, error) {
-	uh.log.Infof("Fetching blog details for blogId: %s", blogId)
+	uh.log.Debugf("Fetching blog details for blogId: %s", blogId)
 
 	// SQL query to retrieve the blog details
 	query := `
@@ -900,12 +899,12 @@ func (uh *uDBHandler) GetBlogByBlogId(blogId string) (*models.Blog, error) {
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched blog details for blogId: %s", blogId)
+	uh.log.Debugf("Successfully fetched blog details for blogId: %s", blogId)
 	return &blog, nil
 }
 
 func (uh *uDBHandler) GetBookmarkBlogsByUsername(username string) ([]models.Blog, error) {
-	uh.log.Infof("Fetching bookmarked blogs for username: %s", username)
+	uh.log.Debugf("Fetching bookmarked blogs for username: %s", username)
 
 	// SQL query to fetch bookmarked blogs
 	query := `
@@ -955,7 +954,7 @@ func (uh *uDBHandler) GetBookmarkBlogsByUsername(username string) ([]models.Blog
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched %d bookmarked blogs for username: %s", len(blogs), username)
+	uh.log.Debugf("Successfully fetched %d bookmarked blogs for username: %s", len(blogs), username)
 	return blogs, nil
 }
 
@@ -982,7 +981,7 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 	}
 
 	if exists {
-		uh.log.Printf("Topic '%s' already exists in category ID %s", description, category)
+		uh.log.Debugf("Topic '%s' already exists in category ID %s", description, category)
 		return tx.Commit()
 	}
 
@@ -999,6 +998,6 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 		return fmt.Errorf("commit failed: %v", err)
 	}
 
-	uh.log.Printf("Successfully inserted '%s' into category %s", description, category)
+	uh.log.Debugf("Successfully inserted '%s' into category %s", description, category)
 	return nil
 }

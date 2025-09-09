@@ -6,15 +6,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/models"
+	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger, db database.NotificationDB) {
+func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger, db database.NotificationDB) {
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -22,9 +22,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 
 	go func() {
 		<-sigChan
-		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
+		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
 		if err := conn.Channel.Close(); err != nil {
-			logrus.Errorf("Failed to close RabbitMQ channel: %v", err)
+			log.Errorf("Failed to close RabbitMQ channel: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -36,7 +36,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db database.NotificationDB) {
+func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, db database.NotificationDB) {
 	msgs, err := conn.Channel.Consume(
 		queueName, // queue
 		"",        // consumer
@@ -47,14 +47,14 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 		nil,       // args
 	)
 	if err != nil {
-		logrus.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
+		log.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+			log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 			continue
 		}
 
@@ -62,17 +62,17 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, db d
 	}
 }
 
-func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, db database.NotificationDB) {
+func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, db database.NotificationDB) {
 	switch user.Action {
 	case constants.USER_REGISTER:
-		log.Infof("Received user registration notification: %s", user.Username)
+		log.Debugf("Received user registration notification: %s", user.Username)
 		err := db.CreateNotification(user.AccountId, constants.AccountCreated, "Welcome to The Monkeys!", user.BlogId, user.AccountId, "Browser")
 		if err != nil {
 			log.Errorf("Failed to create notification for user registration: %v", err)
 		}
 
 	case constants.BLOG_LIKE:
-		log.Infof("Received blog like notification: %s", user.Username)
+		log.Debugf("Received blog like notification: %s", user.Username)
 		err := db.CreateNotification(user.AccountId, constants.BlogLiked, user.Notification, user.BlogId, user.AccountId, "Browser")
 		if err != nil {
 			log.Errorf("Failed to create notification for blog like: %v", err)

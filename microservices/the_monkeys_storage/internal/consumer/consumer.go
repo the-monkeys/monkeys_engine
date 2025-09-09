@@ -18,24 +18,25 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/models"
+	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logger) {
+func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
-		logrus.Infoln("Received termination signal. Closing connection and exiting gracefully.")
+		logger.ZapSugar().Debug("Received termination signal. Closing connection and exiting gracefully.")
 		if err := conn.Channel.Close(); err != nil {
-			logrus.Errorf("Error closing RabbitMQ channel: %v", err)
+			logger.ZapSugar().Errorf("Error closing RabbitMQ channel: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -70,71 +71,63 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *logrus.Logg
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *logrus.Logger, cfg *config.Config, mc *minio.Client) {
+func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
 	msgs, err := conn.Channel.Consume(
-		queueName, // queue
-		"",        // consumer
-		true,      // auto-ack
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
+		queueName,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
-		logrus.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
+		logger.ZapSugar().Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logrus.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+			logger.ZapSugar().Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 			continue
 		}
-
 		handleUserAction(user, log, cfg, mc)
 	}
 }
 
-func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, cfg *config.Config, mc *minio.Client) {
+func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
 	switch user.Action {
 	case constants.USER_REGISTER:
-		log.Infof("Creating user folder: %s", user.Username)
+		log.Debugf("Creating user folder: %s", user.Username)
 		if err := CreateUserFolder(user.Username); err != nil {
 			log.Errorf("Failed to create user folder: %v", err)
 		}
 	case constants.USERNAME_UPDATE:
-		// TODO: WHEN minio is in place completely then remove this block
-		log.Infof("Updating user folder: %s", user.Username)
+		log.Debugf("Updating user folder: %s", user.Username)
 		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
 			log.Errorf("Failed to update user folder (filesystem): %v", err)
 		}
-
-		// Rename the MinIO folder (prefix) used by v2 storage
 		if mc != nil && cfg != nil {
 			if err := UpdateMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username, user.NewUsername); err != nil {
 				log.Errorf("Failed to update MinIO profile folder: %v", err)
 			}
 		}
 	case constants.USER_ACCOUNT_DELETE:
-		// TODO: WHEN minio is in place completely then remove this block
-		log.Infof("Deleting user folder: %s", user.Username)
+		log.Debugf("Deleting user folder: %s", user.Username)
 		if err := DeleteUserFolder(user.Username); err != nil {
 			log.Errorf("Failed to delete user folder: %v", err)
 		}
-		// Delete profile objects from MinIO as well
 		if mc != nil && cfg != nil {
 			if err := DeleteMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username); err != nil {
 				log.Errorf("Failed to delete MinIO profile folder: %v", err)
 			}
 		}
 	case constants.BLOG_DELETE:
-		// TODO: WHEN minio is in place completely then remove this block
-		log.Infof("Deleting blog folder: %s", user.BlogId)
+		log.Debugf("Deleting blog folder: %s", user.BlogId)
 		if err := DeleteBlogFolder(user.BlogId); err != nil {
 			log.Errorf("Failed to delete user folder: %v", err)
 		}
-		// Delete blog post objects (prefix posts/{blogId}/) from MinIO
 		if mc != nil && cfg != nil {
 			if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, user.BlogId); err != nil {
 				log.Errorf("Failed to delete MinIO blog folder: %v", err)
@@ -147,28 +140,20 @@ func handleUserAction(user models.TheMonkeysMessage, log *logrus.Logger, cfg *co
 
 func CreateUserFolder(userName string) error {
 	dirPath, filePath := ConstructPath(constant.ProfileDir, userName, "profile.png")
-
-	// Create directory if it doesn't exist
-	err := os.MkdirAll(dirPath, 0755)
-	if err != nil {
-		logrus.Errorf("Cannot create directory structure for user: %s, error: %v", userName, err)
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		logger.ZapSugar().Errorf("Cannot create directory structure for user: %s, error: %v", userName, err)
 		return err
 	}
-
 	imageByte, err := readImageFromURL(constant.DefaultProfilePhoto)
 	if err != nil {
-		logrus.Errorf("Error fetching image for user: %s, error: %v", userName, err)
+		logger.ZapSugar().Errorf("Error fetching image for user: %s, error: %v", userName, err)
 		return fmt.Errorf("error fetching image: %v", err)
 	}
-
-	// Write image data to file
-	err = os.WriteFile(filePath, imageByte, 0644)
-	if err != nil {
-		logrus.Errorf("Cannot write profile image file for user: %s, error: %v", userName, err)
+	if err = os.WriteFile(filePath, imageByte, 0644); err != nil {
+		logger.ZapSugar().Errorf("Cannot write profile image file for user: %s, error: %v", userName, err)
 		return err
 	}
-
-	logrus.Infof("Done uploading profile pic: %s", filePath)
+	logger.ZapSugar().Debugf("Done uploading profile pic: %s", filePath)
 	return nil
 }
 
@@ -310,7 +295,7 @@ func DeleteBlogFolder(blogId string) error {
 }
 
 // startPeriodicSync runs filesystem to MinIO sync every 24 hours
-func startPeriodicSync(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func startPeriodicSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 
@@ -324,10 +309,10 @@ func startPeriodicSync(cfg *config.Config, mc *minio.Client, log *logrus.Logger)
 }
 
 // syncFilesystemToMinio syncs blog files and profile files from filesystem to MinIO if they don't exist
-func syncFilesystemToMinio(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func syncFilesystemToMinio(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	ctx := context.Background()
 
-	log.Info("Starting periodic sync of filesystem files to MinIO")
+	log.Debug("Starting periodic sync of filesystem files to MinIO")
 
 	// Sync blog files
 	syncBlogFiles(ctx, cfg, mc, log)
@@ -335,11 +320,11 @@ func syncFilesystemToMinio(cfg *config.Config, mc *minio.Client, log *logrus.Log
 	// Sync profile files
 	syncProfileFiles(ctx, cfg, mc, log)
 
-	log.Info("Completed periodic sync of filesystem files to MinIO")
+	log.Debug("Completed periodic sync of filesystem files to MinIO")
 }
 
 // syncBlogFiles syncs blog files from blogs/ directory to posts/ prefix in MinIO
-func syncBlogFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func syncBlogFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	blogsDir := constant.BlogDir
 
 	if _, err := os.Stat(blogsDir); os.IsNotExist(err) {
@@ -347,7 +332,7 @@ func syncBlogFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, lo
 		return
 	}
 
-	log.Info("Syncing blog files...")
+	log.Debug("Syncing blog files...")
 
 	err := filepath.Walk(blogsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -386,7 +371,7 @@ func syncBlogFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, lo
 }
 
 // syncProfileFiles syncs profile files from profiles/ directory to profiles/ prefix in MinIO
-func syncProfileFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func syncProfileFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	profilesDir := constant.ProfileDir
 
 	if _, err := os.Stat(profilesDir); os.IsNotExist(err) {
@@ -394,7 +379,7 @@ func syncProfileFiles(ctx context.Context, cfg *config.Config, mc *minio.Client,
 		return
 	}
 
-	log.Info("Syncing profile files...")
+	log.Debug("Syncing profile files...")
 
 	err := filepath.Walk(profilesDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -433,7 +418,7 @@ func syncProfileFiles(ctx context.Context, cfg *config.Config, mc *minio.Client,
 }
 
 // syncFileToMinio uploads a single file to MinIO if it doesn't already exist
-func syncFileToMinio(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger, filePath, objectKey string, info os.FileInfo) error {
+func syncFileToMinio(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, filePath, objectKey string, info os.FileInfo) error {
 	// Check if object already exists in MinIO
 	_, err := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
 	if err == nil {
@@ -442,7 +427,7 @@ func syncFileToMinio(ctx context.Context, cfg *config.Config, mc *minio.Client, 
 	}
 
 	// Object doesn't exist, upload it
-	log.Infof("Syncing file: %s -> %s", filePath, objectKey)
+	log.Debugf("Syncing file: %s -> %s", filePath, objectKey)
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -461,7 +446,7 @@ func syncFileToMinio(ctx context.Context, cfg *config.Config, mc *minio.Client, 
 		return nil
 	}
 
-	log.Infof("Successfully synced: %s", objectKey)
+	log.Debugf("Successfully synced: %s", objectKey)
 	return nil
 }
 
@@ -497,7 +482,7 @@ func getContentType(fileName string) string {
 }
 
 // startMinioToFileSystemSync runs MinIO to filesystem sync every 24 hours
-func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 
@@ -511,10 +496,10 @@ func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *logru
 }
 
 // syncMinioToFileSystem syncs MinIO objects to filesystem (local or remote via SSH)
-func syncMinioToFileSystem(cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
+func syncMinioToFileSystem(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
 	ctx := context.Background()
 
-	log.Info("Starting MinIO to filesystem sync")
+	log.Debug("Starting MinIO to filesystem sync")
 
 	// Sync posts from MinIO to filesystem
 	syncMinioPostsToFileSystem(ctx, cfg, mc, log)
@@ -522,12 +507,12 @@ func syncMinioToFileSystem(cfg *config.Config, mc *minio.Client, log *logrus.Log
 	// Sync profiles from MinIO to filesystem
 	syncMinioProfilesToFileSystem(ctx, cfg, mc, log)
 
-	log.Info("Completed MinIO to filesystem sync")
+	log.Debug("Completed MinIO to filesystem sync")
 }
 
 // syncMinioPostsToFileSystem syncs posts/{blogID}/ objects to blogs/{blogID}/ filesystem
-func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
-	log.Info("Syncing MinIO posts to filesystem...")
+func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
+	log.Debug("Syncing MinIO posts to filesystem...")
 
 	// List all objects with posts/ prefix
 	opts := minio.ListObjectsOptions{Prefix: "posts/", Recursive: true}
@@ -560,8 +545,8 @@ func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *min
 }
 
 // syncMinioProfilesToFileSystem syncs profiles/{username}/ objects to filesystem
-func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger) {
-	log.Info("Syncing MinIO profiles to filesystem...")
+func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
+	log.Debug("Syncing MinIO profiles to filesystem...")
 
 	// List all objects with profiles/ prefix
 	opts := minio.ListObjectsOptions{Prefix: "profiles/", Recursive: true}
@@ -594,7 +579,7 @@ func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *
 }
 
 // syncMinioObjectToFile downloads a MinIO object to local filesystem if it doesn't exist or is different
-func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger, objectKey, localPath string) error {
+func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, objectKey, localPath string) error {
 	// Check if we should sync to remote instead
 	if cfg.Minio.SyncToRemote && cfg.Minio.RemoteHost != "" && cfg.Minio.RemoteUser != "" {
 		remotePath := filepath.Join(cfg.Minio.RemoteBasePath, localPath)
@@ -603,22 +588,15 @@ func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Cl
 
 	// Local filesystem sync
 	// Check if local file exists and compare with MinIO object
-	if fileInfo, err := os.Stat(localPath); err == nil {
-		// File exists, check if it's different from MinIO object
-		objInfo, err := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to stat MinIO object %s: %v", objectKey, err)
-		}
-
-		// Compare size and modification time
-		if fileInfo.Size() == objInfo.Size && !objInfo.LastModified.After(fileInfo.ModTime()) {
+	if info, err := os.Stat(localPath); err == nil {
+		objInfo, err2 := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
+		if err2 == nil && info.Size() == objInfo.Size && !objInfo.LastModified.After(info.ModTime()) {
 			// File is up to date, skip
 			return nil
 		}
 	}
 
-	// Download from MinIO
-	log.Infof("Syncing from MinIO: %s -> %s", objectKey, localPath)
+	log.Debugf("Syncing from MinIO: %s -> %s", objectKey, localPath)
 
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
@@ -644,13 +622,13 @@ func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Cl
 		return fmt.Errorf("failed to copy data: %v", err)
 	}
 
-	log.Infof("Successfully synced: %s", localPath)
+	log.Debugf("Successfully synced: %s", localPath)
 	return nil
 }
 
 // syncMinioObjectToRemote syncs a MinIO object to remote filesystem via SSH/SCP
-func syncMinioObjectToRemote(ctx context.Context, cfg *config.Config, mc *minio.Client, log *logrus.Logger, objectKey, remotePath, sshHost, sshUser string) error {
-	log.Infof("Syncing from MinIO to remote: %s -> %s@%s:%s", objectKey, sshUser, sshHost, remotePath)
+func syncMinioObjectToRemote(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, objectKey, remotePath, sshHost, sshUser string) error {
+	log.Debugf("Syncing from MinIO to remote: %s -> %s@%s:%s", objectKey, sshUser, sshHost, remotePath)
 
 	// Get object from MinIO
 	obj, err := mc.GetObject(ctx, cfg.Minio.Bucket, objectKey, minio.GetObjectOptions{})
@@ -688,12 +666,12 @@ func syncMinioObjectToRemote(ctx context.Context, cfg *config.Config, mc *minio.
 		return fmt.Errorf("failed to copy file via SCP: %v", err)
 	}
 
-	log.Infof("Successfully synced to remote: %s", remotePath)
+	log.Debugf("Successfully synced to remote: %s", remotePath)
 	return nil
 }
 
 // executeCommand executes a shell command
-func executeCommand(cmd string, log *logrus.Logger) error {
+func executeCommand(cmd string, log *zap.SugaredLogger) error {
 	log.Debugf("Executing command: %s", cmd)
 
 	// This is a simple implementation - in production you'd want better error handling
@@ -711,7 +689,7 @@ func executeCommand(cmd string, log *logrus.Logger) error {
 		return fmt.Errorf("command execution failed: %v", err)
 	}
 
-	log.Infof("Successfully executed: %s", cmd)
+	log.Debugf("Successfully executed: %s", cmd)
 	if len(output) > 0 {
 		log.Debugf("Command output: %s", string(output))
 	}

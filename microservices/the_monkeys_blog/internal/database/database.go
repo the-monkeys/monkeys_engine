@@ -7,10 +7,10 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
-func NewESClient(url, username, password string) (*elasticsearch.Client, error) {
+func NewESClient(url, username, password string, log *zap.SugaredLogger) (*elasticsearch.Client, error) {
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{url},
 		Username:  username,
@@ -38,10 +38,10 @@ func NewESClient(url, username, password string) (*elasticsearch.Client, error) 
 	}
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logrus.Error("Error closing response body:", err)
+			log.Error("Error closing response body:", err)
 		}
 	}()
 
-	logrus.Infof("✅ Elasticsearch connection established successfully")
+	log.Infof("✅ Elasticsearch connection established successfully")
 	return client, nil
 }

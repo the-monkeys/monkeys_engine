@@ -135,7 +135,7 @@ func (uh *uDBHandler) AddPermissionToAUser(blogId string, userId int64, inviterI
 		return err
 	}
 
-	uh.log.Infof("Successfully added permission for blog: %s, user: %d", blogId, userId)
+	uh.log.Debugf("Successfully added permission for blog: %s, user: %d", blogId, userId)
 	return nil
 }
 
@@ -197,7 +197,7 @@ func (uh *uDBHandler) RevokeBlogPermissionFromAUser(blogId string, userId int64,
 		return err
 	}
 
-	uh.log.Infof("Successfully revoked permission for blog: %s, user: %d", blogId, userId)
+	uh.log.Debugf("Successfully revoked permission for blog: %s, user: %d", blogId, userId)
 	return nil
 }
 

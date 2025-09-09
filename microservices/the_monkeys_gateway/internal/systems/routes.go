@@ -6,24 +6,24 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/config"
+	"go.uber.org/zap"
 )
 
 type SystemServiceClient struct {
-	logger *logrus.Logger
+	logger *zap.SugaredLogger
 	config *config.Config
 }
 
-func NewSystemServiceClient(cfg *config.Config) *SystemServiceClient {
+func NewSystemServiceClient(cfg *config.Config, log *zap.SugaredLogger) *SystemServiceClient {
 	return &SystemServiceClient{
-		logger: logrus.New(),
+		logger: log,
 		config: cfg,
 	}
 }
 
 // SystemKeyMiddleware validates system key from header
-func SystemKeyMiddleware(systemKey string) gin.HandlerFunc {
+func SystemKeyMiddleware(systemKey string, log *zap.SugaredLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		providedKey := c.GetHeader("X-System-Key")
 		if providedKey == "" {
@@ -34,7 +34,7 @@ func SystemKeyMiddleware(systemKey string) gin.HandlerFunc {
 		}
 
 		if providedKey != systemKey {
-			logrus.Warnf("Invalid system key attempt from IP: %s", c.ClientIP())
+			log.Warnf("Invalid system key attempt from IP: %s", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid system key",
 			})
@@ -45,12 +45,12 @@ func SystemKeyMiddleware(systemKey string) gin.HandlerFunc {
 	}
 }
 
-func RegisterSystemRouter(router *gin.Engine, cfg *config.Config) *SystemServiceClient {
-	ssc := NewSystemServiceClient(cfg)
+func RegisterSystemRouter(router *gin.Engine, cfg *config.Config, log *zap.SugaredLogger) *SystemServiceClient {
+	ssc := NewSystemServiceClient(cfg, log)
 
 	// System routes group with system key validation
 	systemRoutes := router.Group("/api/v1/system")
-	systemRoutes.Use(SystemKeyMiddleware(cfg.Keys.SystemKey)) // Using system key for system access
+	systemRoutes.Use(SystemKeyMiddleware(cfg.Keys.SystemKey, log)) // Using system key for system access
 
 	// System information routes
 	{

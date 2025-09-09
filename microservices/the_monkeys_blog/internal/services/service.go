@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -21,13 +22,13 @@ import (
 type BlogService struct {
 	osClient   database.ElasticsearchStorage
 	seoManager seo.SEOManager
-	logger     *logrus.Logger
+	logger     *zap.SugaredLogger
 	config     *config.Config
 	qConn      rabbitmq.Conn
 	pb.UnimplementedBlogServiceServer
 }
 
-func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOManager, logger *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
+func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOManager, logger *zap.SugaredLogger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
 	return &BlogService{
 		osClient:   client,
 		seoManager: seoManager,
@@ -38,8 +39,7 @@ func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOMana
 }
 
 func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
-	blog.logger.Infof("Content: %+v", req)
-	blog.logger.Infof("received a blog containing id: %s", req.BlogId)
+	blog.logger.Debugw("draft blog", "blog_id", req.BlogId, "owner", req.OwnerAccountId)
 	req.IsDraft = true
 
 	exists, _, _ := blog.osClient.DoesBlogExist(ctx, req.BlogId)
@@ -114,15 +114,15 @@ func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.BlogById
 }
 
 func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.BlogByIdReq) (*pb.GetDraftBlogsRes, error) {
-	blog.logger.Infof("fetching draft blogs for account id %s", req.OwnerAccountId)
+	blog.logger.Debugw("get draft blogs", "owner", req.OwnerAccountId)
 	if req.OwnerAccountId == "" {
-		logrus.Error("account id cannot be empty")
+		blog.logger.Error("account id cannot be empty")
 		return nil, status.Errorf(codes.InvalidArgument, "Account id cannot be empty")
 	}
 
 	res, err := blog.osClient.GetDraftBlogsByOwnerAccountID(ctx, req.OwnerAccountId)
 	if err != nil {
-		logrus.Errorf("error occurred while getting draft blogs for account id: %s, error: %v", req.OwnerAccountId, err)
+		blog.logger.Errorf("error occurred while getting draft blogs for account id: %s, error: %v", req.OwnerAccountId, err)
 		return nil, status.Errorf(codes.Internal, "cannot get the draft blogs for account id: %s", req.OwnerAccountId)
 	}
 
@@ -130,15 +130,15 @@ func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.BlogB
 }
 
 func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.BlogByIdReq) (*pb.GetPublishedBlogsRes, error) {
-	blog.logger.Infof("fetching published blogs for account id %s", req.OwnerAccountId)
+	blog.logger.Debugw("get published blogs", "owner", req.OwnerAccountId)
 	if req.OwnerAccountId == "" {
-		logrus.Error("account id cannot be empty")
+		blog.logger.Error("account id cannot be empty")
 		return nil, status.Errorf(codes.InvalidArgument, "Account id cannot be empty")
 	}
 
 	res, err := blog.osClient.GetPublishedBlogsByOwnerAccountID(ctx, req.OwnerAccountId)
 	if err != nil {
-		logrus.Errorf("error occurred while getting published blogs for account id: %s, error: %v", req.OwnerAccountId, err)
+		blog.logger.Errorf("error occurred while getting published blogs for account id: %s, error: %v", req.OwnerAccountId, err)
 		return nil, status.Errorf(codes.Internal, "cannot get the published blogs for account id: %s", req.OwnerAccountId)
 	}
 
@@ -146,7 +146,7 @@ func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.B
 }
 
 func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
-	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	blog.logger.Debugw("get draft blog", "blog_id", req.BlogId)
 
 	res, err := blog.osClient.GetDraftedBlogByIdAndOwner(ctx, req.BlogId, req.OwnerAccountId)
 	if err != nil {
@@ -162,7 +162,7 @@ func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.BlogByIdR
 }
 
 func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
-	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
+	blog.logger.Debugw("get published blog", "blog_id", req.BlogId)
 
 	// Fetch the published blog by blog_id and owner_account_id
 	res, err := blog.osClient.GetPublishedBlogByIdAndOwner(ctx, req.BlogId, req.OwnerAccountId)
