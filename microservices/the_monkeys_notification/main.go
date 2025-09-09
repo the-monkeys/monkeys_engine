@@ -4,27 +4,42 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_notification/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/services"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+func printBanner(cfg *config.Config, _ *zap.SugaredLogger) {
+	banner := `
+┌────────────────────────────────────────────────────────────┐
+│   🐒  The Monkeys Notification Service                      │
+│   Status   : ONLINE                                         │
+│   Service  : ` + cfg.Microservices.TheMonkeysNotification + `
+│   Port     : ` + fmt.Sprintf("%d", cfg.Microservices.NotificationPort) + `
+│   Env      : ` + cfg.AppEnv + `
+│   Logs     : zap (structured)                               │
+│   Tip      : set LOG_LEVEL=debug for verbose logs           │
+└────────────────────────────────────────────────────────────┘`
+	fmt.Printf("%s\nEnvironment: %s\nService: %s\nPort: %d\n", banner, cfg.AppEnv, cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
+}
+
 func main() {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		logrus.Errorf("failed to load notification config, error: %+v", err)
+		logger.ZapSugar().Errorf("failed to load notification config, error: %+v", err)
 	}
-	log := logrus.New()
+	log := logger.ZapForService("tm_notification")
 
 	db, err := database.NewNotificationDb(cfg, log)
 	if err != nil {
-		log.Fatalln("failed to connect to the database:", err)
+		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
 	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
@@ -43,14 +58,14 @@ func main() {
 
 	pb.RegisterNotificationServiceServer(grpcServer, notificationSvc)
 
-	log.Infof("✅ the notification service started at: %v", cfg.Microservices.TheMonkeysNotification)
+	printBanner(cfg, log)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }
 
 func BlogServiceConn(addr string) (*grpc.ClientConn, error) {
-	logrus.Infof("gRPC dialing to the blog server: %v", addr)
+	logger.ZapSugar().Debugf("gRPC dialing to the blog server: %v", addr)
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err

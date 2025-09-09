@@ -5,20 +5,20 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_notification/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
+	"go.uber.org/zap"
 )
 
 type NotificationSvc struct {
 	db     database.NotificationDB
-	log    *logrus.Logger
+	log    *zap.SugaredLogger
 	config *config.Config
 	pb.UnimplementedNotificationServiceServer
 }
 
-func NewNotificationSvc(dbConn database.NotificationDB, log *logrus.Logger, config *config.Config) *NotificationSvc {
+func NewNotificationSvc(dbConn database.NotificationDB, log *zap.SugaredLogger, config *config.Config) *NotificationSvc {
 	return &NotificationSvc{
 		db:     dbConn,
 		log:    log,

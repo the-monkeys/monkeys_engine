@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/models"
+	"go.uber.org/zap"
 )
 
 type NotificationDB interface {
@@ -22,10 +22,10 @@ type NotificationDB interface {
 
 type notificationDB struct {
 	db  *sql.DB
-	log *logrus.Logger
+	log *zap.SugaredLogger
 }
 
-func NewNotificationDb(cfg *config.Config, log *logrus.Logger) (NotificationDB, error) {
+func NewNotificationDb(cfg *config.Config, log *zap.SugaredLogger) (NotificationDB, error) {
 	url := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.Postgresql.PrimaryDB.DBUsername,
 		cfg.Postgresql.PrimaryDB.DBPassword,
@@ -43,7 +43,7 @@ func NewNotificationDb(cfg *config.Config, log *logrus.Logger) (NotificationDB, 
 		log.Errorf("ping test failed to psql using sql driver, error: %+v", err)
 		return nil, err
 	}
-	log.Info("the monkeys notification service is connected to psql")
+	log.Debug("the monkeys notification service is connected to psql")
 	return &notificationDB{db: dbPsql, log: log}, nil
 }
 
@@ -99,7 +99,7 @@ func (uh *notificationDB) GetUserNotifications(username string, limit int64, off
 		return nil, err
 	}
 
-	uh.log.Infof("Successfully fetched notifications for user ID: %d", userID)
+	uh.log.Debugf("Successfully fetched notifications for user ID: %d", userID)
 	return notifications, nil
 }
 
@@ -157,7 +157,7 @@ func (uh *notificationDB) CreateNotification(accountID string, notificationName 
 		return err
 	}
 
-	uh.log.Infof("Successfully created notification for user ID: %d", userID)
+	uh.log.Debugf("Successfully created notification for user ID: %d", userID)
 	return nil
 }
 
@@ -191,11 +191,11 @@ func (uh *notificationDB) MarkNotificationAsSeen(notificationIDs []int64, userna
 	}
 
 	if rowsAffected == 0 {
-		uh.log.Infof("No changes made. Either notifications were already seen or do not exist for user ID %d", userID)
+		uh.log.Debugf("No changes made. Either notifications were already seen or do not exist for user ID %d", userID)
 		return nil
 	}
 
-	uh.log.Infof("Successfully marked %d notifications as seen for user ID %d", rowsAffected, userID)
+	uh.log.Debugf("Successfully marked %d notifications as seen for user ID %d", rowsAffected, userID)
 	return nil
 }
 
@@ -284,6 +284,6 @@ func (uh *notificationDB) GetUnseenNotifications(username string, limit int64, o
 		return nil, err
 	}
 
-	// uh.log.Infof("Successfully fetched unseen notifications for user ID: %d", userID)
+	// previously info log removed / converted to debug (left silent intentionally)
 	return notifications, nil
 }
