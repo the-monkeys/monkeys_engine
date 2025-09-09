@@ -37,12 +37,11 @@ func NewUserServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.UserServ
 }
 
 func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *UserServiceClient {
-	lg := zap.S().With("service", "user_gateway")
 	mware := auth.InitAuthMiddleware(authClient, log)
 
 	usc := &UserServiceClient{
-		Client: NewUserServiceClient(cfg, lg),
-		log:    lg,
+		Client: NewUserServiceClient(cfg, log),
+		log:    log,
 	}
 	routes := router.Group("/api/v1/user")
 	routes.GET("/topics", usc.GetAllTopics)
@@ -181,7 +180,7 @@ func (usc *UserServiceClient) UpdateUserProfile(ctx *gin.Context) {
 	var req UpdateUserProfileRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		zap.S().Errorw("update user profile bind json failed", "err", err)
+		usc.log.Errorw("update user profile bind json failed", "err", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
@@ -319,7 +318,7 @@ func (asc *UserServiceClient) FollowTopic(ctx *gin.Context) {
 
 	var req FollowTopic
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		zap.S().Errorw("error while getting the update data: %v", err)
+		asc.log.Errorw("error while getting the update data: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
@@ -362,7 +361,7 @@ func (asc *UserServiceClient) UnFollowTopic(ctx *gin.Context) {
 
 	var req FollowTopic
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		zap.S().Errorw("error while getting the update data: %v", err)
+		asc.log.Errorw("error while getting the update data: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
@@ -402,7 +401,7 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 
 	// Check permissions:
 	if !utils.CheckUserRoleInContext(ctx, constants.RoleOwner) {
-		zap.S().Errorw("user does not have the permission to invite a co-author")
+		asc.log.Errorw("user does not have the permission to invite a co-author")
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
 		return
 	}
@@ -410,7 +409,7 @@ func (asc *UserServiceClient) InviteCoAuthor(ctx *gin.Context) {
 
 	var req CoAuthor
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		zap.S().Errorw("error while getting the update data: %v", err)
+		asc.log.Errorw("error while getting the update data: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
@@ -925,7 +924,7 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 	// Start the gRPC streaming client
 	stream, err := asc.Client.SearchUser(context.Background())
 	if err != nil {
-		zap.S().Errorw("Failed to initialize SearchUser stream: %v", err)
+		asc.log.Errorw("Failed to initialize SearchUser stream: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to initiate search"})
 		return
 	}
@@ -937,14 +936,14 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 		Offset:     int32(offsetInt),
 	})
 	if err != nil {
-		zap.S().Errorw("Failed to send search request: %v", err)
+		asc.log.Errorw("Failed to send search request: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send search request"})
 		return
 	}
 
 	// Close the stream after sending
 	if err := stream.CloseSend(); err != nil {
-		zap.S().Warnw("Failed to close send stream: %v", err)
+		asc.log.Warnw("Failed to close send stream: %v", err)
 	}
 
 	// Collect responses from the stream
@@ -956,7 +955,7 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 			break
 		}
 		if err != nil {
-			zap.S().Errorw("Error receiving search response: %v", err)
+			asc.log.Errorw("Error receiving search response: %v", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error receiving search results"})
 			return
 		}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
-	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/models"
@@ -23,9 +22,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.Sugared
 
 	go func() {
 		<-sigChan
-		logger.ZapSugar().Debug("Received termination signal. Closing connection and exiting gracefully.")
+		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
 		if err := conn.Channel.Close(); err != nil {
-			logger.ZapSugar().Errorf("Failed to close RabbitMQ channel: %v", err)
+			log.Errorf("Failed to close RabbitMQ channel: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -48,14 +47,14 @@ func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, 
 		nil,       // args
 	)
 	if err != nil {
-		logger.ZapSugar().Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
+		log.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
 		return
 	}
 
 	for d := range msgs {
 		user := models.TheMonkeysMessage{}
 		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logger.ZapSugar().Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+			log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 			continue
 		}
 
