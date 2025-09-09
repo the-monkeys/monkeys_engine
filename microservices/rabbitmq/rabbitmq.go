@@ -7,10 +7,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/logger"
 )
+
+var log = logger.ZapForService("rabbitmq")
 
 // / Conn represents a RabbitMQ connection with a channel.
 type Conn struct {
@@ -32,7 +34,7 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 	ch, err := conn.Channel()
 	if err != nil {
 		if cerr := conn.Close(); cerr != nil {
-			logrus.Errorf("failed to close connection after channel error: %v", cerr)
+			log.Errorf("failed to close connection after channel error: %v", cerr)
 		}
 		return Conn{}, fmt.Errorf("failed to open a channel: %w", err)
 	}
@@ -43,10 +45,10 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 	}
 
 	if len(conf.Queues) == 0 || len(conf.RoutingKeys) == 0 {
-		logrus.Fatalf("Queues or RoutingKeys are not configured properly")
+		log.Fatalf("Queues or RoutingKeys are not configured properly")
 	}
 
-	logrus.Infof("Creating the exchange: %s", conf.Exchange)
+	log.Debugf("Creating the exchange: %s", conf.Exchange)
 	err = connection.Channel.ExchangeDeclare(conf.Exchange, "direct", true, false, false, false, nil)
 	if err != nil {
 		connection.Close()
@@ -54,14 +56,14 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 	}
 
 	for i, queue := range conf.Queues {
-		logrus.Infof("Creating a queue: %s", queue)
+		log.Debugf("Creating a queue: %s", queue)
 		_, err = connection.Channel.QueueDeclare(queue, true, false, false, false, nil)
 		if err != nil {
 			connection.Close()
 			return Conn{}, fmt.Errorf("failed to declare queue: %w", err)
 		}
 
-		logrus.Infof("Binding the queue %s with exchange %s using routing key %s", queue, conf.Exchange, conf.RoutingKeys[i])
+		log.Debugf("Binding the queue %s with exchange %s using routing key %s", queue, conf.Exchange, conf.RoutingKeys[i])
 		err = connection.Channel.QueueBind(queue, conf.RoutingKeys[i], conf.Exchange, false, nil)
 		if err != nil {
 			connection.Close()
@@ -79,11 +81,11 @@ func Reconnect(conf config.RabbitMQ) Conn {
 	for {
 		qConn, err = GetConn(conf)
 		if err != nil {
-			logrus.Errorf("cannot connect to RabbitMQ, retrying in 1 second: %v", err)
+			log.Errorf("cannot connect to RabbitMQ, retrying in 1 second: %v", err)
 			time.Sleep(time.Second)
 			continue
 		}
-		logrus.Info("Reconnected to RabbitMQ")
+		log.Debug("Reconnected to RabbitMQ")
 		break
 	}
 	return qConn
@@ -98,7 +100,7 @@ func (c Conn) PublishMessage(exchangeName, routingKey string, message []byte) er
 	if err != nil {
 		return fmt.Errorf("error publishing message: %w", err)
 	}
-	logrus.Infoln("Message published")
+	log.Debug("Message published")
 	return nil
 }
 
@@ -121,12 +123,12 @@ func (c Conn) ReceiveData(queueName string) error {
 
 	go func() {
 		for d := range msgs {
-			logrus.Infof("Received a message: %s", d.Body)
+			log.Debugf("Received a message: %s", d.Body)
 			// Handle your message here
 		}
 	}()
 
-	logrus.Infoln("Waiting for messages. To exit press CTRL+C")
+	log.Debug("Waiting for messages. To exit press CTRL+C")
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
@@ -139,14 +141,14 @@ func (c Conn) ReceiveData(queueName string) error {
 func (c Conn) Close() {
 	if c.Channel != nil {
 		if err := c.Channel.Close(); err != nil {
-			logrus.Errorf("failed to close channel: %v", err)
+			log.Errorf("failed to close channel: %v", err)
 		}
 	}
 	if c.Connection != nil {
 		if err := c.Connection.Close(); err != nil {
-			logrus.Errorf("Error closing RabbitMQ connection: %v", err)
+			log.Errorf("Error closing RabbitMQ connection: %v", err)
 		} else {
-			logrus.Infoln("RabbitMQ connection closed")
+			log.Debug("RabbitMQ connection closed")
 		}
 	}
 }
