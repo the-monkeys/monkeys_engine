@@ -46,7 +46,7 @@ func printBanner(cfg *config.Config) {
 		"│   Logs     : zap (structured)                               │\n" +
 		"│   Tip      : export LOG_LEVEL=debug for verbose logs        │\n" +
 		"└────────────────────────────────────────────────────────────┘\n"
-	fmt.Printf("gateway online", "banner", banner, "env", cfg.AppEnv, "http", cfg.TheMonkeysGateway.HTTP, "https", cfg.TheMonkeysGateway.HTTPS)
+	fmt.Print(banner)
 }
 
 func main() {
