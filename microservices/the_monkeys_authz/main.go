@@ -14,6 +14,19 @@ import (
 	"google.golang.org/grpc"
 )
 
+func printBanner(host, env string) {
+	banner := "\n" +
+		"┌──────────────────────────────────────────────────────────┐\n" +
+		"│   🐒  The Monkeys Authz Service                           │\n" +
+		"│   Status   : ONLINE                                       │\n" +
+		fmt.Sprintf("│   Host     : %-44s│\n", host) +
+		fmt.Sprintf("│   Env      : %-44s│\n", env) +
+		"│   Logs     : zap (structured)                             │\n" +
+		"│   Tip      : Set LOG_LEVEL=debug for verbose output       │\n" +
+		"└──────────────────────────────────────────────────────────┘\n"
+	fmt.Print(banner)
+}
+
 func main() {
 	log := logger.ZapForService("tm-authz")
 
@@ -47,7 +60,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterAuthServiceServer(grpcServer, authServer)
 
-	log.Infow("authentication server started", "address", host)
+	printBanner(host, cfg.AppEnv)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalw("gRPC auth server cannot start", "error", err)
 	}

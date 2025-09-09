@@ -27,7 +27,7 @@ func printBanner(host, env string) {
 		"│   Logs     : zap (structured)                             │\n" +
 		"│   Tip      : Set LOG_LEVEL=debug for verbose output       │\n" +
 		"└──────────────────────────────────────────────────────────┘\n"
-	fmt.Printf("service online", "banner", banner, "host", host, "env", env)
+	fmt.Print(banner)
 }
 
 func main() {
