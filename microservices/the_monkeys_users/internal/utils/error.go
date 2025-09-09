@@ -3,24 +3,25 @@ package utils
 import (
 	"database/sql"
 
-	"github.com/sirupsen/logrus"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Errors(err error) error {
+	log := logger.ZapForService("tm_users")
 	switch err {
 	case sql.ErrNoRows:
-		logrus.Infof("cannot find the row")
+		log.Debugf("cannot find the row")
 		return status.Errorf(codes.NotFound, "failed to find the record, error: %v", err)
 	case sql.ErrTxDone:
-		logrus.Infof("The transaction has already been committed or rolled back.")
+		log.Debugf("The transaction has already been committed or rolled back.")
 		return status.Errorf(codes.Internal, "failed to find the record, error: %v", err)
 	case sql.ErrConnDone:
-		logrus.Infof("The database connection has been closed.")
+		log.Debugf("The database connection has been closed.")
 		return status.Errorf(codes.Unavailable, "failed to find the record, error: %v", err)
 	default:
-		logrus.Infof("An internal server error occurred: %v\n", err)
+		log.Debugf("An internal server error occurred: %v", err)
 		return status.Errorf(codes.Internal, "failed to find the record, error: %v", err)
 	}
 }

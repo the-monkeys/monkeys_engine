@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -19,6 +18,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/utils"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	timestamp "google.golang.org/protobuf/types/known/timestamppb"
@@ -26,23 +26,18 @@ import (
 
 type UserSvc struct {
 	dbConn database.UserDb
-	log    *logrus.Logger
+	log    *zap.SugaredLogger
 	config *config.Config
 	qConn  rabbitmq.Conn
 	pb.UnimplementedUserServiceServer
 }
 
-func NewUserSvc(dbConn database.UserDb, log *logrus.Logger, config *config.Config, qConn rabbitmq.Conn) *UserSvc {
-	return &UserSvc{
-		dbConn: dbConn,
-		log:    log,
-		config: config,
-		qConn:  qConn,
-	}
+func NewUserSvc(dbConn database.UserDb, log *zap.SugaredLogger, config *config.Config, qConn rabbitmq.Conn) *UserSvc {
+	return &UserSvc{dbConn: dbConn, log: log, config: config, qConn: qConn}
 }
 
 func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (*pb.UserProfileRes, error) {
-	us.log.Infof("profile info has been requested for user: %s.", req.Username)
+	us.log.Debugf("profile info has been requested for user: %s.", req.Username)
 	if !req.IsPrivate {
 		userProfile, err := us.dbConn.GetUserProfile(req.Username)
 		if err != nil {
@@ -109,7 +104,7 @@ func (us *UserSvc) GetUserProfile(ctx context.Context, req *pb.UserProfileReq) (
 }
 
 func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityReq) (*pb.UserActivityResp, error) {
-	logrus.Infof("Retrieving activities for: %v", req.UserName)
+	us.log.Debugf("Retrieving activities for: %v", req.UserName)
 	// Check if username exits or not
 	user, err := us.dbConn.CheckIfUsernameExist(req.UserName)
 	if err != nil {
@@ -124,8 +119,8 @@ func (us *UserSvc) GetUserActivities(ctx context.Context, req *pb.UserActivityRe
 }
 
 func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProfileReq) (*pb.UpdateUserProfileRes, error) {
-	us.log.Infof("user %s is updating the profile.", req.Username)
-	us.log.Infof("req: %+v", req)
+	us.log.Debugf("user %s is updating the profile.", req.Username)
+	us.log.Debugf("req: %+v", req)
 
 	// Check if the user exists
 	userDetails, err := us.dbConn.CheckIfUsernameExist(req.Username)
@@ -183,7 +178,7 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 // 5. Delete the topics of the user
 // 6. Send User a mail
 func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
-	us.log.Infof("user %s has requested to delete the  profile.", req.Username)
+	us.log.Debugf("user %s has requested to delete the  profile.", req.Username)
 
 	// Check if username exits or not
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
@@ -234,7 +229,7 @@ func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProf
 }
 
 func (us *UserSvc) GetAllTopics(context.Context, *pb.GetTopicsRequests) (*pb.GetTopicsResponse, error) {
-	us.log.Info("getting all the topics")
+	us.log.Debug("getting all the topics")
 
 	res, err := us.dbConn.GetAllTopicsFromDb()
 	if err != nil {
@@ -249,7 +244,7 @@ func (us *UserSvc) GetAllTopics(context.Context, *pb.GetTopicsRequests) (*pb.Get
 }
 
 func (us *UserSvc) GetAllCategories(ctx context.Context, req *pb.GetAllCategoriesReq) (*pb.GetAllCategoriesRes, error) {
-	us.log.Info("getting all the Description and Categories")
+	us.log.Debug("getting all the Description and Categories")
 
 	res, err := us.dbConn.GetAllCategories()
 	if err != nil {
@@ -272,10 +267,10 @@ func (us *UserSvc) GetUserDetails(ctx context.Context, req *pb.UserDetailReq) (*
 
 	switch {
 	case req.AccountId != "":
-		us.log.Infof("Profile info has been requested for account id: %s.", req.AccountId)
+		us.log.Debugf("Profile info has been requested for account id: %s.", req.AccountId)
 		userInfo, err = us.dbConn.CheckIfAccIdExist(req.AccountId)
 	case req.Username != "":
-		us.log.Infof("Profile info has been requested for username: %s.", req.Username)
+		us.log.Debugf("Profile info has been requested for username: %s.", req.Username)
 		userInfo, err = us.dbConn.CheckIfUsernameExist(req.Username)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "either AccountId or Username must be provided")
@@ -384,10 +379,10 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 }
 
 func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
-	us.log.Infof("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
+	us.log.Debugf("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
 	resp, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -396,7 +391,7 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 
 	// Invite the co-author
 	if err := us.dbConn.AddPermissionToAUser(req.BlogId, resp.Id, req.BlogOwnerUsername, constants.RoleEditor); err != nil {
-		logrus.Errorf("error while inviting the co-author: %v", err)
+		us.log.Errorf("error while inviting the co-author: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -417,10 +412,10 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 }
 
 func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAccessReq) (*pb.CoAuthorAccessRes, error) {
-	us.log.Infof("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
+	us.log.Debugf("user %s has requested to invite %s as a co-author.", req.BlogOwnerUsername, req.Username)
 	resp, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -429,7 +424,7 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 
 	// Invite the co-author
 	if err := us.dbConn.RevokeBlogPermissionFromAUser(req.BlogId, resp.Id, constants.RoleEditor); err != nil {
-		logrus.Errorf("error while inviting the co-author: %v", err)
+		us.log.Errorf("error while inviting the co-author: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -451,7 +446,7 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 }
 
 func (us *UserSvc) GetBlogsByUserIds(ctx context.Context, req *pb.BlogsByUserIdsReq) (*pb.BlogsByUserNameRes, error) {
-	us.log.Infof("fetching blogs for user: %s", req.AccountId)
+	us.log.Debugf("fetching blogs for user: %s", req.AccountId)
 
 	switch req.Type {
 	case "colab":
@@ -485,7 +480,7 @@ func (us *UserSvc) GetBlogsByUserIds(ctx context.Context, req *pb.BlogsByUserIds
 }
 
 func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq) (*pb.CreateTopicsRes, error) {
-	us.log.Infof("fetching co-authors for user: %s", req.Username)
+	us.log.Debugf("fetching co-authors for user: %s", req.Username)
 	if len(req.Topics) == 0 {
 		us.log.Errorf("user %s has entered no topic", req.Username)
 		return nil, status.Errorf(codes.InvalidArgument, "there is no topic")
@@ -520,7 +515,7 @@ func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq)
 func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -529,7 +524,7 @@ func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 
 	err = us.dbConn.BookMarkABlog(req.BlogId, user.Id)
 	if err != nil {
-		logrus.Errorf("error while bookmarking the blog: %v", err)
+		us.log.Errorf("error while bookmarking the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -550,7 +545,7 @@ func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -559,7 +554,7 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 
 	err = us.dbConn.RemoveBookmarkFromBlog(req.BlogId, user.Id)
 	if err != nil {
-		logrus.Errorf("error while removing the bookmark from the blog: %v", err)
+		us.log.Errorf("error while removing the bookmark from the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -578,11 +573,11 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 }
 
 func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
-	us.log.Infof("user %s has requested to follow %s.", req.FollowerUsername, req.Username)
+	us.log.Debugf("user %s has requested to follow %s.", req.FollowerUsername, req.Username)
 
 	err := us.dbConn.FollowAUser(req.Username, req.FollowerUsername)
 	if err != nil {
-		logrus.Errorf("error while following the user: %v", err)
+		us.log.Errorf("error while following the user: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -606,13 +601,13 @@ func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.U
 			Notification: fmt.Sprintf("%s has followed you", req.FollowerUsername),
 		})
 		if err != nil {
-			logrus.Errorf("failed to marshal message, error: %v", err)
+			us.log.Errorf("failed to marshal message, error: %v", err)
 		}
 
 		go func() {
 			err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
 			if err != nil {
-				logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", req.Username, err)
+				us.log.Errorf("failed to publish message for notification service for user: %s, error: %v", req.Username, err)
 			}
 		}()
 	}
@@ -624,11 +619,11 @@ func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.U
 }
 
 func (us *UserSvc) UnFollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.UserFollowRes, error) {
-	us.log.Infof("user %s has requested to un-follow %s.", req.FollowerUsername, req.Username)
+	us.log.Debugf("user %s has requested to un-follow %s.", req.FollowerUsername, req.Username)
 
 	err := us.dbConn.UnFollowAUser(req.Username, req.FollowerUsername)
 	if err != nil {
-		logrus.Errorf("error while un-following the user: %v", err)
+		us.log.Errorf("error while un-following the user: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -649,7 +644,7 @@ func (us *UserSvc) UnFollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb
 }
 
 func (us *UserSvc) GetFollowers(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingResp, error) {
-	us.log.Infof("fetching followers for user: %s", req.Username)
+	us.log.Debugf("fetching followers for user: %s", req.Username)
 	resp, err := us.dbConn.GetFollowers(req.Username)
 	if err != nil {
 		us.log.Errorf("error while fetching followers for user %s, err: %v", req.Username, err)
@@ -675,7 +670,7 @@ func (us *UserSvc) GetFollowers(ctx context.Context, req *pb.UserDetailReq) (*pb
 }
 
 func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingResp, error) {
-	us.log.Infof("fetching following for user: %s", req.Username)
+	us.log.Debugf("fetching following for user: %s", req.Username)
 	resp, err := us.dbConn.GetFollowings(req.Username)
 	if err != nil {
 		us.log.Errorf("error while fetching following for user %s, err: %v", req.Username, err)
@@ -704,7 +699,7 @@ func (us *UserSvc) GetFollowing(ctx context.Context, req *pb.UserDetailReq) (*pb
 func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -713,7 +708,7 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 
 	err = us.dbConn.LikeBlog(req.Username, req.BlogId)
 	if err != nil {
-		logrus.Errorf("error while liking the blog: %v", err)
+		us.log.Errorf("error while liking the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -728,7 +723,7 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 	// Send a notification to the user
 	blog, err := us.dbConn.GetBlogsByBlogId(req.BlogId)
 	if err != nil {
-		logrus.Errorf("error while getting the blog: %v", err)
+		us.log.Errorf("error while getting the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -740,15 +735,15 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 			Notification: fmt.Sprintf("%s liked your blog: %s", user.Username, blog.BlogId),
 		})
 		if err != nil {
-			logrus.Errorf("failed to marshal message, error: %v", err)
+			us.log.Errorf("failed to marshal message, error: %v", err)
 		}
 
 		go func() {
 			err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx)
 			if err != nil {
-				logrus.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
+				us.log.Errorf("failed to publish message for notification service for user: %s, error: %v", user.Username, err)
 			}
-			logrus.Infof("message published successfully for user: %s", user.Username)
+			us.log.Debugf("message published successfully for user: %s", user.Username)
 		}()
 	}
 
@@ -761,7 +756,7 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookMarkRes, error) {
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		logrus.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
@@ -770,7 +765,7 @@ func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.Boo
 
 	err = us.dbConn.UnlikeBlog(req.Username, req.BlogId)
 	if err != nil {
-		logrus.Errorf("error while unliking the blog: %v", err)
+		us.log.Errorf("error while unliking the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -793,7 +788,7 @@ func (us *UserSvc) GetIfIFollowedUser(ctx context.Context, req *pb.UserFollowReq
 
 	isFollowing, err := us.dbConn.IsUserFollowing(req.FollowerUsername, req.Username)
 	if err != nil {
-		logrus.Errorf("error while following the user: %v", err)
+		us.log.Errorf("error while following the user: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -808,7 +803,7 @@ func (us *UserSvc) GetIfBlogLiked(ctx context.Context, req *pb.BookMarkReq) (*pb
 
 	isLiked, err := us.dbConn.IsBlogLikedByUser(req.Username, req.BlogId)
 	if err != nil {
-		logrus.Errorf("error while liking the blog: %v", err)
+		us.log.Errorf("error while liking the blog: %v", err)
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
@@ -863,13 +858,13 @@ func (s *UserSvc) GetLikeCounts(ctx context.Context, req *pb.BookMarkReq) (*pb.C
 }
 
 func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
-	us.log.Info("SearchUser stream initiated")
+	us.log.Debug("SearchUser stream initiated")
 
 	for {
 		// Receive data from the stream
 		req, err := stream.Recv()
 		if err == io.EOF {
-			us.log.Info("SearchUser stream closed by client")
+			us.log.Debug("SearchUser stream closed by client")
 			return nil
 		}
 		if err != nil {
@@ -877,7 +872,7 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 			return status.Errorf(codes.Internal, "Error reading stream: %v", err)
 		}
 
-		us.log.Infof("Received search request for username: %s or account_id: %s", req.GetUsername(), req.GetAccountId())
+		us.log.Debugf("Received search request for username: %s or account_id: %s", req.GetUsername(), req.GetAccountId())
 
 		// Search user based on the provided details
 		var users []models.UserAccount
@@ -914,7 +909,7 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 }
 
 func (us *UserSvc) GetFollowersFollowingCounts(ctx context.Context, req *pb.UserDetailReq) (*pb.FollowerFollowingCountsResp, error) {
-	us.log.Infof("fetching followers and following count for user: %s", req.Username)
+	us.log.Debugf("fetching followers and following count for user: %s", req.Username)
 	followers, following, err := us.dbConn.GetFollowersAndFollowingsCounts(req.Username)
 	if err != nil {
 		us.log.Errorf("error while fetching followers and following count for user %s, err: %v", req.Username, err)
