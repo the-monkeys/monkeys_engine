@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
 )
 
@@ -62,18 +61,18 @@ func (w *JwtWrapper) ValidateToken(signedToken string) (claims *jwtClaims, err e
 		},
 	)
 	if err != nil {
-		logrus.Errorf("cannot parse with claims the json token, error: %v", err)
+		authzLog.Errorf("cannot parse with claims the json token, error: %v", err)
 		return
 	}
 
 	claims, ok := token.Claims.(*jwtClaims)
 	if !ok {
-		logrus.Errorf("cannot parse jwt claims, error: %v", err)
+		authzLog.Errorf("cannot parse jwt claims, error: %v", err)
 		return nil, errors.New("couldn't parse the claims")
 	}
 
 	if claims.ExpiresAt < time.Now().Local().Unix() {
-		logrus.Errorf("the token expired already, error: %v", err)
+		authzLog.Errorf("the token expired already, error: %v", err)
 		return nil, errors.New("the token is expired")
 	}
 
