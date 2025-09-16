@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
+	"github.com/lib/pq"                // Keep for pq.Array functionality
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/models"
@@ -33,14 +34,14 @@ func NewNotificationDb(cfg *config.Config, log *zap.SugaredLogger) (Notification
 		cfg.Postgresql.PrimaryDB.DBPort,
 		cfg.Postgresql.PrimaryDB.DBName,
 	)
-	dbPsql, err := sql.Open("postgres", url)
+	dbPsql, err := sql.Open("pgx", url)
 	if err != nil {
-		log.Fatalf("cannot connect psql using sql driver, error: %+v", err)
+		log.Fatalf("cannot connect psql using pgx driver, error: %+v", err)
 		return nil, err
 	}
 
 	if err = dbPsql.Ping(); err != nil {
-		log.Errorf("ping test failed to psql using sql driver, error: %+v", err)
+		log.Errorf("ping test failed to psql using pgx driver, error: %+v", err)
 		return nil, err
 	}
 	log.Debug("the monkeys notification service is connected to psql")
@@ -170,14 +171,14 @@ func (uh *notificationDB) MarkNotificationAsSeen(notificationIDs []int64, userna
 		return err
 	}
 
-	// Prepare the IN clause with ANY and use pq.Array to handle the slice
+	// Prepare the IN clause with ANY to handle the slice
 	query := `
 		UPDATE notifications
 		SET seen = TRUE
 		WHERE id = ANY($1) AND user_id = $2 AND seen = FALSE;
 	`
 
-	// Execute the query with pq.Array to pass the slice correctly
+	// Execute the query with pq.Array to pass the slice correctly (keeping pq.Array for array handling)
 	result, err := uh.db.Exec(query, pq.Array(notificationIDs), userID)
 	if err != nil {
 		uh.log.Errorf("Error marking notifications as seen for user ID %d, error: %+v", userID, err)
