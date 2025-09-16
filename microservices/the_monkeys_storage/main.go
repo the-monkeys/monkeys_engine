@@ -6,15 +6,13 @@ import (
 	"os"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
-	"github.com/the-monkeys/the_monkeys/constants"
-
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/server"
-
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -30,7 +28,7 @@ func init() {
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(folderPath, 0755)
 		if err != nil {
-			logrus.Fatalf("Error creating folder path: %v", err)
+			logger.ZapSugar().Fatalf("Error creating folder path: %v", err)
 		}
 	}
 
@@ -41,18 +39,31 @@ func init() {
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(blogPath, 0755)
 		if err != nil {
-			logrus.Fatalf("Error creating blog path: %v", err)
+			logger.ZapSugar().Fatalf("Error creating blog path: %v", err)
 		}
 	}
+}
+
+func printBanner(cfg *config.Config) {
+	banner := `
+┌────────────────────────────────────────────────────────────┐
+│   🐒  The Monkeys Storage Service                           │
+│   Status   : ONLINE                                         │
+│   Service  : ` + cfg.Microservices.TheMonkeysFileStore + `
+│   Port     : ` + fmt.Sprintf("%d", cfg.Microservices.StoragePort) + `
+│   Env      : ` + cfg.AppEnv + `
+│   Logs     : zap (structured)                               │
+│   Tip      : set LOG_LEVEL=debug for verbose logs           │
+└────────────────────────────────────────────────────────────┘`
+	fmt.Printf("%s\nEnvironment: %s\nService: %s\nPort: %d\n", banner, cfg.AppEnv, cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
 }
 
 func main() {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		logrus.Errorf("Failed to load file server config, error: %+v", err)
+		logger.ZapSugar().Errorf("Failed to load file server config, error: %+v", err)
 	}
-
-	log := logrus.New()
+	log := logger.ZapForService("tm_storage")
 
 	// Connect to rabbitmq server
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
@@ -64,17 +75,14 @@ func main() {
 		log.Errorf("File server failed to listen at port %v, error: %+v", host, err)
 	}
 
-	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir)
-	// newFileServer := server.NewFileServer(common.PROFILE_PIC_DIR, common.BLOG_FILES, log)
+	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir, log)
 
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(constants.MaxMsgSize), grpc.MaxSendMsgSize(constants.MaxMsgSize))
-
 	pb.RegisterUploadBlogFileServer(grpcServer, fileService)
-	// fs.RegisterFileServiceServer(grpcServer, newFileServer)
 
-	log.Infof("✅ the file storage server started at: %v:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
-
+	log.Debugf("the file storage server started at: %v:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
+	printBanner(cfg)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }

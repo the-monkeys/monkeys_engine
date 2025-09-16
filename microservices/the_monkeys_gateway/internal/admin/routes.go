@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,20 +17,20 @@ import (
 
 type AdminServiceClient struct {
 	Client pb.UserServiceClient
-	logger *logrus.Logger
+	logger *zap.SugaredLogger
 }
 
-func NewAdminServiceClient(cfg *config.Config) pb.UserServiceClient {
+func NewAdminServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.UserServiceClient {
 	cc, err := grpc.NewClient(cfg.Microservices.TheMonkeysUser, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logrus.Errorf("cannot dial to grpc user server for admin: %v", err)
+		log.Errorf("cannot dial to grpc user server for admin: %v", err)
 	}
-	logrus.Infof("✅ admin service is dialing to user rpc server at: %v", cfg.Microservices.TheMonkeysUser)
+	log.Infof("✅ admin service is dialing to user rpc server at: %v", cfg.Microservices.TheMonkeysUser)
 	return pb.NewUserServiceClient(cc)
 }
 
 // LocalNetworkMiddleware restricts access to local network only
-func LocalNetworkMiddleware() gin.HandlerFunc {
+func LocalNetworkMiddleware(log *zap.SugaredLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
 
@@ -45,7 +45,7 @@ func LocalNetworkMiddleware() gin.HandlerFunc {
 
 		// Check if IP is from local network
 		if !isLocalNetwork(ip) {
-			logrus.Warnf("Admin access attempt from non-local IP: %s", clientIP)
+			log.Warnf("Admin access attempt from non-local IP: %s", clientIP)
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "Access denied: Admin API only accessible from local network",
 			})
@@ -81,7 +81,7 @@ func isLocalNetwork(ip net.IP) bool {
 }
 
 // AdminKeyMiddleware validates admin key from header
-func AdminKeyMiddleware(adminKey string) gin.HandlerFunc {
+func AdminKeyMiddleware(adminKey string, log *zap.SugaredLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		providedKey := c.GetHeader("X-Admin-Key")
 		if providedKey == "" {
@@ -92,7 +92,7 @@ func AdminKeyMiddleware(adminKey string) gin.HandlerFunc {
 		}
 
 		if providedKey != adminKey {
-			logrus.Warnf("Invalid admin key attempt from IP: %s", c.ClientIP())
+			log.Warnf("Invalid admin key attempt from IP: %s", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid admin key",
 			})
@@ -103,16 +103,16 @@ func AdminKeyMiddleware(adminKey string) gin.HandlerFunc {
 	}
 }
 
-func RegisterAdminRouter(router *gin.Engine, cfg *config.Config) *AdminServiceClient {
+func RegisterAdminRouter(router *gin.Engine, cfg *config.Config, logg *zap.SugaredLogger) *AdminServiceClient {
 	asc := &AdminServiceClient{
-		Client: NewAdminServiceClient(cfg),
-		logger: logrus.New(),
+		Client: NewAdminServiceClient(cfg, logg),
+		logger: logg,
 	}
 
 	// Admin routes group with local network restriction and admin key validation
 	adminRoutes := router.Group("/api/v1/admin")
-	adminRoutes.Use(LocalNetworkMiddleware())
-	adminRoutes.Use(AdminKeyMiddleware(cfg.Keys.AdminSecretKey))
+	adminRoutes.Use(LocalNetworkMiddleware(logg))
+	adminRoutes.Use(AdminKeyMiddleware(cfg.Keys.AdminSecretKey, logg))
 
 	// User management routes
 	{

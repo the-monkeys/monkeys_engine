@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 type TheMonkeysGateway struct {
@@ -171,14 +171,16 @@ type Config struct {
 	Redis             Redis             `mapstructure:"redis"`
 	Minio             Minio             `mapstructure:"minio"`
 	SEO               SEO               `mapstructure:"seo"`
+	AppEnv            string            `mapstructure:"app_env"`
 }
 
 func GetConfig() (*Config, error) {
+	log := zap.S()
 	// Load .env file if it exists
 	if err := godotenv.Load(".env"); err != nil {
-		logrus.Warnf("No .env file found or error loading .env file: %v", err)
+		log.Warnf("No .env file found or error loading .env file: %v", err)
 	} else {
-		logrus.Info("Successfully loaded .env file")
+		log.Debug("Successfully loaded .env file")
 	}
 
 	// Configure Viper for environment variables
@@ -201,19 +203,19 @@ func GetConfig() (*Config, error) {
 	// Comment out YAML config reading for testing
 	// Binding struct to config
 	// if err := viper.ReadInConfig(); err != nil {
-	//  logrus.Errorf("Error reading config file, %v", err)
+	//  log.Errorf("Error reading config file, %v", err)
 	//  return config, err
 	// }
 
 	if err := viper.Unmarshal(config); err != nil {
-		logrus.Errorf("Unable to decode into struct, %v", err)
+		log.Errorf("Unable to decode into struct, %v", err)
 		return config, err
 	}
 
 	// Handle array environment variables manually
 	handleArrayEnvVars(config)
 
-	logrus.Info("Configuration loaded from environment variables only")
+	log.Debug("Configuration loaded from environment variables only")
 	return config, nil
 }
 
@@ -224,6 +226,7 @@ func bindEnvVars() {
 	viper.BindEnv("the_monkeys_gateway.HTTP", "THE_MONKEYS_GATEWAY_HTTP")
 	viper.BindEnv("the_monkeys_gateway.http_port", "THE_MONKEYS_GATEWAY_HTTP_PORT")
 	viper.BindEnv("the_monkeys_gateway.internal_port", "THE_MONKEYS_GATEWAY_INTERNAL_PORT")
+	viper.BindEnv("app_env", "APP_ENV")
 
 	// Microservices
 	viper.BindEnv("microservices.the_monkeys_authz", "MICROSERVICES_THE_MONKEYS_AUTHZ")

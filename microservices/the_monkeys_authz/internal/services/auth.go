@@ -3,12 +3,10 @@ package services
 import (
 	"errors"
 	"net/smtp"
-
-	"github.com/sirupsen/logrus"
 )
 
 func (srv *AuthzSvc) SendMail(email, emailBody string) error {
-	logrus.Infof("Send mail routine triggered")
+	srv.logger.Debug("send mail routine triggered")
 
 	cfg := srv.config
 
@@ -55,10 +53,10 @@ func (srv *AuthzSvc) SendMail(email, emailBody string) error {
 	auth := smtp.PlainAuth("", fromEmail, smtpPassword, host)
 
 	if err := smtp.SendMail(address, auth, fromEmail, []string{email}, message); err != nil {
-		logrus.Errorf("error occurred while sending verification email to %s: %v", email, err)
+		srv.logger.Errorw("failed to send verification email", "to", email, "error", err)
 		return err
 	}
 
-	logrus.Infof("verification email successfully sent to %s", email)
+	srv.logger.Debugw("verification email sent", "to", email)
 	return nil
 }

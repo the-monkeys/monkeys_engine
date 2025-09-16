@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"google.golang.org/grpc/codes"
@@ -39,7 +38,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
 		return
 	}
-	logrus.Infof("✅ Fetching feed from blog service")
+	asc.log.Infof("✅ Fetching feed from blog service")
 
 	// Call gRPC to get blog metadata
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
@@ -49,7 +48,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -92,7 +91,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -128,7 +127,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -171,7 +170,7 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -214,7 +213,7 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -250,7 +249,7 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -300,12 +299,12 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 		Offset: int32(offsetInt),
 	}
 
-	logrus.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", searchQuery, limitInt, offsetInt)
+	asc.log.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", searchQuery, limitInt, offsetInt)
 
 	// Call gRPC to search blog metadata
 	stream, err := asc.Client.SearchBlogsMetadata(context.Background(), searchReq)
 	if err != nil {
-		logrus.Errorf("cannot search blogs, error: %v", err)
+		asc.log.Errorf("cannot search blogs, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -331,7 +330,7 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 			break
 		}
 		if err != nil {
-			logrus.Errorf("error receiving search results: %v", err)
+			asc.log.Errorf("error receiving search results: %v", err)
 			if status, ok := status.FromError(err); ok {
 				switch status.Code() {
 				case codes.NotFound:
@@ -350,7 +349,7 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 		// Unmarshal into a map
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -386,7 +385,7 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -484,7 +483,7 @@ func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string)
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -527,7 +526,7 @@ func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string)
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -563,7 +562,7 @@ func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string)
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -628,7 +627,7 @@ func (asc *BlogServiceClient) MetaUsersPublished(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -671,7 +670,7 @@ func (asc *BlogServiceClient) MetaUsersPublished(ctx *gin.Context) {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -707,7 +706,7 @@ func (asc *BlogServiceClient) MetaUsersPublished(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -772,7 +771,7 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -815,7 +814,7 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -851,7 +850,7 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -891,7 +890,7 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 	blogResp, err := asc.UserCli.GetUsersBookmarks(tokenAccountId)
 
 	if err != nil {
-		logrus.Errorf("cannot get the bookmarks, error: %v", err)
+		asc.log.Errorf("cannot get the bookmarks, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the bookmarks"})
 		return
 	}
@@ -910,7 +909,7 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		logrus.Errorf("cannot get the blogs by tags, error: %v", err)
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
 			case codes.NotFound:
@@ -953,7 +952,7 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
 		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
-			logrus.Errorf("cannot unmarshal the blog, error: %v", err)
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
 		}
@@ -989,7 +988,7 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 	for _, blog := range allBlogs {
 		blogID, ok := blog["blog_id"].(string)
 		if !ok {
-			logrus.Errorf("BlogId is either missing or not a string: %v", blog)
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
 			continue
 		}
 
@@ -1034,14 +1033,14 @@ func (asc *BlogServiceClient) GetUserTags(ctx *gin.Context) {
 		AccountId: userInfo.AccountId,
 	})
 	if err != nil {
-		logrus.Errorf("cannot fetch user blog data, error: %v", err)
+		asc.log.Errorf("cannot fetch user blog data, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot fetch user blog data"})
 		return
 	}
 
 	var respMap map[string]interface{}
 	if err := json.Unmarshal(resp.Value, &respMap); err != nil {
-		logrus.Errorf("cannot unmarshal the blog response, error: %v", err)
+		asc.log.Errorf("cannot unmarshal the blog response, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog response"})
 		return
 	}

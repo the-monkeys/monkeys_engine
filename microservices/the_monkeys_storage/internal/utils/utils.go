@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 func RemoveSpecialChar(val string) string {
 	// Define regular expression to match all special characters
 	reg, err := regexp.Compile(`[^a-zA-Z0-9\.]+`)
 	if err != nil {
-		logrus.Error("cannot compile regexp")
+		zap.S().Error("cannot compile regexp")
 	}
 
 	// Remove special characters from the input string
@@ -38,7 +38,7 @@ func ReadImageFromURL(url string) ([]byte, error) {
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logrus.Errorf("Error closing response body: %v", err)
+			zap.S().Errorf("Error closing response body: %v", err)
 		}
 	}()
 
