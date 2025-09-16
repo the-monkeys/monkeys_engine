@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/the-monkeys/the_monkeys/logger"
 )
 
@@ -24,7 +24,7 @@ var (
 func main() {
 	// Connect to PostgreSQL
 	var err error
-	db, err = sql.Open("postgres", postgresDSN)
+	db, err = sql.Open("pgx", postgresDSN)
 	if err != nil {
 		log.Fatalf("failed to open postgres: %v", err)
 	}

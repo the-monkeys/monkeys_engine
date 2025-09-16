@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -85,9 +86,9 @@ func NewUserDbHandler(cfg *config.Config, log *zap.SugaredLogger) (UserDb, error
 		cfg.Postgresql.PrimaryDB.DBPort,
 		cfg.Postgresql.PrimaryDB.DBName,
 	)
-	db, err := sql.Open("postgres", url)
+	db, err := sql.Open("pgx", url)
 	if err != nil {
-		log.Fatalf("Cannot connect to PostgreSQL, error: %+v", err)
+		log.Fatalf("Cannot connect to PostgreSQL using pgx driver, error: %+v", err)
 		return nil, err
 	}
 
@@ -263,7 +264,7 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 		dbUserInfo.Instagram.String, username)
 	if result.Err() != nil {
 		uh.log.Errorf("cannot update user %s, error: %v", username, result.Err())
-		if pqErr, ok := result.Err().(*pq.Error); ok && pqErr.Code == "23505" {
+		if pgErr, ok := result.Err().(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			return status.Errorf(codes.AlreadyExists, "email already exists")
 		}
 		return status.Errorf(codes.Internal, "internal server error, error: %v", result.Err())
