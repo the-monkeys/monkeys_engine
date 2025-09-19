@@ -15,6 +15,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/services"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func printBanner(host, env string) {
@@ -41,9 +43,11 @@ func main() {
 	defer logger.Sync()
 
 	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
-	lis, err := net.Listen("tcp", host)
+	// Bind to all interfaces for health checks to work
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.BlogPort)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		logg.Fatalf("failed to listen", "host", host, "err", err)
+		logg.Fatalf("failed to listen", "host", listenAddr, "err", err)
 		return
 	}
 
@@ -61,6 +65,14 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterBlogServiceServer(grpcServer, blogService)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	// Set the service as serving (healthy)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("BlogService", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	printBanner(host, cfg.AppEnv)
 	if err := grpcServer.Serve(lis); err != nil {
