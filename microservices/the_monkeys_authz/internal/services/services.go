@@ -510,6 +510,18 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 }
 
 func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameReq) (*pb.UpdateUsernameRes, error) {
+	if req.CurrentUsername == req.NewUsername {
+		return nil, status.Errorf(codes.InvalidArgument, "current username and new username cannot be the same")
+	}
+
+	if req.CurrentUsername == "" || req.NewUsername == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "current username or new username cannot be empty")
+	}
+
+	if utils.IsRestrictedUsername(req.NewUsername) {
+		return nil, status.Errorf(codes.InvalidArgument, "the username %s is not allowed, please choose a different username", req.NewUsername)
+	}
+
 	// Check if the user exists
 	user, err := as.dbConn.CheckIfUsernameExist(req.CurrentUsername)
 	if err != nil {
