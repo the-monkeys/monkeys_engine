@@ -1,0 +1,44 @@
+# Production-grade Dockerfile using Python distroless
+# Build stage
+FROM python:3.10-slim as builder
+
+# Install system dependencies needed for building
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements first for better layer caching
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --target=/app/packages -r requirements.txt
+
+# Copy source code
+COPY . .
+
+# Generate proto files during build
+WORKDIR /app/microservices/the_monkeys_ai
+RUN python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto
+
+# Production stage using Python distroless
+FROM gcr.io/distroless/python3-debian12:nonroot
+
+# Copy Python packages and application code
+COPY --from=builder /app/packages /app/packages
+COPY --from=builder /app /app
+
+# Set environment variables
+ENV PYTHONPATH=/app/packages:/app
+ENV PYTHONUNBUFFERED=1
+
+# Expose ports (gRPC and health check)
+EXPOSE 50057 51057
+
+# Run as non-root user (built into distroless)
+USER nonroot:nonroot
+
+# Working directory
+WORKDIR /app
+
+# Run the service
+ENTRYPOINT ["python", "-u", "microservices/the_monkeys_ai/main.py"]

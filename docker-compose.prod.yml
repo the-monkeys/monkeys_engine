@@ -148,3 +148,27 @@ services:
         max-file: "3"
     # Remove volumes in production (code is baked into image)
     volumes: []
+
+  the_monkeys_ai_engine:
+    build:
+      dockerfile: microservices/the_monkeys_ai/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.3'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
