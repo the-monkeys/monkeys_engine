@@ -164,13 +164,13 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 
 	// Start the HTTPS server in a background goroutine
 	if enableTLS {
-		go func() {
-			log.Infow("https listening", "addr", httpsSrv.Addr)
-			if err := httpsSrv.ListenAndServeTLS(tlsCert, tlsKey); err != nil && err != http.ErrServerClosed {
-				log.Errorw("https server start failed", "err", err)
-				panic(err)
-			}
-		}()
+		// go func() {
+		// 	log.Infow("https listening", "addr", httpsSrv.Addr)
+		// 	if err := httpsSrv.ListenAndServeTLS(tlsCert, tlsKey); err != nil && err != http.ErrServerClosed {
+		// 		log.Errorw("https server start failed", "err", err)
+		// 		panic(err)
+		// 	}
+		// }()
 	}
 
 	// Listen to SIGINT and SIGTERM signals

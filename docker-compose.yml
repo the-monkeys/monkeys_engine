@@ -115,7 +115,11 @@ services:
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_gateway/Dockerfile
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_gateway/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
@@ -123,20 +127,31 @@ services:
       - db-migrations
       - the_monkeys_db
       - minio
-    volumes:
-      - .:/go/src/app
     ports:
       - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_gateway/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - NO_TLS=1
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check using existing /healthz endpoint
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
-      interval: 300s
+      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
 
   the_monkeys_authz:
     container_name: "the-monkeys-auth"
