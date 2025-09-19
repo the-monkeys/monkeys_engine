@@ -74,3 +74,29 @@ services:
         max-file: "3"
     # Remove volumes in production (code is baked into image)
     volumes: []
+
+  the_monkeys_storage:
+    build:
+      dockerfile: microservices/the_monkeys_storage/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Keep storage volumes for file persistence
+    volumes:
+      - the_monkeys_profile:/profile
+      - blogs_volume:/blogs
