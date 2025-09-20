@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
@@ -50,9 +50,9 @@ func NewAuthDBHandler(cfg *config.Config, logger *zap.SugaredLogger) (AuthDBHand
 		cfg.Postgresql.PrimaryDB.DBName,
 	)
 
-	dbPsql, err := sql.Open("postgres", url)
+	dbPsql, err := sql.Open("pgx", url)
 	if err != nil {
-		logger.Fatalw("cannot connect psql using sql driver", "error", err)
+		logger.Fatalw("cannot connect psql using pgx driver", "error", err)
 		return nil, err
 	}
 
