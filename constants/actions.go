@@ -16,6 +16,18 @@ const (
 	PROFILE_UPDATE = "profile_update"
 )
 
+// RestrictedUsernames contains usernames that are not allowed for user registration
+var RestrictedUsernames = []string{
+	"admin", "administrator", "root", "superuser", "support", "help",
+	"contact", "info", "user", "username", "null", "undefined",
+	"system", "api", "www", "mail", "ftp", "blog", "news", "forum",
+	"test", "demo", "guest", "public", "private", "staff", "moderator",
+	"team", "teams", "feed", "feedback", "themonkeys", "the_monkeys", "themonkeysadmin", "themonkeysadministrator",
+	"about", "access", "account", "accounts", "activity", "add", "address", "addresses",
+	"all", "analytics", "and", "api", "apps", "archive", "archives", "area", "areas",
+	"auth", "authentication", "authorize", "auto", "backup", "backups", "base", "billing",
+}
+
 const (
 	NotificationRegister = `Subject: Welcome! Complete Your Registration
 

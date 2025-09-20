@@ -112,6 +112,17 @@ func GenerateGUID() string {
 	return fmt.Sprintf("%x%x", randomBytes, timestamp)
 }
 
+// IsRestrictedUsername checks if a username is in the restricted list
+func IsRestrictedUsername(username string) bool {
+	lowerUsername := strings.ToLower(username)
+	for _, restricted := range constants.RestrictedUsernames {
+		if lowerUsername == strings.ToLower(restricted) {
+			return true
+		}
+	}
+	return false
+}
+
 // Function to shuffle a string
 //func shuffleString(s string) string {
 //	// Convert string to a slice of runes (to handle Unicode characters properly)
