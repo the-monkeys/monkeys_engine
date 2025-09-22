@@ -14,6 +14,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/server"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func init() {
@@ -69,16 +71,25 @@ func main() {
 	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
 
-	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
-	lis, err := net.Listen("tcp", host)
+	// Bind to all interfaces for health checks to work
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.StoragePort)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		log.Errorf("File server failed to listen at port %v, error: %+v", host, err)
+		log.Errorf("File server failed to listen at port %v, error: %+v", listenAddr, err)
 	}
 
 	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir, log)
 
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(constants.MaxMsgSize), grpc.MaxSendMsgSize(constants.MaxMsgSize))
 	pb.RegisterUploadBlogFileServer(grpcServer, fileService)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	// Set the service as serving (healthy)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("StorageService", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	log.Debugf("the file storage server started at: %v:%d", cfg.Microservices.TheMonkeysFileStore, cfg.Microservices.StoragePort)
 	printBanner(cfg)

@@ -13,6 +13,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func printBanner(cfg *config.Config) {
@@ -41,9 +43,11 @@ func main() {
 		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysUser, cfg.Microservices.UserPort))
+	// Bind to all interfaces for health checks to work
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.UserPort)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		log.Errorf("failed to listen at port %v, error: %+v", cfg.Microservices.TheMonkeysUser, err)
+		log.Errorf("failed to listen at port %v, error: %+v", listenAddr, err)
 	}
 
 	printBanner(cfg)
@@ -55,6 +59,14 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterUserServiceServer(grpcServer, userService)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	// Set the service as serving (healthy)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("UserService", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	log.Debugf("✅ the user service started at: %v", cfg.Microservices.TheMonkeysUser+":"+fmt.Sprint(cfg.Microservices.UserPort))
 	if err := grpcServer.Serve(lis); err != nil {

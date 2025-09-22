@@ -1,0 +1,174 @@
+# Production docker-compose override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+version: '3.8'
+
+services:
+  the_monkeys_authz:
+    build:
+      dockerfile: microservices/the_monkeys_authz/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
+
+  the_monkeys_blog:
+    build:
+      dockerfile: microservices/the_monkeys_blog/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
+
+  the_monkeys_user:
+    build:
+      dockerfile: microservices/the_monkeys_users/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
+
+  the_monkeys_storage:
+    build:
+      dockerfile: microservices/the_monkeys_storage/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Keep storage volumes for file persistence
+    volumes:
+      - the_monkeys_profile:/profile
+      - blogs_volume:/blogs
+
+  the_monkeys_notification:
+    build:
+      dockerfile: microservices/the_monkeys_notification/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
+
+  the_monkeys_gateway:
+    build:
+      dockerfile: microservices/the_monkeys_gateway/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
+
+  the_monkeys_ai_engine:
+    build:
+      dockerfile: microservices/the_monkeys_ai/Dockerfile.distroless
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.3'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Remove volumes in production (code is baked into image)
+    volumes: []
