@@ -51,12 +51,18 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 50054
+# Define port argument from environment
+ARG STORAGE_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV STORAGE_SERVICE_PORT=${STORAGE_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${STORAGE_SERVICE_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:50054"]
+    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:${STORAGE_SERVICE_PORT}"]
 
 # Run the binary
 CMD ["./storage-service"]

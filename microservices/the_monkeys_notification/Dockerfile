@@ -47,12 +47,18 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 50055
+# Define port argument from environment
+ARG NOTIFICATION_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV NOTIFICATION_SERVICE_PORT=${NOTIFICATION_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${NOTIFICATION_SERVICE_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:50055"]
+    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:${NOTIFICATION_SERVICE_PORT}"]
 
 # Run the binary
 CMD ["./notification-service"]

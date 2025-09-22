@@ -51,12 +51,20 @@ USER appuser
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
-# Expose ports (gRPC and health check)
-EXPOSE 50057 51057
+# Define port arguments from environment
+ARG AI_ENGINE_PORT
+ARG AI_ENGINE_HEALTH_PORT
+
+# Set port environment variables for runtime
+ENV AI_ENGINE_PORT=${AI_ENGINE_PORT}
+ENV AI_ENGINE_HEALTH_PORT=${AI_ENGINE_HEALTH_PORT}
+
+# Expose ports dynamically (gRPC and health check)
+EXPOSE ${AI_ENGINE_PORT} ${AI_ENGINE_HEALTH_PORT}
 
 # Health check using the existing HTTP endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD ["curl", "-f", "http://localhost:51057/health"]
+    CMD ["curl", "-f", "http://localhost:${AI_ENGINE_HEALTH_PORT}/health"]
 
 # Run the service
 CMD ["python", "-u", "microservices/the_monkeys_ai/main.py"]

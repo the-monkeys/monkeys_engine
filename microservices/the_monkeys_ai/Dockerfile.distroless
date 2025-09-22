@@ -31,8 +31,16 @@ COPY --from=builder /app /app
 ENV PYTHONPATH=/app/packages:/app
 ENV PYTHONUNBUFFERED=1
 
-# Expose ports (gRPC and health check)
-EXPOSE 50057 51057
+# Define port arguments from environment
+ARG AI_ENGINE_PORT
+ARG AI_ENGINE_HEALTH_PORT
+
+# Set port environment variables for runtime
+ENV AI_ENGINE_PORT=${AI_ENGINE_PORT}
+ENV AI_ENGINE_HEALTH_PORT=${AI_ENGINE_HEALTH_PORT}
+
+# Expose ports dynamically
+EXPOSE ${AI_ENGINE_PORT} ${AI_ENGINE_HEALTH_PORT}
 
 # Run as non-root user (built into distroless)
 USER nonroot:nonroot

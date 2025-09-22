@@ -31,8 +31,14 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /app/authz-service /authz-service
 COPY --from=builder /tmp/grpc_health_probe /usr/local/bin/grpc_health_probe
 
-# Expose port
-EXPOSE 50051
+# Define port argument from environment
+ARG AUTHZ_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV AUTHZ_SERVICE_PORT=${AUTHZ_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${AUTHZ_SERVICE_PORT}
 
 # Run as non-root user (built into distroless)
 USER nonroot:nonroot

@@ -47,12 +47,18 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 50053
+# Define port argument from environment
+ARG USER_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV USER_SERVICE_PORT=${USER_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${USER_SERVICE_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:50053"]
+    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:${USER_SERVICE_PORT}"]
 
 # Run the binary
 CMD ["./user-service"]

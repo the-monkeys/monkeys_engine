@@ -118,6 +118,9 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_gateway/Dockerfile
+      args:
+        GATEWAY_HTTP_PORT: ${THE_MONKEYS_GATEWAY_HTTP_PORT}
+        GATEWAY_HTTPS_PORT: ${THE_MONKEYS_GATEWAY_HTTPS}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_gateway/Dockerfile.distroless
     networks:
@@ -158,6 +161,8 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_authz/Dockerfile
+      args:
+        AUTHZ_SERVICE_PORT: ${MICROSERVICES_AUTHZ_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_authz/Dockerfile.distroless
     networks:
@@ -195,6 +200,8 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_storage/Dockerfile
+      args:
+        STORAGE_SERVICE_PORT: ${MICROSERVICES_STORAGE_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_storage/Dockerfile.distroless
     networks:
@@ -235,6 +242,8 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_users/Dockerfile
+      args:
+        USER_SERVICE_PORT: ${MICROSERVICES_USER_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_users/Dockerfile.distroless
     networks:
@@ -272,6 +281,8 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_blog/Dockerfile
+      args:
+        BLOG_SERVICE_PORT: ${MICROSERVICES_BLOG_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_blog/Dockerfile.distroless
     networks:
@@ -310,6 +321,8 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_notification/Dockerfile
+      args:
+        NOTIFICATION_SERVICE_PORT: ${MICROSERVICES_NOTIFICATION_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_notification/Dockerfile.distroless
     networks:
@@ -350,6 +363,9 @@ services:
     build:
       context: .
       dockerfile: microservices/the_monkeys_ai/Dockerfile
+      args:
+        AI_ENGINE_PORT: ${MICROSERVICES_AI_ENGINE_PORT}
+        AI_ENGINE_HEALTH_PORT: ${MICROSERVICES_AI_ENGINE_HEALTH_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_ai/Dockerfile.distroless
     networks:

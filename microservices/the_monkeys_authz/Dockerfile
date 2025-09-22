@@ -47,12 +47,18 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 50051
+# Define port argument from environment
+ARG AUTHZ_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV AUTHZ_SERVICE_PORT=${AUTHZ_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${AUTHZ_SERVICE_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:50051"]
+    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:${AUTHZ_SERVICE_PORT}"]
 
 # Run the binary
 CMD ["./authz-service"]

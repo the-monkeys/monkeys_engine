@@ -47,12 +47,18 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 50052
+# Define port argument from environment
+ARG BLOG_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV BLOG_SERVICE_PORT=${BLOG_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${BLOG_SERVICE_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:50052"]
+    CMD ["/usr/local/bin/grpc_health_probe", "-addr=localhost:${BLOG_SERVICE_PORT}"]
 
 # Run the binary
 CMD ["./blog-service"]

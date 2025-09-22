@@ -46,12 +46,20 @@ RUN chown -R appuser:appgroup /app && \
 # Switch to non-root user
 USER appuser
 
-# Expose ports (HTTP and HTTPS)
-EXPOSE 8081 8080
+# Define port arguments from environment
+ARG GATEWAY_HTTP_PORT
+ARG GATEWAY_HTTPS_PORT
+
+# Set port environment variables for runtime
+ENV GATEWAY_HTTP_PORT=${GATEWAY_HTTP_PORT}
+ENV GATEWAY_HTTPS_PORT=${GATEWAY_HTTPS_PORT}
+
+# Expose ports dynamically (HTTP and HTTPS)
+EXPOSE ${GATEWAY_HTTP_PORT} ${GATEWAY_HTTPS_PORT}
 
 # Health check using the existing /healthz endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ["curl", "-f", "http://localhost:8081/healthz"]
+    CMD ["curl", "-f", "http://localhost:${GATEWAY_HTTP_PORT}/healthz"]
 
 # Run the binary
 CMD ["./gateway-service"]
