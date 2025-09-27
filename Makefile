@@ -15,7 +15,7 @@ proto:
 	protoc microservices/the_monkeys_storage/internal/pb/*.proto --go_out=. --go-grpc_out=.
 
 proto-gen-interservices:
-	protoc apis/interservice/**/*.proto --go_out=. --go-grpc_out=.
+	protoc apis/serviceconn/**/**/*.proto --go_out=. --go-grpc_out=.
 
 sql-gen:
 	echo "Enter the file's name or description (Node keep it short):"

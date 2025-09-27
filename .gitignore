@@ -63,3 +63,6 @@ local_profiles/*
 monkeys-seo-cred.json
 monkeys-cred.json
 err.log
+
+.venv
+__pycache__

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package reports_svc;
+
+option go_package = "./apis/serviceconn/gateway_reports/pb";
+
+message Report {
+  string report_id = 1;
+  string reason_type = 2;
+  uint32 flag_count = 3;
+  string reporter_id = 4;
+  string reported_type = 5;
+  string reported_id = 6;
+  string reason = 7;
+  string status = 8;
+  string reporter_notes = 9;
+  string moderator_id = 10;
+  string moderator_notes = 11;
+}
+
+message CreateReportRequest {
+  Report data = 1;
+}
+
+message CreateReportResponse {
+  uint32 status = 1;
+  string message = 2;
+  string error = 3;
+}
+
+service ReportsService {
+  rpc CreateReport(CreateReportRequest) returns (CreateReportResponse) {}
+} 
