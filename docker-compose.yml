@@ -96,18 +96,18 @@ services:
     image: minio/minio:latest
     container_name: the-monkeys-minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_PORT}:${MINIO_API_INTERNAL_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_INTERNAL_PORT}"
     networks:
       - monkeys-network
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":${MINIO_CONSOLE_INTERNAL_PORT}"
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_API_INTERNAL_PORT}/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -150,7 +150,7 @@ services:
           cpus: '0.2'
     # Health check using existing /healthz endpoint
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -189,7 +189,7 @@ services:
           cpus: '0.1'
     # Health check is built into Dockerfile, but can override here
     healthcheck:
-      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50051"]
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -231,7 +231,7 @@ services:
           cpus: '0.2'
     # Health check
     healthcheck:
-      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50054"]
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_STORAGE_INTERNAL_PORT}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -270,7 +270,7 @@ services:
           cpus: '0.2'
     # Health check
     healthcheck:
-      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50053"]
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_USER_INTERNAL_PORT}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -310,7 +310,7 @@ services:
           cpus: '0.2'
     # Health check
     healthcheck:
-      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50052"]
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_BLOG_INTERNAL_PORT}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -352,7 +352,7 @@ services:
           cpus: '0.2'
     # Health check
     healthcheck:
-      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50055"]
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"]
       interval: 30s
       timeout: 10s
       retries: 3
