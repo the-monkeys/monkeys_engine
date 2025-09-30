@@ -1,13 +1,12 @@
 services:
   the_monkeys_db:
     container_name: "the-monkeys-psql"
-    image: bitnami/postgresql:latest
+    image: postgres:15-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
       POSTGRES_USER: ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}
       POSTGRES_DB: ${POSTGRESQL_PRIMARY_DB_DB_NAME}
-      POSTGRESQL_ENABLE_LDAP: no
     ports:
       - "${POSTGRESQL_PRIMARY_DB_DB_PORT}:${POSTGRESQL_PRIMARY_DB_INTERNAL_PORT}"
     networks:
