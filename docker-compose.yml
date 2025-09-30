@@ -16,7 +16,7 @@ services:
       - ./backup:/backup
       - ./postgres_backup:/backup_source
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME} -d ${POSTGRESQL_PRIMARY_DB_DB_NAME}" ]
       interval: 5s
       timeout: 5s
       retries: 5
