@@ -1,0 +1,278 @@
+name: 🐒 Build and Push Docker Images
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'microservices/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  build-and-push:
+    name: Build & Push Container Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    strategy:
+      matrix:
+        service:
+          - name: gateway
+            dockerfile: microservices/the_monkeys_gateway/Dockerfile
+            context: .
+            build_args: |
+              GATEWAY_HTTP_PORT=8081
+              GATEWAY_HTTPS_PORT=8443
+          - name: ai-engine
+            dockerfile: microservices/the_monkeys_ai/Dockerfile
+            context: .
+            build_args: |
+              AI_ENGINE_PORT=50057
+              AI_ENGINE_HEALTH_PORT=51600
+          - name: blog
+            dockerfile: microservices/the_monkeys_blog/Dockerfile
+            context: .
+            build_args: ""
+          - name: auth
+            dockerfile: microservices/the_monkeys_authz/Dockerfile
+            context: .
+            build_args: ""
+          - name: user
+            dockerfile: microservices/the_monkeys_users/Dockerfile
+            context: .
+            build_args: ""
+          - name: notification
+            dockerfile: microservices/the_monkeys_notification/Dockerfile
+            context: .
+            build_args: ""
+          - name: storage
+            dockerfile: microservices/the_monkeys_storage/Dockerfile
+            context: .
+            build_args: ""
+
+    steps:
+      - name: 🛒 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/monkeys-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: 🔨 Build and Push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.service.build_args }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-docker-compose:
+    name: 📦 Generate Registry Deployment Config
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    
+    steps:
+      - name: 🛒 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📝 Generate Registry Docker Compose
+        run: |
+          # Create docker-compose.registry.yml with only our custom microservices from GitHub Container Registry
+          # Infrastructure services should be managed separately using existing docker-compose.yml
+          cat > docker-compose.registry.yml << 'EOF'
+          # 🐒 The Monkeys Engine - Registry Microservices
+          # Contains ONLY custom-built microservices from GitHub Container Registry
+          # Use this with your existing docker-compose.yml for infrastructure services
+          
+          version: '3.8'
+          
+          services:
+            the_monkeys_gateway:
+              container_name: "the-monkeys-gateway"
+              image: ghcr.io/the-monkeys/monkeys-gateway:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - the_monkeys_db
+                - minio
+              ports:
+                - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              environment:
+                - NO_TLS=1
+              user: "1001:1001"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            the_monkeys_ai_engine:
+              container_name: "the_monkeys_ai_engine"
+              image: ghcr.io/the-monkeys/monkeys-ai-engine:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+              ports:
+                - "${MICROSERVICES_AI_ENGINE_PORT}:${MICROSERVICES_AI_ENGINE_INTERNAL_PORT}"
+                - "${MICROSERVICES_AI_ENGINE_HEALTH_PORT}:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            the_monkeys_blog:
+              container_name: "the-monkeys-blog"
+              image: ghcr.io/the-monkeys/monkeys-blog:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - elasticsearch-node1
+              ports:
+                - "${MICROSERVICES_BLOG_PORT}:${MICROSERVICES_BLOG_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
+            the_monkeys_authz:
+              container_name: "the-monkeys-auth"
+              image: ghcr.io/the-monkeys/monkeys-auth:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - the_monkeys_db
+              ports:
+                - "${MICROSERVICES_AUTHZ_PORT}:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
+            the_monkeys_users:
+              container_name: "the-monkeys-user"
+              image: ghcr.io/the-monkeys/monkeys-user:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - the_monkeys_db
+              ports:
+                - "${MICROSERVICES_USER_PORT}:${MICROSERVICES_USER_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
+            the_monkeys_notification:
+              container_name: "the_monkeys_notification"
+              image: ghcr.io/the-monkeys/monkeys-notification:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - the_monkeys_db
+              ports:
+                - "${MICROSERVICES_NOTIFICATION_PORT}:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
+            the_monkeys_storage:
+              container_name: "the_monkeys_storage"
+              image: ghcr.io/the-monkeys/monkeys-storage:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - minio
+              ports:
+                - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
+          networks:
+            monkeys-network:
+              driver: bridge
+
+          volumes:
+            postgres_data:
+            rabbitmq_data:
+            elasticsearch_data:
+            minio_data:
+          EOF
+
+      - name: 📤 Upload Registry Compose as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-compose-registry
+          path: docker-compose.registry.yml
+          retention-days: 30
+
+      - name: 📋 Display Registry Images
+        run: |
+          echo "🎉 Successfully built and pushed all microservice container images!"
+          echo ""
+          echo "📦 Available Microservices Images:"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-gateway:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-ai-engine:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-blog:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-auth:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-user:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-notification:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-storage:latest"
+          echo ""
+          echo "🚀 To deploy:"
+          echo "1. Use your existing docker-compose.yml for infrastructure services"
+          echo "2. Update microservice image references to use registry images above"
+          echo "3. Or use docker-compose.registry.yml alongside your infrastructure setup"
