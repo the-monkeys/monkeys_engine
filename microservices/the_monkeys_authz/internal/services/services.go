@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
@@ -47,6 +48,8 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	as.logger.Debugf("got the request data for : %+v", req.Email)
 	user := &models.TheMonkeysUser{}
 
+	
+
 	if err := utils.ValidateRegisterUserRequest(req); err != nil {
 		as.logger.Errorf("incomplete request body provided for email %s, error: %+v", req.Email, err)
 		return nil, status.Errorf(codes.InvalidArgument, "Incomplete request body provided for email %s", req.Email)
@@ -68,9 +71,9 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	// Create a userId and username
 	user.AccountId = utils.GenerateGUID()
 	user.Username = utils.GenerateGUID()
-	user.FirstName = req.FirstName
-	user.LastName = req.GetLastName()
-	user.Email = req.GetEmail()
+	user.FirstName = strings.TrimSpace(req.FirstName)
+	user.LastName = strings.TrimSpace(req.LastName)
+	user.Email = strings.TrimSpace(req.Email)
 	user.Password = utils.HashPassword(req.Password)
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
@@ -738,9 +741,9 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 	// Create a userId and username
 	user.AccountId = utils.GenerateGUID()
 	user.Username = utils.GenerateGUID()
-	user.FirstName = req.FirstName
-	user.LastName = req.GetLastName()
-	user.Email = req.GetEmail()
+	user.FirstName = strings.TrimSpace(req.FirstName)
+	user.LastName = strings.TrimSpace(req.LastName)
+	user.Email = strings.TrimSpace(req.Email)
 	user.Password = utils.HashPassword(req.Password)
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
