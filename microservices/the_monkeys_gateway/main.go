@@ -142,8 +142,12 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	}
 
 	// HTTP server (no TLS)
+	httpAddr := cfg.TheMonkeysGateway.HTTP
+	if httpAddr != "" && httpAddr[0] != ':' {
+		httpAddr = ":" + httpAddr
+	}
 	httpSrv := &http.Server{
-		Addr:           cfg.TheMonkeysGateway.HTTP,
+		Addr:           httpAddr,
 		Handler:        s.router,
 		MaxHeaderBytes: 1 << 20,
 		ReadTimeout:    10 * time.Second,
@@ -151,8 +155,12 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	}
 
 	// HTTPS server (with TLS)
+	httpsAddr := cfg.TheMonkeysGateway.HTTPS
+	if httpsAddr != "" && httpsAddr[0] != ':' {
+		httpsAddr = ":" + httpsAddr
+	}
 	httpsSrv := &http.Server{
-		Addr:           cfg.TheMonkeysGateway.HTTPS,
+		Addr:           httpsAddr,
 		Handler:        s.router,
 		MaxHeaderBytes: 1 << 20,
 		ReadTimeout:    10 * time.Second,
@@ -164,13 +172,13 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 
 	// Start the HTTPS server in a background goroutine
 	if enableTLS {
-		go func() {
-			log.Infow("https listening", "addr", httpsSrv.Addr)
-			if err := httpsSrv.ListenAndServeTLS(tlsCert, tlsKey); err != nil && err != http.ErrServerClosed {
-				log.Errorw("https server start failed", "err", err)
-				panic(err)
-			}
-		}()
+		// go func() {
+		// 	log.Infow("https listening", "addr", httpsSrv.Addr)
+		// 	if err := httpsSrv.ListenAndServeTLS(tlsCert, tlsKey); err != nil && err != http.ErrServerClosed {
+		// 		log.Errorw("https server start failed", "err", err)
+		// 		panic(err)
+		// 	}
+		// }()
 	}
 
 	// Listen to SIGINT and SIGTERM signals

@@ -1,13 +1,12 @@
 services:
   the_monkeys_db:
     container_name: "the-monkeys-psql"
-    image: bitnami/postgresql:latest
+    image: postgres:15-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
       POSTGRES_USER: ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}
       POSTGRES_DB: ${POSTGRESQL_PRIMARY_DB_DB_NAME}
-      POSTGRESQL_ENABLE_LDAP: no
     ports:
       - "${POSTGRESQL_PRIMARY_DB_DB_PORT}:${POSTGRESQL_PRIMARY_DB_INTERNAL_PORT}"
     networks:
@@ -17,7 +16,7 @@ services:
       - ./backup:/backup
       - ./postgres_backup:/backup_source
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME} -d ${POSTGRESQL_PRIMARY_DB_DB_NAME}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -96,18 +95,18 @@ services:
     image: minio/minio:latest
     container_name: the-monkeys-minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_PORT}:${MINIO_API_INTERNAL_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_INTERNAL_PORT}"
     networks:
       - monkeys-network
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":${MINIO_CONSOLE_INTERNAL_PORT}"
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_API_INTERNAL_PORT}/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -115,7 +114,14 @@ services:
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_gateway/Dockerfile
+      args:
+        GATEWAY_HTTP_PORT: ${THE_MONKEYS_GATEWAY_HTTP_PORT}
+        GATEWAY_HTTPS_PORT: ${THE_MONKEYS_GATEWAY_HTTPS}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_gateway/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
@@ -123,43 +129,80 @@ services:
       - db-migrations
       - the_monkeys_db
       - minio
-    volumes:
-      - .:/go/src/app
     ports:
       - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_gateway/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - NO_TLS=1
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check using existing /healthz endpoint
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
-      interval: 300s
+      test: ["CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz"]
+      interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
 
   the_monkeys_authz:
     container_name: "the-monkeys-auth"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_authz/Dockerfile
+      args:
+        AUTHZ_SERVICE_PORT: ${MICROSERVICES_AUTHZ_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_authz/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-    volumes:
-      - .:/go/src/app
     ports:
       - "${MICROSERVICES_AUTHZ_PORT}:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_authz/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    # Health check is built into Dockerfile, but can override here
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   the_monkeys_storage:
     container_name: "the_monkeys_storage"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_storage/Dockerfile
+      args:
+        STORAGE_SERVICE_PORT: ${MICROSERVICES_STORAGE_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_storage/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
@@ -167,39 +210,80 @@ services:
       - db-migrations
       - the_monkeys_db
     volumes:
-      - .:/go/src/app
       - the_monkeys_profile:/profile
       - blogs_volume:/blogs
     ports:
       - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_storage/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_STORAGE_INTERNAL_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   the_monkeys_user:
     container_name: "the-monkeys-user"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_users/Dockerfile
+      args:
+        USER_SERVICE_PORT: ${MICROSERVICES_USER_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_users/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
-    volumes:
-      - .:/go/src/app
     ports:
       - "${MICROSERVICES_USER_PORT}:${MICROSERVICES_USER_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_users/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_USER_INTERNAL_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   the_monkeys_blog:
     container_name: "the-monkeys-blog"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_blog/Dockerfile
+      args:
+        BLOG_SERVICE_PORT: ${MICROSERVICES_BLOG_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_blog/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
@@ -207,19 +291,39 @@ services:
       - db-migrations
       - the_monkeys_db
       - elasticsearch-node1
-    volumes:
-      - .:/go/src/app
     ports:
       - "${MICROSERVICES_BLOG_PORT}:${MICROSERVICES_BLOG_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_blog/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_BLOG_INTERNAL_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   the_monkeys_notification:
     container_name: "the_monkeys_notification"
-    image: golang:1.24.4
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_notification/Dockerfile
+      args:
+        NOTIFICATION_SERVICE_PORT: ${MICROSERVICES_NOTIFICATION_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_notification/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
@@ -229,50 +333,64 @@ services:
       - elasticsearch-node1
       - the_monkeys_blog
       - the_monkeys_user
-    volumes:
-      - .:/go/src/app
     ports:
       - "${MICROSERVICES_NOTIFICATION_PORT}:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"
-    working_dir: /go/src/app
-    command: go run microservices/the_monkeys_notification/main.go
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.7'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
+    # Health check
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   the_monkeys_ai_engine:
     container_name: "the_monkeys_ai_engine"
-    image: python:3.10
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_ai/Dockerfile
+      args:
+        AI_ENGINE_PORT: ${MICROSERVICES_AI_ENGINE_PORT}
+        AI_ENGINE_HEALTH_PORT: ${MICROSERVICES_AI_ENGINE_HEALTH_PORT}
+    # For production, you can switch to:
+    # dockerfile: microservices/the_monkeys_ai/Dockerfile.distroless
     networks:
       - monkeys-network
     depends_on:
       - rabbitmq
       - the_monkeys_db
-    volumes:
-      - .:/app
     ports:
       - "${MICROSERVICES_AI_ENGINE_PORT}:${MICROSERVICES_AI_ENGINE_INTERNAL_PORT}"
       - "${MICROSERVICES_AI_ENGINE_HEALTH_PORT}:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}"  # Health check endpoint (gRPC port + 1000)
-    working_dir: /app
-    command: >
-      bash -c "echo 'Starting setup...' && 
-        echo 'Installing system dependencies...' &&
-        apt-get update && apt-get install -y curl &&
-        echo 'Installing requirements...' &&
-        pip install -r requirements.txt && 
-        cd /app && 
-        echo 'Generating proto files...' &&
-        cd microservices/the_monkeys_ai &&
-        python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. gw_recom.proto &&
-        echo 'Proto files generated successfully!' &&
-        ls -la && # Show files in directory
-        cd /app &&
-        echo 'Running main.py...' &&
-        PYTHONPATH=/app python -u microservices/the_monkeys_ai/main.py 2>&1"
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
+    # Security: Run as non-root user
+    user: "1001:1001"
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.3'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${MICROSERVICES_AI_ENGINE_HEALTH_INTERNAL_PORT}/health"]
       interval: 30s

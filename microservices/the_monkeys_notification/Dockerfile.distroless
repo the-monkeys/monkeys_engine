@@ -1,0 +1,47 @@
+# Production-grade Dockerfile using Google's Distroless
+# Build stage
+FROM golang:1.24.4-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates wget
+
+WORKDIR /app
+
+# Copy go mod files first (for better layer caching)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build static binary with all optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -a -installsuffix cgo \
+    -ldflags='-w -s -extldflags "-static"' \
+    -tags netgo,osusergo \
+    -o notification-service ./microservices/the_monkeys_notification/main.go
+
+# Download grpc_health_probe
+RUN wget -qO /tmp/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.25/grpc_health_probe-linux-amd64 && \
+    chmod +x /tmp/grpc_health_probe
+
+# Production stage using Google's Distroless (most secure)
+FROM gcr.io/distroless/static-debian12:nonroot
+
+# Copy the binary and health probe from builder stage
+COPY --from=builder /app/notification-service /notification-service
+COPY --from=builder /tmp/grpc_health_probe /usr/local/bin/grpc_health_probe
+
+# Define port argument from environment
+ARG NOTIFICATION_SERVICE_PORT
+
+# Set port environment variable for runtime
+ENV NOTIFICATION_SERVICE_PORT=${NOTIFICATION_SERVICE_PORT}
+
+# Expose port dynamically
+EXPOSE ${NOTIFICATION_SERVICE_PORT}
+
+# Run as non-root user (built into distroless)
+USER nonroot:nonroot
+
+# Run the binary
+ENTRYPOINT ["/notification-service"]

@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func printBanner(cfg *config.Config, _ *zap.SugaredLogger) {
@@ -42,10 +44,11 @@ func main() {
 		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
-	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysNotification, cfg.Microservices.NotificationPort)
-	lis, err := net.Listen("tcp", host)
+	// Bind to all interfaces for health checks to work
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.NotificationPort)
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		log.Errorf("failed to listen at port %v, error: %+v", host, err)
+		log.Errorf("failed to listen at port %v, error: %+v", listenAddr, err)
 	}
 
 	// Connect to rabbitmq server
@@ -57,6 +60,14 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	pb.RegisterNotificationServiceServer(grpcServer, notificationSvc)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+
+	// Set the service as serving (healthy)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("NotificationService", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	printBanner(cfg, log)
 	if err := grpcServer.Serve(lis); err != nil {
