@@ -253,7 +253,7 @@ jobs:
           EOF
 
       - name: 📤 Upload Registry Compose as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-compose-registry
           path: docker-compose.registry.yml
