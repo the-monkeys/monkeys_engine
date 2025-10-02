@@ -210,8 +210,10 @@ services:
       - db-migrations
       - the_monkeys_db
     volumes:
-      - the_monkeys_profile:/profile
-      - blogs_volume:/blogs
+      - ./profile:/app/profile          # Mount existing production files
+      - ./blogs:/app/blogs              # Mount existing production files
+      - profile_volume:/app/profile     # Persist /app/profile data
+      - blogs_volume:/app/blogs         # Persist /app/blogs data
     ports:
       - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
     restart: unless-stopped
@@ -404,10 +406,12 @@ networks:
 
 volumes:
   postgres_data:
-  the_monkeys_profile:
-  blogs_volume:
   rabbitmq_data:
   elasticsearch-data1:
     driver: local
   minio_data:
+    driver: local
+  profile_volume:
+    driver: local
+  blogs_volume:
     driver: local
