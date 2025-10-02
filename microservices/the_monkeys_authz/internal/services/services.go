@@ -46,6 +46,11 @@ func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Co
 
 func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
 	as.logger.Debugf("got the request data for : %+v", req.Email)
+	// Cleanup request data
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.LastName = strings.TrimSpace(req.LastName)
+	req.IpAddress = strings.TrimSpace(req.IpAddress)
 	user := &models.TheMonkeysUser{}
 
 	
@@ -71,9 +76,9 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	// Create a userId and username
 	user.AccountId = utils.GenerateGUID()
 	user.Username = utils.GenerateGUID()
-	user.FirstName = strings.TrimSpace(req.FirstName)
-	user.LastName = strings.TrimSpace(req.LastName)
-	user.Email = strings.TrimSpace(req.Email)
+	user.FirstName = req.FirstName
+	user.LastName = req.GetLastName()
+	user.Email = req.GetEmail()
 	user.Password = utils.HashPassword(req.Password)
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
@@ -741,9 +746,9 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 	// Create a userId and username
 	user.AccountId = utils.GenerateGUID()
 	user.Username = utils.GenerateGUID()
-	user.FirstName = strings.TrimSpace(req.FirstName)
-	user.LastName = strings.TrimSpace(req.LastName)
-	user.Email = strings.TrimSpace(req.Email)
+	user.FirstName = req.FirstName
+	user.LastName = req.GetLastName()
+	user.Email = req.GetEmail()
 	user.Password = utils.HashPassword(req.Password)
 	user.UserStatus = "active"
 	user.EmailVerificationToken = encHash
