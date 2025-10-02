@@ -1,7 +1,7 @@
 services:
   the_monkeys_db:
     container_name: "the-monkeys-psql"
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
