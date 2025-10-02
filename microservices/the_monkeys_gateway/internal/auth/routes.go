@@ -100,10 +100,6 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		return
 	}
 
-	body.FirstName = strings.TrimSpace(body.FirstName)
-	body.LastName = strings.TrimSpace(body.LastName)
-	body.Email = strings.TrimSpace(body.Email)
-
 	// check for google login
 	var loginMethod pb.RegisterUserRequest_LoginMethod
 	switch body.LoginMethod {
