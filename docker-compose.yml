@@ -210,10 +210,10 @@ services:
       - db-migrations
       - the_monkeys_db
     volumes:
-      - ./profile:/app/profile          # Mount existing production files
-      - ./blogs:/app/blogs              # Mount existing production files
-      - profile_volume:/app/profile     # Persist /app/profile data
-      - blogs_volume:/app/blogs         # Persist /app/blogs data
+      - ./profile:/app/profile          # Mount existing production files where code expects them
+      - ./blogs:/app/blogs              # Mount existing production files where code expects them
+      - ./local_profiles:/app/local_profiles  # Mount local profiles sync directory
+      - ./local_blogs:/app/local_blogs        # Mount local blogs sync directory
     ports:
       - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
     restart: unless-stopped
@@ -410,8 +410,4 @@ volumes:
   elasticsearch-data1:
     driver: local
   minio_data:
-    driver: local
-  profile_volume:
-    driver: local
-  blogs_volume:
     driver: local
