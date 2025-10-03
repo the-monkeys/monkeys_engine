@@ -19,9 +19,9 @@ import (
 )
 
 func init() {
-	// Define the complete path including `/` and the folder name
-	folderPath := "/" + constant.ProfileDir
-	blogPath := "/" + constant.BlogDir
+	// Define the complete path including the working directory and the folder name
+	folderPath := constant.ProfileDir
+	blogPath := constant.BlogDir
 
 	// Check if the directory already exists
 	_, err := os.Stat(folderPath)

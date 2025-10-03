@@ -37,8 +37,8 @@ RUN apk --no-cache add ca-certificates tzdata && \
 WORKDIR /app
 
 # Create directories for storage (matching volume mounts)
-RUN mkdir -p /profile /blogs && \
-    chown -R appuser:appgroup /profile /blogs
+RUN mkdir -p /profile /blogs local_blogs local_profiles && \
+    chown -R appuser:appgroup /profile /blogs local_blogs local_profiles
 
 # Copy the binary and health probe from builder stage
 COPY --from=builder /app/storage-service .
