@@ -219,8 +219,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
     # Resource limits for production
     deploy:
       resources:
