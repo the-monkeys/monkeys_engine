@@ -57,14 +57,10 @@ func (fs *FileService) UploadBlogFile(stream pb.UploadBlogFile_UploadBlogFileSer
 			return err
 		}
 	}
-	// Check if file exists, if not create it with sample data
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fs.log.Debugf("the file, %s doesn't exists", filePath)
-
-		if err := os.WriteFile(filePath, byteSlice, 0644); err != nil {
-			fs.log.Errorf("cannot create a file for this blog id: %s", blogId)
-			return err
-		}
+	// Write the file (overwrite if exists)
+	if err := os.WriteFile(filePath, byteSlice, 0644); err != nil {
+		fs.log.Errorf("cannot write file for blog id: %s, error: %v", blogId, err)
+		return err
 	}
 
 	fs.log.Debugf("done uploading file: %s", filePath)
