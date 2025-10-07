@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/database"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -41,9 +44,17 @@ func main() {
 		log.Fatalw("activity service cannot listen", "address", listenAddr, "error", err)
 	}
 
+	// Initialize Elasticsearch database
+	db, err := database.NewActivityDB(cfg, log)
+	if err != nil {
+		log.Fatalw("failed to initialize activity database", "error", err)
+	}
+
 	grpcServer := grpc.NewServer()
-	// TODO: Register ActivityService proto once created
-	// pb.RegisterActivityServiceServer(grpcServer, activityServer)
+
+	// Register ActivityService
+	activityServer := services.NewActivityServiceServer(cfg, log, db)
+	pb.RegisterActivityServiceServer(grpcServer, activityServer)
 
 	// Register health check service
 	healthServer := health.NewServer()
