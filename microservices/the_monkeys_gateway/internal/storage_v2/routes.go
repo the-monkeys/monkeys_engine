@@ -49,6 +49,7 @@ func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
 		Secure: cfg.Minio.UseSSL,
 	})
 	if err != nil {
+		log.Error(err.Error())
 		return nil, err
 	}
 

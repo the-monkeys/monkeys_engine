@@ -46,3 +46,29 @@ proto-gen:
 
 freeze:
 	pip freeze > requirements.txt
+
+
+include .env
+
+APP_ENV ?= development 
+
+ifeq ($(APP_ENV), production)
+	COMPOSE_FILE_EXTENSION := .prod.yml
+	CONTAINER_RUNTIME := docker
+else
+	COMPOSE_FILE_EXTENSION := .yml 
+endif
+
+ifneq (, $(shell which podman))
+	CONTAINER_RUNTIME := podman
+endif
+
+# List of compose files of our services
+REPORTS_COMPOSE := microservices/the_monkeys_reports/docker-compose$(COMPOSE_FILE_EXTENSION)
+ROOT_COMPOSE := docker-compose$(COMPOSE_FILE_EXTENSION)
+
+containers/up:
+	$(CONTAINER_RUNTIME) compose -f  $(ROOT_COMPOSE) -f $(REPORTS_COMPOSE) --env-file .env up
+
+containers/down:
+	$(CONTAINER_RUNTIME) compose -f  $(ROOT_COMPOSE) -f $(REPORTS_COMPOSE) down
