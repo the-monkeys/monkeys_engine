@@ -1,0 +1,18 @@
+# Multi-stage build file for better performance
+.dockerignore
+Dockerfile*
+README.md
+.git
+.gitignore
+*.md
+logs/
+*.log
+.env*
+test/
+docs/
+.vscode/
+.idea/
+*.tmp
+*.temp
+node_modules/
+coverage/
