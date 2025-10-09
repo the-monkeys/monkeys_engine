@@ -4,6 +4,16 @@ package auth_svc;
 
 option go_package = "./apis/serviceconn/gateway_authz/pb";
 
+// Global enums for activity tracking
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_WEB = 1;
+  PLATFORM_MOBILE = 2;
+  PLATFORM_TABLET = 3;
+  PLATFORM_API = 4;
+  PLATFORM_DESKTOP = 5;
+}
+
 message RegisterUserRequest {
   string first_name = 1;
   string last_name = 2;
@@ -12,13 +22,19 @@ message RegisterUserRequest {
   LoginMethod login_method = 5;
   string ip_address = 6;
   string client = 7;
+  
+  // Activity tracking fields - NEW
+  string session_id = 8;
+  string user_agent = 9;
+  string referrer = 10;
+  Platform platform = 11;
 
   enum LoginMethod {
     The_MONKEYS = 0;
     GOOGLE_ACC = 1;
     ANDROID = 2;
     IPHONE = 3;
-  } 
+  }
 }
 
 message RegisterUserResponse {
@@ -98,6 +114,12 @@ message LoginUserRequest {
   string password = 2;
   string ip_address = 3;
   string client = 4;
+  
+  // Activity tracking fields - NEW
+  string session_id = 5;
+  string user_agent = 6;
+  string referrer = 7;
+  Platform platform = 8;
 }
 
 message LoginUserResponse {
@@ -118,6 +140,12 @@ message ForgotPasswordReq {
   string email = 1;
   string ip_address = 2;
   string client = 3;
+  
+  // Activity tracking fields - NEW
+  string session_id = 4;
+  string user_agent = 5;
+  string referrer = 6;
+  Platform platform = 7;
 }
 
 message ForgotPasswordRes {
@@ -133,6 +161,12 @@ message ResetPasswordReq {
   string username = 4;
   string ip_address = 5;
   string client = 6;
+  
+  // Activity tracking fields - NEW
+  string session_id = 7;
+  string user_agent = 8;
+  string referrer = 9;
+  Platform platform = 10;
 }
 
 message ResetPasswordRes {
@@ -154,6 +188,12 @@ message UpdatePasswordReq {
   string email = 3;
   string ip_address = 4;
   string client = 5;
+  
+  // Activity tracking fields - NEW
+  string session_id = 6;
+  string user_agent = 7;
+  string referrer = 8;
+  Platform platform = 9;
 }
 
 message UpdatePasswordRes {
@@ -165,6 +205,12 @@ message EmailVerificationReq {
   string email = 1;
   string ip_address = 2;
   string client = 3;
+  
+  // Activity tracking fields - NEW
+  string session_id = 4;
+  string user_agent = 5;
+  string referrer = 6;
+  Platform platform = 7;
 }
 
 message EmailVerificationRes {
@@ -178,6 +224,12 @@ message VerifyEmailReq {
   string token = 3;
   string ip_address = 4;
   string client = 5;
+  
+  // Activity tracking fields - NEW
+  string session_id = 6;
+  string user_agent = 7;
+  string referrer = 8;
+  Platform platform = 9;
 }
 
 message VerifyEmailRes {
@@ -191,6 +243,12 @@ message UpdateUsernameReq {
   string new_username = 2;
   string client = 3;
   string ip = 4;
+  
+  // Activity tracking fields - NEW
+  string session_id = 5;
+  string user_agent = 6;
+  string referrer = 7;
+  Platform platform = 8;
 }
 
 message UpdateUsernameRes {
@@ -213,6 +271,12 @@ message UpdatePasswordWithPasswordReq {
   string new_password = 3;
   string ip_address = 4;
   string client = 5;
+  
+  // Activity tracking fields - NEW
+  string session_id = 6;
+  string user_agent = 7;
+  string referrer = 8;
+  Platform platform = 9;
 }
 
 message UpdatePasswordWithPasswordRes {
@@ -225,6 +289,12 @@ message UpdateEmailIdReq {
   string ip_address = 2;
   string client = 3;
   string username = 4;
+  
+  // Activity tracking fields - NEW
+  string session_id = 5;
+  string user_agent = 6;
+  string referrer = 7;
+  Platform platform = 8;
 }
 
 message UpdateEmailIdRes {

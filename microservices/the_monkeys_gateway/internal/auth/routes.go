@@ -111,6 +111,8 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("IP")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
 		FirstName:   body.FirstName,
@@ -120,6 +122,9 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		LoginMethod: loginMethod,
 		IpAddress:   ipAddress,
 		Client:      client,
+		UserAgent:   userAgent,
+		Referrer:    referrer,
+		Platform:    pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -162,12 +167,17 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	res, err := asc.Client.Login(context.Background(), &pb.LoginUserRequest{
 		Email:     body.Email,
 		Password:  body.Password,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -214,11 +224,16 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	res, err := asc.Client.ForgotPassword(context.Background(), &pb.ForgotPasswordReq{
 		Email:     body.Email,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -245,12 +260,17 @@ func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	res, err := asc.Client.ResetPassword(context.Background(), &pb.ResetPasswordReq{
 		Username:  userAny,
 		Token:     secretAny,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -305,6 +325,8 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	resp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
 		Password:  pass.NewPassword,
@@ -312,6 +334,9 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		Email:     res.Email,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -343,11 +368,16 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	res, err := asc.Client.RequestForEmailVerification(context.Background(), &pb.EmailVerificationReq{
 		Email:     vrEmail.Email,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -379,6 +409,8 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
@@ -386,6 +418,9 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 		Token:     evSecret,
 		IpAddress: ipAddress,
 		Client:    client,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -471,6 +506,8 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	var newUsername UpdateUsername
 
@@ -489,6 +526,9 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		NewUsername:     newUsername.Username,
 		Client:          client,
 		Ip:              ipAddress,
+		UserAgent:       userAgent,
+		Referrer:        referrer,
+		Platform:        pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -523,6 +563,8 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	var updatePass UpdatePassword
 
@@ -537,6 +579,9 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		NewPassword:     updatePass.NewPassword,
 		Client:          client,
 		IpAddress:       ipAddress,
+		UserAgent:       userAgent,
+		Referrer:        referrer,
+		Platform:        pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -566,6 +611,8 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 
 	ipAddress := ctx.Request.Header.Get("Ip")
 	client := ctx.Request.Header.Get("Client")
+	userAgent := ctx.Request.UserAgent()
+	referrer := ctx.Request.Referer()
 
 	var emailBody GetEmail
 
@@ -579,6 +626,9 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 		NewEmail:  emailBody.Email,
 		Client:    client,
 		IpAddress: ipAddress,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 
 	if err != nil {
@@ -643,11 +693,21 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
+	ipAddress := c.Request.Header.Get("IP")
+	clientHeader := c.Request.Header.Get("Client")
+	userAgent := c.Request.UserAgent()
+	referrer := c.Request.Referer()
+
 	loginResp, err := asc.Client.GoogleLogin(context.Background(), &pb.RegisterUserRequest{
 		Email:       userInfo.Email,
 		LoginMethod: pb.RegisterUserRequest_GOOGLE_ACC,
 		FirstName:   userInfo.GivenName,
 		LastName:    userInfo.FamilyName,
+		IpAddress:   ipAddress,
+		Client:      clientHeader,
+		UserAgent:   userAgent,
+		Referrer:    referrer,
+		Platform:    pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login using google"})

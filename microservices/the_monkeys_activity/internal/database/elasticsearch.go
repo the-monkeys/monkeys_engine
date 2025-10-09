@@ -16,6 +16,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// ActivityDatabase defines the interface for activity database operations
+type ActivityDatabase interface {
+	SaveActivity(ctx context.Context, req *pb.TrackActivityRequest) (string, error)
+	GetUserActivities(ctx context.Context, req *pb.GetUserActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
+	SaveSecurityEvent(ctx context.Context, req *pb.TrackSecurityEventRequest) (string, error)
+	Health(ctx context.Context) error
+}
+
 const (
 	// Elasticsearch indices for different types of events
 	ActivityEventIndex      = "activity-events"

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	activitypb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_authz/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/service_types"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/db"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/utils"
@@ -44,6 +44,156 @@ func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Co
 	}
 }
 
+// Helper method to generate session ID
+func (as *AuthzSvc) generateSessionID() string {
+	return fmt.Sprintf("session_%d_%s", time.Now().UnixNano(), utils.GenerateGUID()[:8])
+}
+
+// Helper method to detect platform from user agent or request platform
+func (as *AuthzSvc) detectPlatform(userAgent string, reqPlatform pb.Platform) activitypb.Platform {
+	// If platform is provided in request, convert it
+	switch reqPlatform {
+	case pb.Platform_PLATFORM_WEB:
+		return activitypb.Platform_PLATFORM_WEB
+	case pb.Platform_PLATFORM_MOBILE:
+		return activitypb.Platform_PLATFORM_MOBILE
+	case pb.Platform_PLATFORM_TABLET:
+		return activitypb.Platform_PLATFORM_TABLET
+	case pb.Platform_PLATFORM_API:
+		return activitypb.Platform_PLATFORM_API
+	case pb.Platform_PLATFORM_DESKTOP:
+		return activitypb.Platform_PLATFORM_DESKTOP
+	default:
+		// Detect from user agent if platform not specified
+		if userAgent != "" {
+			userAgent = strings.ToLower(userAgent)
+			if strings.Contains(userAgent, "mobile") || strings.Contains(userAgent, "android") || strings.Contains(userAgent, "iphone") {
+				return activitypb.Platform_PLATFORM_MOBILE
+			}
+			if strings.Contains(userAgent, "tablet") || strings.Contains(userAgent, "ipad") {
+				return activitypb.Platform_PLATFORM_TABLET
+			}
+		}
+		return activitypb.Platform_PLATFORM_WEB
+	}
+}
+
+// Helper method to send activity tracking message to RabbitMQ
+func (as *AuthzSvc) sendActivityTrackingMessage(activityReq *activitypb.TrackActivityRequest) {
+	go func() {
+		// Create activity tracking message
+		activityMsg, err := json.Marshal(activityReq)
+		if err != nil {
+			as.logger.Errorf("failed to marshal activity tracking message: %v", err)
+			return
+		}
+
+		// Send to activity tracking queue via RabbitMQ
+		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, "activity.track", activityMsg)
+		if err != nil {
+			as.logger.Errorf("failed to publish activity tracking message: %v", err)
+			return
+		}
+
+		as.logger.Debugf("activity tracking message sent for user %s, action %s", activityReq.UserId, activityReq.Action)
+	}()
+}
+
+// Helper method to track auth activities
+func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string, req interface{}) {
+	var sessionID, ipAddress, userAgent, referrer string
+	var platform pb.Platform
+
+	// Extract common fields from different request types
+	switch r := req.(type) {
+	case *pb.RegisterUserRequest:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.LoginUserRequest:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.ForgotPasswordReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.ResetPasswordReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.UpdatePasswordReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.EmailVerificationReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.VerifyEmailReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.UpdateUsernameReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.UpdatePasswordWithPasswordReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.UpdateEmailIdReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIpAddress()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	}
+
+	if sessionID == "" {
+		sessionID = as.generateSessionID()
+	}
+
+	// Create activity tracking request
+	activityReq := &activitypb.TrackActivityRequest{
+		UserId:     user.AccountId,
+		AccountId:  user.AccountId,
+		SessionId:  sessionID,
+		Category:   activitypb.ActivityCategory_CATEGORY_AUTHENTICATION,
+		Action:     action,
+		Resource:   "user",
+		ResourceId: user.AccountId,
+		ClientIp:   ipAddress,
+		UserAgent:  userAgent,
+		Country:    "", // TODO: Add geolocation lookup
+		Platform:   as.detectPlatform(userAgent, platform),
+		Referrer:   referrer,
+		Success:    true,
+		DurationMs: 0, // TODO: Add timing if needed
+	}
+
+	// Send activity tracking message
+	as.sendActivityTrackingMessage(activityReq)
+}
+
 func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
 	as.logger.Debugf("got the request data for : %+v", req.Email)
 	// Cleanup request data
@@ -52,8 +202,6 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	req.LastName = strings.TrimSpace(req.LastName)
 	req.IpAddress = strings.TrimSpace(req.IpAddress)
 	user := &models.TheMonkeysUser{}
-
-	
 
 	if err := utils.ValidateRegisterUserRequest(req); err != nil {
 		as.logger.Errorf("incomplete request body provided for email %s, error: %+v", req.Email, err)
@@ -109,7 +257,8 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 		as.logger.Debug("Email Sent!")
 	}()
 
-	go cache.AddUserLog(as.dbConn, user, constants.Register, constants.ServiceAuth, constants.EventRegister, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "register", req)
 
 	as.logger.Debugf("user %s is successfully registered.", user.Email)
 
@@ -260,7 +409,8 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	go cache.AddUserLog(as.dbConn, user, constants.Login, constants.ServiceAuth, constants.EventLogin, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "login", req)
 
 	resp := &pb.LoginUserResponse{
 		StatusCode:              http.StatusOK,
@@ -313,7 +463,8 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	go cache.AddUserLog(as.dbConn, user, constants.ForgotPassword, constants.ServiceAuth, constants.EventForgotPassword, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "forgot_password", req)
 
 	return &pb.ForgotPasswordRes{
 		StatusCode: 200,
@@ -361,7 +512,8 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	go cache.AddUserLog(as.dbConn, user, constants.VerifiedEmailForPassChange, constants.ServiceAuth, constants.EventVerifiedEmailForPassChange, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "reset_password", req)
 
 	return &pb.ResetPasswordRes{
 		StatusCode: http.StatusOK,
@@ -403,7 +555,8 @@ func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordRe
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	go cache.AddUserLog(as.dbConn, user, constants.UpdatedPassword, constants.ServiceAuth, constants.EventUpdatedPassword, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "update_password", req)
 
 	return &pb.UpdatePasswordRes{
 		StatusCode: http.StatusOK,
@@ -452,7 +605,8 @@ func (as *AuthzSvc) RequestForEmailVerification(ctx context.Context, req *pb.Ema
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	go cache.AddUserLog(as.dbConn, user, constants.RequestForEmailVerification, constants.ServiceAuth, constants.EventRequestForEmailVerification, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "request_email_verification", req)
 
 	return &pb.EmailVerificationRes{
 		StatusCode: http.StatusOK,
@@ -501,8 +655,8 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	// Set default IP address and client if not provided
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	// Add user log asynchronously
-	go cache.AddUserLog(as.dbConn, user, constants.VerifyEmail, constants.ServiceAuth, constants.EventVerifiedEmail, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "verify_email", req)
 
 	user.Email = req.Email
 	token, err := as.jwt.GenerateToken(user)
@@ -566,8 +720,8 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.Ip, req.Client)
 
-	// Add a user log
-	go cache.AddUserLog(as.dbConn, user, constants.UpdatedUserName, constants.ServiceAuth, constants.EventUpdateUsername, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "update_username", req)
 
 	user.Username = req.NewUsername
 	token, err := as.jwt.GenerateToken(user)
@@ -620,8 +774,8 @@ func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.Upda
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	// Add a user log
-	go cache.AddUserLog(as.dbConn, user, constants.UpdatedPassword, constants.ServiceAuth, constants.EventUpdatedPassword, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "update_password_with_password", req)
 
 	// Return
 	return &pb.UpdatePasswordWithPasswordRes{
@@ -679,8 +833,8 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 
 	user.IpAddress, user.Client = utils.IpClientConvert(req.IpAddress, req.Client)
 
-	// Add a user log
-	go cache.AddUserLog(as.dbConn, user, constants.ChangedEmail, constants.ServiceAuth, constants.EventUpdateEmail, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "update_email", req)
 
 	user.Email = req.NewEmail
 	token, err := as.jwt.GenerateToken(user)
@@ -777,7 +931,8 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 		as.logger.Debugf("Email Sent!")
 	}()
 
-	go cache.AddUserLog(as.dbConn, user, constants.Register, constants.ServiceAuth, constants.EventRegister, as.logger)
+	// Track authentication activity
+	as.trackAuthActivity(user, "google_login", req)
 
 	as.logger.Debugf("user %s is successfully registered.", user.Email)
 

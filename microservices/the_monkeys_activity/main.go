@@ -7,7 +7,9 @@ import (
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/logger"
+	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/database"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/messaging"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -49,6 +51,14 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to initialize activity database", "error", err)
 	}
+
+	// Initialize RabbitMQ connection using the standard reconnect method
+	log.Infow("connecting to RabbitMQ for activity tracking")
+	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+
+	// Start the activity consumer using the same pattern as users service
+	log.Infow("starting activity consumer")
+	go messaging.ConsumeActivityMessages(qConn, cfg, log, db)
 
 	grpcServer := grpc.NewServer()
 
