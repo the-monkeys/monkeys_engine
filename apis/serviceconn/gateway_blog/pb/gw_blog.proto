@@ -6,6 +6,16 @@ import "google/protobuf/any.proto";
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
+// Global enums for activity tracking (matching auth service)
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_WEB = 1;
+  PLATFORM_MOBILE = 2;
+  PLATFORM_TABLET = 3;
+  PLATFORM_API = 4;
+  PLATFORM_DESKTOP = 5;
+}
+
 message DraftBlogRequest {
     string blog_id = 1;
     string owner_account_id = 2;
@@ -18,6 +28,12 @@ message DraftBlogRequest {
     string ip = 9;
     string client = 10;
     string action = 11;
+    
+    // Enhanced client tracking fields (backward compatible)
+    string session_id = 12;
+    string user_agent = 13;
+    string referrer = 14;
+    Platform platform = 15;
 }
 
 message BlogResponse {
@@ -100,6 +116,12 @@ message PublishBlogReq {
     string client = 4;
     repeated string tags = 5;
     string slug = 6;
+    
+    // Enhanced client tracking fields (backward compatible)
+    string session_id = 7;
+    string user_agent = 8;
+    string referrer = 9;
+    Platform platform = 10;
 }
 
 message PublishBlogResp {
@@ -183,6 +205,12 @@ message DeleteBlogReq {
     string owner_account_id = 2;
     string ip = 3;
     string client = 4;
+    
+    // Enhanced client tracking fields (backward compatible)
+    string session_id = 5;
+    string user_agent = 6;
+    string referrer = 7;
+    Platform platform = 8;
 }
 
 message DeleteBlogResp {
@@ -217,6 +245,14 @@ message GetBlogsReq {
     int32 limit = 6;
     int32 offset = 7;
     string sort_by = 8;
+    
+    // Enhanced client tracking fields (backward compatible)
+    string ip = 9;
+    string client = 10;
+    string session_id = 11;
+    string user_agent = 12;
+    string referrer = 13;
+    Platform platform = 14;
 }
 
 message GetBlogsBySliceReq {
@@ -238,6 +274,12 @@ message BlogReq {
     string username = 5;
     bool is_draft = 6;
     bool is_archive = 7;
+    
+    // Enhanced client tracking fields (backward compatible)
+    string session_id = 8;
+    string user_agent = 9;
+    string referrer = 10;
+    Platform platform = 11;
 }
 
 message BlogResp {
@@ -252,6 +294,14 @@ message BlogListReq {
     string accountId = 4; // Optional: filter by account ID
     bool isDraft = 5; // Optional: filter by draft status
     repeated string blog_ids = 6; // Optional: filter by specific blog IDs
+    
+    // Enhanced client tracking fields (backward compatible)
+    string ip = 7;
+    string client = 8;
+    string session_id = 9;
+    string user_agent = 10;
+    string referrer = 11;
+    Platform platform = 12;
 }
 
 message SearchReq {
@@ -259,6 +309,14 @@ message SearchReq {
     int32 limit = 2; // Number of results to return
     int32 offset = 3; // Offset for pagination
     repeated string tags = 4; // Optional tags to filter results
+    
+    // Enhanced client tracking fields (backward compatible)
+    string ip = 5;
+    string client = 6;
+    string session_id = 7;
+    string user_agent = 8;
+    string referrer = 9;
+    Platform platform = 10;
 }
 
 service BlogService {

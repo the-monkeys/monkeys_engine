@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -40,11 +41,20 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	}
 	asc.log.Infof("✅ Fetching feed from blog service")
 
-	// Call gRPC to get blog metadata
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
-		Tags:   tags.Tags,
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Tags:      tags.Tags,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -163,10 +173,23 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
-	// Call gRPC to get blog metadata
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get user account ID if authenticated (can be empty for anonymous users)
+	userAccountId := ctx.GetString("accountId")
+
+	// Call gRPC to get blog metadata with comprehensive user and client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
+		AccountId: userAccountId, // Include user account ID for personalized feed tracking
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -270,6 +293,13 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
+	// Get client information for search activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get user account ID if authenticated (can be empty for anonymous users)
+	// TODO: Pass userAccountId to SearchReq once AccountId field is added to protobuf
+	_ = ctx.GetString("accountId") // Will be used when protobuf is enhanced
+
 	// Get limit and offset with defaults
 	limit := ctx.DefaultQuery("limit", "20")
 	offset := ctx.DefaultQuery("offset", "0")
@@ -292,11 +322,18 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
-	// Create search request
+	// Create search request with client tracking
+	// TODO: Add AccountId field to SearchReq protobuf for user tracking
 	searchReq := &pb.SearchReq{
-		Query:  searchQuery,
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
+		Query:     searchQuery,
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	}
 
 	asc.log.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", searchQuery, limitInt, offsetInt)
@@ -461,6 +498,9 @@ func (asc *BlogServiceClient) GetHumorNews(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string) {
+	// Get client information for category browsing activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
 	// Get Limits and offset
 	limit := ctx.DefaultQuery("limit", "500")
 	offset := ctx.DefaultQuery("offset", "0")
@@ -475,11 +515,17 @@ func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string)
 		offsetInt = 0
 	}
 
-	// Call gRPC to get blog metadata
+	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
-		Tags:   tags,
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Tags:      tags,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -618,12 +664,21 @@ func (asc *BlogServiceClient) MetaUsersPublished(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
-	// Call gRPC to get blog metadata
+	// Get client information for user profile browsing activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
 		AccountId: userInfo.AccountId,
 		IsDraft:   false, // Only published blogs
 		Limit:     int32(limitInt),
 		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -762,12 +817,21 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 		offsetInt = 0
 	}
 
-	// Call gRPC to get blog metadata
+	// Get client information for draft blog browsing activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
 		AccountId: userInfo.AccountId,
 		IsDraft:   true, // Only draft blogs
 		Limit:     int32(limitInt),
 		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -900,12 +964,21 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 		return
 	}
 
-	// Call gRPC to get blog metadata
+	// Get client information for bookmarks browsing activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetBlogsByBlogIds(context.Background(), &pb.BlogListReq{
-		BlogIds: blogResp,
-		IsDraft: false, // Only published blogs
-		Limit:   int32(limitInt),
-		Offset:  int32(offsetInt),
+		BlogIds:   blogResp,
+		IsDraft:   false, // Only published blogs
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -1029,8 +1102,17 @@ func (asc *BlogServiceClient) GetUserTags(ctx *gin.Context) {
 		}
 	}
 
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
 	resp, err := asc.Client.UsersBlogData(context.Background(), &pb.BlogReq{
 		AccountId: userInfo.AccountId,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		asc.log.Errorf("cannot fetch user blog data, error: %v", err)

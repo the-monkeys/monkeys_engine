@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
+	activitypb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -17,6 +19,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/seo"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type BlogService struct {
@@ -36,6 +39,265 @@ func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOMana
 		config:     config,
 		qConn:      qConn,
 	}
+}
+
+// Helper method to generate session ID
+func (blog *BlogService) generateSessionID() string {
+	return fmt.Sprintf("session_%d_%s", time.Now().UnixNano(), generateGUID()[:8])
+}
+
+// Helper method to generate GUID (simple version)
+func generateGUID() string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+// Helper method to detect platform from user agent or request platform
+func (blog *BlogService) detectPlatform(userAgent string, reqPlatform pb.Platform) activitypb.Platform {
+	// If platform is provided in request, convert it
+	switch reqPlatform {
+	case pb.Platform_PLATFORM_WEB:
+		return activitypb.Platform_PLATFORM_WEB
+	case pb.Platform_PLATFORM_MOBILE:
+		return activitypb.Platform_PLATFORM_MOBILE
+	case pb.Platform_PLATFORM_TABLET:
+		return activitypb.Platform_PLATFORM_TABLET
+	case pb.Platform_PLATFORM_API:
+		return activitypb.Platform_PLATFORM_API
+	case pb.Platform_PLATFORM_DESKTOP:
+		return activitypb.Platform_PLATFORM_DESKTOP
+	default:
+		// Detect from user agent if platform not specified
+		if userAgent != "" {
+			userAgent = strings.ToLower(userAgent)
+			if strings.Contains(userAgent, "mobile") || strings.Contains(userAgent, "android") || strings.Contains(userAgent, "iphone") {
+				return activitypb.Platform_PLATFORM_MOBILE
+			}
+			if strings.Contains(userAgent, "tablet") || strings.Contains(userAgent, "ipad") {
+				return activitypb.Platform_PLATFORM_TABLET
+			}
+		}
+		return activitypb.Platform_PLATFORM_WEB
+	}
+}
+
+// Helper method to send activity tracking message to RabbitMQ
+func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.TrackActivityRequest) {
+	go func() {
+		// Create activity tracking message
+		activityMsg, err := json.Marshal(activityReq)
+		if err != nil {
+			blog.logger.Errorf("failed to marshal activity tracking message: %v", err)
+			return
+		}
+
+		// Send to activity tracking queue via RabbitMQ
+		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
+		if err != nil {
+			blog.logger.Errorf("failed to publish activity tracking message: %v", err)
+			return
+		}
+
+		blog.logger.Debugf("activity tracking message sent for user %s, action %s", activityReq.UserId, activityReq.Action)
+	}()
+}
+
+// Helper method to track blog activities
+func (blog *BlogService) trackBlogActivity(accountId, action, resource, resourceId string, req interface{}) {
+	var sessionID, ipAddress, userAgent, referrer string
+	var platform pb.Platform
+
+	// Extract common fields from different request types
+	switch r := req.(type) {
+	case *pb.BlogReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.DraftBlogRequest:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.PublishBlogReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.DeleteBlogReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.BlogListReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	case *pb.SearchReq:
+		sessionID = r.GetSessionId()
+		ipAddress = r.GetIp()
+		userAgent = r.GetUserAgent()
+		referrer = r.GetReferrer()
+		platform = r.GetPlatform()
+	}
+
+	if sessionID == "" {
+		sessionID = blog.generateSessionID()
+	}
+
+	// Create activity tracking request with enhanced metadata
+	activityReq := &activitypb.TrackActivityRequest{
+		UserId:     accountId,
+		AccountId:  accountId,
+		SessionId:  sessionID,
+		Category:   activitypb.ActivityCategory_CATEGORY_CONTENT,
+		Action:     action,
+		Resource:   resource,
+		ResourceId: resourceId,
+		ClientIp:   ipAddress,
+		UserAgent:  userAgent,
+		Country:    "", // TODO: Add geolocation lookup
+		Platform:   blog.detectPlatform(userAgent, platform),
+		Referrer:   referrer,
+		Success:    true,
+		DurationMs: 0, // TODO: Add timing if needed
+	}
+
+	// Enhanced: Fetch and include detailed metadata for recommendation engine
+	var metadata map[string]interface{}
+
+	if resource == "blog" && resourceId != "" {
+		// Fetch comprehensive blog metadata
+		metadata = blog.fetchBlogMetadataForActivity(context.Background(), resourceId)
+	} else if resource == "search" && resourceId != "" {
+		// Create search context metadata
+		metadata = map[string]interface{}{
+			"search_query":       resourceId,
+			"search_terms":       strings.Fields(resourceId),
+			"search_type":        "blog_search",
+			"metadata_source":    "search_context",
+			"metadata_timestamp": time.Now().UTC().Format(time.RFC3339),
+		}
+
+		// Add search-specific context from request
+		if searchReq, ok := req.(*pb.SearchReq); ok {
+			if len(searchReq.Tags) > 0 {
+				metadata["search_tags"] = searchReq.Tags
+			}
+			metadata["search_limit"] = searchReq.Limit
+			metadata["search_offset"] = searchReq.Offset
+		}
+	}
+
+	// Convert metadata to protobuf Struct if available
+	if metadata != nil {
+		if metadataStruct, err := structpb.NewStruct(metadata); err == nil {
+			activityReq.Metadata = metadataStruct
+		} else {
+			blog.logger.Warnf("failed to convert metadata to struct: %v", err)
+		}
+	}
+
+	// Send activity tracking message
+	blog.sendActivityTrackingMessage(activityReq)
+}
+
+// Helper method to fetch comprehensive blog metadata for activity tracking
+func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogId string) map[string]interface{} {
+	defer func() {
+		if r := recover(); r != nil {
+			blog.logger.Errorf("recovered from panic in fetchBlogMetadataForActivity: %v", r)
+		}
+	}()
+
+	// Fetch blog data from Elasticsearch
+	blogData, err := blog.osClient.GetBlogByBlogId(ctx, blogId, false) // Published blogs
+	if err != nil {
+		// Try draft blogs if published blog not found
+		blogData, err = blog.osClient.GetBlogByBlogId(ctx, blogId, true)
+		if err != nil {
+			blog.logger.Warnf("could not fetch blog metadata for activity tracking, blogId: %s, error: %v", blogId, err)
+			return nil
+		}
+	}
+
+	// Extract key metadata for recommendation engine
+	metadata := make(map[string]interface{})
+
+	// Blog identification and ownership
+	if blogId, ok := blogData["blog_id"].(string); ok {
+		metadata["blog_id"] = blogId
+	}
+	if ownerAccountId, ok := blogData["owner_account_id"].(string); ok {
+		metadata["blog_author_id"] = ownerAccountId
+	}
+
+	// Blog content metadata
+	if title, ok := blogData["title"].(string); ok {
+		metadata["blog_title"] = title
+	}
+	if category, ok := blogData["category"].(string); ok {
+		metadata["blog_category"] = category
+	}
+
+	// Blog tags for content-based recommendations
+	if tags, ok := blogData["tags"].([]interface{}); ok {
+		stringTags := make([]string, len(tags))
+		for i, tag := range tags {
+			if tagStr, ok := tag.(string); ok {
+				stringTags[i] = tagStr
+			}
+		}
+		metadata["blog_tags"] = stringTags
+	} else if tags, ok := blogData["tags"].([]string); ok {
+		metadata["blog_tags"] = tags
+	}
+
+	// Temporal metadata
+	if publishedTime, ok := blogData["published_time"].(string); ok {
+		metadata["blog_published_time"] = publishedTime
+	}
+	if createdTime, ok := blogData["created_time"].(string); ok {
+		metadata["blog_created_time"] = createdTime
+	}
+
+	// Content type and structure
+	if contentType, ok := blogData["content_type"].(string); ok {
+		metadata["blog_content_type"] = contentType
+	}
+
+	// Blog status and metrics
+	if isDraft, ok := blogData["is_draft"].(bool); ok {
+		metadata["blog_is_draft"] = isDraft
+	}
+	if isArchive, ok := blogData["is_archive"].(bool); ok {
+		metadata["blog_is_archive"] = isArchive
+	}
+
+	// Author information for collaborative filtering
+	if authorList, ok := blogData["author_list"].([]interface{}); ok {
+		stringAuthors := make([]string, len(authorList))
+		for i, author := range authorList {
+			if authorStr, ok := author.(string); ok {
+				stringAuthors[i] = authorStr
+			}
+		}
+		metadata["blog_authors"] = stringAuthors
+	} else if authorList, ok := blogData["author_list"].([]string); ok {
+		metadata["blog_authors"] = authorList
+	}
+
+	// Add source and confidence for data quality
+	metadata["metadata_source"] = "elasticsearch"
+	metadata["metadata_timestamp"] = time.Now().UTC().Format(time.RFC3339)
+
+	blog.logger.Debugf("fetched blog metadata for activity tracking: blogId=%s, metadata=%v", blogId, metadata)
+	return metadata
 }
 
 func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest) (*pb.BlogResponse, error) {
@@ -88,6 +350,13 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		blog.logger.Errorf("cannot store draft into opensearch: %v", err)
 		return nil, err
 	}
+
+	// Track blog activity
+	action := "create_draft"
+	if exists {
+		action = "update_draft"
+	}
+	blog.trackBlogActivity(req.OwnerAccountId, action, "blog", req.BlogId, req)
 
 	return &pb.BlogResponse{
 		Blog: req.Blog,
@@ -248,6 +517,9 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 
 	}()
 
+	// Track blog activity
+	blog.trackBlogActivity(req.AccountId, "publish_blog", "blog", req.BlogId, req)
+
 	return &pb.PublishBlogResp{
 		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
 	}, nil
@@ -295,6 +567,9 @@ func (blog *BlogService) MoveBlogToDraftStatus(ctx context.Context, req *pb.Blog
 			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
 		}
 	}()
+
+	// Track blog activity
+	blog.trackBlogActivity(req.AccountId, "move_to_draft", "blog", req.BlogId, req)
 
 	return &pb.BlogResp{
 		Message: fmt.Sprintf("the blog %s has been moved to draft.", req.BlogId),
@@ -384,6 +659,9 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[2], err)
 		}
 	}()
+
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "delete_blog", "blog", req.BlogId, req)
 
 	// fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
 	return &pb.DeleteBlogResp{

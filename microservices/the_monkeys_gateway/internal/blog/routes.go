@@ -385,13 +385,21 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	}
 
 	id := ctx.Param("blog_id")
+
+	// Get client information using utility function
+	clientInfo := utils.GetClientInfo(ctx)
+
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
 		BlogId:    id,
 		AccountId: accId,
-		Ip:        ctx.Request.Header.Get("IP"),
-		Client:    ctx.Request.Header.Get("Client"),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
 		Tags:      publishBody.Tags,
 		Slug:      publishBody.Slug,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -453,9 +461,19 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 
 	blogId := ctx.Param("blog_id")
 	accId := ctx.GetString("accountId")
+
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
 	res, err := asc.Client.DeleteABlogByBlogId(context.Background(), &pb.DeleteBlogReq{
 		BlogId:         blogId,
 		OwnerAccountId: accId,
+		Ip:             clientInfo.IPAddress,
+		Client:         clientInfo.ClientType,
+		SessionId:      clientInfo.SessionID,
+		UserAgent:      clientInfo.UserAgent,
+		Referrer:       clientInfo.Referrer,
+		Platform:       utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -591,8 +609,8 @@ func (asc *BlogServiceClient) GetColDraftBlogByBlogId(ctx *gin.Context) {
 func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	id := ctx.Param("blog_id")
 
-	ipAddress := ctx.Request.Header.Get("IP")
-	client := ctx.Request.Header.Get("Client")
+	// Get client information using utility function
+	clientInfo := utils.GetClientInfo(ctx)
 
 	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
@@ -731,7 +749,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		// Handle different message types
 		switch messageType {
 		case websocket.TextMessage:
-			if err := asc.handleTextMessage(msg, conn, stream, id, ipAddress, client, action, &initialLogDone); err != nil {
+			if err := asc.handleTextMessage(msg, conn, stream, id, clientInfo, utils.GetBlogPlatform(ctx), action, &initialLogDone); err != nil {
 				asc.log.Errorf("Error handling text message: %v", err)
 				// Send error response but don't close connection
 				errorMsg := map[string]interface{}{
@@ -764,7 +782,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 }
 
 // Helper function to handle text messages
-func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn, stream pb.BlogService_DraftBlogV2Client, id, ipAddress, client, action string, initialLogDone *bool) error {
+func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn, stream pb.BlogService_DraftBlogV2Client, id string, clientInfo utils.ClientInfo, platform pb.Platform, action string, initialLogDone *bool) error {
 	// Handle ping/pong messages from client
 	var messageCheck map[string]interface{}
 	if err := json.Unmarshal(msg, &messageCheck); err == nil {
@@ -810,8 +828,12 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 	}
 
 	draftBlog["blog_id"] = id
-	draftBlog["Ip"] = ipAddress
-	draftBlog["Client"] = client
+	draftBlog["ip"] = clientInfo.IPAddress
+	draftBlog["client"] = clientInfo.ClientType
+	draftBlog["session_id"] = clientInfo.SessionID
+	draftBlog["user_agent"] = clientInfo.UserAgent
+	draftBlog["referrer"] = clientInfo.Referrer
+	draftBlog["platform"] = int32(platform) // Convert enum to int32 for protobuf Any
 
 	// Only set the action and log the initial creation or update once
 	if !*initialLogDone {
@@ -1109,6 +1131,8 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 		Limit:   int32(limitInt),
 		Offset:  int32(offsetInt),
 	})
+
+	// TODO: Add client tracking once GetBlogsReq protobuf is regenerated with enhanced fields
 
 	if err != nil {
 		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
@@ -1474,11 +1498,19 @@ func (asc *BlogServiceClient) MoveBlogToDraft(ctx *gin.Context) {
 	accId := ctx.GetString("accountId")
 
 	id := ctx.Param("blog_id")
+
+	// Get client information using utility function
+	clientInfo := utils.GetClientInfo(ctx)
+
 	resp, err := asc.Client.MoveBlogToDraftStatus(context.Background(), &pb.BlogReq{
 		BlogId:    id,
 		AccountId: accId,
-		Ip:        ctx.Request.Header.Get("IP"),
-		Client:    ctx.Request.Header.Get("Client"),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 
 	if err != nil {
@@ -1610,9 +1642,22 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
 
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get user account ID if authenticated (can be empty for anonymous users)
+	userAccountId := ctx.GetString("accountId")
+
 	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
-		BlogId:  blogId,
-		IsDraft: false,
+		BlogId:    blogId,
+		AccountId: userAccountId, // Include user account ID for comprehensive tracking
+		IsDraft:   false,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -1662,9 +1707,18 @@ func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
 		return
 	}
 
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
 	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
-		BlogId:  blogId,
-		IsDraft: true,
+		BlogId:    blogId,
+		IsDraft:   true,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
