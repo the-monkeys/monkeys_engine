@@ -38,13 +38,13 @@ func newServer() *Server {
 func printBanner(cfg *config.Config) {
 	banner := "\n" +
 		"┌────────────────────────────────────────────────────────────┐\n" +
-		"│   🐒  The Monkeys API Gateway                               │\n" +
-		"│   Status   : ONLINE                                         │\n" +
+		"│   🐒  The Monkeys API Gateway                              │\n" +
+		"│   Status   : ONLINE                                        │\n" +
 		"│   HTTP     : http://" + cfg.TheMonkeysGateway.HTTP + "\n" +
 		"│   HTTPS    : https://" + cfg.TheMonkeysGateway.HTTPS + "\n" +
 		"│   Env      : " + cfg.AppEnv + "\n" +
-		"│   Logs     : zap (structured)                               │\n" +
-		"│   Tip      : export LOG_LEVEL=debug for verbose logs        │\n" +
+		"│   Logs     : zap (structured)                              │\n" +
+		"│   Tip      : export LOG_LEVEL=debug for verbose logs       │\n" +
 		"└────────────────────────────────────────────────────────────┘\n"
 	fmt.Print(banner)
 }

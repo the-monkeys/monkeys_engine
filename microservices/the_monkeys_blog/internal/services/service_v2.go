@@ -90,6 +90,8 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 					blog.logger.Errorf("failed to publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
 				}
 			}()
+
+			go blog.trackBlogActivity(ownerAccountId, constants.BLOG_CREATE, "blog", blogId, req)
 		}
 
 		_, err = blog.osClient.SaveBlog(stream.Context(), req)
@@ -301,6 +303,14 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
 	blog.logger.Debugf("Received request for blog: %v", req)
 
+	// Track blog reading activity
+	action := constants.READ_BLOG
+	if req.IsDraft {
+		action = constants.READ_DRAFT
+	}
+
+	go blog.trackBlogActivity(req.AccountId, action, "blog", req.BlogId, req)
+
 	blogData, err := blog.osClient.GetBlogByBlogId(ctx, req.BlogId, req.IsDraft)
 	if err != nil {
 		blog.logger.Errorf("Error fetching blog: %v", err)
@@ -390,6 +400,37 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogSer
 	returnData := make(map[string]interface{})
 	var blogs []map[string]interface{}
 
+	// Track blog activity - determine action based on request type
+	action := "browse_feed"
+	resource := "feed"
+	resourceId := "global_feed"
+
+	if len(req.Tags) > 0 {
+		action = "browse_by_tags"
+		resource = "tags"
+		resourceId = strings.Join(req.Tags, ",")
+	}
+
+	if req.AccountId != "" {
+		if req.IsDraft {
+			action = "browse_drafts"
+			resource = "user_drafts"
+		} else {
+			action = "browse_user_blogs"
+			resource = "user_blogs"
+		}
+		resourceId = req.AccountId
+	}
+
+	if len(req.BlogIds) > 0 {
+		action = "browse_bookmarks"
+		resource = "bookmarks"
+		resourceId = strings.Join(req.BlogIds, ",")
+	}
+
+	// Track the activity
+	blog.trackBlogActivity(req.AccountId, action, resource, resourceId, req)
+
 	// Find blog by tags
 	if len(req.Tags) > 0 {
 		blog.logger.Debug("Fetching published blogs by tags")
@@ -448,6 +489,10 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogSer
 
 func (blog *BlogService) SearchBlogsMetadata(req *pb.SearchReq, stream pb.BlogService_SearchBlogsMetadataServer) error {
 	blog.logger.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", req.Query, req.Limit, req.Offset)
+
+	// Track search activity with user context
+	blog.trackBlogActivity("", "search_blogs", "search", req.Query, req)
+	// TODO: Add AccountId field to SearchReq protobuf to track which user is searching
 
 	returnData := make(map[string]interface{})
 	var searchTerms = []string{}
@@ -599,6 +644,9 @@ func (blog *BlogService) MetaGetBlogsByBlogIds(req *pb.BlogListReq, stream pb.Bl
 
 func (blog *BlogService) UsersBlogData(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
 	blog.logger.Debugf("Received request for user blog data: %v", req)
+
+	// Track user tag browsing activity
+	blog.trackBlogActivity(req.AccountId, "browse_user_tags", "user_tags", req.AccountId, req)
 
 	// Fetch user blog data from the database
 	blogData, err := blog.osClient.GetAllTagsFromUserPublishedBlogs(ctx, req.AccountId)
