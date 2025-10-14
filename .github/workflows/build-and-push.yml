@@ -60,6 +60,10 @@ jobs:
             dockerfile: microservices/the_monkeys_storage/Dockerfile
             context: .
             build_args: ""
+          - name: activity
+            dockerfile: microservices/the_monkeys_activity/Dockerfile
+            context: .
+            build_args: ""
 
     steps:
       - name: 🛒 Checkout Repository
@@ -241,6 +245,21 @@ jobs:
                 - .env
               user: "1001:1001"
 
+            the_monkeys_activity:
+              container_name: "the_monkeys_activity"
+              image: ghcr.io/the-monkeys/monkeys-activity:latest
+              networks:
+                - monkeys-network
+              depends_on:
+                - rabbitmq
+                - the_monkeys_db
+              ports:
+                - "${MICROSERVICES_ACTIVITY_PORT}:${MICROSERVICES_ACTIVITY_INTERNAL_PORT}"
+              restart: unless-stopped
+              env_file:
+                - .env
+              user: "1001:1001"
+
           networks:
             monkeys-network:
               driver: bridge
@@ -271,6 +290,7 @@ jobs:
           echo "• ghcr.io/${{ github.repository_owner }}/monkeys-user:latest"
           echo "• ghcr.io/${{ github.repository_owner }}/monkeys-notification:latest"
           echo "• ghcr.io/${{ github.repository_owner }}/monkeys-storage:latest"
+          echo "• ghcr.io/${{ github.repository_owner }}/monkeys-activity:latest"
           echo ""
           echo "🚀 To deploy:"
           echo "1. Use your existing docker-compose.yml for infrastructure services"
