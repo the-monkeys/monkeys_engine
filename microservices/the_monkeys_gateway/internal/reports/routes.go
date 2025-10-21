@@ -32,9 +32,6 @@ func NewReportsServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.Repor
 	return pb.NewReportsServiceClient(conn)
 }
 
-func (rsc *ReportsServiceClient) GetReports(ctx *gin.Context) {
-}
-
 func (rsc *ReportsServiceClient) CreateReport(ctx *gin.Context) {
 	type requestBody struct {
 		ReasonType    string `json:"reason_type"`
@@ -64,6 +61,7 @@ func (rsc *ReportsServiceClient) CreateReport(ctx *gin.Context) {
 		ReporterNotes: body.ReporterNotes,
 		ReportedId:    body.ReportedId,
 	})
+
 	rsc.log.Info(res)
 
 	if err != nil {
@@ -71,9 +69,13 @@ func (rsc *ReportsServiceClient) CreateReport(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-}
 
-func (rsc *ReportsServiceClient) FlagReport(ctx *gin.Context) {
+	if res.Status == 0 {
+		ctx.JSON(500, gin.H{"error": res.Error})
+		return
+	}
+
+	ctx.JSON(201, gin.H{"success": res.Message})
 }
 
 func RegisterReportsServiceRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, lg *zap.SugaredLogger) *ReportsServiceClient {
@@ -89,9 +91,7 @@ func RegisterReportsServiceRoutes(router *gin.Engine, cfg *config.Config, authCl
 
 	routes.Use(mware.AuthRequired)
 
-	//	routes.GET("/", reportsServiceClient.GetReports)
 	routes.POST("/", reportsServiceClient.CreateReport)
-	routes.PATCH("/:report_id/flag", reportsServiceClient.FlagReport)
 
 	return reportsServiceClient
 }
