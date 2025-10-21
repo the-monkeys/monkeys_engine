@@ -63,6 +63,10 @@ ifneq (, $(shell which podman))
 	CONTAINER_RUNTIME := podman
 endif
 
+ifneq (, $(shell which docker))
+	CONTAINER_RUNTIME := docker
+endif
+
 # List of compose files of our services
 REPORTS_COMPOSE := microservices/the_monkeys_reports/docker-compose$(COMPOSE_FILE_EXTENSION)
 ROOT_COMPOSE := docker-compose$(COMPOSE_FILE_EXTENSION)
@@ -72,3 +76,6 @@ containers/up:
 
 containers/down:
 	$(CONTAINER_RUNTIME) compose -f  $(ROOT_COMPOSE) -f $(REPORTS_COMPOSE) down
+
+containers/logs:
+	$(CONTAINER_RUNTIME) compose -f  $(ROOT_COMPOSE) -f $(REPORTS_COMPOSE) logs -f
