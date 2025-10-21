@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.9
 // 	protoc        v6.32.0
-// source: gw_report.proto
+// source: monkeys_protos/gw_report.proto
 
 package _go
 
@@ -33,13 +33,14 @@ type Report struct {
 	ReporterNotes  string                 `protobuf:"bytes,8,opt,name=reporter_notes,json=reporterNotes,proto3" json:"reporter_notes,omitempty"`
 	ModeratorId    string                 `protobuf:"bytes,9,opt,name=moderator_id,json=moderatorId,proto3" json:"moderator_id,omitempty"`
 	ModeratorNotes string                 `protobuf:"bytes,10,opt,name=moderator_notes,json=moderatorNotes,proto3" json:"moderator_notes,omitempty"`
+	Verdict        string                 `protobuf:"bytes,11,opt,name=verdict,proto3" json:"verdict,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Report) Reset() {
 	*x = Report{}
-	mi := &file_gw_report_proto_msgTypes[0]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -51,7 +52,7 @@ func (x *Report) String() string {
 func (*Report) ProtoMessage() {}
 
 func (x *Report) ProtoReflect() protoreflect.Message {
-	mi := &file_gw_report_proto_msgTypes[0]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -64,7 +65,7 @@ func (x *Report) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Report.ProtoReflect.Descriptor instead.
 func (*Report) Descriptor() ([]byte, []int) {
-	return file_gw_report_proto_rawDescGZIP(), []int{0}
+	return file_monkeys_protos_gw_report_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Report) GetReportId() string {
@@ -137,6 +138,13 @@ func (x *Report) GetModeratorNotes() string {
 	return ""
 }
 
+func (x *Report) GetVerdict() string {
+	if x != nil {
+		return x.Verdict
+	}
+	return ""
+}
+
 type CreateReportRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ReasonType    string                 `protobuf:"bytes,1,opt,name=reason_type,json=reasonType,proto3" json:"reason_type,omitempty"`
@@ -150,7 +158,7 @@ type CreateReportRequest struct {
 
 func (x *CreateReportRequest) Reset() {
 	*x = CreateReportRequest{}
-	mi := &file_gw_report_proto_msgTypes[1]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -162,7 +170,7 @@ func (x *CreateReportRequest) String() string {
 func (*CreateReportRequest) ProtoMessage() {}
 
 func (x *CreateReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gw_report_proto_msgTypes[1]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +183,7 @@ func (x *CreateReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReportRequest.ProtoReflect.Descriptor instead.
 func (*CreateReportRequest) Descriptor() ([]byte, []int) {
-	return file_gw_report_proto_rawDescGZIP(), []int{1}
+	return file_monkeys_protos_gw_report_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateReportRequest) GetReasonType() string {
@@ -224,7 +232,7 @@ type CreateReportResponse struct {
 
 func (x *CreateReportResponse) Reset() {
 	*x = CreateReportResponse{}
-	mi := &file_gw_report_proto_msgTypes[2]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +244,7 @@ func (x *CreateReportResponse) String() string {
 func (*CreateReportResponse) ProtoMessage() {}
 
 func (x *CreateReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gw_report_proto_msgTypes[2]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +257,7 @@ func (x *CreateReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReportResponse.ProtoReflect.Descriptor instead.
 func (*CreateReportResponse) Descriptor() ([]byte, []int) {
-	return file_gw_report_proto_rawDescGZIP(), []int{2}
+	return file_monkeys_protos_gw_report_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateReportResponse) GetStatus() uint32 {
@@ -283,7 +291,7 @@ type FlagReportRequest struct {
 
 func (x *FlagReportRequest) Reset() {
 	*x = FlagReportRequest{}
-	mi := &file_gw_report_proto_msgTypes[3]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -295,7 +303,7 @@ func (x *FlagReportRequest) String() string {
 func (*FlagReportRequest) ProtoMessage() {}
 
 func (x *FlagReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gw_report_proto_msgTypes[3]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -308,7 +316,7 @@ func (x *FlagReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlagReportRequest.ProtoReflect.Descriptor instead.
 func (*FlagReportRequest) Descriptor() ([]byte, []int) {
-	return file_gw_report_proto_rawDescGZIP(), []int{3}
+	return file_monkeys_protos_gw_report_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *FlagReportRequest) GetReportId() string {
@@ -336,7 +344,7 @@ type FlagReportResponse struct {
 
 func (x *FlagReportResponse) Reset() {
 	*x = FlagReportResponse{}
-	mi := &file_gw_report_proto_msgTypes[4]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +356,7 @@ func (x *FlagReportResponse) String() string {
 func (*FlagReportResponse) ProtoMessage() {}
 
 func (x *FlagReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gw_report_proto_msgTypes[4]
+	mi := &file_monkeys_protos_gw_report_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +369,7 @@ func (x *FlagReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlagReportResponse.ProtoReflect.Descriptor instead.
 func (*FlagReportResponse) Descriptor() ([]byte, []int) {
-	return file_gw_report_proto_rawDescGZIP(), []int{4}
+	return file_monkeys_protos_gw_report_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *FlagReportResponse) GetStatus() uint32 {
@@ -385,11 +393,11 @@ func (x *FlagReportResponse) GetError() string {
 	return ""
 }
 
-var File_gw_report_proto protoreflect.FileDescriptor
+var File_monkeys_protos_gw_report_proto protoreflect.FileDescriptor
 
-const file_gw_report_proto_rawDesc = "" +
+const file_monkeys_protos_gw_report_proto_rawDesc = "" +
 	"\n" +
-	"\x0fgw_report.proto\x12\vreports_svc\"\xd7\x02\n" +
+	"\x1emonkeys_protos/gw_report.proto\x12\vreports_svc\"\xf1\x02\n" +
 	"\x06Report\x12\x1b\n" +
 	"\treport_id\x18\x01 \x01(\tR\breportId\x12\x1f\n" +
 	"\vreason_type\x18\x02 \x01(\tR\n" +
@@ -405,7 +413,8 @@ const file_gw_report_proto_rawDesc = "" +
 	"\x0ereporter_notes\x18\b \x01(\tR\rreporterNotes\x12!\n" +
 	"\fmoderator_id\x18\t \x01(\tR\vmoderatorId\x12'\n" +
 	"\x0fmoderator_notes\x18\n" +
-	" \x01(\tR\x0emoderatorNotes\"\xc4\x01\n" +
+	" \x01(\tR\x0emoderatorNotes\x12\x18\n" +
+	"\averdict\x18\v \x01(\tR\averdict\"\xc4\x01\n" +
 	"\x13CreateReportRequest\x12\x1f\n" +
 	"\vreason_type\x18\x01 \x01(\tR\n" +
 	"reasonType\x12\x1f\n" +
@@ -432,26 +441,26 @@ const file_gw_report_proto_rawDesc = "" +
 	"FlagReport\x12\x1e.reports_svc.FlagReportRequest\x1a\x1f.reports_svc.FlagReportResponse\"\x00B\x10Z\x0e./generated/gob\x06proto3"
 
 var (
-	file_gw_report_proto_rawDescOnce sync.Once
-	file_gw_report_proto_rawDescData []byte
+	file_monkeys_protos_gw_report_proto_rawDescOnce sync.Once
+	file_monkeys_protos_gw_report_proto_rawDescData []byte
 )
 
-func file_gw_report_proto_rawDescGZIP() []byte {
-	file_gw_report_proto_rawDescOnce.Do(func() {
-		file_gw_report_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_gw_report_proto_rawDesc), len(file_gw_report_proto_rawDesc)))
+func file_monkeys_protos_gw_report_proto_rawDescGZIP() []byte {
+	file_monkeys_protos_gw_report_proto_rawDescOnce.Do(func() {
+		file_monkeys_protos_gw_report_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_monkeys_protos_gw_report_proto_rawDesc), len(file_monkeys_protos_gw_report_proto_rawDesc)))
 	})
-	return file_gw_report_proto_rawDescData
+	return file_monkeys_protos_gw_report_proto_rawDescData
 }
 
-var file_gw_report_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
-var file_gw_report_proto_goTypes = []any{
+var file_monkeys_protos_gw_report_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_monkeys_protos_gw_report_proto_goTypes = []any{
 	(*Report)(nil),               // 0: reports_svc.Report
 	(*CreateReportRequest)(nil),  // 1: reports_svc.CreateReportRequest
 	(*CreateReportResponse)(nil), // 2: reports_svc.CreateReportResponse
 	(*FlagReportRequest)(nil),    // 3: reports_svc.FlagReportRequest
 	(*FlagReportResponse)(nil),   // 4: reports_svc.FlagReportResponse
 }
-var file_gw_report_proto_depIdxs = []int32{
+var file_monkeys_protos_gw_report_proto_depIdxs = []int32{
 	1, // 0: reports_svc.ReportsService.CreateReport:input_type -> reports_svc.CreateReportRequest
 	3, // 1: reports_svc.ReportsService.FlagReport:input_type -> reports_svc.FlagReportRequest
 	2, // 2: reports_svc.ReportsService.CreateReport:output_type -> reports_svc.CreateReportResponse
@@ -463,26 +472,26 @@ var file_gw_report_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_gw_report_proto_init() }
-func file_gw_report_proto_init() {
-	if File_gw_report_proto != nil {
+func init() { file_monkeys_protos_gw_report_proto_init() }
+func file_monkeys_protos_gw_report_proto_init() {
+	if File_monkeys_protos_gw_report_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gw_report_proto_rawDesc), len(file_gw_report_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_monkeys_protos_gw_report_proto_rawDesc), len(file_monkeys_protos_gw_report_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_gw_report_proto_goTypes,
-		DependencyIndexes: file_gw_report_proto_depIdxs,
-		MessageInfos:      file_gw_report_proto_msgTypes,
+		GoTypes:           file_monkeys_protos_gw_report_proto_goTypes,
+		DependencyIndexes: file_monkeys_protos_gw_report_proto_depIdxs,
+		MessageInfos:      file_monkeys_protos_gw_report_proto_msgTypes,
 	}.Build()
-	File_gw_report_proto = out.File
-	file_gw_report_proto_goTypes = nil
-	file_gw_report_proto_depIdxs = nil
+	File_monkeys_protos_gw_report_proto = out.File
+	file_monkeys_protos_gw_report_proto_goTypes = nil
+	file_monkeys_protos_gw_report_proto_depIdxs = nil
 }

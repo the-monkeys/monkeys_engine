@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.0
-// source: gw_report.proto
+// source: monkeys_protos/gw_report.proto
 
 package _go
 
@@ -155,5 +155,5 @@ var ReportsService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "gw_report.proto",
+	Metadata: "monkeys_protos/gw_report.proto",
 }
