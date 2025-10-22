@@ -368,23 +368,22 @@ func (db *ActivityDB) shouldUseTimeSeries(req *pb.TrackActivityRequest) bool {
 
 	// Critical activities that should stay in regular index for immediate access
 	criticalActions := map[string]bool{
-		"register": false,
-		"login":    false,
-		"purchase": false,
-		"payment":  false,
-		"error":    false,
-		"security": false,
+		"register": true,
+		"login":    true,
+		"purchase": true,
+		"payment":  true,
+		"error":    true,
+		"security": true,
 	}
 
 	action := req.GetAction()
 
-	// Critical actions always go to regular index
-	if !criticalActions[action] && action != "" {
-		// Non-critical actions can be checked for other criteria
-		return true
+	// Critical actions always go to regular index (comprehensive data storage)
+	if criticalActions[action] {
+		return false
 	}
 
-	// High-volume actions go to time-series
+	// High-volume actions go to time-series (optimized storage)
 	if highVolumeActions[action] {
 		return true
 	}
@@ -397,7 +396,10 @@ func (db *ActivityDB) shouldUseTimeSeries(req *pb.TrackActivityRequest) bool {
 func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActivityRequest) (string, error) {
 	activityID := fmt.Sprintf("activity_%d_%s", time.Now().UnixNano(), req.GetUserId())
 
-	// Convert protobuf to document (full structure for regular index)
+	// Extract client information
+	clientInfo := req.GetClientInfo()
+
+	// Convert protobuf to document (full structure for regular index with comprehensive client info)
 	doc := map[string]interface{}{
 		"@timestamp":  time.Now().Format(time.RFC3339),
 		"id":          activityID,
@@ -408,14 +410,102 @@ func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActiv
 		"action":      req.GetAction(),
 		"resource":    req.GetResource(),
 		"resource_id": req.GetResourceId(),
-		"client_ip":   req.GetClientIp(),
-		"user_agent":  req.GetUserAgent(),
-		"country":     req.GetCountry(),
-		"platform":    req.GetPlatform().String(),
-		"referrer":    req.GetReferrer(),
 		"success":     req.GetSuccess(),
 		"duration_ms": req.GetDurationMs(),
 		"metadata":    req.GetMetadata(),
+	}
+
+	// Add comprehensive client information
+	if clientInfo != nil {
+		doc["client_info"] = map[string]interface{}{
+			// Network Information
+			"ip_address":        clientInfo.GetIpAddress(),
+			"user_agent":        clientInfo.GetUserAgent(),
+			"x_forwarded_for":   clientInfo.GetXForwardedFor(),
+			"x_real_ip":         clientInfo.GetXRealIp(),
+			"x_forwarded_proto": clientInfo.GetXForwardedProto(),
+			"x_forwarded_host":  clientInfo.GetXForwardedHost(),
+
+			// Browser Information
+			"accept_language": clientInfo.GetAcceptLanguage(),
+			"accept_encoding": clientInfo.GetAcceptEncoding(),
+			"accept":          clientInfo.GetAccept(),
+			"cache_control":   clientInfo.GetCacheControl(),
+			"connection":      clientInfo.GetConnection(),
+			"dnt":             clientInfo.GetDnt(),
+
+			// Security Headers
+			"sec_ch_ua":          clientInfo.GetSecChUa(),
+			"sec_ch_ua_mobile":   clientInfo.GetSecChUaMobile(),
+			"sec_ch_ua_platform": clientInfo.GetSecChUaPlatform(),
+			"sec_fetch_site":     clientInfo.GetSecFetchSite(),
+			"sec_fetch_mode":     clientInfo.GetSecFetchMode(),
+			"sec_fetch_user":     clientInfo.GetSecFetchUser(),
+			"sec_fetch_dest":     clientInfo.GetSecFetchDest(),
+
+			// Referrer Information
+			"referer": clientInfo.GetReferer(),
+			"origin":  clientInfo.GetOrigin(),
+
+			// Cloudflare Headers
+			"cf_connecting_ip": clientInfo.GetCfConnectingIp(),
+			"cf_ipcountry":     clientInfo.GetCfIpcountry(),
+			"cf_ray":           clientInfo.GetCfRay(),
+			"cf_visitor":       clientInfo.GetCfVisitor(),
+
+			// UTM Parameters
+			"utm_source":   clientInfo.GetUtmSource(),
+			"utm_medium":   clientInfo.GetUtmMedium(),
+			"utm_campaign": clientInfo.GetUtmCampaign(),
+			"utm_term":     clientInfo.GetUtmTerm(),
+			"utm_content":  clientInfo.GetUtmContent(),
+
+			// Custom Tracking Headers
+			"x_client_id":      clientInfo.GetXClientId(),
+			"x_session_id":     clientInfo.GetXSessionId(),
+			"x_request_id":     clientInfo.GetXRequestId(),
+			"x_correlation_id": clientInfo.GetXCorrelationId(),
+
+			// Processed Information
+			"platform":        clientInfo.GetPlatform().String(),
+			"device_type":     clientInfo.GetDeviceType().String(),
+			"browser":         clientInfo.GetBrowser(),
+			"browser_version": clientInfo.GetBrowserVersion(),
+			"os":              clientInfo.GetOs(),
+			"os_version":      clientInfo.GetOsVersion(),
+			"country":         clientInfo.GetCountry(),
+			"city":            clientInfo.GetCity(),
+			"timezone":        clientInfo.GetTimezone(),
+			"languages":       clientInfo.GetLanguages(),
+			"is_mobile":       clientInfo.GetIsMobile(),
+			"is_tablet":       clientInfo.GetIsTablet(),
+			"is_bot":          clientInfo.GetIsBot(),
+			"trust_score":     clientInfo.GetTrustScore(),
+
+			// Behavioral Indicators
+			"has_ad_blocker": clientInfo.GetHasAdBlocker(),
+			"supports_webgl": clientInfo.GetSupportsWebgl(),
+			"supports_touch": clientInfo.GetSupportsTouch(),
+			"screen_width":   clientInfo.GetScreenWidth(),
+			"screen_height":  clientInfo.GetScreenHeight(),
+			"color_depth":    clientInfo.GetColorDepth(),
+			"browser_engine": clientInfo.GetBrowserEngine(),
+		}
+
+		// Add backward compatibility fields for easy querying
+		doc["client_ip"] = clientInfo.GetIpAddress()
+		doc["user_agent"] = clientInfo.GetUserAgent()
+		doc["country"] = clientInfo.GetCountry()
+		doc["platform"] = clientInfo.GetPlatform().String()
+		doc["referrer"] = clientInfo.GetReferer()
+	} else {
+		// Fallback for missing client info
+		doc["client_info"] = nil
+		doc["client_ip"] = "unknown"
+		doc["user_agent"] = "unknown"
+		doc["country"] = "unknown"
+		doc["platform"] = "unknown"
+		doc["referrer"] = ""
 	}
 
 	docBytes, err := json.Marshal(doc)
@@ -464,7 +554,10 @@ func (db *ActivityDB) saveToTimeSeries(ctx context.Context, req *pb.TrackActivit
 
 	activityID := fmt.Sprintf("activity_%d_%s", time.Now().UnixNano(), req.GetUserId())
 
-	// Optimized document structure for time-series (performance focused)
+	// Extract client information
+	clientInfo := req.GetClientInfo()
+
+	// Optimized document structure for time-series (performance focused, essential fields only)
 	doc := map[string]interface{}{
 		"@timestamp":  time.Now().Format(time.RFC3339),
 		"user_id":     req.GetUserId(),
@@ -474,9 +567,24 @@ func (db *ActivityDB) saveToTimeSeries(ctx context.Context, req *pb.TrackActivit
 		"resource_id": req.GetResourceId(),
 		"success":     req.GetSuccess(),
 		"duration_ms": req.GetDurationMs(),
-		"platform":    req.GetPlatform().String(),
-		"client_ip":   req.GetClientIp(),
 		"category":    req.GetCategory().String(),
+	}
+
+	// Add essential client info for time-series (lightweight for performance)
+	if clientInfo != nil {
+		doc["client_ip"] = clientInfo.GetIpAddress()
+		doc["platform"] = clientInfo.GetPlatform().String()
+		doc["country"] = clientInfo.GetCountry()
+		doc["is_bot"] = clientInfo.GetIsBot()
+		doc["utm_source"] = clientInfo.GetUtmSource()
+		doc["utm_campaign"] = clientInfo.GetUtmCampaign()
+	} else {
+		doc["client_ip"] = "unknown"
+		doc["platform"] = "unknown"
+		doc["country"] = "unknown"
+		doc["is_bot"] = false
+		doc["utm_source"] = ""
+		doc["utm_campaign"] = ""
 	}
 
 	docBytes, err := json.Marshal(doc)
@@ -656,20 +764,60 @@ func (db *ActivityDB) convertToActivityEvent(doc map[string]interface{}) *pb.Act
 	if resourceID, ok := doc["resource_id"].(string); ok {
 		activity.ResourceId = resourceID
 	}
-	if clientIP, ok := doc["client_ip"].(string); ok {
-		activity.ClientIp = clientIP
-	}
-	if userAgent, ok := doc["user_agent"].(string); ok {
-		activity.UserAgent = userAgent
-	}
-	if country, ok := doc["country"].(string); ok {
-		activity.Country = country
-	}
-	if platform, ok := doc["platform"].(string); ok {
-		activity.Platform = db.stringToPlatform(platform)
-	}
-	if referrer, ok := doc["referrer"].(string); ok {
-		activity.Referrer = referrer
+	// Convert client_info from document
+	activity.ClientInfo = &pb.ClientInfo{}
+
+	// Check if we have the comprehensive client_info object
+	if clientInfoObj, ok := doc["client_info"].(map[string]interface{}); ok && clientInfoObj != nil {
+		// Extract comprehensive client information
+		if ipAddress, ok := clientInfoObj["ip_address"].(string); ok {
+			activity.ClientInfo.IpAddress = ipAddress
+		}
+		if userAgent, ok := clientInfoObj["user_agent"].(string); ok {
+			activity.ClientInfo.UserAgent = userAgent
+		}
+		if country, ok := clientInfoObj["country"].(string); ok {
+			activity.ClientInfo.Country = country
+		}
+		if platform, ok := clientInfoObj["platform"].(string); ok {
+			activity.ClientInfo.Platform = db.stringToPlatform(platform)
+		}
+		if referer, ok := clientInfoObj["referer"].(string); ok {
+			activity.ClientInfo.Referer = referer
+		}
+		if utmSource, ok := clientInfoObj["utm_source"].(string); ok {
+			activity.ClientInfo.UtmSource = utmSource
+		}
+		if utmCampaign, ok := clientInfoObj["utm_campaign"].(string); ok {
+			activity.ClientInfo.UtmCampaign = utmCampaign
+		}
+		if browser, ok := clientInfoObj["browser"].(string); ok {
+			activity.ClientInfo.Browser = browser
+		}
+		if isBot, ok := clientInfoObj["is_bot"].(bool); ok {
+			activity.ClientInfo.IsBot = isBot
+		}
+		if trustScore, ok := clientInfoObj["trust_score"].(float64); ok {
+			activity.ClientInfo.TrustScore = trustScore
+		}
+		// Add more fields as needed...
+	} else {
+		// Fallback to backward compatibility fields
+		if clientIP, ok := doc["client_ip"].(string); ok {
+			activity.ClientInfo.IpAddress = clientIP
+		}
+		if userAgent, ok := doc["user_agent"].(string); ok {
+			activity.ClientInfo.UserAgent = userAgent
+		}
+		if country, ok := doc["country"].(string); ok {
+			activity.ClientInfo.Country = country
+		}
+		if platform, ok := doc["platform"].(string); ok {
+			activity.ClientInfo.Platform = db.stringToPlatform(platform)
+		}
+		if referrer, ok := doc["referrer"].(string); ok {
+			activity.ClientInfo.Referer = referrer
+		}
 	}
 	if success, ok := doc["success"].(bool); ok {
 		activity.Success = success
@@ -965,6 +1113,9 @@ func (db *ActivityDB) SaveActivityToTimeSeries(ctx context.Context, req *pb.Trac
 
 	activityID := fmt.Sprintf("activity_%d_%s", time.Now().UnixNano(), req.GetUserId())
 
+	// Extract client information
+	clientInfo := req.GetClientInfo()
+
 	// Simplified document structure for time-series (optimized for performance)
 	doc := map[string]interface{}{
 		"@timestamp":  time.Now().Format(time.RFC3339),
@@ -975,8 +1126,19 @@ func (db *ActivityDB) SaveActivityToTimeSeries(ctx context.Context, req *pb.Trac
 		"resource_id": req.GetResourceId(),
 		"success":     req.GetSuccess(),
 		"duration_ms": req.GetDurationMs(),
-		"platform":    req.GetPlatform().String(),
-		"client_ip":   req.GetClientIp(),
+	}
+
+	// Add essential client info for time-series (minimal set for performance)
+	if clientInfo != nil {
+		doc["platform"] = clientInfo.GetPlatform().String()
+		doc["client_ip"] = clientInfo.GetIpAddress()
+		doc["country"] = clientInfo.GetCountry()
+		doc["is_bot"] = clientInfo.GetIsBot()
+	} else {
+		doc["platform"] = "unknown"
+		doc["client_ip"] = "unknown"
+		doc["country"] = "unknown"
+		doc["is_bot"] = false
 	}
 
 	docBytes, err := json.Marshal(doc)

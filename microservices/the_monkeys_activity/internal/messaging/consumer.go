@@ -89,10 +89,15 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 			"action", activityReq.Action,
 			"category", activityReq.Category.String())
 
-		// Fix empty client_ip field to prevent Elasticsearch validation errors
-		if activityReq.ClientIp == "" {
-			activityReq.ClientIp = "127.0.0.1" // Default to localhost for empty IP
-			log.Debugw("fixed empty client_ip field", "user_id", activityReq.UserId, "default_ip", "127.0.0.1")
+		// Fix empty client_info.ip_address field to prevent Elasticsearch validation errors
+		if activityReq.ClientInfo == nil {
+			activityReq.ClientInfo = &pb.ClientInfo{
+				IpAddress: "127.0.0.1", // Default to localhost for empty IP
+			}
+			log.Debugw("created missing client_info with default IP", "user_id", activityReq.UserId, "default_ip", "127.0.0.1")
+		} else if activityReq.ClientInfo.IpAddress == "" {
+			activityReq.ClientInfo.IpAddress = "127.0.0.1" // Default to localhost for empty IP
+			log.Debugw("fixed empty client_info.ip_address field", "user_id", activityReq.UserId, "default_ip", "127.0.0.1")
 		}
 
 		// Store the activity in Elasticsearch
@@ -312,11 +317,15 @@ func (ac *ActivityConsumer) processMessage(msg amqp.Delivery) {
 	}
 
 	// Log the received activity
+	platform := "unknown"
+	if activityReq.ClientInfo != nil {
+		platform = activityReq.ClientInfo.Platform.String()
+	}
 	ac.logger.Debugw("processing activity tracking message",
 		"user_id", activityReq.UserId,
 		"action", activityReq.Action,
 		"category", activityReq.Category,
-		"platform", activityReq.Platform.String())
+		"platform", platform)
 
 	// Store the activity in Elasticsearch
 	if err := ac.storeActivity(&activityReq); err != nil {

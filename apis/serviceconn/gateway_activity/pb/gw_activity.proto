@@ -150,16 +150,12 @@ message ActivityEvent {
   string action = 6;
   string resource = 7;
   string resource_id = 8;
-  string client_ip = 9;
-  string user_agent = 10;
-  string country = 11;
-  Platform platform = 12;
-  string referrer = 13;
-  google.protobuf.Struct metadata = 14;
-  bool success = 15;
-  int64 duration_ms = 16;
-  google.protobuf.Timestamp timestamp = 17;
-  google.protobuf.Timestamp created_at = 18;
+  ClientInfo client_info = 9;
+  google.protobuf.Struct metadata = 10;
+  bool success = 11;
+  int64 duration_ms = 12;
+  google.protobuf.Timestamp timestamp = 13;
+  google.protobuf.Timestamp created_at = 14;
 }
 
 message SecurityEvent {
@@ -436,6 +432,82 @@ message PerformanceEvent {
 
 // Request/Response Messages
 
+// Client Information for comprehensive tracking
+message ClientInfo {
+  // Network Information
+  string ip_address = 1;
+  string user_agent = 2;
+  string x_forwarded_for = 3;
+  string x_real_ip = 4;
+  string x_forwarded_proto = 5;
+  string x_forwarded_host = 6;
+  
+  // Browser Information
+  string accept_language = 7;
+  string accept_encoding = 8;
+  string accept = 9;
+  string cache_control = 10;
+  string connection = 11;
+  string dnt = 12; // Do Not Track
+  
+  // Security Headers
+  string sec_ch_ua = 13;
+  string sec_ch_ua_mobile = 14;
+  string sec_ch_ua_platform = 15;
+  string sec_fetch_site = 16;
+  string sec_fetch_mode = 17;
+  string sec_fetch_user = 18;
+  string sec_fetch_dest = 19;
+  
+  // Referrer Information
+  string referer = 20;
+  string origin = 21;
+  
+  // Cloudflare Headers (if applicable)
+  string cf_connecting_ip = 22;
+  string cf_ipcountry = 23;
+  string cf_ray = 24;
+  string cf_visitor = 25;
+  
+  // UTM Parameters
+  string utm_source = 26;
+  string utm_medium = 27;
+  string utm_campaign = 28;
+  string utm_term = 29;
+  string utm_content = 30;
+  
+  // Custom Tracking Headers
+  string x_client_id = 31;
+  string x_session_id = 32;
+  string x_request_id = 33;
+  string x_correlation_id = 34;
+  
+  // Processed Information (derived from headers)
+  Platform platform = 35;
+  DeviceType device_type = 36;
+  string browser = 37;
+  string browser_version = 38;
+  string os = 39;
+  string os_version = 40;
+  string country = 41;
+  string city = 42;
+  string timezone = 43;
+  repeated string languages = 44;
+  bool is_mobile = 45;
+  bool is_tablet = 46;
+  bool is_bot = 47;
+  double trust_score = 48;
+  
+  // Behavioral Indicators
+  bool has_ad_blocker = 49;
+  bool supports_webgl = 50;
+  bool supports_touch = 51;
+  int32 screen_width = 52;
+  int32 screen_height = 53;
+  int32 color_depth = 54;
+  string browser_engine = 55;
+}
+
 // Track Activity
 message TrackActivityRequest {
   string user_id = 1;
@@ -445,14 +517,10 @@ message TrackActivityRequest {
   string action = 5;
   string resource = 6;
   string resource_id = 7;
-  string client_ip = 8;
-  string user_agent = 9;
-  string country = 10;
-  Platform platform = 11;
-  string referrer = 12;
-  google.protobuf.Struct metadata = 13;
-  bool success = 14;
-  int64 duration_ms = 15;
+  ClientInfo client_info = 8;
+  google.protobuf.Struct metadata = 9;
+  bool success = 10;
+  int64 duration_ms = 11;
 }
 
 message TrackActivityResponse {

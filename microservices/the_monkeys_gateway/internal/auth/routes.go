@@ -28,6 +28,62 @@ type ServiceClient struct {
 	googleOauthConfig *oauth2.Config
 }
 
+// createClientInfo creates a comprehensive ClientInfo protobuf message from gin context
+func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
+	// Get comprehensive client information using enhanced utility function
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get platform enum for protobuf
+	platform := utils.GetAuthPlatform(ctx)
+
+	return &pb.ClientInfo{
+		// Basic client information
+		IpAddress: clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  platform,
+
+		// Enhanced Browser fingerprinting
+		AcceptLanguage:   clientInfo.AcceptLanguage,
+		AcceptEncoding:   clientInfo.AcceptEncoding,
+		Dnt:              clientInfo.DNT,
+		Timezone:         clientInfo.Timezone,
+		ScreenResolution: clientInfo.ScreenResolution,
+		ColorDepth:       clientInfo.ColorDepth,
+		DeviceMemory:     clientInfo.DeviceMemory,
+		Languages:        clientInfo.Languages,
+
+		// Location & Geographic hints
+		Country:        clientInfo.Country,
+		TimezoneOffset: clientInfo.TimezoneOffset,
+
+		// Marketing & UTM tracking
+		UtmSource:   clientInfo.UTMSource,
+		UtmMedium:   clientInfo.UTMMedium,
+		UtmCampaign: clientInfo.UTMCampaign,
+		UtmContent:  clientInfo.UTMContent,
+		UtmTerm:     clientInfo.UTMTerm,
+
+		// Behavioral indicators
+		IsBot:        clientInfo.IsBot,
+		TrustScore:   clientInfo.TrustScore,
+		RequestCount: int32(clientInfo.RequestCount),
+
+		// Technical environment
+		IsSecureContext:   clientInfo.IsSecureContext,
+		ConnectionType:    clientInfo.ConnectionType,
+		BrowserEngine:     clientInfo.BrowserEngine,
+		JavascriptEnabled: clientInfo.JavaScriptEnabled,
+
+		// Timestamps
+		FirstSeen:   clientInfo.FirstSeen,
+		LastSeen:    clientInfo.LastSeen,
+		CollectedAt: clientInfo.CollectedAt,
+	}
+}
+
 // InitServiceClient initializes the gRPC connection to the auth service.
 func InitServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.AuthServiceClient {
 	authService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAuthz, cfg.Microservices.AuthzPort)
@@ -100,7 +156,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		return
 	}
 
-	// check for google login
+	// Check for google login
 	var loginMethod pb.RegisterUserRequest_LoginMethod
 	switch body.LoginMethod {
 	case "google-oauth2":
@@ -109,8 +165,12 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		loginMethod = pb.RegisterUserRequest_The_MONKEYS
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
+	// Get comprehensive client information using helper function
+	clientInfo := asc.createClientInfo(ctx)
+
+	// Log registration attempt with enhanced tracking
+	asc.Log.Debug("Registration attempt from IP: %s, User-Agent: %s, Platform: %s, SessionID: %s",
+		clientInfo.IpAddress, clientInfo.UserAgent, clientInfo.Platform, clientInfo.SessionId)
 
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
 		FirstName:   body.FirstName,
@@ -118,11 +178,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		Email:       body.Email,
 		Password:    body.Password,
 		LoginMethod: loginMethod,
-		IpAddress:   clientInfo.IPAddress,
-		Client:      clientInfo.ClientType,
-		UserAgent:   clientInfo.UserAgent,
-		Referrer:    clientInfo.Referrer,
-		Platform:    pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		ClientInfo:  clientInfo,
 	})
 
 	if err != nil {
@@ -147,6 +203,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 			}
 		}
 	}
+
 	ctx.JSON(int(res.StatusCode), &res)
 }
 
@@ -163,17 +220,10 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 
 	body.Email = strings.TrimSpace(body.Email)
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	res, err := asc.Client.Login(context.Background(), &pb.LoginUserRequest{
-		Email:     body.Email,
-		Password:  body.Password,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Email:      body.Email,
+		Password:   body.Password,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -218,16 +268,9 @@ func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	res, err := asc.Client.ForgotPassword(context.Background(), &pb.ForgotPasswordReq{
-		Email:     body.Email,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Email:      body.Email,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -252,17 +295,10 @@ func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 	userAny := ctx.Query("user")
 	secretAny := ctx.Query("evpw")
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	res, err := asc.Client.ResetPassword(context.Background(), &pb.ResetPasswordReq{
-		Username:  userAny,
-		Token:     secretAny,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Username:   userAny,
+		Token:      secretAny,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -315,18 +351,11 @@ func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	resp, err := asc.Client.UpdatePassword(context.Background(), &pb.UpdatePasswordReq{
-		Password:  pass.NewPassword,
-		Username:  res.UserName,
-		Email:     res.Email,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Password:   pass.NewPassword,
+		Username:   res.UserName,
+		Email:      res.Email,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -356,16 +385,9 @@ func (asc *ServiceClient) ReqEmailVerification(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	res, err := asc.Client.RequestForEmailVerification(context.Background(), &pb.EmailVerificationReq{
-		Email:     vrEmail.Email,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Email:      vrEmail.Email,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -395,18 +417,11 @@ func (asc *ServiceClient) VerifyEmail(ctx *gin.Context) {
 	username := ctx.Query("user")
 	evSecret := ctx.Query("evpw")
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	// Verify Headers
 	res, err := asc.Client.VerifyEmail(context.Background(), &pb.VerifyEmailReq{
-		Username:  username,
-		Token:     evSecret,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Username:   username,
+		Token:      evSecret,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -490,9 +505,6 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	var newUsername UpdateUsername
 
 	if err := ctx.BindJSON(&newUsername); err != nil {
@@ -508,11 +520,7 @@ func (asc *ServiceClient) UpdateUserName(ctx *gin.Context) {
 	resp, err := asc.Client.UpdateUsername(context.Background(), &pb.UpdateUsernameReq{
 		CurrentUsername: currentUsername,
 		NewUsername:     newUsername.Username,
-		Client:          clientInfo.ClientType,
-		Ip:              clientInfo.IPAddress,
-		UserAgent:       clientInfo.UserAgent,
-		Referrer:        clientInfo.Referrer,
-		Platform:        pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		ClientInfo:      asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -545,9 +553,6 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	var updatePass UpdatePassword
 
 	if err := ctx.BindJSON(&updatePass); err != nil {
@@ -559,11 +564,7 @@ func (asc *ServiceClient) ChangePasswordWithCurrentPassword(ctx *gin.Context) {
 		Username:        username,
 		CurrentPassword: updatePass.CurrentPassword,
 		NewPassword:     updatePass.NewPassword,
-		Client:          clientInfo.ClientType,
-		IpAddress:       clientInfo.IPAddress,
-		UserAgent:       clientInfo.UserAgent,
-		Referrer:        clientInfo.Referrer,
-		Platform:        pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		ClientInfo:      asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -591,9 +592,6 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(ctx)
-
 	var emailBody GetEmail
 
 	if err := ctx.BindJSON(&emailBody); err != nil {
@@ -602,13 +600,9 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 	}
 
 	resp, err := asc.Client.UpdateEmailId(context.Background(), &pb.UpdateEmailIdReq{
-		Username:  username,
-		NewEmail:  emailBody.Email,
-		Client:    clientInfo.ClientType,
-		IpAddress: clientInfo.IPAddress,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		Username:   username,
+		NewEmail:   emailBody.Email,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -673,19 +667,12 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Get client information using utility function
-	clientInfo := utils.GetClientInfo(c)
-
 	loginResp, err := asc.Client.GoogleLogin(context.Background(), &pb.RegisterUserRequest{
 		Email:       userInfo.Email,
 		LoginMethod: pb.RegisterUserRequest_GOOGLE_ACC,
 		FirstName:   userInfo.GivenName,
 		LastName:    userInfo.FamilyName,
-		IpAddress:   clientInfo.IPAddress,
-		Client:      clientInfo.ClientType,
-		UserAgent:   clientInfo.UserAgent,
-		Referrer:    clientInfo.Referrer,
-		Platform:    pb.Platform_PLATFORM_UNSPECIFIED, // Let activity service detect platform
+		ClientInfo:  asc.createClientInfo(c),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login using google"})

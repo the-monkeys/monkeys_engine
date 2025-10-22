@@ -51,6 +51,356 @@ func generateGUID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
+// Helper method to extract UTM parameters from referrer URL
+func (blog *BlogService) extractUTMFromReferrer(referrer, utmParam string) string {
+	if referrer == "" {
+		return ""
+	}
+
+	// Simple URL parameter extraction
+	paramPrefix := utmParam + "="
+	if idx := strings.Index(referrer, paramPrefix); idx != -1 {
+		start := idx + len(paramPrefix)
+		end := strings.IndexAny(referrer[start:], "&# ")
+		if end == -1 {
+			return referrer[start:]
+		}
+		return referrer[start : start+end]
+	}
+	return ""
+}
+
+// ComprehensiveClientInfo represents all client information extracted from requests
+type ComprehensiveClientInfo struct {
+	// Basic client information
+	IPAddress string
+	Client    string
+	SessionID string
+	UserAgent string
+	Referrer  string
+	Platform  pb.Platform
+
+	// Enhanced Browser fingerprinting
+	AcceptLanguage   string
+	AcceptEncoding   string
+	DNT              string
+	Timezone         string
+	ScreenResolution string
+	ColorDepth       string
+	DeviceMemory     string
+	Languages        []string
+
+	// Location & Geographic hints
+	Country        string
+	TimezoneOffset string
+
+	// Marketing & UTM tracking
+	UTMSource   string
+	UTMMedium   string
+	UTMCampaign string
+	UTMContent  string
+	UTMTerm     string
+
+	// Behavioral indicators
+	IsBot        bool
+	TrustScore   float64
+	RequestCount int32
+
+	// Technical environment
+	IsSecureContext   bool
+	ConnectionType    string
+	BrowserEngine     string
+	JavaScriptEnabled bool
+
+	// Timestamps
+	FirstSeen   string
+	LastSeen    string
+	CollectedAt string
+}
+
+// Helper method to extract comprehensive client info from any request type
+func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClientInfo {
+	var clientInfo *pb.ClientInfo
+	var sessionID, ipAddress, userAgent, referrer, client string
+	var platform pb.Platform
+
+	// Extract ClientInfo from different request types
+	switch r := req.(type) {
+	case *pb.BlogReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.DraftBlogRequest:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.PublishBlogReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.DeleteBlogReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.BlogListReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.SearchReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else if r != nil {
+			// Fallback to individual fields if ClientInfo not available
+			sessionID = r.GetSessionId()
+			ipAddress = r.GetIp()
+			userAgent = r.GetUserAgent()
+			referrer = r.GetReferrer()
+			platform = r.GetPlatform()
+			client = r.GetClient()
+		}
+	case *pb.BlogByIdReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else {
+			blog.logger.Debugf("BlogByIdReq doesn't have client tracking fields, using defaults")
+		}
+	case *pb.ArchiveBlogReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		} else {
+			blog.logger.Debugf("ArchiveBlogReq doesn't have client tracking fields, using defaults")
+		}
+	case *pb.GetBlogsByTagsNameReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		}
+	case *pb.GetBlogsReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		}
+	case *pb.GetBlogsBySliceReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		}
+	default:
+		// Fallback for unknown request types
+		blog.logger.Debugf("Unknown request type for client tracking: %T", req)
+		return &ComprehensiveClientInfo{
+			SessionID: blog.generateSessionID(),
+			Platform:  pb.Platform_PLATFORM_UNSPECIFIED,
+		}
+	}
+
+	// If we have comprehensive ClientInfo, use it
+	if clientInfo != nil {
+		// Generate session ID if not provided
+		sessionIDFromClient := clientInfo.GetSessionId()
+		if sessionIDFromClient == "" {
+			sessionIDFromClient = blog.generateSessionID()
+		}
+
+		return &ComprehensiveClientInfo{
+			// Basic client information
+			IPAddress: clientInfo.GetIpAddress(),
+			Client:    clientInfo.GetClient(),
+			SessionID: sessionIDFromClient,
+			UserAgent: clientInfo.GetUserAgent(),
+			Referrer:  clientInfo.GetReferrer(),
+			Platform:  clientInfo.GetPlatform(),
+
+			// Enhanced Browser fingerprinting
+			AcceptLanguage:   clientInfo.GetAcceptLanguage(),
+			AcceptEncoding:   clientInfo.GetAcceptEncoding(),
+			DNT:              clientInfo.GetDnt(),
+			Timezone:         clientInfo.GetTimezone(),
+			ScreenResolution: clientInfo.GetScreenResolution(),
+			ColorDepth:       clientInfo.GetColorDepth(),
+			DeviceMemory:     clientInfo.GetDeviceMemory(),
+			Languages:        clientInfo.GetLanguages(),
+
+			// Location & Geographic hints
+			Country:        clientInfo.GetCountry(),
+			TimezoneOffset: clientInfo.GetTimezoneOffset(),
+
+			// Marketing & UTM tracking
+			UTMSource:   clientInfo.GetUtmSource(),
+			UTMMedium:   clientInfo.GetUtmMedium(),
+			UTMCampaign: clientInfo.GetUtmCampaign(),
+			UTMContent:  clientInfo.GetUtmContent(),
+			UTMTerm:     clientInfo.GetUtmTerm(),
+
+			// Behavioral indicators
+			IsBot:        clientInfo.GetIsBot(),
+			TrustScore:   float64(clientInfo.GetTrustScore()),
+			RequestCount: clientInfo.GetRequestCount(),
+
+			// Technical environment
+			IsSecureContext:   clientInfo.GetIsSecureContext(),
+			ConnectionType:    clientInfo.GetConnectionType(),
+			BrowserEngine:     clientInfo.GetBrowserEngine(),
+			JavaScriptEnabled: clientInfo.GetJavascriptEnabled(),
+
+			// Timestamps
+			FirstSeen:   clientInfo.GetFirstSeen(),
+			LastSeen:    clientInfo.GetLastSeen(),
+			CollectedAt: clientInfo.GetCollectedAt(),
+		}
+	}
+
+	// Fallback to individual fields if ClientInfo not available
+	// Generate session ID if not provided
+	if sessionID == "" {
+		sessionID = blog.generateSessionID()
+	}
+
+	// Extract what we can from UserAgent and other available fields
+	var isBot bool
+	var browserEngine, acceptLanguage string
+	var isSecureContext, jsEnabled bool
+	var trustScore float64
+
+	if userAgent != "" {
+		userAgentLower := strings.ToLower(userAgent)
+
+		// Detect if it's a bot
+		isBot = strings.Contains(userAgentLower, "bot") ||
+			strings.Contains(userAgentLower, "crawler") ||
+			strings.Contains(userAgentLower, "spider") ||
+			strings.Contains(userAgentLower, "scraper")
+
+		// Extract browser engine from user agent
+		if strings.Contains(userAgentLower, "webkit") {
+			browserEngine = "WebKit"
+		} else if strings.Contains(userAgentLower, "gecko") {
+			browserEngine = "Gecko"
+		} else if strings.Contains(userAgentLower, "trident") {
+			browserEngine = "Trident"
+		} else if strings.Contains(userAgentLower, "edg") {
+			browserEngine = "EdgeHTML"
+		}
+
+		// Assume JavaScript is enabled for web browsers (not for bots/API clients)
+		jsEnabled = !isBot && (platform == pb.Platform_PLATFORM_WEB ||
+			platform == pb.Platform_PLATFORM_MOBILE ||
+			platform == pb.Platform_PLATFORM_TABLET)
+
+		// Basic trust score calculation
+		trustScore = 0.5 // Base score
+		if isBot {
+			trustScore = 0.2
+		} else if platform == pb.Platform_PLATFORM_API {
+			trustScore = 0.7
+		} else {
+			trustScore = 0.8
+		}
+	}
+
+	// Detect secure context from referrer or assume HTTPS for modern browsers
+	if referrer != "" {
+		isSecureContext = strings.HasPrefix(strings.ToLower(referrer), "https://")
+	} else {
+		isSecureContext = true // Assume secure context by default
+	}
+
+	// Extract language from user agent if possible
+	var languages []string
+	if userAgent != "" && strings.Contains(userAgent, "en-") {
+		acceptLanguage = "en-US,en;q=0.9"
+		languages = []string{"en-US", "en"}
+	} else if userAgent != "" {
+		acceptLanguage = "en-US,en;q=0.9" // Default fallback
+		languages = []string{"en-US"}
+	}
+
+	// Create comprehensive structure with available individual field data and intelligent defaults
+	return &ComprehensiveClientInfo{
+		// Basic client information (available from individual fields)
+		IPAddress: ipAddress,
+		Client:    client,
+		SessionID: sessionID,
+		UserAgent: userAgent,
+		Referrer:  referrer,
+		Platform:  platform,
+
+		// Enhanced fields (intelligent extraction from available data)
+		AcceptLanguage:   acceptLanguage,
+		AcceptEncoding:   "gzip, deflate, br", // Common default
+		DNT:              "0",                 // Default: tracking allowed
+		Timezone:         "UTC",               // Default timezone
+		ScreenResolution: "",                  // Cannot determine from server-side
+		ColorDepth:       "24",                // Common default
+		DeviceMemory:     "",                  // Cannot determine from server-side
+		Languages:        languages,
+
+		// Location & Geographic hints (can be enhanced with GeoIP later)
+		Country:        "",       // TODO: Add GeoIP lookup for country detection
+		TimezoneOffset: "+00:00", // UTC default
+
+		// Marketing & UTM tracking (extract from referrer if possible)
+		UTMSource:   blog.extractUTMFromReferrer(referrer, "utm_source"),
+		UTMMedium:   blog.extractUTMFromReferrer(referrer, "utm_medium"),
+		UTMCampaign: blog.extractUTMFromReferrer(referrer, "utm_campaign"),
+		UTMContent:  blog.extractUTMFromReferrer(referrer, "utm_content"),
+		UTMTerm:     blog.extractUTMFromReferrer(referrer, "utm_term"),
+
+		// Behavioral indicators (intelligent calculation)
+		IsBot:        isBot,
+		TrustScore:   trustScore,
+		RequestCount: 1, // First request in this context
+
+		// Technical environment (intelligent detection)
+		IsSecureContext:   isSecureContext,
+		ConnectionType:    "", // Cannot determine from server-side
+		BrowserEngine:     browserEngine,
+		JavaScriptEnabled: jsEnabled,
+
+		// Timestamps
+		FirstSeen:   time.Now().Format(time.RFC3339),
+		LastSeen:    time.Now().Format(time.RFC3339),
+		CollectedAt: time.Now().Format(time.RFC3339),
+	}
+}
+
 // Helper method to detect platform from user agent or request platform
 func (blog *BlogService) detectPlatform(userAgent string, reqPlatform pb.Platform) activitypb.Platform {
 	// If platform is provided in request, convert it
@@ -101,72 +451,57 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 	}()
 }
 
-// Helper method to track blog activities
+// Helper method to track blog activities with comprehensive client information
 func (blog *BlogService) trackBlogActivity(accountId, action, resource, resourceId string, req interface{}) {
-	var sessionID, ipAddress, userAgent, referrer string
-	var platform pb.Platform
+	// Extract comprehensive client information
+	clientInfo := blog.extractClientInfo(req)
 
-	// Extract common fields from different request types
-	switch r := req.(type) {
-	case *pb.BlogReq:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
-	case *pb.DraftBlogRequest:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
-	case *pb.PublishBlogReq:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
-	case *pb.DeleteBlogReq:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
-	case *pb.BlogListReq:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
-	case *pb.SearchReq:
-		sessionID = r.GetSessionId()
-		ipAddress = r.GetIp()
-		userAgent = r.GetUserAgent()
-		referrer = r.GetReferrer()
-		platform = r.GetPlatform()
+	// Create comprehensive ClientInfo for activity tracking
+	activityClientInfo := &activitypb.ClientInfo{
+		IpAddress:      clientInfo.IPAddress,
+		UserAgent:      clientInfo.UserAgent,
+		AcceptLanguage: clientInfo.AcceptLanguage,
+		AcceptEncoding: clientInfo.AcceptEncoding,
+		Dnt:            clientInfo.DNT,
+		Referer:        clientInfo.Referrer,
+		Platform:       blog.detectPlatform(clientInfo.UserAgent, clientInfo.Platform),
+		Country:        clientInfo.Country,
+		IsBot:          clientInfo.IsBot,
+		TrustScore:     clientInfo.TrustScore,
+		BrowserEngine:  clientInfo.BrowserEngine,
+		UtmSource:      clientInfo.UTMSource,
+		UtmMedium:      clientInfo.UTMMedium,
+		UtmCampaign:    clientInfo.UTMCampaign,
+		UtmTerm:        clientInfo.UTMTerm,
+		UtmContent:     clientInfo.UTMContent,
+		Timezone:       clientInfo.Timezone,
+		Languages:      clientInfo.Languages,
+		XClientId:      "", // TODO: Extract if available
+		XSessionId:     clientInfo.SessionID,
+		// Additional fields that can be populated from comprehensive client info
+		Connection: clientInfo.ConnectionType,
+		Origin:     "", // TODO: Extract from referrer if needed
 	}
 
-	if sessionID == "" {
-		sessionID = blog.generateSessionID()
-	}
-
-	// Create activity tracking request with enhanced metadata
+	// Create enhanced activity tracking request with comprehensive client data
 	activityReq := &activitypb.TrackActivityRequest{
 		UserId:     accountId,
 		AccountId:  accountId,
-		SessionId:  sessionID,
+		SessionId:  clientInfo.SessionID,
 		Category:   activitypb.ActivityCategory_CATEGORY_CONTENT,
 		Action:     action,
 		Resource:   resource,
 		ResourceId: resourceId,
-		ClientIp:   ipAddress,
-		UserAgent:  userAgent,
-		Country:    "", // TODO: Add geolocation lookup
-		Platform:   blog.detectPlatform(userAgent, platform),
-		Referrer:   referrer,
+		ClientInfo: activityClientInfo,
 		Success:    true,
 		DurationMs: 0, // TODO: Add timing if needed
 	}
+
+	// Log comprehensive client tracking information for debugging
+	blog.logger.Debugf("Tracking %s activity for user %s - IP: %s, Platform: %s, UserAgent: %s, Country: %s, UTM Source: %s, Trust Score: %f, Browser: %s",
+		action, accountId, clientInfo.IPAddress, clientInfo.Platform,
+		clientInfo.UserAgent, clientInfo.Country, clientInfo.UTMSource,
+		clientInfo.TrustScore, clientInfo.BrowserEngine)
 
 	// Enhanced: Fetch and include detailed metadata for recommendation engine
 	var metadata map[string]interface{}
@@ -376,6 +711,9 @@ func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.BlogById
 		isDraft = true
 	}
 
+	// Track blog activity
+	// blog.trackBlogActivity(req.OwnerAccountId, "check_blog_existence", "blog", req.BlogId, req)
+
 	return &pb.BlogExistsRes{
 		BlogExists: exists,
 		IsDraft:    isDraft,
@@ -395,6 +733,9 @@ func (blog *BlogService) GetDraftBlogsByAccId(ctx context.Context, req *pb.BlogB
 		return nil, status.Errorf(codes.Internal, "cannot get the draft blogs for account id: %s", req.OwnerAccountId)
 	}
 
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_draft_blogs", "user", req.OwnerAccountId, req)
+
 	return res, nil
 }
 
@@ -410,6 +751,9 @@ func (blog *BlogService) GetPublishedBlogsByAccID(ctx context.Context, req *pb.B
 		blog.logger.Errorf("error occurred while getting published blogs for account id: %s, error: %v", req.OwnerAccountId, err)
 		return nil, status.Errorf(codes.Internal, "cannot get the published blogs for account id: %s", req.OwnerAccountId)
 	}
+
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_published_blogs", "user", req.OwnerAccountId, req)
 
 	return res, nil
 }
@@ -427,6 +771,9 @@ func (blog *BlogService) GetDraftBlogById(ctx context.Context, req *pb.BlogByIdR
 		return nil, status.Errorf(codes.NotFound, "no blog found with blogId: %s and ownerAccountId: %s", req.BlogId, req.OwnerAccountId)
 	}
 
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_draft_blog", "blog", req.BlogId, req)
+
 	return res, nil
 }
 
@@ -443,6 +790,9 @@ func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req
 	if res == nil {
 		return nil, status.Errorf(codes.NotFound, "no blog found with blogId: %s and ownerAccountId: %s", req.BlogId, req.OwnerAccountId)
 	}
+
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_published_blog", "blog", req.BlogId, req)
 
 	// Return the found blog
 	return res, nil
@@ -584,12 +934,29 @@ func (blog *BlogService) GetPublishedBlogsByTagsName(ctx context.Context, req *p
 		req.TagNames[i] = strings.TrimSpace(req.TagNames[i])
 	}
 
-	return blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
+	res, err := blog.osClient.GetPublishedBlogByTagsName(ctx, req.TagNames...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track blog activity (call once after the loop, not inside it)
+	blog.trackBlogActivity("", "get_blogs_by_tags", "search", strings.Join(req.TagNames, ","), req)
+
+	return res, nil
 }
 
 func (blog *BlogService) GetPublishedBlogById(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
-	return blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
+
+	res, err := blog.osClient.GetPublishedBlogById(ctx, req.BlogId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_published_blog_by_id", "blog", req.BlogId, req)
+
+	return res, nil
 }
 
 func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlogReq) (*pb.ArchiveBlogResp, error) {
@@ -613,13 +980,25 @@ func (blog *BlogService) ArchiveBlogById(ctx context.Context, req *pb.ArchiveBlo
 	}
 
 	blog.logger.Infof("Blog with ID: %s archived successfully, status code: %v", req.BlogId, updateResp.StatusCode)
+
+	// Track blog activity
+	blog.trackBlogActivity("", "archive_blog", "blog", req.BlogId, req)
+
 	return &pb.ArchiveBlogResp{
 		Message: fmt.Sprintf("Blog %s has been archived!", req.BlogId),
 	}, nil
 }
 
 func (blog *BlogService) GetLatest100Blogs(ctx context.Context, req *pb.GetBlogsByTagsNameReq) (*pb.GetBlogsByTagsNameRes, error) {
-	return blog.osClient.GetLast100BlogsLatestFirst(ctx)
+	res, err := blog.osClient.GetLast100BlogsLatestFirst(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track blog activity
+	blog.trackBlogActivity("", "get_latest_blogs", "search", "latest_100", req)
+
+	return res, nil
 }
 
 // TODO: Incase of blog doesn't exists, do return 404
@@ -671,7 +1050,16 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 
 func (blog *BlogService) GetDraftBlogByBlogId(ctx context.Context, req *pb.BlogByIdReq) (*pb.BlogByIdRes, error) {
 	blog.logger.Infof("fetching blog with id: %s", req.BlogId)
-	return blog.osClient.GetDraftBlogByBlogId(ctx, req.BlogId)
+
+	res, err := blog.osClient.GetDraftBlogByBlogId(ctx, req.BlogId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track blog activity
+	blog.trackBlogActivity(req.OwnerAccountId, "get_draft_blog_by_id", "blog", req.BlogId, req)
+
+	return res, nil
 }
 
 func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBlogsByBlogIds) (*pb.GetBlogsRes, error) {
@@ -679,5 +1067,13 @@ func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBl
 		return nil, status.Errorf(codes.InvalidArgument, "blog ids cannot be empty")
 	}
 
-	return blog.osClient.GetBlogsByBlogIds(ctc, req.BlogIds)
+	res, err := blog.osClient.GetBlogsByBlogIds(ctc, req.BlogIds)
+	if err != nil {
+		return nil, err
+	}
+
+	// Track blog activity (call once for the batch, not in any loop)
+	blog.trackBlogActivity("", "get_blogs_by_ids", "search", strings.Join(req.BlogIds, ","), req)
+
+	return res, nil
 }
