@@ -1,0 +1,44 @@
+# Activity Service Configuration
+server:
+  port: 50058
+  read_timeout: 30
+  write_timeout: 30
+  environment: development
+
+database:
+  host: localhost
+  port: 5432
+  username: postgres
+  password: password
+  database: activity_db
+  ssl_mode: disable
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+auth:
+  jwt_secret: your_jwt_secret_key
+  token_expiry: 3600
+  refresh_expiry: 86400
+
+logging:
+  level: info
+  format: json
+
+# Activity tracking specific settings
+activity:
+  retention_days: 365
+  batch_size: 1000
+  max_events_per_user_per_day: 10000
+  enable_analytics: true
+  enable_security_events: true
+
+# Privacy and compliance settings
+privacy:
+  enable_anonymization: true
+  anonymization_delay_days: 30
+  enable_gdpr_exports: true
+  data_retention_policy: strict

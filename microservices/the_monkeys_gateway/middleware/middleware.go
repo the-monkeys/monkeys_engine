@@ -32,7 +32,7 @@ func CORSMiddleware(allowedOriginExp string) gin.HandlerFunc {
 			lg.Warnw("cors request blocked", "origin", requestOrigin, "method", c.Request.Method)
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, IP, Client, OS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, IP, Client, OS, User-Agent, Accept-Language, DNT, Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-Fetch-Site, Sec-Fetch-Mode, Sec-Fetch-User, Sec-Fetch-Dest, Referer, X-Forwarded-For, X-Real-IP, X-Forwarded-Proto, X-Forwarded-Host, X-Original-URL, CF-Connecting-IP, CF-IPCountry, CF-Ray, CF-Visitor, X-UTM-Source, X-UTM-Medium, X-UTM-Campaign, X-UTM-Term, X-UTM-Content, X-Client-ID, X-Session-ID, X-Request-ID, X-Correlation-ID")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -56,7 +56,7 @@ func TmpCORSMiddleware() gin.HandlerFunc {
 }
 
 func NewCorsMiddleware() gin.HandlerFunc {
-	return cors.New(cors.Config{AllowOrigins: []string{"*"}, AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}, AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "IP", "Client", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "accept", "Cache-Control", "X-Requested-With"}, ExposeHeaders: []string{"Content-Length"}, AllowCredentials: true})
+	return cors.New(cors.Config{AllowOrigins: []string{"*"}, AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}, AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "IP", "Client", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "accept", "Cache-Control", "X-Requested-With", "User-Agent", "Accept-Language", "DNT", "Sec-CH-UA", "Sec-CH-UA-Mobile", "Sec-CH-UA-Platform", "Sec-Fetch-Site", "Sec-Fetch-Mode", "Sec-Fetch-User", "Sec-Fetch-Dest", "Referer", "X-Forwarded-For", "X-Real-IP", "X-Forwarded-Proto", "X-Forwarded-Host", "X-Original-URL", "CF-Connecting-IP", "CF-IPCountry", "CF-Ray", "CF-Visitor", "X-UTM-Source", "X-UTM-Medium", "X-UTM-Campaign", "X-UTM-Term", "X-UTM-Content", "X-Client-ID", "X-Session-ID", "X-Request-ID", "X-Correlation-ID"}, ExposeHeaders: []string{"Content-Length"}, AllowCredentials: true})
 }
 
 func LogRequestBody() gin.HandlerFunc {
