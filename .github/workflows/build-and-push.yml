@@ -63,8 +63,8 @@ jobs:
           - name: activity
             dockerfile: microservices/the_monkeys_activity/Dockerfile
           - name: reports
-            dockerfile: microservices/the_monkeys_reports/Dockerfile
-            context: .
+            dockerfile: ./microservices/the_monkeys_reports/Dockerfile
+            context: ./microservices/the_monkeys_reports
             build_args: ""
 
     steps:
