@@ -62,6 +62,8 @@ jobs:
             build_args: ""
           - name: activity
             dockerfile: microservices/the_monkeys_activity/Dockerfile
+          - name: reports
+            dockerfile: microservices/the_monkeys_reports/Dockerfile
             context: .
             build_args: ""
 
