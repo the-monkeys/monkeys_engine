@@ -1,0 +1,145 @@
+{
+    "index_patterns": [
+        "activity-events-*"
+    ],
+    "template": {
+        "mappings": {
+            "properties": {
+                "@timestamp": {
+                    "type": "date"
+                },
+                "action": {
+                    "type": "keyword"
+                },
+                "category": {
+                    "type": "keyword"
+                },
+                "user_id": {
+                    "type": "keyword"
+                },
+                "resource": {
+                    "type": "keyword"
+                },
+                "resource_id": {
+                    "type": "keyword"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "duration_ms": {
+                    "type": "long"
+                },
+                "client_ip": {
+                    "type": "ip"
+                },
+                "user_agent": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 512
+                        }
+                    }
+                },
+                "referrer": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 512
+                        }
+                    }
+                },
+                "client_type": {
+                    "type": "keyword"
+                },
+                "session_id": {
+                    "type": "keyword"
+                },
+                "platform": {
+                    "type": "keyword"
+                },
+                "accept_language": {
+                    "type": "keyword"
+                },
+                "accept_encoding": {
+                    "type": "keyword"
+                },
+                "dnt": {
+                    "type": "keyword"
+                },
+                "timezone": {
+                    "type": "keyword"
+                },
+                "screen_resolution": {
+                    "type": "keyword"
+                },
+                "color_depth": {
+                    "type": "keyword"
+                },
+                "device_memory": {
+                    "type": "keyword"
+                },
+                "languages": {
+                    "type": "keyword"
+                },
+                "country": {
+                    "type": "keyword"
+                },
+                "timezone_offset": {
+                    "type": "keyword"
+                },
+                "utm_source": {
+                    "type": "keyword"
+                },
+                "utm_medium": {
+                    "type": "keyword"
+                },
+                "utm_campaign": {
+                    "type": "keyword"
+                },
+                "utm_content": {
+                    "type": "keyword"
+                },
+                "utm_term": {
+                    "type": "keyword"
+                },
+                "is_bot": {
+                    "type": "boolean"
+                },
+                "trust_score": {
+                    "type": "float"
+                },
+                "request_count": {
+                    "type": "integer"
+                },
+                "is_secure_context": {
+                    "type": "boolean"
+                },
+                "connection_type": {
+                    "type": "keyword"
+                },
+                "browser_engine": {
+                    "type": "keyword"
+                },
+                "javascript_enabled": {
+                    "type": "boolean"
+                },
+                "first_seen": {
+                    "type": "date"
+                },
+                "last_seen": {
+                    "type": "date"
+                },
+                "collected_at": {
+                    "type": "date"
+                }
+            }
+        },
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 1,
+            "index.mapping.total_fields.limit": 2000
+        }
+    }
+}

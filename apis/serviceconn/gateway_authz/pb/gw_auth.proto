@@ -4,21 +4,78 @@ package auth_svc;
 
 option go_package = "./apis/serviceconn/gateway_authz/pb";
 
+// Global enums for activity tracking
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_WEB = 1;
+  PLATFORM_MOBILE = 2;
+  PLATFORM_TABLET = 3;
+  PLATFORM_API = 4;
+  PLATFORM_DESKTOP = 5;
+}
+
+// Reusable client information for all requests
+message ClientInfo {
+  // Basic client information
+  string ip_address = 1;
+  string client = 2;
+  string session_id = 3;
+  string user_agent = 4;
+  string referrer = 5;
+  Platform platform = 6;
+
+  // Enhanced Browser fingerprinting
+  string accept_language = 7;
+  string accept_encoding = 8;
+  string dnt = 9;
+  string timezone = 10;
+  string screen_resolution = 11;
+  string color_depth = 12;
+  string device_memory = 13;
+  repeated string languages = 14;
+
+  // Location & Geographic hints
+  string country = 15;
+  string timezone_offset = 16;
+
+  // Marketing & UTM tracking
+  string utm_source = 17;
+  string utm_medium = 18;
+  string utm_campaign = 19;
+  string utm_content = 20;
+  string utm_term = 21;
+
+  // Behavioral indicators
+  bool is_bot = 22;
+  double trust_score = 23;
+  int32 request_count = 24;
+
+  // Technical environment
+  bool is_secure_context = 25;
+  string connection_type = 26;
+  string browser_engine = 27;
+  bool javascript_enabled = 28;
+
+  // Timestamps
+  string first_seen = 29;
+  string last_seen = 30;
+  string collected_at = 31;
+}
+
 message RegisterUserRequest {
   string first_name = 1;
   string last_name = 2;
   string email = 3;
   string password = 4;
   LoginMethod login_method = 5;
-  string ip_address = 6;
-  string client = 7;
+  ClientInfo client_info = 6;
 
   enum LoginMethod {
     The_MONKEYS = 0;
     GOOGLE_ACC = 1;
     ANDROID = 2;
     IPHONE = 3;
-  } 
+  }
 }
 
 message RegisterUserResponse {
@@ -96,8 +153,7 @@ message AccessCheckRes {
 message LoginUserRequest {
   string email = 1;
   string password = 2;
-  string ip_address = 3;
-  string client = 4;
+  ClientInfo client_info = 3;
 }
 
 message LoginUserResponse {
@@ -116,8 +172,7 @@ message LoginUserResponse {
 
 message ForgotPasswordReq {
   string email = 1;
-  string ip_address = 2;
-  string client = 3;
+  ClientInfo client_info = 2;
 }
 
 message ForgotPasswordRes {
@@ -131,8 +186,7 @@ message ResetPasswordReq {
   string token = 2;
   string email = 3;
   string username = 4;
-  string ip_address = 5;
-  string client = 6;
+  ClientInfo client_info = 5;
 }
 
 message ResetPasswordRes {
@@ -152,8 +206,7 @@ message UpdatePasswordReq {
   string password = 1;
   string username = 2;
   string email = 3;
-  string ip_address = 4;
-  string client = 5;
+  ClientInfo client_info = 4;
 }
 
 message UpdatePasswordRes {
@@ -163,8 +216,7 @@ message UpdatePasswordRes {
 
 message EmailVerificationReq {
   string email = 1;
-  string ip_address = 2;
-  string client = 3;
+  ClientInfo client_info = 2;
 }
 
 message EmailVerificationRes {
@@ -176,8 +228,7 @@ message VerifyEmailReq {
   string email = 1;
   string username = 2;
   string token = 3;
-  string ip_address = 4;
-  string client = 5;
+  ClientInfo client_info = 4;
 }
 
 message VerifyEmailRes {
@@ -189,8 +240,7 @@ message VerifyEmailRes {
 message UpdateUsernameReq {
   string current_username = 1;
   string new_username = 2;
-  string client = 3;
-  string ip = 4;
+  ClientInfo client_info = 3;
 }
 
 message UpdateUsernameRes {
@@ -211,8 +261,7 @@ message UpdatePasswordWithPasswordReq {
   string current_password = 1;
   string username = 2;
   string new_password = 3;
-  string ip_address = 4;
-  string client = 5;
+  ClientInfo client_info = 4;
 }
 
 message UpdatePasswordWithPasswordRes {
@@ -222,9 +271,8 @@ message UpdatePasswordWithPasswordRes {
 
 message UpdateEmailIdReq {
   string new_email = 1;
-  string ip_address = 2;
-  string client = 3;
-  string username = 4;
+  string username = 2;
+  ClientInfo client_info = 3;
 }
 
 message UpdateEmailIdRes {

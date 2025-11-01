@@ -43,6 +43,62 @@ type BlogServiceClient struct {
 	log     *zap.SugaredLogger
 }
 
+// createClientInfo creates a comprehensive ClientInfo protobuf message from gin context
+func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
+	// Get comprehensive client information using enhanced utility function
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get platform enum for protobuf
+	platform := utils.GetBlogPlatform(ctx)
+
+	return &pb.ClientInfo{
+		// Basic client information
+		IpAddress: clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  platform,
+
+		// Enhanced Browser fingerprinting
+		AcceptLanguage:   clientInfo.AcceptLanguage,
+		AcceptEncoding:   clientInfo.AcceptEncoding,
+		Dnt:              clientInfo.DNT,
+		Timezone:         clientInfo.Timezone,
+		ScreenResolution: clientInfo.ScreenResolution,
+		ColorDepth:       clientInfo.ColorDepth,
+		DeviceMemory:     clientInfo.DeviceMemory,
+		Languages:        clientInfo.Languages,
+
+		// Location & Geographic hints
+		Country:        clientInfo.Country,
+		TimezoneOffset: clientInfo.TimezoneOffset,
+
+		// Marketing & UTM tracking
+		UtmSource:   clientInfo.UTMSource,
+		UtmMedium:   clientInfo.UTMMedium,
+		UtmCampaign: clientInfo.UTMCampaign,
+		UtmContent:  clientInfo.UTMContent,
+		UtmTerm:     clientInfo.UTMTerm,
+
+		// Behavioral indicators
+		IsBot:        clientInfo.IsBot,
+		TrustScore:   clientInfo.TrustScore,
+		RequestCount: int32(clientInfo.RequestCount),
+
+		// Technical environment
+		IsSecureContext:   clientInfo.IsSecureContext,
+		ConnectionType:    clientInfo.ConnectionType,
+		BrowserEngine:     clientInfo.BrowserEngine,
+		JavascriptEnabled: clientInfo.JavaScriptEnabled,
+
+		// Timestamps
+		FirstSeen:   clientInfo.FirstSeen,
+		LastSeen:    clientInfo.LastSeen,
+		CollectedAt: clientInfo.CollectedAt,
+	}
+}
+
 func NewBlogServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.BlogServiceClient {
 	blogService := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysBlog, cfg.Microservices.BlogPort)
 	cc, err := grpc.NewClient(blogService, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -74,14 +130,14 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	routes.POST("/publish/:blog_id", mware.AuthzRequired, blogClient.PublishBlogById)
 
 	routes.POST("/archive/:blog_id", mware.AuthzRequired, blogClient.ArchiveBlogById)
-	routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
+	// routes.GET("/all/drafts/:acc_id", blogClient.AllDrafts)
 	routes.GET("/all-col/:acc_id", blogClient.AllCollabBlogs)
 	routes.GET("/drafts/:acc_id/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByAccId)
 	// routes.GET("/all/publishes/:acc_id", blogClient.AllPublishesByAccountId)
 
-	routes.GET("/my-drafts/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogId)
+	// routes.GET("/my-drafts/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogId)
 
-	routes.GET("/all/bookmarks", blogClient.GetBookmarks)
+	// routes.GET("/all/bookmarks", blogClient.GetBookmarks)
 
 	routes.DELETE("/:blog_id", mware.AuthzRequired, blogClient.DeleteBlogById)
 
@@ -112,7 +168,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	// Protected APIs
 	{
 		// Get blogs of following users
-		routesV2.GET("/following", rateLimiter, blogClient.FollowingBlogsFeed) // Blogs for following feed
+		routesV2.GET("/following-feed", rateLimiter, blogClient.FollowingBlogsFeed) // Blogs for following feed
 		// User can get their blogs (draft)
 		// routesV2.GET("/my-drafts", rateLimiter, blogClient.MyDraftBlogs)       // Get all my draft blogs
 		routesV2.GET("/in-my-draft", rateLimiter, blogClient.MetaMyDraftBlogs) // Get my draft blog by id
@@ -190,6 +246,7 @@ func (asc *BlogServiceClient) AllDrafts(ctx *gin.Context) {
 	}
 	res, err := asc.Client.GetDraftBlogsByAccId(context.Background(), &pb.BlogByIdReq{
 		OwnerAccountId: accId,
+		ClientInfo:     asc.createClientInfo(ctx),
 		// Email:          "",
 		// Username:       "",
 	})
@@ -305,6 +362,7 @@ func (asc *BlogServiceClient) AllPublishesByAccountId(ctx *gin.Context) {
 
 	res, err := asc.Client.GetPublishedBlogsByAccID(context.Background(), &pb.BlogByIdReq{
 		OwnerAccountId: accId,
+		ClientInfo:     asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -347,6 +405,7 @@ func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 	blog, err := asc.Client.GetDraftBlogById(ctx, &pb.BlogByIdReq{
 		BlogId:         blogID,
 		OwnerAccountId: accID,
+		ClientInfo:     asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -385,13 +444,13 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 	}
 
 	id := ctx.Param("blog_id")
+
 	resp, err := asc.Client.PublishBlog(context.Background(), &pb.PublishBlogReq{
-		BlogId:    id,
-		AccountId: accId,
-		Ip:        ctx.Request.Header.Get("IP"),
-		Client:    ctx.Request.Header.Get("Client"),
-		Tags:      publishBody.Tags,
-		Slug:      publishBody.Slug,
+		BlogId:     id,
+		AccountId:  accId,
+		Tags:       publishBody.Tags,
+		Slug:       publishBody.Slug,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -422,7 +481,8 @@ func (asc *BlogServiceClient) ArchiveBlogById(ctx *gin.Context) {
 
 	id := ctx.Param("blog_id")
 	resp, err := asc.Client.ArchiveBlogById(context.Background(), &pb.ArchiveBlogReq{
-		BlogId: id,
+		BlogId:     id,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -453,9 +513,11 @@ func (asc *BlogServiceClient) DeleteBlogById(ctx *gin.Context) {
 
 	blogId := ctx.Param("blog_id")
 	accId := ctx.GetString("accountId")
+
 	res, err := asc.Client.DeleteABlogByBlogId(context.Background(), &pb.DeleteBlogReq{
 		BlogId:         blogId,
 		OwnerAccountId: accId,
+		ClientInfo:     asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -536,7 +598,8 @@ func (asc *BlogServiceClient) GetDraftBlogByBlogId(ctx *gin.Context) {
 	}
 
 	resp, err := asc.Client.GetDraftBlogByBlogId(context.Background(), &pb.BlogByIdReq{
-		BlogId: blogId,
+		BlogId:     blogId,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -567,7 +630,8 @@ func (asc *BlogServiceClient) GetColDraftBlogByBlogId(ctx *gin.Context) {
 	}
 
 	resp, err := asc.Client.GetDraftBlogByBlogId(context.Background(), &pb.BlogByIdReq{
-		BlogId: blogId,
+		BlogId:     blogId,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -591,12 +655,13 @@ func (asc *BlogServiceClient) GetColDraftBlogByBlogId(ctx *gin.Context) {
 func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	id := ctx.Param("blog_id")
 
-	ipAddress := ctx.Request.Header.Get("IP")
-	client := ctx.Request.Header.Get("Client")
+	// Get client information using utility function
+	clientInfo := utils.GetClientInfo(ctx)
 
 	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
-		BlogId: id,
+		BlogId:     id,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -731,7 +796,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 		// Handle different message types
 		switch messageType {
 		case websocket.TextMessage:
-			if err := asc.handleTextMessage(msg, conn, stream, id, ipAddress, client, action, &initialLogDone); err != nil {
+			if err := asc.handleTextMessage(msg, conn, stream, id, clientInfo, utils.GetBlogPlatform(ctx), action, &initialLogDone); err != nil {
 				asc.log.Errorf("Error handling text message: %v", err)
 				// Send error response but don't close connection
 				errorMsg := map[string]interface{}{
@@ -764,7 +829,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 }
 
 // Helper function to handle text messages
-func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn, stream pb.BlogService_DraftBlogV2Client, id, ipAddress, client, action string, initialLogDone *bool) error {
+func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn, stream pb.BlogService_DraftBlogV2Client, id string, clientInfo utils.ClientInfo, platform pb.Platform, action string, initialLogDone *bool) error {
 	// Handle ping/pong messages from client
 	var messageCheck map[string]interface{}
 	if err := json.Unmarshal(msg, &messageCheck); err == nil {
@@ -810,8 +875,12 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 	}
 
 	draftBlog["blog_id"] = id
-	draftBlog["Ip"] = ipAddress
-	draftBlog["Client"] = client
+	draftBlog["ip"] = clientInfo.IPAddress
+	draftBlog["client"] = clientInfo.ClientType
+	draftBlog["session_id"] = clientInfo.SessionID
+	draftBlog["user_agent"] = clientInfo.UserAgent
+	draftBlog["referrer"] = clientInfo.Referrer
+	draftBlog["platform"] = int32(platform) // Convert enum to int32 for protobuf Any
 
 	// Only set the action and log the initial creation or update once
 	if !*initialLogDone {
@@ -1007,8 +1076,9 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 	}
 
 	stream, err := asc.Client.MetaGetFeedBlogs(context.Background(), &pb.BlogListReq{
-		Limit:  int32(limitInt),
-		Offset: int32(offsetInt),
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1104,10 +1174,11 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 	}
 
 	stream, err := asc.Client.GetBlogs(context.Background(), &pb.GetBlogsReq{
-		IsDraft: false,
-		Tags:    tags.Tags,
-		Limit:   int32(limitInt),
-		Offset:  int32(offsetInt),
+		IsDraft:    false,
+		Tags:       tags.Tags,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1184,10 +1255,11 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 	tokenAccountId := ctx.GetString("accountId")
 
 	stream, err := asc.Client.GetBlogs(context.Background(), &pb.GetBlogsReq{
-		AccountId: tokenAccountId,
-		IsDraft:   true,
-		Limit:     5,
-		Offset:    0,
+		AccountId:  tokenAccountId,
+		IsDraft:    true,
+		Limit:      5,
+		Offset:     0,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1277,10 +1349,11 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 	}
 
 	stream, err := asc.Client.GetBlogs(context.Background(), &pb.GetBlogsReq{
-		AccountId: tokenAccountId,
-		IsDraft:   false,
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
+		AccountId:  tokenAccountId,
+		IsDraft:    false,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1388,10 +1461,11 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 	}
 
 	stream, err := asc.Client.GetBlogs(context.Background(), &pb.GetBlogsReq{
-		AccountId: userInfo.AccountId,
-		IsDraft:   false,
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
+		AccountId:  userInfo.AccountId,
+		IsDraft:    false,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1474,11 +1548,12 @@ func (asc *BlogServiceClient) MoveBlogToDraft(ctx *gin.Context) {
 	accId := ctx.GetString("accountId")
 
 	id := ctx.Param("blog_id")
+
+	// Get client information using utility function
 	resp, err := asc.Client.MoveBlogToDraftStatus(context.Background(), &pb.BlogReq{
-		BlogId:    id,
-		AccountId: accId,
-		Ip:        ctx.Request.Header.Get("IP"),
-		Client:    ctx.Request.Header.Get("Client"),
+		BlogId:     id,
+		AccountId:  accId,
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1531,10 +1606,11 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 	}
 
 	stream, err := asc.Client.GetBlogsBySlice(context.Background(), &pb.GetBlogsBySliceReq{
-		BlogIds: blogResp,
-		IsDraft: false,
-		Limit:   int32(limitInt),
-		Offset:  int32(offsetInt),
+		BlogIds:    blogResp,
+		IsDraft:    false,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
 
 	if err != nil {
@@ -1610,9 +1686,22 @@ func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
 func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
 
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
+	// Get user account ID if authenticated (can be empty for anonymous users)
+	userAccountId := ctx.GetString("accountId")
+
 	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
-		BlogId:  blogId,
-		IsDraft: false,
+		BlogId:    blogId,
+		AccountId: userAccountId, // Include user account ID for comprehensive tracking
+		IsDraft:   false,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
@@ -1662,9 +1751,18 @@ func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
 		return
 	}
 
+	// Get client information for activity tracking
+	clientInfo := utils.GetClientInfo(ctx)
+
 	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
-		BlogId:  blogId,
-		IsDraft: true,
+		BlogId:    blogId,
+		IsDraft:   true,
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
 	})
 	if err != nil {
 		if status, ok := status.FromError(err); ok {

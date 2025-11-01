@@ -1,0 +1,1078 @@
+syntax = "proto3";
+
+package activity_svc;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "./apis/serviceconn/gateway_activity/pb";
+
+// Activity Service - handles all user activity tracking
+service ActivityService {
+  // Core activity tracking
+  rpc TrackActivity(TrackActivityRequest) returns (TrackActivityResponse);
+  rpc GetUserActivities(GetUserActivitiesRequest) returns (GetUserActivitiesResponse);
+  rpc GetActivityAnalytics(GetActivityAnalyticsRequest) returns (GetActivityAnalyticsResponse);
+  
+  // Security events
+  rpc TrackSecurityEvent(TrackSecurityEventRequest) returns (TrackSecurityEventResponse);
+  rpc GetSecurityEvents(GetSecurityEventsRequest) returns (GetSecurityEventsResponse);
+  
+  // User behavior analytics
+  rpc GetUserBehaviorAnalytics(GetUserBehaviorAnalyticsRequest) returns (GetUserBehaviorAnalyticsResponse);
+  rpc GetReadingBehavior(GetReadingBehaviorRequest) returns (GetReadingBehaviorResponse);
+  
+  // Recommendation tracking
+  rpc TrackRecommendationInteraction(TrackRecommendationInteractionRequest) returns (TrackRecommendationInteractionResponse);
+  rpc GetRecommendationAnalytics(GetRecommendationAnalyticsRequest) returns (GetRecommendationAnalyticsResponse);
+  
+  // Content analytics
+  rpc GetContentAnalytics(GetContentAnalyticsRequest) returns (GetContentAnalyticsResponse);
+  rpc TrackContentInteraction(TrackContentInteractionRequest) returns (TrackContentInteractionResponse);
+  
+  // User journey tracking
+  rpc TrackUserJourney(TrackUserJourneyRequest) returns (TrackUserJourneyResponse);
+  rpc GetUserJourneyAnalytics(GetUserJourneyAnalyticsRequest) returns (GetUserJourneyAnalyticsResponse);
+  
+  // Notification tracking
+  rpc TrackNotificationEvent(TrackNotificationEventRequest) returns (TrackNotificationEventResponse);
+  rpc GetNotificationAnalytics(GetNotificationAnalyticsRequest) returns (GetNotificationAnalyticsResponse);
+  
+  // Financial event tracking
+  rpc TrackFinancialEvent(TrackFinancialEventRequest) returns (TrackFinancialEventResponse);
+  rpc GetFinancialEvents(GetFinancialEventsRequest) returns (GetFinancialEventsResponse);
+  
+  // Integration events
+  rpc TrackIntegrationEvent(TrackIntegrationEventRequest) returns (TrackIntegrationEventResponse);
+  rpc GetIntegrationEvents(GetIntegrationEventsRequest) returns (GetIntegrationEventsResponse);
+  
+  // Incident tracking
+  rpc TrackIncidentEvent(TrackIncidentEventRequest) returns (TrackIncidentEventResponse);
+  rpc GetIncidentEvents(GetIncidentEventsRequest) returns (GetIncidentEventsResponse);
+  
+  // Compliance events
+  rpc TrackComplianceEvent(TrackComplianceEventRequest) returns (TrackComplianceEventResponse);
+  rpc GetComplianceEvents(GetComplianceEventsRequest) returns (GetComplianceEventsResponse);
+  
+  // Search activity tracking
+  rpc TrackSearchActivity(TrackSearchActivityRequest) returns (TrackSearchActivityResponse);
+  rpc GetSearchAnalytics(GetSearchAnalyticsRequest) returns (GetSearchAnalyticsResponse);
+  
+  // Performance tracking
+  rpc TrackPerformanceEvent(TrackPerformanceEventRequest) returns (TrackPerformanceEventResponse);
+  rpc GetPerformanceAnalytics(GetPerformanceAnalyticsRequest) returns (GetPerformanceAnalyticsResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Enums
+enum ActivityCategory {
+  CATEGORY_UNSPECIFIED = 0;
+  CATEGORY_AUTHENTICATION = 1;
+  CATEGORY_AUTHORIZATION = 2;
+  CATEGORY_CONTENT = 3;
+  CATEGORY_SOCIAL = 4;
+  CATEGORY_SEARCH = 5;
+  CATEGORY_NAVIGATION = 6;
+  CATEGORY_RECOMMENDATION = 7;
+  CATEGORY_ANALYTICS = 8;
+  CATEGORY_SECURITY = 9;
+  CATEGORY_SYSTEM = 10;
+  CATEGORY_NOTIFICATION = 11;
+  CATEGORY_COMPLIANCE = 12;
+  CATEGORY_FINANCIAL = 13;
+  CATEGORY_INTEGRATION = 14;
+  CATEGORY_INCIDENT = 15;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
+}
+
+enum JourneyStage {
+  JOURNEY_STAGE_UNSPECIFIED = 0;
+  JOURNEY_STAGE_ONBOARDING = 1;
+  JOURNEY_STAGE_ACTIVATION = 2;
+  JOURNEY_STAGE_ENGAGEMENT = 3;
+  JOURNEY_STAGE_RETENTION = 4;
+  JOURNEY_STAGE_CHURN = 5;
+  JOURNEY_STAGE_REACTIVATION = 6;
+}
+
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_WEB = 1;
+  PLATFORM_MOBILE = 2;
+  PLATFORM_TABLET = 3;
+  PLATFORM_API = 4;
+  PLATFORM_DESKTOP = 5;
+}
+
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED = 0;
+  DEVICE_TYPE_DESKTOP = 1;
+  DEVICE_TYPE_MOBILE = 2;
+  DEVICE_TYPE_TABLET = 3;
+  DEVICE_TYPE_BOT = 4;
+  DEVICE_TYPE_UNKNOWN = 5;
+}
+
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_EMAIL = 1;
+  NOTIFICATION_CHANNEL_PUSH = 2;
+  NOTIFICATION_CHANNEL_IN_APP = 3;
+  NOTIFICATION_CHANNEL_SMS = 4;
+  NOTIFICATION_CHANNEL_WEBHOOK = 5;
+}
+
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_MARKETING = 1;
+  NOTIFICATION_TYPE_TRANSACTIONAL = 2;
+  NOTIFICATION_TYPE_SYSTEM = 3;
+  NOTIFICATION_TYPE_ALERT = 4;
+  NOTIFICATION_TYPE_SECURITY = 5;
+}
+
+// Core Messages
+message ActivityEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string session_id = 4;
+  ActivityCategory category = 5;
+  string action = 6;
+  string resource = 7;
+  string resource_id = 8;
+  ClientInfo client_info = 9;
+  google.protobuf.Struct metadata = 10;
+  bool success = 11;
+  int64 duration_ms = 12;
+  google.protobuf.Timestamp timestamp = 13;
+  google.protobuf.Timestamp created_at = 14;
+}
+
+message SecurityEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string event_type = 4;
+  Severity severity = 5;
+  string description = 6;
+  SecurityContext context = 7;
+  int32 risk_score = 8;
+  bool resolved = 9;
+  string resolved_by = 10;
+  google.protobuf.Timestamp resolved_at = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message SecurityContext {
+  string ip_address = 1;
+  string user_agent = 2;
+  string country = 3;
+  int32 failed_attempts = 4;
+  google.protobuf.Timestamp last_success = 5;
+  google.protobuf.Struct patterns = 6;
+}
+
+message UserBehaviorAnalytics {
+  string user_id = 1;
+  string account_id = 2;
+  string time_range = 3;
+  int64 total_activities = 4;
+  int32 unique_actions = 5;
+  int32 session_count = 6;
+  int64 avg_session_duration_ms = 7;
+  google.protobuf.Struct category_breakdown = 8;
+  google.protobuf.Struct action_frequency = 9;
+  repeated HourlyActivity hourly_pattern = 10;
+  google.protobuf.Struct device_usage = 11;
+  repeated LocationActivity location_pattern = 12;
+  double engagement_score = 13;
+  int32 risk_score = 14;
+  google.protobuf.Timestamp last_activity = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+message HourlyActivity {
+  int32 hour = 1;
+  int32 count = 2;
+}
+
+message LocationActivity {
+  string country = 1;
+  int32 count = 2;
+}
+
+message ReadingBehaviorAnalytics {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string content_id = 4;
+  string session_id = 5;
+  double scroll_depth = 6;
+  double reading_speed = 7;
+  int64 dwell_time_ms = 8;
+  double completion_rate = 9;
+  int32 return_visits = 10;
+  int32 word_count = 11;
+  double readability_score = 12;
+  DeviceType device_type = 13;
+  int32 time_of_day = 14;
+  bool is_weekend = 15;
+  string content_format = 16;
+  bool has_images = 17;
+  bool has_links = 18;
+  int32 link_clicks = 19;
+  int32 image_views = 20;
+  google.protobuf.Timestamp timestamp = 21;
+  google.protobuf.Timestamp created_at = 22;
+}
+
+message RecommendationInteraction {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string session_id = 4;
+  string recommendation_type = 5;
+  string item_id = 6;
+  int32 position = 7;
+  string action = 8;
+  google.protobuf.Struct context = 9;
+  google.protobuf.Timestamp timestamp = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message ContentInteraction {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string content_id = 4;
+  string content_type = 5;
+  string interaction_type = 6;
+  int64 duration_ms = 7;
+  double scroll_depth = 8;
+  double reading_speed = 9;
+  double completion_rate = 10;
+  google.protobuf.Struct context = 11;
+  google.protobuf.Timestamp timestamp = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message SearchActivity {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string session_id = 4;
+  string query = 5;
+  google.protobuf.Struct filters = 6;
+  int32 result_count = 7;
+  repeated string clicked_results = 8;
+  bool no_results = 9;
+  google.protobuf.Struct context = 10;
+  google.protobuf.Timestamp timestamp = 11;
+  google.protobuf.Timestamp created_at = 12;
+}
+
+message NotificationEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  NotificationType type = 4;
+  NotificationChannel channel = 5;
+  string template = 6;
+  string subject = 7;
+  string status = 8;
+  int64 delivery_time_ms = 9;
+  google.protobuf.Timestamp open_time = 10;
+  google.protobuf.Timestamp click_time = 11;
+  repeated string clicked_links = 12;
+  google.protobuf.Struct device_info = 13;
+  google.protobuf.Struct location_info = 14;
+  string bounce_reason = 15;
+  google.protobuf.Timestamp unsubscribe_time = 16;
+  google.protobuf.Struct context = 17;
+  google.protobuf.Timestamp timestamp = 18;
+  google.protobuf.Timestamp created_at = 19;
+  google.protobuf.Timestamp updated_at = 20;
+}
+
+message FinancialEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string transaction_type = 4;
+  double amount = 5;
+  string currency = 6;
+  string status = 7;
+  string payment_method = 8;
+  string transaction_id = 9;
+  string subscription_id = 10;
+  string plan_id = 11;
+  string billing_cycle = 12;
+  int32 trial_days = 13;
+  string discount_code = 14;
+  double discount_amount = 15;
+  double tax_amount = 16;
+  double processing_fee = 17;
+  string failure_reason = 18;
+  string refund_reason = 19;
+  google.protobuf.Struct context = 20;
+  google.protobuf.Timestamp processed_at = 21;
+  google.protobuf.Timestamp timestamp = 22;
+  google.protobuf.Timestamp created_at = 23;
+  google.protobuf.Timestamp updated_at = 24;
+}
+
+message UserJourneyEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string session_id = 4;
+  JourneyStage journey_stage = 5;
+  string funnel = 6;
+  int32 step = 7;
+  string step_name = 8;
+  bool conversion = 9;
+  bool drop_off = 10;
+  int64 time_to_step_ms = 11;
+  string ab_test_variant = 12;
+  string referrer = 13;
+  string utm_source = 14;
+  string utm_medium = 15;
+  string utm_campaign = 16;
+  google.protobuf.Struct context = 17;
+  google.protobuf.Timestamp timestamp = 18;
+  google.protobuf.Timestamp created_at = 19;
+}
+
+message IntegrationEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string integration_type = 4;
+  string service = 5;
+  string endpoint = 6;
+  string method = 7;
+  int32 status_code = 8;
+  int64 response_time_ms = 9;
+  int64 payload_size_bytes = 10;
+  string api_key_hash = 11;
+  string oauth_token_hash = 12;
+  int32 retry_count = 13;
+  bool success = 14;
+  string error_message = 15;
+  bool rate_limited = 16;
+  google.protobuf.Struct context = 17;
+  google.protobuf.Timestamp timestamp = 18;
+  google.protobuf.Timestamp created_at = 19;
+}
+
+message IncidentEvent {
+  string id = 1;
+  string incident_id = 2;
+  string incident_type = 3;
+  Severity severity = 4;
+  string status = 5;
+  repeated string affected_users = 6;
+  bool data_breach = 7;
+  repeated string data_types = 8;
+  string detection_method = 9;
+  string description = 10;
+  string impact_scope = 11;
+  repeated string response_team = 12;
+  repeated string actions = 13;
+  bool notifications_sent = 14;
+  bool regulators_notified = 15;
+  google.protobuf.Struct forensic_data = 16;
+  int64 resolution_time_ms = 17;
+  string resolved_by = 18;
+  google.protobuf.Struct context = 19;
+  google.protobuf.Timestamp detected_at = 20;
+  google.protobuf.Timestamp resolved_at = 21;
+  google.protobuf.Timestamp created_at = 22;
+  google.protobuf.Timestamp updated_at = 23;
+}
+
+message ComplianceEvent {
+  string id = 1;
+  string user_id = 2;
+  string account_id = 3;
+  string event_type = 4;
+  string status = 5;
+  google.protobuf.Struct request_data = 6;
+  google.protobuf.Struct response_data = 7;
+  string processed_by = 8;
+  google.protobuf.Timestamp completed_at = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message PerformanceEvent {
+  string id = 1;
+  string service = 2;
+  string operation = 3;
+  string user_id = 4;
+  int64 duration_ms = 5;
+  int32 status_code = 6;
+  string error_message = 7;
+  google.protobuf.Struct context = 8;
+  google.protobuf.Timestamp timestamp = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+// Request/Response Messages
+
+// Client Information for comprehensive tracking
+message ClientInfo {
+  // Network Information
+  string ip_address = 1;
+  string user_agent = 2;
+  string x_forwarded_for = 3;
+  string x_real_ip = 4;
+  string x_forwarded_proto = 5;
+  string x_forwarded_host = 6;
+  
+  // Browser Information
+  string accept_language = 7;
+  string accept_encoding = 8;
+  string accept = 9;
+  string cache_control = 10;
+  string connection = 11;
+  string dnt = 12; // Do Not Track
+  
+  // Security Headers
+  string sec_ch_ua = 13;
+  string sec_ch_ua_mobile = 14;
+  string sec_ch_ua_platform = 15;
+  string sec_fetch_site = 16;
+  string sec_fetch_mode = 17;
+  string sec_fetch_user = 18;
+  string sec_fetch_dest = 19;
+  
+  // Referrer Information
+  string referer = 20;
+  string origin = 21;
+  
+  // Cloudflare Headers (if applicable)
+  string cf_connecting_ip = 22;
+  string cf_ipcountry = 23;
+  string cf_ray = 24;
+  string cf_visitor = 25;
+  
+  // UTM Parameters
+  string utm_source = 26;
+  string utm_medium = 27;
+  string utm_campaign = 28;
+  string utm_term = 29;
+  string utm_content = 30;
+  
+  // Custom Tracking Headers
+  string x_client_id = 31;
+  string x_session_id = 32;
+  string x_request_id = 33;
+  string x_correlation_id = 34;
+  
+  // Processed Information (derived from headers)
+  Platform platform = 35;
+  DeviceType device_type = 36;
+  string browser = 37;
+  string browser_version = 38;
+  string os = 39;
+  string os_version = 40;
+  string country = 41;
+  string city = 42;
+  string timezone = 43;
+  repeated string languages = 44;
+  bool is_mobile = 45;
+  bool is_tablet = 46;
+  bool is_bot = 47;
+  double trust_score = 48;
+  
+  // Behavioral Indicators
+  bool has_ad_blocker = 49;
+  bool supports_webgl = 50;
+  bool supports_touch = 51;
+  int32 screen_width = 52;
+  int32 screen_height = 53;
+  int32 color_depth = 54;
+  string browser_engine = 55;
+}
+
+// Track Activity
+message TrackActivityRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string session_id = 3;
+  ActivityCategory category = 4;
+  string action = 5;
+  string resource = 6;
+  string resource_id = 7;
+  ClientInfo client_info = 8;
+  google.protobuf.Struct metadata = 9;
+  bool success = 10;
+  int64 duration_ms = 11;
+}
+
+message TrackActivityResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string activity_id = 3;
+  Error error = 4;
+}
+
+// Get User Activities
+message GetUserActivitiesRequest {
+  string user_id = 1;
+  string account_id = 2;
+  ActivityCategory category = 3;
+  string action = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  int32 offset = 8;
+}
+
+message GetUserActivitiesResponse {
+  int32 status_code = 1;
+  repeated ActivityEvent activities = 2;
+  int64 total_count = 3;
+  Error error = 4;
+}
+
+// Get Activity Analytics
+message GetActivityAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string time_range = 3; // "1h", "24h", "7d", "30d", "90d"
+  repeated ActivityCategory categories = 4;
+}
+
+message GetActivityAnalyticsResponse {
+  int32 status_code = 1;
+  UserBehaviorAnalytics analytics = 2;
+  Error error = 3;
+}
+
+// Track Security Event
+message TrackSecurityEventRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string event_type = 3;
+  Severity severity = 4;
+  string description = 5;
+  SecurityContext context = 6;
+  int32 risk_score = 7;
+}
+
+message TrackSecurityEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string event_id = 3;
+  Error error = 4;
+}
+
+// Get Security Events
+message GetSecurityEventsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  Severity min_severity = 3;
+  bool resolved = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  int32 offset = 8;
+}
+
+message GetSecurityEventsResponse {
+  int32 status_code = 1;
+  repeated SecurityEvent events = 2;
+  int64 total_count = 3;
+  Error error = 4;
+}
+
+// Get User Behavior Analytics
+message GetUserBehaviorAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string time_range = 3;
+}
+
+message GetUserBehaviorAnalyticsResponse {
+  int32 status_code = 1;
+  UserBehaviorAnalytics analytics = 2;
+  Error error = 3;
+}
+
+// Get Reading Behavior
+message GetReadingBehaviorRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string content_id = 3;
+  string time_range = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message GetReadingBehaviorResponse {
+  int32 status_code = 1;
+  repeated ReadingBehaviorAnalytics behavior = 2;
+  int64 total_count = 3;
+  Error error = 4;
+}
+
+// Track Recommendation Interaction
+message TrackRecommendationInteractionRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string session_id = 3;
+  string recommendation_type = 4;
+  string item_id = 5;
+  int32 position = 6;
+  string action = 7;
+  google.protobuf.Struct context = 8;
+}
+
+message TrackRecommendationInteractionResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string interaction_id = 3;
+  Error error = 4;
+}
+
+// Get Recommendation Analytics
+message GetRecommendationAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string recommendation_type = 3;
+  string time_range = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message GetRecommendationAnalyticsResponse {
+  int32 status_code = 1;
+  repeated RecommendationInteraction interactions = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct analytics_summary = 4;
+  Error error = 5;
+}
+
+// Get Content Analytics
+message GetContentAnalyticsRequest {
+  string content_id = 1;
+  string author_id = 2;
+  string content_type = 3;
+  string time_range = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message GetContentAnalyticsResponse {
+  int32 status_code = 1;
+  repeated ContentInteraction interactions = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct analytics_summary = 4;
+  Error error = 5;
+}
+
+// Track Content Interaction
+message TrackContentInteractionRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string content_id = 3;
+  string content_type = 4;
+  string interaction_type = 5;
+  int64 duration_ms = 6;
+  double scroll_depth = 7;
+  double reading_speed = 8;
+  double completion_rate = 9;
+  google.protobuf.Struct context = 10;
+}
+
+message TrackContentInteractionResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string interaction_id = 3;
+  Error error = 4;
+}
+
+// Track User Journey
+message TrackUserJourneyRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string session_id = 3;
+  JourneyStage journey_stage = 4;
+  string funnel = 5;
+  int32 step = 6;
+  string step_name = 7;
+  bool conversion = 8;
+  bool drop_off = 9;
+  int64 time_to_step_ms = 10;
+  string ab_test_variant = 11;
+  string referrer = 12;
+  string utm_source = 13;
+  string utm_medium = 14;
+  string utm_campaign = 15;
+  google.protobuf.Struct context = 16;
+}
+
+message TrackUserJourneyResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string journey_id = 3;
+  Error error = 4;
+}
+
+// Get User Journey Analytics
+message GetUserJourneyAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string funnel = 3;
+  JourneyStage stage = 4;
+  string time_range = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message GetUserJourneyAnalyticsResponse {
+  int32 status_code = 1;
+  repeated UserJourneyEvent journeys = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct funnel_analytics = 4;
+  Error error = 5;
+}
+
+// Track Notification Event
+message TrackNotificationEventRequest {
+  string user_id = 1;
+  string account_id = 2;
+  NotificationType type = 3;
+  NotificationChannel channel = 4;
+  string template = 5;
+  string subject = 6;
+  string status = 7;
+  int64 delivery_time_ms = 8;
+  repeated string clicked_links = 9;
+  google.protobuf.Struct device_info = 10;
+  google.protobuf.Struct location_info = 11;
+  string bounce_reason = 12;
+  google.protobuf.Struct context = 13;
+}
+
+message TrackNotificationEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string notification_id = 3;
+  Error error = 4;
+}
+
+// Get Notification Analytics
+message GetNotificationAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  NotificationType type = 3;
+  NotificationChannel channel = 4;
+  string time_range = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message GetNotificationAnalyticsResponse {
+  int32 status_code = 1;
+  repeated NotificationEvent notifications = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct analytics_summary = 4;
+  Error error = 5;
+}
+
+// Track Financial Event
+message TrackFinancialEventRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string transaction_type = 3;
+  double amount = 4;
+  string currency = 5;
+  string status = 6;
+  string payment_method = 7;
+  string transaction_id = 8;
+  string subscription_id = 9;
+  string plan_id = 10;
+  string billing_cycle = 11;
+  int32 trial_days = 12;
+  string discount_code = 13;
+  double discount_amount = 14;
+  double tax_amount = 15;
+  double processing_fee = 16;
+  string failure_reason = 17;
+  string refund_reason = 18;
+  google.protobuf.Struct context = 19;
+}
+
+message TrackFinancialEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string financial_event_id = 3;
+  Error error = 4;
+}
+
+// Get Financial Events
+message GetFinancialEventsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string transaction_type = 3;
+  string status = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  int32 offset = 8;
+}
+
+message GetFinancialEventsResponse {
+  int32 status_code = 1;
+  repeated FinancialEvent events = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct financial_summary = 4;
+  Error error = 5;
+}
+
+// Track Integration Event
+message TrackIntegrationEventRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string integration_type = 3;
+  string service = 4;
+  string endpoint = 5;
+  string method = 6;
+  int32 status_code = 7;
+  int64 response_time_ms = 8;
+  int64 payload_size_bytes = 9;
+  string api_key_hash = 10;
+  string oauth_token_hash = 11;
+  int32 retry_count = 12;
+  bool success = 13;
+  string error_message = 14;
+  bool rate_limited = 15;
+  google.protobuf.Struct context = 16;
+}
+
+message TrackIntegrationEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string integration_event_id = 3;
+  Error error = 4;
+}
+
+// Get Integration Events
+message GetIntegrationEventsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string integration_type = 3;
+  string service = 4;
+  bool success = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp end_time = 7;
+  int32 limit = 8;
+  int32 offset = 9;
+}
+
+message GetIntegrationEventsResponse {
+  int32 status_code = 1;
+  repeated IntegrationEvent events = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct integration_summary = 4;
+  Error error = 5;
+}
+
+// Track Incident Event
+message TrackIncidentEventRequest {
+  string incident_id = 1;
+  string incident_type = 2;
+  Severity severity = 3;
+  string status = 4;
+  repeated string affected_users = 5;
+  bool data_breach = 6;
+  repeated string data_types = 7;
+  string detection_method = 8;
+  string description = 9;
+  string impact_scope = 10;
+  repeated string response_team = 11;
+  repeated string actions = 12;
+  bool notifications_sent = 13;
+  bool regulators_notified = 14;
+  google.protobuf.Struct forensic_data = 15;
+  int64 resolution_time_ms = 16;
+  string resolved_by = 17;
+  google.protobuf.Struct context = 18;
+}
+
+message TrackIncidentEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string incident_event_id = 3;
+  Error error = 4;
+}
+
+// Get Incident Events
+message GetIncidentEventsRequest {
+  string incident_id = 1;
+  string incident_type = 2;
+  Severity min_severity = 3;
+  string status = 4;
+  bool data_breach = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp end_time = 7;
+  int32 limit = 8;
+  int32 offset = 9;
+}
+
+message GetIncidentEventsResponse {
+  int32 status_code = 1;
+  repeated IncidentEvent events = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct incident_summary = 4;
+  Error error = 5;
+}
+
+// Track Compliance Event
+message TrackComplianceEventRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string event_type = 3;
+  string status = 4;
+  google.protobuf.Struct request_data = 5;
+  google.protobuf.Struct response_data = 6;
+  string processed_by = 7;
+}
+
+message TrackComplianceEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string compliance_event_id = 3;
+  Error error = 4;
+}
+
+// Get Compliance Events
+message GetComplianceEventsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string event_type = 3;
+  string status = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  int32 limit = 7;
+  int32 offset = 8;
+}
+
+message GetComplianceEventsResponse {
+  int32 status_code = 1;
+  repeated ComplianceEvent events = 2;
+  int64 total_count = 3;
+  Error error = 4;
+}
+
+// Track Search Activity
+message TrackSearchActivityRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string session_id = 3;
+  string query = 4;
+  google.protobuf.Struct filters = 5;
+  int32 result_count = 6;
+  repeated string clicked_results = 7;
+  bool no_results = 8;
+  google.protobuf.Struct context = 9;
+}
+
+message TrackSearchActivityResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string search_activity_id = 3;
+  Error error = 4;
+}
+
+// Get Search Analytics
+message GetSearchAnalyticsRequest {
+  string user_id = 1;
+  string account_id = 2;
+  string query = 3;
+  bool no_results = 4;
+  string time_range = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message GetSearchAnalyticsResponse {
+  int32 status_code = 1;
+  repeated SearchActivity searches = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct search_summary = 4;
+  Error error = 5;
+}
+
+// Track Performance Event
+message TrackPerformanceEventRequest {
+  string service = 1;
+  string operation = 2;
+  string user_id = 3;
+  int64 duration_ms = 4;
+  int32 status_code = 5;
+  string error_message = 6;
+  google.protobuf.Struct context = 7;
+}
+
+message TrackPerformanceEventResponse {
+  int32 status_code = 1;
+  string message = 2;
+  string performance_event_id = 3;
+  Error error = 4;
+}
+
+// Get Performance Analytics
+message GetPerformanceAnalyticsRequest {
+  string service = 1;
+  string operation = 2;
+  string user_id = 3;
+  int32 min_status_code = 4;
+  int32 max_status_code = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp end_time = 7;
+  int32 limit = 8;
+  int32 offset = 9;
+}
+
+message GetPerformanceAnalyticsResponse {
+  int32 status_code = 1;
+  repeated PerformanceEvent events = 2;
+  int64 total_count = 3;
+  google.protobuf.Struct performance_summary = 4;
+  Error error = 5;
+}
+
+// Health Check
+message HealthCheckRequest {
+}
+
+message HealthCheckResponse {
+  int32 status_code = 1;
+  string status = 2;
+  string service_name = 3;
+  string version = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+// Common Error Message
+message Error {
+  int32 status = 1;
+  string error = 2;
+  string message = 3;
+}
