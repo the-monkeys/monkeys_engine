@@ -1,3 +1,3 @@
 [submodule "monkeys_protos"]
 	path = monkeys_protos
-	url = git@github.com:the-monkeys/monkeys_protos.git
+	url = https://github.com/the-monkeys/monkeys_protos.git
