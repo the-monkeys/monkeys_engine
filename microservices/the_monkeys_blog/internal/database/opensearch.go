@@ -522,6 +522,12 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 		return nil, fmt.Errorf("at least one tag must be provided")
 	}
 
+	// Normalize tags to lowercase for case-insensitive search
+	normalizedTags := make([]string, len(tags))
+	for i, tag := range tags {
+		normalizedTags[i] = strings.ToLower(strings.TrimSpace(tag))
+	}
+
 	// Build the query to search for published blogs by tags with the `is_archived` filtering
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
@@ -536,8 +542,22 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{
 					{
-						"terms": map[string]interface{}{
-							"tags.keyword": tags,
+						"bool": map[string]interface{}{
+							"should": func() []map[string]interface{} {
+								var shouldClauses []map[string]interface{}
+								for _, tag := range normalizedTags {
+									shouldClauses = append(shouldClauses, map[string]interface{}{
+										"term": map[string]interface{}{
+											"tags.keyword": map[string]interface{}{
+												"value":            tag,
+												"case_insensitive": true,
+											},
+										},
+									})
+								}
+								return shouldClauses
+							}(),
+							"minimum_should_match": 1,
 						},
 					},
 					{
