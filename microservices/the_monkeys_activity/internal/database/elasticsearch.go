@@ -483,13 +483,16 @@ func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActiv
 			"trust_score":     clientInfo.GetTrustScore(),
 
 			// Behavioral Indicators
-			"has_ad_blocker": clientInfo.GetHasAdBlocker(),
-			"supports_webgl": clientInfo.GetSupportsWebgl(),
-			"supports_touch": clientInfo.GetSupportsTouch(),
-			"screen_width":   clientInfo.GetScreenWidth(),
-			"screen_height":  clientInfo.GetScreenHeight(),
-			"color_depth":    clientInfo.GetColorDepth(),
-			"browser_engine": clientInfo.GetBrowserEngine(),
+			"has_ad_blocker":     clientInfo.GetHasAdBlocker(),
+			"supports_webgl":     clientInfo.GetSupportsWebgl(),
+			"supports_touch":     clientInfo.GetSupportsTouch(),
+			"screen_width":       clientInfo.GetScreenWidth(),
+			"screen_height":      clientInfo.GetScreenHeight(),
+			"color_depth":        clientInfo.GetColorDepth(),
+			"browser_engine":     clientInfo.GetBrowserEngine(),
+			"timezone_offset":    clientInfo.TimezoneOffset,
+			"javascript_enabled": clientInfo.JavascriptEnabled,
+			"request_count":      clientInfo.RequestCount,
 		}
 
 		// Add backward compatibility fields for easy querying

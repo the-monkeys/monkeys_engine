@@ -36,7 +36,7 @@ func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
 	// Get platform enum for protobuf
 	platform := utils.GetAuthPlatform(ctx)
 
-	return &pb.ClientInfo{
+	ci := &pb.ClientInfo{
 		// Basic client information
 		IpAddress: clientInfo.IPAddress,
 		Client:    clientInfo.ClientType,
@@ -54,6 +54,7 @@ func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
 		ColorDepth:       clientInfo.ColorDepth,
 		DeviceMemory:     clientInfo.DeviceMemory,
 		Languages:        clientInfo.Languages,
+		Origin:           clientInfo.Origin,
 
 		// Location & Geographic hints
 		Country:        clientInfo.Country,
@@ -82,6 +83,7 @@ func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
 		LastSeen:    clientInfo.LastSeen,
 		CollectedAt: clientInfo.CollectedAt,
 	}
+	return ci
 }
 
 // InitServiceClient initializes the gRPC connection to the auth service.
@@ -173,6 +175,7 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		clientInfo.IpAddress, clientInfo.UserAgent, clientInfo.Platform, clientInfo.SessionId)
 
 	res, err := asc.Client.RegisterUser(context.Background(), &pb.RegisterUserRequest{
+
 		FirstName:   body.FirstName,
 		LastName:    body.LastName,
 		Email:       body.Email,
