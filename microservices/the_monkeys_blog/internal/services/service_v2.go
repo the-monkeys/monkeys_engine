@@ -45,10 +45,19 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		blog.logger.Debugw("draft blog v2", "blog_id", req["blog_id"], "owner", req["owner_account_id"])
 		req["is_draft"] = true
 
-		blogId := req["blog_id"].(string)
-		ownerAccountId := req["owner_account_id"].(string)
-		ip := req["Ip"].(string)
-		client := req["Client"].(string)
+		blogId, _ := req["blog_id"].(string)
+		ownerAccountId, _ := req["owner_account_id"].(string)
+		var ip, client string
+		if v, ok := req["Ip"]; ok && v != nil {
+			ip, _ = v.(string)
+		} else {
+			ip = ""
+		}
+		if v, ok := req["Client"]; ok && v != nil {
+			client, _ = v.(string)
+		} else {
+			client = ""
+		}
 		tagsInterface, ok := req["tags"].([]interface{})
 		if !ok {
 			blog.logger.Errorf("Tags field is not of type []interface{}")
@@ -102,12 +111,12 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 
 		// // Respond back to the client
 		// resp := &pb.BlogResponse{
-		// 	Blog: req.Blog,
+		//  Blog: req.Blog,
 		// }
 		// respAny, err := anypb.New(resp)
 		// if err != nil {
-		// 	blog.logger.Errorf("Error marshalling response: %v", err)
-		// 	return status.Errorf(codes.Internal, "Failed to create response: %v", err)
+		//  blog.logger.Errorf("Error marshalling response: %v", err)
+		//  return status.Errorf(codes.Internal, "Failed to create response: %v", err)
 		// }
 
 		// TODO: Change the return data to the actual response
