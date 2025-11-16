@@ -60,6 +60,7 @@ message ClientInfo {
   string first_seen = 29;
   string last_seen = 30;
   string collected_at = 31;
+  string Origin = 32;
 }
 
 message RegisterUserRequest {

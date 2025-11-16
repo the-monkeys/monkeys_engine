@@ -506,6 +506,10 @@ message ClientInfo {
   int32 screen_height = 53;
   int32 color_depth = 54;
   string browser_engine = 55;
+  int32 device_memory = 56;
+  int32 timezone_offset  = 57;
+  bool javascript_enabled = 58;
+  int32 request_count = 59;
 }
 
 // Track Activity

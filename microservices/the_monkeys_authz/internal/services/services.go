@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +59,7 @@ type ComprehensiveClientInfo struct {
 	UserAgent string
 	Referrer  string
 	Platform  pb.Platform
+	Origin    string
 
 	// Enhanced Browser fingerprinting
 	AcceptLanguage   string
@@ -100,7 +102,6 @@ type ComprehensiveClientInfo struct {
 // Helper method to extract comprehensive client info from any request type
 func (as *AuthzSvc) extractClientInfo(req interface{}) *ComprehensiveClientInfo {
 	var clientInfo *pb.ClientInfo
-
 	// Extract ClientInfo from different request types
 	switch r := req.(type) {
 	case *pb.RegisterUserRequest:
@@ -249,31 +250,47 @@ func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string
 	// Extract comprehensive client information
 	clientInfo := as.extractClientInfo(req)
 
+	color_depth, err := strconv.ParseInt(clientInfo.ColorDepth, 10, 16)
+	if err != nil {
+		color_depth = -1
+	}
+
+	screen_width, _ := strconv.ParseInt(strings.Split(clientInfo.ScreenResolution, "x")[0], 10, 16)
+	screen_height, _ := strconv.ParseInt(strings.Split(clientInfo.ScreenResolution, "x")[1], 10, 16)
+	timezone_offset, _ := strconv.ParseInt(clientInfo.TimezoneOffset, 10, 16)
+
 	// Create comprehensive ClientInfo for activity tracking
 	activityClientInfo := &activitypb.ClientInfo{
-		IpAddress:      clientInfo.IPAddress,
-		UserAgent:      clientInfo.UserAgent,
-		AcceptLanguage: clientInfo.AcceptLanguage,
-		AcceptEncoding: clientInfo.AcceptEncoding,
-		Dnt:            clientInfo.DNT,
-		Referer:        clientInfo.Referrer,
-		Platform:       as.detectPlatform(clientInfo.UserAgent, clientInfo.Platform),
-		Country:        clientInfo.Country,
-		IsBot:          clientInfo.IsBot,
-		TrustScore:     clientInfo.TrustScore,
-		BrowserEngine:  clientInfo.BrowserEngine,
-		UtmSource:      clientInfo.UTMSource,
-		UtmMedium:      clientInfo.UTMMedium,
-		UtmCampaign:    clientInfo.UTMCampaign,
-		UtmTerm:        clientInfo.UTMTerm,
-		UtmContent:     clientInfo.UTMContent,
-		Timezone:       clientInfo.Timezone,
-		Languages:      clientInfo.Languages,
-		XClientId:      "", // TODO: Extract if available
-		XSessionId:     clientInfo.SessionID,
+		IpAddress:         clientInfo.IPAddress,
+		UserAgent:         clientInfo.UserAgent,
+		AcceptLanguage:    clientInfo.AcceptLanguage,
+		AcceptEncoding:    clientInfo.AcceptEncoding,
+		Dnt:               clientInfo.DNT,
+		Referer:           clientInfo.Referrer,
+		Platform:          as.detectPlatform(clientInfo.UserAgent, clientInfo.Platform),
+		Country:           clientInfo.Country,
+		IsBot:             clientInfo.IsBot,
+		TrustScore:        clientInfo.TrustScore,
+		BrowserEngine:     clientInfo.BrowserEngine,
+		UtmSource:         clientInfo.UTMSource,
+		UtmMedium:         clientInfo.UTMMedium,
+		UtmCampaign:       clientInfo.UTMCampaign,
+		UtmTerm:           clientInfo.UTMTerm,
+		UtmContent:        clientInfo.UTMContent,
+		Timezone:          clientInfo.Timezone,
+		Languages:         clientInfo.Languages,
+		ColorDepth:        int32(color_depth),
+		ScreenWidth:       int32(screen_width),
+		ScreenHeight:      int32(screen_height),
+		CfIpcountry:       clientInfo.Country,
+		TimezoneOffset:    int32(timezone_offset),
+		JavascriptEnabled: clientInfo.JavaScriptEnabled,
+		RequestCount:      clientInfo.RequestCount,
+		// XClientId:  clientInfo.Client, // TODO: Extract if available
+		XSessionId: clientInfo.SessionID,
 		// Additional fields that can be populated from comprehensive client info
 		Connection: clientInfo.ConnectionType,
-		Origin:     "", // TODO: Extract from referrer if needed
+		Origin:     clientInfo.Origin, // Use Referrer as Origin since it's available in ClientInfo
 	}
 
 	// Create enhanced activity tracking request with comprehensive client data
