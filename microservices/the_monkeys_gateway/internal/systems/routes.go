@@ -1,8 +1,11 @@
 package systems
 
 import (
+	"fmt"
 	"net/http"
+	"net/smtp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +51,9 @@ func SystemKeyMiddleware(systemKey string, log *zap.SugaredLogger) gin.HandlerFu
 func RegisterSystemRouter(router *gin.Engine, cfg *config.Config, log *zap.SugaredLogger) *SystemServiceClient {
 	ssc := NewSystemServiceClient(cfg, log)
 
+	// Public contact route (no authentication required)
+	router.POST("/api/v1/contact", ssc.HandleContactForm)
+
 	// System routes group with system key validation
 	systemRoutes := router.Group("/api/v1/system")
 	systemRoutes.Use(SystemKeyMiddleware(cfg.Keys.SystemKey, log)) // Using system key for system access
@@ -76,7 +82,7 @@ func RegisterSystemRouter(router *gin.Engine, cfg *config.Config, log *zap.Sugar
 
 // GetSystemInfo returns basic system information
 func (ssc *SystemServiceClient) GetSystemInfo(ctx *gin.Context) {
-	ssc.logger.Infof("System info requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("System info requested from IP: %s", ctx.ClientIP())
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"system": gin.H{
@@ -97,7 +103,7 @@ func (ssc *SystemServiceClient) GetSystemInfo(ctx *gin.Context) {
 
 // GetVersionInfo returns frontend and backend version information
 func (ssc *SystemServiceClient) GetVersionInfo(ctx *gin.Context) {
-	ssc.logger.Infof("Version info requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("Version info requested from IP: %s", ctx.ClientIP())
 
 	// This would typically be read from build files, environment variables, or version files
 	ctx.JSON(http.StatusOK, gin.H{
@@ -152,7 +158,7 @@ func (ssc *SystemServiceClient) GetVersionInfo(ctx *gin.Context) {
 
 // GetSystemHealth returns system health status
 func (ssc *SystemServiceClient) GetSystemHealth(ctx *gin.Context) {
-	ssc.logger.Infof("System health check requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("System health check requested from IP: %s", ctx.ClientIP())
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status": "healthy",
@@ -180,7 +186,7 @@ func (ssc *SystemServiceClient) GetSystemHealth(ctx *gin.Context) {
 
 // GetSystemMetrics returns system performance metrics
 func (ssc *SystemServiceClient) GetSystemMetrics(ctx *gin.Context) {
-	ssc.logger.Infof("System metrics requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("System metrics requested from IP: %s", ctx.ClientIP())
 
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
@@ -211,7 +217,7 @@ func (ssc *SystemServiceClient) GetSystemMetrics(ctx *gin.Context) {
 
 // GetDatabaseStatus returns database connection status
 func (ssc *SystemServiceClient) GetDatabaseStatus(ctx *gin.Context) {
-	ssc.logger.Infof("Database status requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("Database status requested from IP: %s", ctx.ClientIP())
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"postgresql": gin.H{
@@ -241,7 +247,7 @@ func (ssc *SystemServiceClient) GetDatabaseStatus(ctx *gin.Context) {
 
 // GetServicesStatus returns microservices status
 func (ssc *SystemServiceClient) GetServicesStatus(ctx *gin.Context) {
-	ssc.logger.Infof("Services status requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("Services status requested from IP: %s", ctx.ClientIP())
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"services": gin.H{
@@ -280,7 +286,7 @@ func (ssc *SystemServiceClient) GetServicesStatus(ctx *gin.Context) {
 
 // GetRepositoryInfo returns repository information using GitHub token
 func (ssc *SystemServiceClient) GetRepositoryInfo(ctx *gin.Context) {
-	ssc.logger.Infof("Repository info requested from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("Repository info requested from IP: %s", ctx.ClientIP())
 
 	// This would use the GitHub token from config to fetch real repository data
 	githubToken := ssc.config.Keys.GitHubToken
@@ -332,7 +338,7 @@ func (ssc *SystemServiceClient) ClearSystemCache(ctx *gin.Context) {
 		return
 	}
 
-	ssc.logger.Infof("Cache clear requested for type: %s from IP: %s", req.CacheType, ctx.ClientIP())
+	ssc.logger.Debugf("Cache clear requested for type: %s from IP: %s", req.CacheType, ctx.ClientIP())
 
 	validTypes := []string{"all", "redis", "memory", "database"}
 	isValid := false
@@ -371,7 +377,7 @@ func (ssc *SystemServiceClient) SetMaintenanceMode(ctx *gin.Context) {
 		req.Duration = "30m"
 	}
 
-	ssc.logger.Infof("Maintenance mode enabled from IP: %s, duration: %s", ctx.ClientIP(), req.Duration)
+	ssc.logger.Debugf("Maintenance mode enabled from IP: %s, duration: %s", ctx.ClientIP(), req.Duration)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":             "Maintenance mode enabled",
@@ -384,7 +390,7 @@ func (ssc *SystemServiceClient) SetMaintenanceMode(ctx *gin.Context) {
 
 // DisableMaintenanceMode disables maintenance mode
 func (ssc *SystemServiceClient) DisableMaintenanceMode(ctx *gin.Context) {
-	ssc.logger.Infof("Maintenance mode disabled from IP: %s", ctx.ClientIP())
+	ssc.logger.Debugf("Maintenance mode disabled from IP: %s", ctx.ClientIP())
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":     "Maintenance mode disabled",
@@ -405,7 +411,7 @@ func (ssc *SystemServiceClient) TriggerSystemBackup(ctx *gin.Context) {
 		req.Async = true
 	}
 
-	ssc.logger.Infof("System backup triggered, type: %s, async: %v, from IP: %s", req.BackupType, req.Async, ctx.ClientIP())
+	ssc.logger.Debugf("System backup triggered, type: %s, async: %v, from IP: %s", req.BackupType, req.Async, ctx.ClientIP())
 
 	backupID := "backup_" + time.Now().Format("20060102_150405")
 
@@ -417,4 +423,220 @@ func (ssc *SystemServiceClient) TriggerSystemBackup(ctx *gin.Context) {
 		"started_at":           time.Now().UTC(),
 		"estimated_completion": time.Now().Add(30 * time.Minute).UTC(),
 	})
+}
+
+// ContactFormRequest represents the contact form data
+type ContactFormRequest struct {
+	FirstName   string `json:"first_name" binding:"required"`
+	LastName    string `json:"last_name" binding:"required"`
+	Email       string `json:"email" binding:"required,email"`
+	CompanyName string `json:"company_name"`
+	CompanySize string `json:"company_size"`
+	Subject     string `json:"subject" binding:"required"`
+	Message     string `json:"message"`
+}
+
+// HandleContactForm handles contact form submissions and sends emails
+func (ssc *SystemServiceClient) HandleContactForm(ctx *gin.Context) {
+	// Only allow in non-local environments
+	// if ssc.config.AppEnv == "development" || ssc.config.AppEnv == "local" {
+	// 	ssc.logger.Warnf("Contact form submission blocked in local environment from IP: %s", ctx.ClientIP())
+	// 	ctx.JSON(http.StatusOK, gin.H{
+	// 		"message": "Contact form received (email not sent in local environment)",
+	// 		"status":  "success",
+	// 	})
+	// 	return
+	// }
+
+	var req ContactFormRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ssc.logger.Errorf("Invalid contact form data from IP %s: %v", ctx.ClientIP(), err)
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Validate email format
+	if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid email address format",
+		})
+		return
+	}
+
+	ssc.logger.Infof("Contact form submission received from: %s (%s) - Subject: %s", req.Email, ctx.ClientIP(), req.Subject)
+
+	// Send email using Gmail SMTP
+	if err := ssc.sendContactEmail(&req, ctx.ClientIP()); err != nil {
+		ssc.logger.Errorf("Failed to send contact email: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to send email",
+			"message": "We're having trouble processing your request. Please try again later.",
+		})
+		return
+	}
+
+	ssc.logger.Infof("Contact email sent successfully for: %s %s (%s)", req.FirstName, req.LastName, req.Email)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Thank you for contacting us! We'll get back to you soon.",
+		"status":  "success",
+	})
+}
+
+// sendContactEmail sends the contact form data via Gmail SMTP
+func (ssc *SystemServiceClient) sendContactEmail(req *ContactFormRequest, clientIP string) error {
+	// Get Gmail configuration
+	gmailConfig := ssc.config.Gmail
+	if gmailConfig.SMTPMail == "" || gmailConfig.SMTPPassword == "" {
+		return fmt.Errorf("Gmail SMTP credentials not configured")
+	}
+
+	// Recipient email
+	recipientEmail := "monkeys.admin@monkeys.com.co"
+
+	// Compose email
+	from := gmailConfig.SMTPMail
+	to := []string{recipientEmail}
+
+	// Build email headers and body
+	var emailBuilder strings.Builder
+	emailBuilder.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	emailBuilder.WriteString(fmt.Sprintf("To: %s\r\n", recipientEmail))
+	emailBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", req.Subject)) // Use user's subject directly
+	emailBuilder.WriteString("MIME-version: 1.0;\r\n")
+	emailBuilder.WriteString("Content-Type: text/html; charset=\"UTF-8\";\r\n")
+	emailBuilder.WriteString("\r\n")
+	emailBuilder.WriteString(buildContactEmailHTML(req, clientIP))
+
+	message := []byte(emailBuilder.String())
+
+	// Gmail SMTP configuration
+	smtpHost := gmailConfig.SMTPHost
+	if smtpHost == "" {
+		smtpHost = "smtp.gmail.com"
+	}
+
+	smtpAddr := gmailConfig.SMTPAddress
+	if smtpAddr == "" {
+		smtpAddr = "smtp.gmail.com:587"
+	}
+
+	// Authentication
+	auth := smtp.PlainAuth("", gmailConfig.SMTPMail, gmailConfig.SMTPPassword, smtpHost)
+
+	// Send email
+	err := smtp.SendMail(smtpAddr, auth, from, to, message)
+	if err != nil {
+		return fmt.Errorf("SMTP send failed: %w", err)
+	}
+
+	return nil
+}
+
+// buildContactEmailHTML builds the HTML template for contact form emails
+func buildContactEmailHTML(req *ContactFormRequest, clientIP string) string {
+	var html strings.Builder
+
+	html.WriteString(`<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+		.header { background-color: #eb5c09ff; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+		.content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }
+		.info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+		.info-table td { padding: 12px; border-bottom: 1px solid #ddd; }
+		.info-table td:first-child { font-weight: bold; width: 150px; background-color: #f5f5f5; }
+		.message-box { background-color: white; padding: 15px; border-left: 4px solid #eb5c09ff; margin: 15px 0; }
+		.footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; }
+	</style>
+</head>
+<body>
+	<div class="header">
+		<h2 style="margin: 0;">Contact Monkeys</h2>
+	</div>
+	<div class="content">
+		<table class="info-table">
+			<tr>
+				<td>Name</td>
+				<td>`)
+	html.WriteString(fmt.Sprintf("%s %s", req.FirstName, req.LastName))
+	html.WriteString(`</td>
+			</tr>
+			<tr>
+				<td>Email</td>
+				<td><a href="mailto:`)
+	html.WriteString(req.Email)
+	html.WriteString(`" style="color: #4CAF50; text-decoration: none;">`)
+	html.WriteString(req.Email)
+	html.WriteString(`</a></td>
+			</tr>`)
+
+	if req.CompanyName != "" {
+		html.WriteString(`
+			<tr>
+				<td>Company</td>
+				<td>`)
+		html.WriteString(req.CompanyName)
+		html.WriteString(`</td>
+			</tr>`)
+	}
+
+	if req.CompanySize != "" {
+		html.WriteString(`
+			<tr>
+				<td>Company Size</td>
+				<td>`)
+		html.WriteString(req.CompanySize)
+		html.WriteString(`</td>
+			</tr>`)
+	}
+
+	html.WriteString(`
+			<tr>
+				<td>Subject</td>
+				<td><strong>`)
+	html.WriteString(req.Subject)
+	html.WriteString(`</strong></td>
+			</tr>`)
+
+	if req.Message != "" {
+		html.WriteString(`
+			<tr>
+				<td colspan="2">
+					<div class="message-box">
+						<strong>Message:</strong><br><br>`)
+		html.WriteString(strings.ReplaceAll(req.Message, "\n", "<br>"))
+		html.WriteString(`
+					</div>
+				</td>
+			</tr>`)
+	}
+
+	html.WriteString(`
+			<tr>
+				<td>IP Address</td>
+				<td>`)
+	html.WriteString(clientIP)
+	html.WriteString(`</td>
+			</tr>
+			<tr>
+				<td>Timestamp</td>
+				<td>`)
+	html.WriteString(time.Now().UTC().Format(time.RFC3339))
+	html.WriteString(`</td>
+			</tr>
+		</table>
+		<div class="footer">
+			<p>This email was sent from The Monkeys contact form.</p>
+		</div>
+	</div>
+</body>
+</html>`)
+
+	return html.String()
 }
