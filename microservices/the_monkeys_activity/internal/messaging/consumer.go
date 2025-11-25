@@ -73,9 +73,11 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 	log.Infow("activity consumer started successfully, waiting for messages")
 
 	for msg := range msgs {
+
 		log.Debugw("received activity tracking message", "body", string(msg.Body))
 
 		var activityReq pb.TrackActivityRequest
+
 		if err := json.Unmarshal(msg.Body, &activityReq); err != nil {
 			log.Errorw("failed to unmarshal activity tracking message",
 				"error", err,
@@ -101,7 +103,7 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 		}
 
 		// Store the activity in Elasticsearch
-		if err := storeActivity(db, &activityReq, log); err != nil {
+		if err := storeActivity(db, &activityReq, log); err != nil { //todo: storing activity data
 			log.Errorw("failed to store activity in database",
 				"error", err,
 				"user_id", activityReq.UserId,
@@ -123,7 +125,6 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 // storeActivity saves the activity tracking data to Elasticsearch
 func storeActivity(db database.ActivityDatabase, req *pb.TrackActivityRequest, log *zap.SugaredLogger) error {
 	ctx := context.Background()
-
 	log.Debugw("storing activity in database",
 		"user_id", req.UserId,
 		"action", req.Action,
@@ -131,6 +132,7 @@ func storeActivity(db database.ActivityDatabase, req *pb.TrackActivityRequest, l
 
 	// Use the existing SaveActivity method from the ActivityDatabase interface
 	activityID, err := db.SaveActivity(ctx, req)
+
 	if err != nil {
 		return fmt.Errorf("failed to save activity in Elasticsearch: %w", err)
 	}

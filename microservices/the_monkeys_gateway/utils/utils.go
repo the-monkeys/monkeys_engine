@@ -194,6 +194,7 @@ type ClientInfo struct {
 	ClientType string // Better name than just "Client"
 	SessionID  string // Session identifier from context or generated
 	Platform   string // Platform category (web, mobile, tablet, etc.)
+	Origin     string
 
 	// Browser fingerprinting
 	AcceptLanguage   string   // Preferred languages
@@ -261,7 +262,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 	// Get timestamps
 	firstSeen, lastSeen, collectedAt := getTimestamps(ctx)
 
-	return ClientInfo{
+	ci := ClientInfo{
 		// Basic information (existing)
 		IPAddress:  ipAddress,
 		UserAgent:  userAgent,
@@ -269,6 +270,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		ClientType: clientType,
 		SessionID:  sessionID,
 		Platform:   platform,
+		Origin:     ctx.Request.Header.Get("Origin"),
 
 		// Browser fingerprinting
 		AcceptLanguage:   acceptLanguage,
@@ -277,7 +279,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		Timezone:         timezone,
 		ScreenResolution: screenRes,
 		ColorDepth:       ctx.Request.Header.Get("X-Color-Depth"),
-		DeviceMemory:     ctx.Request.Header.Get("Device-Memory"),
+		DeviceMemory:     ctx.Request.Header.Get("X-Device-Memory"),
 		Languages:        languages,
 
 		// Location & Geographic hints
@@ -307,6 +309,8 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		LastSeen:    lastSeen,
 		CollectedAt: collectedAt,
 	}
+
+	return ci
 }
 
 // getClientType determines client type from headers with fallback
