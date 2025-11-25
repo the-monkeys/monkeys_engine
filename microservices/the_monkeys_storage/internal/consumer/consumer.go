@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -296,7 +295,7 @@ func DeleteBlogFolder(blogId string) error {
 
 // startPeriodicSync runs filesystem to MinIO sync every 24 hours
 func startPeriodicSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(3 * time.Hour)
 	defer ticker.Stop()
 
 	// Run initial sync after 1 minute
@@ -483,7 +482,7 @@ func getContentType(fileName string) string {
 
 // startMinioToFileSystemSync runs MinIO to filesystem sync every 24 hours
 func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(4 * time.Hour)
 	defer ticker.Stop()
 
 	// Run initial sync after 2 minutes (offset from filesystem->minio sync)
@@ -580,13 +579,7 @@ func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *
 
 // syncMinioObjectToFile downloads a MinIO object to local filesystem if it doesn't exist or is different
 func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, objectKey, localPath string) error {
-	// Check if we should sync to remote instead
-	if cfg.Minio.SyncToRemote && cfg.Minio.RemoteHost != "" && cfg.Minio.RemoteUser != "" {
-		remotePath := filepath.Join(cfg.Minio.RemoteBasePath, localPath)
-		return syncMinioObjectToRemote(ctx, cfg, mc, log, objectKey, remotePath, cfg.Minio.RemoteHost, cfg.Minio.RemoteUser)
-	}
-
-	// Local filesystem sync
+	// Local filesystem sync (remote sync is now handled by minio-sync container)
 	// Check if local file exists and compare with MinIO object
 	if info, err := os.Stat(localPath); err == nil {
 		objInfo, err2 := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
@@ -623,75 +616,5 @@ func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Cl
 	}
 
 	log.Debugf("Successfully synced: %s", localPath)
-	return nil
-}
-
-// syncMinioObjectToRemote syncs a MinIO object to remote filesystem via SSH/SCP
-func syncMinioObjectToRemote(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, objectKey, remotePath, sshHost, sshUser string) error {
-	log.Debugf("Syncing from MinIO to remote: %s -> %s@%s:%s", objectKey, sshUser, sshHost, remotePath)
-
-	// Get object from MinIO
-	obj, err := mc.GetObject(ctx, cfg.Minio.Bucket, objectKey, minio.GetObjectOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get object from MinIO: %v", err)
-	}
-	defer obj.Close()
-
-	// Create temp file locally first
-	tempFile, err := os.CreateTemp("", "minio_sync_*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	// Copy MinIO object to temp file
-	if _, err := io.Copy(tempFile, obj); err != nil {
-		return fmt.Errorf("failed to copy data to temp file: %v", err)
-	}
-	tempFile.Close()
-
-	// Use SCP to copy to remote (requires scp command and SSH keys)
-	remoteDir := filepath.Dir(remotePath)
-
-	// Create remote directory first
-	mkdirCmd := fmt.Sprintf(`ssh %s@%s "mkdir -p %s"`, sshUser, sshHost, remoteDir)
-	if err := executeCommand(mkdirCmd, log); err != nil {
-		return fmt.Errorf("failed to create remote directory: %v", err)
-	}
-
-	// Copy file via SCP
-	scpCmd := fmt.Sprintf(`scp %s %s@%s:%s`, tempFile.Name(), sshUser, sshHost, remotePath)
-	if err := executeCommand(scpCmd, log); err != nil {
-		return fmt.Errorf("failed to copy file via SCP: %v", err)
-	}
-
-	log.Debugf("Successfully synced to remote: %s", remotePath)
-	return nil
-}
-
-// executeCommand executes a shell command
-func executeCommand(cmd string, log *zap.SugaredLogger) error {
-	log.Debugf("Executing command: %s", cmd)
-
-	// This is a simple implementation - in production you'd want better error handling
-	// Execute the SSH/SCP command
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		return fmt.Errorf("empty command")
-	}
-
-	// Execute the command
-	execCmd := exec.Command(parts[0], parts[1:]...)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		log.Errorf("Command failed: %s, output: %s, error: %v", cmd, string(output), err)
-		return fmt.Errorf("command execution failed: %v", err)
-	}
-
-	log.Debugf("Successfully executed: %s", cmd)
-	if len(output) > 0 {
-		log.Debugf("Command output: %s", string(output))
-	}
 	return nil
 }

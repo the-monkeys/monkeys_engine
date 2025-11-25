@@ -112,6 +112,45 @@ services:
       retries: 3
     restart: always
 
+  minio-sync:
+    image: minio/mc:latest
+    container_name: the-monkeys-minio-sync
+    networks:
+      - monkeys-network
+    depends_on:
+      - minio
+    environment:
+      LOCAL_MINIO_ENDPOINT: http://minio:${MINIO_API_INTERNAL_PORT}
+      LOCAL_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      LOCAL_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      REMOTE_MINIO_ENDPOINT: ${MINIO_REMOTE_ENDPOINT}
+      REMOTE_MINIO_ACCESS_KEY: ${MINIO_REMOTE_ACCESS_KEY}
+      REMOTE_MINIO_SECRET_KEY: ${MINIO_REMOTE_SECRET_KEY}
+      SOURCE_BUCKET: ${MINIO_BUCKET_NAME}
+      TARGET_BUCKET: ${MINIO_REMOTE_BUCKET_NAME}
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      echo '[SYNC] Configuring MinIO client...';
+      echo '[SYNC] Local endpoint: '$$LOCAL_MINIO_ENDPOINT;
+      echo '[SYNC] Remote endpoint: '$$REMOTE_MINIO_ENDPOINT;
+      mc alias set local $$LOCAL_MINIO_ENDPOINT $$LOCAL_MINIO_ACCESS_KEY $$LOCAL_MINIO_SECRET_KEY || { echo '[ERROR] Failed to set local alias'; exit 1; };
+      echo '[SYNC] Local alias configured successfully';
+      mc alias set remote $$REMOTE_MINIO_ENDPOINT $$REMOTE_MINIO_ACCESS_KEY $$REMOTE_MINIO_SECRET_KEY || { echo '[ERROR] Failed to set remote alias'; exit 1; };
+      echo '[SYNC] Remote alias configured successfully';
+      echo '[SYNC] Waiting for local MinIO to be ready...';
+      until mc ls local/ > /dev/null 2>&1; do echo '[SYNC] Waiting for local MinIO...'; sleep 2; done;
+      echo '[SYNC] Local MinIO is ready';
+      echo '[SYNC] Creating buckets if they do not exist...';
+      mc mb local/$$SOURCE_BUCKET --ignore-existing && echo '[SYNC] Local bucket ready' || echo '[ERROR] Failed to create local bucket';
+      mc mb remote/$$TARGET_BUCKET --ignore-existing && echo '[SYNC] Remote bucket ready' || echo '[ERROR] Failed to create remote bucket';
+      echo '[SYNC] Verifying remote connection...';
+      mc ls remote/$$TARGET_BUCKET && echo '[SYNC] Remote bucket verified' || echo '[ERROR] Cannot access remote bucket';
+      echo '[SYNC] Starting real-time sync from local to remote...';
+      mc mirror --watch --overwrite local/$$SOURCE_BUCKET remote/$$TARGET_BUCKET;
+      "
+    restart: unless-stopped
+
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
     build:
