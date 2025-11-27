@@ -151,6 +151,41 @@ services:
       "
     restart: unless-stopped
 
+  minio-restore:
+    image: minio/mc:latest
+    container_name: the-monkeys-minio-restore
+    profiles: ["restore"]
+    networks:
+      - monkeys-network
+    depends_on:
+      - minio
+    environment:
+      LOCAL_MINIO_ENDPOINT: http://minio:${MINIO_API_INTERNAL_PORT}
+      LOCAL_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      LOCAL_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      REMOTE_MINIO_ENDPOINT: ${MINIO_REMOTE_ENDPOINT}
+      REMOTE_MINIO_ACCESS_KEY: ${MINIO_REMOTE_ACCESS_KEY}
+      REMOTE_MINIO_SECRET_KEY: ${MINIO_REMOTE_SECRET_KEY}
+      SOURCE_BUCKET: ${MINIO_BUCKET_NAME}
+      TARGET_BUCKET: ${MINIO_REMOTE_BUCKET_NAME}
+    entrypoint: >
+      /bin/sh -c "
+      echo '[RESTORE] Pausing sync container...';
+      docker pause the-monkeys-minio-sync 2>/dev/null || echo '[RESTORE] Sync container not running';
+      echo '[RESTORE] Starting MinIO data restoration...';
+      mc alias set local $$LOCAL_MINIO_ENDPOINT $$LOCAL_MINIO_ACCESS_KEY $$LOCAL_MINIO_SECRET_KEY;
+      mc alias set remote $$REMOTE_MINIO_ENDPOINT $$REMOTE_MINIO_ACCESS_KEY $$REMOTE_MINIO_SECRET_KEY;
+      until mc ls local/ > /dev/null 2>&1; do sleep 2; done;
+      mc mb local/$$SOURCE_BUCKET --ignore-existing;
+      echo '[RESTORE] Restoring data from remote to local...';
+      mc mirror --overwrite remote/$$TARGET_BUCKET local/$$SOURCE_BUCKET;
+      echo '[RESTORE] Resuming sync container...';
+      docker unpause the-monkeys-minio-sync 2>/dev/null || echo '[RESTORE] Sync container not running';
+      echo '[RESTORE] Restoration complete!';
+      "
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
     build:
