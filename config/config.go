@@ -137,11 +137,11 @@ type Minio struct {
 	UseSSL        bool   `mapstructure:"use_ssl"`
 	CDNURL        string `mapstructure:"cdn_url"`
 	PublicBaseURL string `mapstructure:"public_base_url"`
-	// Sync settings
-	SyncToRemote   bool   `mapstructure:"sync_to_remote"`
-	RemoteHost     string `mapstructure:"remote_host"`
-	RemoteUser     string `mapstructure:"remote_user"`
-	RemoteBasePath string `mapstructure:"remote_base_path"`
+	// Remote sync settings
+	RemoteEndpoint   string `mapstructure:"remote_endpoint"`
+	RemoteAccessKey  string `mapstructure:"remote_access_key"`
+	RemoteSecretKey  string `mapstructure:"remote_secret_key"`
+	RemoteBucketName string `mapstructure:"remote_bucket_name"`
 }
 
 type Cors struct {
@@ -343,10 +343,10 @@ func bindEnvVars() {
 	viper.BindEnv("minio.use_ssl", "MINIO_USE_SSL")
 	viper.BindEnv("minio.cdn_url", "MINIO_CDN_URL")
 	viper.BindEnv("minio.public_base_url", "MINIO_PUBLIC_BASE_URL")
-	viper.BindEnv("minio.sync_to_remote", "MINIO_SYNC_TO_REMOTE")
-	viper.BindEnv("minio.remote_host", "MINIO_REMOTE_HOST")
-	viper.BindEnv("minio.remote_user", "MINIO_REMOTE_USER")
-	viper.BindEnv("minio.remote_base_path", "MINIO_REMOTE_BASE_PATH")
+	viper.BindEnv("minio.remote_endpoint", "MINIO_REMOTE_ENDPOINT")
+	viper.BindEnv("minio.remote_access_key", "MINIO_REMOTE_ACCESS_KEY")
+	viper.BindEnv("minio.remote_secret_key", "MINIO_REMOTE_SECRET_KEY")
+	viper.BindEnv("minio.remote_bucket_name", "MINIO_REMOTE_BUCKET_NAME")
 
 	// SEO
 	viper.BindEnv("seo.enabled", "SEO_ENABLED")
