@@ -48,6 +48,8 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 	// Get comprehensive client information using enhanced utility function
 	clientInfo := utils.GetClientInfo(ctx)
 
+	fmt.Println("clientInfo in blog routes:: ", clientInfo)
+
 	// Get platform enum for protobuf
 	platform := utils.GetBlogPlatform(ctx)
 
@@ -93,9 +95,18 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 		JavascriptEnabled: clientInfo.JavaScriptEnabled,
 
 		// Timestamps
-		FirstSeen:   clientInfo.FirstSeen,
-		LastSeen:    clientInfo.LastSeen,
-		CollectedAt: clientInfo.CollectedAt,
+		FirstSeen:      clientInfo.FirstSeen,
+		LastSeen:       clientInfo.LastSeen,
+		CollectedAt:    clientInfo.CollectedAt,
+		Origin:         clientInfo.Origin,
+		RealIp:         clientInfo.RealIP,
+		DeviceType:     clientInfo.DeviceType,
+		Os:             clientInfo.Os,
+		Accept:         clientInfo.Accept,
+		Connection:     clientInfo.Connection,
+		ForwardedFor:   clientInfo.ForwardedFor,
+		ForwardedHost:  clientInfo.ForwardedHost,
+		ForwardedProto: clientInfo.ForwardedProto,
 	}
 }
 
@@ -428,6 +439,8 @@ func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 }
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
+
+	fmt.Println("printing headers", ctx.Request.Header)
 
 	// Check permissions:
 	if !utils.CheckUserAccessInContext(ctx, "Publish") {

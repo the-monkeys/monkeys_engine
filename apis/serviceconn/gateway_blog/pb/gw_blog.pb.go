@@ -119,11 +119,22 @@ type ClientInfo struct {
 	BrowserEngine     string `protobuf:"bytes,27,opt,name=browser_engine,json=browserEngine,proto3" json:"browser_engine,omitempty"`
 	JavascriptEnabled bool   `protobuf:"varint,28,opt,name=javascript_enabled,json=javascriptEnabled,proto3" json:"javascript_enabled,omitempty"`
 	// Timestamps
-	FirstSeen     string `protobuf:"bytes,29,opt,name=first_seen,json=firstSeen,proto3" json:"first_seen,omitempty"`
-	LastSeen      string `protobuf:"bytes,30,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
-	CollectedAt   string `protobuf:"bytes,31,opt,name=collected_at,json=collectedAt,proto3" json:"collected_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	FirstSeen      string `protobuf:"bytes,29,opt,name=first_seen,json=firstSeen,proto3" json:"first_seen,omitempty"`
+	LastSeen       string `protobuf:"bytes,30,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
+	CollectedAt    string `protobuf:"bytes,31,opt,name=collected_at,json=collectedAt,proto3" json:"collected_at,omitempty"`
+	Origin         string `protobuf:"bytes,32,opt,name=origin,proto3" json:"origin,omitempty"`
+	RealIp         string `protobuf:"bytes,33,opt,name=real_ip,json=realIp,proto3" json:"real_ip,omitempty"`
+	Browser        string `protobuf:"bytes,34,opt,name=browser,proto3" json:"browser,omitempty"`
+	Accept         string `protobuf:"bytes,35,opt,name=accept,proto3" json:"accept,omitempty"`
+	Connection     string `protobuf:"bytes,36,opt,name=connection,proto3" json:"connection,omitempty"`
+	DeviceType     string `protobuf:"bytes,37,opt,name=device_type,json=deviceType,proto3" json:"device_type,omitempty"`
+	Os             string `protobuf:"bytes,38,opt,name=os,proto3" json:"os,omitempty"`
+	ForwardedFor   string `protobuf:"bytes,39,opt,name=forwarded_for,json=forwardedFor,proto3" json:"forwarded_for,omitempty"`
+	ForwardedProto string `protobuf:"bytes,40,opt,name=forwarded_proto,json=forwardedProto,proto3" json:"forwarded_proto,omitempty"`
+	ForwardedHost  string `protobuf:"bytes,41,opt,name=forwarded_host,json=forwardedHost,proto3" json:"forwarded_host,omitempty"`
+	ForwardedPort  string `protobuf:"bytes,42,opt,name=forwarded_port,json=forwardedPort,proto3" json:"forwarded_port,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ClientInfo) Reset() {
@@ -369,6 +380,83 @@ func (x *ClientInfo) GetLastSeen() string {
 func (x *ClientInfo) GetCollectedAt() string {
 	if x != nil {
 		return x.CollectedAt
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetOrigin() string {
+	if x != nil {
+		return x.Origin
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetRealIp() string {
+	if x != nil {
+		return x.RealIp
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetBrowser() string {
+	if x != nil {
+		return x.Browser
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetAccept() string {
+	if x != nil {
+		return x.Accept
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetConnection() string {
+	if x != nil {
+		return x.Connection
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetDeviceType() string {
+	if x != nil {
+		return x.DeviceType
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetOs() string {
+	if x != nil {
+		return x.Os
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetForwardedFor() string {
+	if x != nil {
+		return x.ForwardedFor
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetForwardedProto() string {
+	if x != nil {
+		return x.ForwardedProto
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetForwardedHost() string {
+	if x != nil {
+		return x.ForwardedHost
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetForwardedPort() string {
+	if x != nil {
+		return x.ForwardedPort
 	}
 	return ""
 }
@@ -3120,7 +3208,8 @@ var File_apis_serviceconn_gateway_blog_pb_gw_blog_proto protoreflect.FileDescrip
 
 const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\n" +
-	".apis/serviceconn/gateway_blog/pb/gw_blog.proto\x12\bblog_svc\x1a\x19google/protobuf/any.proto\"\xa5\b\n" +
+	".apis/serviceconn/gateway_blog/pb/gw_blog.proto\x12\bblog_svc\x1a\x19google/protobuf/any.proto\"\xf5\n" +
+	"\n" +
 	"\n" +
 	"ClientInfo\x12\x1d\n" +
 	"\n" +
@@ -3163,7 +3252,21 @@ const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\n" +
 	"first_seen\x18\x1d \x01(\tR\tfirstSeen\x12\x1b\n" +
 	"\tlast_seen\x18\x1e \x01(\tR\blastSeen\x12!\n" +
-	"\fcollected_at\x18\x1f \x01(\tR\vcollectedAt\"\x8c\x04\n" +
+	"\fcollected_at\x18\x1f \x01(\tR\vcollectedAt\x12\x16\n" +
+	"\x06origin\x18  \x01(\tR\x06origin\x12\x17\n" +
+	"\areal_ip\x18! \x01(\tR\x06realIp\x12\x18\n" +
+	"\abrowser\x18\" \x01(\tR\abrowser\x12\x16\n" +
+	"\x06accept\x18# \x01(\tR\x06accept\x12\x1e\n" +
+	"\n" +
+	"connection\x18$ \x01(\tR\n" +
+	"connection\x12\x1f\n" +
+	"\vdevice_type\x18% \x01(\tR\n" +
+	"deviceType\x12\x0e\n" +
+	"\x02os\x18& \x01(\tR\x02os\x12#\n" +
+	"\rforwarded_for\x18' \x01(\tR\fforwardedFor\x12'\n" +
+	"\x0fforwarded_proto\x18( \x01(\tR\x0eforwardedProto\x12%\n" +
+	"\x0eforwarded_host\x18) \x01(\tR\rforwardedHost\x12%\n" +
+	"\x0eforwarded_port\x18* \x01(\tR\rforwardedPort\"\x8c\x04\n" +
 	"\x10DraftBlogRequest\x12\x17\n" +
 	"\ablog_id\x18\x01 \x01(\tR\x06blogId\x12(\n" +
 	"\x10owner_account_id\x18\x02 \x01(\tR\x0eownerAccountId\x12\"\n" +

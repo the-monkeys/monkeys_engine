@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,9 +114,21 @@ type ComprehensiveClientInfo struct {
 	JavaScriptEnabled bool
 
 	// Timestamps
-	FirstSeen   string
-	LastSeen    string
-	CollectedAt string
+	FirstSeen      string
+	LastSeen       string
+	CollectedAt    string
+	Origin         string
+	RealIp         string
+	ForwardedFor   string
+	ForwardedProto string
+	ForwardedHost  string
+	ForwardedPort  string
+	Os             string
+	Browser        string
+	Device         string
+	Accept         string
+	Connection     string
+	Referer        string
 }
 
 // Helper method to extract comprehensive client info from any request type
@@ -279,6 +292,18 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 			ConnectionType:    clientInfo.GetConnectionType(),
 			BrowserEngine:     clientInfo.GetBrowserEngine(),
 			JavaScriptEnabled: clientInfo.GetJavascriptEnabled(),
+			Browser:           clientInfo.GetBrowser(),
+			Accept:            clientInfo.GetAccept(),
+			Connection:        clientInfo.GetConnection(),
+			Origin:            clientInfo.GetOrigin(),
+			Referer:           clientInfo.GetReferrer(),
+			RealIp:            clientInfo.GetRealIp(),
+			ForwardedFor:      clientInfo.GetForwardedFor(),
+			ForwardedHost:     clientInfo.GetForwardedHost(),
+			ForwardedPort:     clientInfo.GetForwardedPort(),
+			ForwardedProto:    clientInfo.GetForwardedProto(),
+			Os:                clientInfo.GetOs(),
+			Device:            clientInfo.GetDeviceType(),
 
 			// Timestamps
 			FirstSeen:   clientInfo.GetFirstSeen(),
@@ -440,6 +465,8 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 			return
 		}
 
+		fmt.Println("activityMsg1: ", string(activityMsg))
+
 		// Send to activity tracking queue via RabbitMQ
 		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
 		if err != nil {
@@ -456,31 +483,63 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 	// Extract comprehensive client information
 	clientInfo := blog.extractClientInfo(req)
 
+	fmt.Println("ClientInfo in blog service**>>>> : ", clientInfo)
+
+	toInt32 := func(s string) int32 {
+		v, _ := strconv.ParseInt(s, 10, 32)
+		return int32(v)
+	}
+
+	colorDepth := toInt32(clientInfo.ColorDepth)
+
+	var screenWidth, screenHeight int32
+	parts := strings.Split(clientInfo.ScreenResolution, "x")
+	if len(parts) == 2 {
+		screenWidth = toInt32(parts[0])
+		screenHeight = toInt32(parts[1])
+	}
+
+	timezoneOffset := toInt32(clientInfo.TimezoneOffset)
+
 	// Create comprehensive ClientInfo for activity tracking
 	activityClientInfo := &activitypb.ClientInfo{
-		IpAddress:      clientInfo.IPAddress,
-		UserAgent:      clientInfo.UserAgent,
-		AcceptLanguage: clientInfo.AcceptLanguage,
-		AcceptEncoding: clientInfo.AcceptEncoding,
-		Dnt:            clientInfo.DNT,
-		Referer:        clientInfo.Referrer,
-		Platform:       blog.detectPlatform(clientInfo.UserAgent, clientInfo.Platform),
-		Country:        clientInfo.Country,
-		IsBot:          clientInfo.IsBot,
-		TrustScore:     clientInfo.TrustScore,
-		BrowserEngine:  clientInfo.BrowserEngine,
-		UtmSource:      clientInfo.UTMSource,
-		UtmMedium:      clientInfo.UTMMedium,
-		UtmCampaign:    clientInfo.UTMCampaign,
-		UtmTerm:        clientInfo.UTMTerm,
-		UtmContent:     clientInfo.UTMContent,
-		Timezone:       clientInfo.Timezone,
-		Languages:      clientInfo.Languages,
-		XClientId:      "", // TODO: Extract if available
-		XSessionId:     clientInfo.SessionID,
+		IpAddress:         clientInfo.IPAddress,
+		UserAgent:         clientInfo.UserAgent,
+		AcceptLanguage:    clientInfo.AcceptLanguage,
+		AcceptEncoding:    clientInfo.AcceptEncoding,
+		Dnt:               clientInfo.DNT,
+		Referer:           clientInfo.Referrer,
+		Platform:          blog.detectPlatform(clientInfo.UserAgent, clientInfo.Platform),
+		Country:           clientInfo.Country,
+		IsBot:             clientInfo.IsBot,
+		TrustScore:        clientInfo.TrustScore,
+		BrowserEngine:     clientInfo.BrowserEngine,
+		UtmSource:         clientInfo.UTMSource,
+		UtmMedium:         clientInfo.UTMMedium,
+		UtmCampaign:       clientInfo.UTMCampaign,
+		UtmTerm:           clientInfo.UTMTerm,
+		UtmContent:        clientInfo.UTMContent,
+		Timezone:          clientInfo.Timezone,
+		Languages:         clientInfo.Languages,
+		XClientId:         "", // TODO: Extract if available
+		XSessionId:        clientInfo.SessionID,
+		ColorDepth:        colorDepth,
+		ScreenWidth:       screenWidth,
+		ScreenHeight:      screenHeight,
+		TimezoneOffset:    timezoneOffset,
+		JavascriptEnabled: clientInfo.JavaScriptEnabled,
+		RequestCount:      clientInfo.RequestCount,
+		// IsSecureContext:   clientInfo.IsSecureContext,
 		// Additional fields that can be populated from comprehensive client info
-		Connection: clientInfo.ConnectionType,
-		Origin:     "", // TODO: Extract from referrer if needed
+		Connection:      clientInfo.ConnectionType,
+		Origin:          clientInfo.Origin,
+		XRealIp:         clientInfo.RealIp,
+		XForwardedFor:   clientInfo.ForwardedFor,
+		XForwardedProto: clientInfo.ForwardedProto,
+		XForwardedHost:  clientInfo.ForwardedHost,
+		Accept:          clientInfo.Accept,
+		Browser:         clientInfo.Browser,
+		Os:              clientInfo.Os,
 	}
 
 	// Create enhanced activity tracking request with comprehensive client data
@@ -537,6 +596,8 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 			blog.logger.Warnf("failed to convert metadata to struct: %v", err)
 		}
 	}
+
+	fmt.Println("activityReq: ", activityReq)
 
 	// Send activity tracking message
 	blog.sendActivityTrackingMessage(activityReq)
@@ -801,7 +862,9 @@ func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req
 func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
 
-	// TODO: Check if blog exists and published
+	fmt.Println("clientinfo in publishblog", req.ClientInfo)
+
+	// Check if the blog exists
 	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
 	if err != nil {
 		blog.logger.Errorf("Error checking blog existence: %v", err)

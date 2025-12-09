@@ -188,13 +188,22 @@ func GetClientIP(ctx *gin.Context) string {
 // GetClientInfo extracts comprehensive client information from request headers
 type ClientInfo struct {
 	// Basic information (existing)
-	IPAddress  string
-	UserAgent  string
-	Referrer   string
-	ClientType string // Better name than just "Client"
-	SessionID  string // Session identifier from context or generated
-	Platform   string // Platform category (web, mobile, tablet, etc.)
-	Origin     string
+	IPAddress      string
+	UserAgent      string
+	Referrer       string
+	ClientType     string // Better name than just "Client"
+	SessionID      string // Session identifier from context or generated
+	Platform       string // Platform category (web, mobile, tablet, etc.)
+	Origin         string
+	RealIP         string
+	Browser        string
+	Accept         string
+	Connection     string
+	DeviceType     string
+	Os             string
+	ForwardedFor   string
+	ForwardedHost  string
+	ForwardedProto string
 
 	// Browser fingerprinting
 	AcceptLanguage   string   // Preferred languages
@@ -245,7 +254,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 	platform := getPlatform(ctx)
 
 	// Get enhanced browser information
-	acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages := getEnhancedBrowserInfo(ctx)
+	accept, acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages := getEnhancedBrowserInfo(ctx)
 
 	// Get location information
 	country, timezoneOffset := getLocationInfo(ctx)
@@ -264,13 +273,21 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 
 	ci := ClientInfo{
 		// Basic information (existing)
-		IPAddress:  ipAddress,
-		UserAgent:  userAgent,
-		Referrer:   referrer,
-		ClientType: clientType,
-		SessionID:  sessionID,
-		Platform:   platform,
-		Origin:     ctx.Request.Header.Get("Origin"),
+		IPAddress:      ipAddress,
+		UserAgent:      userAgent,
+		Referrer:       referrer,
+		ClientType:     clientType,
+		SessionID:      sessionID,
+		Platform:       platform,
+		Origin:         ctx.Request.Header.Get("Origin"),
+		RealIP:         GetClientIP(ctx),
+		DeviceType:     ctx.Request.Header.Get("X-Device"),
+		Os:             ctx.Request.Header.Get("X-Os"),
+		Accept:         accept,
+		Connection:     ctx.Request.Header.Get("Connection"),
+		ForwardedFor:   ctx.Request.Header.Get("X-Forwarded-For"),
+		ForwardedHost:  ctx.Request.Header.Get("X-Forwarded-Host"),
+		ForwardedProto: ctx.Request.Header.Get("X-Forwarded-Proto"),
 
 		// Browser fingerprinting
 		AcceptLanguage:   acceptLanguage,
@@ -393,7 +410,8 @@ func getPlatform(ctx *gin.Context) string {
 }
 
 // getEnhancedBrowserInfo extracts additional browser fingerprinting data
-func getEnhancedBrowserInfo(ctx *gin.Context) (string, string, string, string, string, []string) {
+func getEnhancedBrowserInfo(ctx *gin.Context) (string, string, string, string, string, string, []string) {
+	accept := ctx.Request.Header.Get("Accept")
 	acceptLanguage := ctx.Request.Header.Get("Accept-Language")
 	acceptEncoding := ctx.Request.Header.Get("Accept-Encoding")
 	dnt := ctx.Request.Header.Get("DNT")
@@ -401,7 +419,7 @@ func getEnhancedBrowserInfo(ctx *gin.Context) (string, string, string, string, s
 	screenRes := ctx.Request.Header.Get("X-Screen-Resolution")
 	languages := parseAcceptLanguage(acceptLanguage)
 
-	return acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages
+	return accept, acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages
 }
 
 // getLocationInfo extracts location-related information
