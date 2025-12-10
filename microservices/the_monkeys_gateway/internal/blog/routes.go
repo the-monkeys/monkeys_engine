@@ -61,11 +61,12 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 		UserAgent: clientInfo.UserAgent,
 		Referrer:  clientInfo.Referrer,
 		Platform:  platform,
+		Browser:   clientInfo.Browser,
+		Dnt:       clientInfo.DNT,
 
 		// Enhanced Browser fingerprinting
 		AcceptLanguage:   clientInfo.AcceptLanguage,
 		AcceptEncoding:   clientInfo.AcceptEncoding,
-		Dnt:              clientInfo.DNT,
 		Timezone:         clientInfo.Timezone,
 		ScreenResolution: clientInfo.ScreenResolution,
 		ColorDepth:       clientInfo.ColorDepth,
@@ -440,8 +441,6 @@ func (asc *BlogServiceClient) GetDraftBlogByAccId(ctx *gin.Context) {
 
 func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 
-	fmt.Println("printing headers", ctx.Request.Header)
-
 	// Check permissions:
 	if !utils.CheckUserAccessInContext(ctx, "Publish") {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
@@ -670,6 +669,8 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 
 	// Get client information using utility function
 	clientInfo := utils.GetClientInfo(ctx)
+	fmt.Printf("ctx.Request.Header: %v\n", ctx.Request.Header)
+	fmt.Printf("clientInfo: %v\n", clientInfo)
 
 	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{

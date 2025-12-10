@@ -18,6 +18,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/seo"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -129,6 +130,7 @@ type ComprehensiveClientInfo struct {
 	Accept         string
 	Connection     string
 	Referer        string
+	DeviceType     string
 }
 
 // Helper method to extract comprehensive client info from any request type
@@ -303,7 +305,7 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 			ForwardedPort:     clientInfo.GetForwardedPort(),
 			ForwardedProto:    clientInfo.GetForwardedProto(),
 			Os:                clientInfo.GetOs(),
-			Device:            clientInfo.GetDeviceType(),
+			DeviceType:        clientInfo.GetDeviceType(),
 
 			// Timestamps
 			FirstSeen:   clientInfo.GetFirstSeen(),
@@ -483,8 +485,6 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 	// Extract comprehensive client information
 	clientInfo := blog.extractClientInfo(req)
 
-	fmt.Println("ClientInfo in blog service**>>>> : ", clientInfo)
-
 	toInt32 := func(s string) int32 {
 		v, _ := strconv.ParseInt(s, 10, 32)
 		return int32(v)
@@ -540,6 +540,7 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 		Accept:          clientInfo.Accept,
 		Browser:         clientInfo.Browser,
 		Os:              clientInfo.Os,
+		DeviceType:      activitypb.DeviceType(utils.GetDeviceType(clientInfo.DeviceType)), // converting device type (desktop, mobile and table to enum 1,2,3)
 	}
 
 	// Create enhanced activity tracking request with comprehensive client data

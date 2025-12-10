@@ -252,9 +252,11 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 	clientType := getClientType(ctx)
 	sessionID := getSessionID(ctx)
 	platform := getPlatform(ctx)
+	browser := getBrowser(ctx)
+	dnt := getDNT(ctx)
 
 	// Get enhanced browser information
-	accept, acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages := getEnhancedBrowserInfo(ctx)
+	accept, acceptLanguage, acceptEncoding, timezone, screenRes, languages := getEnhancedBrowserInfo(ctx)
 
 	// Get location information
 	country, timezoneOffset := getLocationInfo(ctx)
@@ -279,6 +281,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		ClientType:     clientType,
 		SessionID:      sessionID,
 		Platform:       platform,
+		Browser:        browser,
 		Origin:         ctx.Request.Header.Get("Origin"),
 		RealIP:         GetClientIP(ctx),
 		DeviceType:     ctx.Request.Header.Get("X-Device"),
@@ -288,11 +291,11 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		ForwardedFor:   ctx.Request.Header.Get("X-Forwarded-For"),
 		ForwardedHost:  ctx.Request.Header.Get("X-Forwarded-Host"),
 		ForwardedProto: ctx.Request.Header.Get("X-Forwarded-Proto"),
+		DNT:            dnt,
 
 		// Browser fingerprinting
 		AcceptLanguage:   acceptLanguage,
 		AcceptEncoding:   acceptEncoding,
-		DNT:              dnt,
 		Timezone:         timezone,
 		ScreenResolution: screenRes,
 		ColorDepth:       ctx.Request.Header.Get("X-Color-Depth"),
@@ -328,6 +331,15 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 	}
 
 	return ci
+}
+
+// getDNT determines DNT (Do Not Track) from headers with fallback
+func getDNT(ctx *gin.Context) string {
+	dnt := ctx.Request.Header.Get("Sec-Gpc")
+	if dnt == "" {
+		dnt = ctx.Request.Header.Get("Dnt")
+	}
+	return dnt
 }
 
 // getClientType determines client type from headers with fallback
@@ -409,17 +421,64 @@ func getPlatform(ctx *gin.Context) string {
 	}
 }
 
+func getBrowser(ctx *gin.Context) string {
+	// First try the X-Browser header
+	if browser := ctx.Request.Header.Get("X-Browser"); browser != "" {
+		return browser
+	}
+
+	// Fallback to Sec-Ch-Ua header
+	uaList := ctx.Request.Header["Sec-Ch-Ua"]
+	if len(uaList) == 0 {
+		return "unknown"
+	}
+
+	// Priority order
+	preferred := []string{"Brave", "Chrome", "Chromium", "Firefox", "Edge", "Safari"}
+
+	// Combine all lines into one string
+	raw := strings.Join(uaList, ", ")
+
+	// Split by commas
+	parts := strings.SplitSeq(raw, ",")
+
+	for p := range parts {
+		p = strings.TrimSpace(p)
+
+		// Extract the browser name inside quotes
+		if strings.HasPrefix(p, `"`) {
+			end := strings.Index(p[1:], `"`)
+			if end != -1 {
+				name := p[1 : end+1] // correctly extract the quoted name
+
+				// Skip noise brands
+				if strings.EqualFold(name, "Not_A Brand") || strings.EqualFold(name, "Not A(Brand") {
+					continue
+				}
+
+				// Return the first preferred match
+				for _, b := range preferred {
+					if strings.EqualFold(name, b) {
+						return b
+					}
+				}
+			}
+		}
+	}
+
+	return "unknown"
+}
+
 // getEnhancedBrowserInfo extracts additional browser fingerprinting data
-func getEnhancedBrowserInfo(ctx *gin.Context) (string, string, string, string, string, string, []string) {
+func getEnhancedBrowserInfo(ctx *gin.Context) (string, string, string, string, string, []string) {
 	accept := ctx.Request.Header.Get("Accept")
 	acceptLanguage := ctx.Request.Header.Get("Accept-Language")
 	acceptEncoding := ctx.Request.Header.Get("Accept-Encoding")
-	dnt := ctx.Request.Header.Get("DNT")
 	timezone := ctx.Request.Header.Get("X-Timezone")
 	screenRes := ctx.Request.Header.Get("X-Screen-Resolution")
 	languages := parseAcceptLanguage(acceptLanguage)
 
-	return accept, acceptLanguage, acceptEncoding, dnt, timezone, screenRes, languages
+	return accept, acceptLanguage, acceptEncoding, timezone, screenRes, languages
 }
 
 // getLocationInfo extracts location-related information

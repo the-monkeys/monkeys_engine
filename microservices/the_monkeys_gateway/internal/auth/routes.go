@@ -55,6 +55,13 @@ func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
 		DeviceMemory:     clientInfo.DeviceMemory,
 		Languages:        clientInfo.Languages,
 		Origin:           clientInfo.Origin,
+		DeviceType:       clientInfo.DeviceType,
+		Browser:          clientInfo.Browser,
+		Accept:           clientInfo.Accept,
+		Os:               clientInfo.Os,
+		ForwardedFor:     clientInfo.ForwardedFor,
+		ForwardedHost:    clientInfo.ForwardedHost,
+		ForwardedProto:   clientInfo.ForwardedProto,
 
 		// Location & Geographic hints
 		Country:        clientInfo.Country,
@@ -169,6 +176,8 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 
 	// Get comprehensive client information using helper function
 	clientInfo := asc.createClientInfo(ctx)
+
+	asc.Log.Debug("Client info: %v", clientInfo)
 
 	// Log registration attempt with enhanced tracking
 	asc.Log.Debug("Registration attempt from IP: %s, User-Agent: %s, Platform: %s, SessionID: %s",

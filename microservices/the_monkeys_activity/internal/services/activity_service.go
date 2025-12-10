@@ -34,6 +34,7 @@ func (s *ActivityServiceServer) TrackActivity(ctx context.Context, req *pb.Track
 		"account_id", req.GetAccountId(),
 		"category", req.GetCategory(),
 		"action", req.GetAction(),
+		"clientInfo", req.GetClientInfo(),
 	)
 
 	// Validate required fields
