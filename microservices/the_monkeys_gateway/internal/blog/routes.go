@@ -669,8 +669,6 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 
 	// Get client information using utility function
 	clientInfo := utils.GetClientInfo(ctx)
-	fmt.Printf("ctx.Request.Header: %v\n", ctx.Request.Header)
-	fmt.Printf("clientInfo: %v\n", clientInfo)
 
 	// Check if the blog exists
 	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{

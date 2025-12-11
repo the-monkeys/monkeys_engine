@@ -177,8 +177,6 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 	// Get comprehensive client information using helper function
 	clientInfo := asc.createClientInfo(ctx)
 
-	asc.Log.Debug("Client info: %v", clientInfo)
-
 	// Log registration attempt with enhanced tracking
 	asc.Log.Debug("Registration attempt from IP: %s, User-Agent: %s, Platform: %s, SessionID: %s",
 		clientInfo.IpAddress, clientInfo.UserAgent, clientInfo.Platform, clientInfo.SessionId)
