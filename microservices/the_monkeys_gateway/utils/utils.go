@@ -376,26 +376,11 @@ func getClientType(ctx *gin.Context) string {
 
 // getSessionID extracts or generates session ID from request
 func getSessionID(ctx *gin.Context) string {
-	// Try to get session ID from header first
+	// get session ID from header first
 	if sessionID := ctx.Request.Header.Get("X-Session-ID"); sessionID != "" {
 		return sessionID
 	}
-
-	// Try to get from context (if set by middleware)
-	if sessionID, exists := ctx.Get("session_id"); exists {
-		if id, ok := sessionID.(string); ok {
-			return id
-		}
-	}
-
-	// Try to get from cookie
-	if cookie, err := ctx.Request.Cookie("session_id"); err == nil {
-		return cookie.Value
-	}
-
-	// Generate a simple session ID if none found (basic implementation)
-	// In production, this should be handled by proper session middleware
-	return fmt.Sprintf("sess_%d", time.Now().UnixNano())
+	return ""
 }
 
 // getPlatform determines platform category from user agent
