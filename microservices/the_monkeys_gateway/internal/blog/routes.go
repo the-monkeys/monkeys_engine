@@ -48,8 +48,6 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 	// Get comprehensive client information using enhanced utility function
 	clientInfo := utils.GetClientInfo(ctx)
 
-	fmt.Println("clientInfo in blog routes:: ", clientInfo)
-
 	// Get platform enum for protobuf
 	platform := utils.GetBlogPlatform(ctx)
 

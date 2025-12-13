@@ -78,6 +78,7 @@ type ComprehensiveClientInfo struct {
 	IPAddress string
 	Client    string
 	SessionID string
+	VisitorID string
 	UserAgent string
 	Referrer  string
 	Platform  pb.Platform
@@ -136,7 +137,7 @@ type ComprehensiveClientInfo struct {
 // Helper method to extract comprehensive client info from any request type
 func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClientInfo {
 	var clientInfo *pb.ClientInfo
-	var sessionID, ipAddress, userAgent, referrer, client string
+	var sessionID, visitorID, ipAddress, userAgent, referrer, client string
 	var platform pb.Platform
 
 	// Extract ClientInfo from different request types
@@ -259,6 +260,7 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 			IPAddress: clientInfo.GetIpAddress(),
 			Client:    clientInfo.GetClient(),
 			SessionID: sessionIDFromClient,
+			VisitorID: clientInfo.GetVisitorId(),
 			UserAgent: clientInfo.GetUserAgent(),
 			Referrer:  clientInfo.GetReferrer(),
 			Platform:  clientInfo.GetPlatform(),
@@ -315,10 +317,6 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 	}
 
 	// Fallback to individual fields if ClientInfo not available
-	// Generate session ID if not provided
-	if sessionID == "" {
-		sessionID = blog.generateSessionID()
-	}
 
 	// Extract what we can from UserAgent and other available fields
 	var isBot bool
@@ -385,6 +383,7 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 		IPAddress: ipAddress,
 		Client:    client,
 		SessionID: sessionID,
+		VisitorID: visitorID,
 		UserAgent: userAgent,
 		Referrer:  referrer,
 		Platform:  platform,
@@ -467,8 +466,6 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 			return
 		}
 
-		fmt.Println("activityMsg1: ", string(activityMsg))
-
 		// Send to activity tracking queue via RabbitMQ
 		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
 		if err != nil {
@@ -483,6 +480,7 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 // Helper method to track blog activities with comprehensive client information
 func (blog *BlogService) trackBlogActivity(accountId, action, resource, resourceId string, req interface{}) {
 	// Extract comprehensive client information
+
 	clientInfo := blog.extractClientInfo(req)
 
 	toInt32 := func(s string) int32 {
@@ -523,6 +521,7 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 		Languages:         clientInfo.Languages,
 		XClientId:         "", // TODO: Extract if available
 		XSessionId:        clientInfo.SessionID,
+		VisitorId:         clientInfo.VisitorID,
 		ColorDepth:        colorDepth,
 		ScreenWidth:       screenWidth,
 		ScreenHeight:      screenHeight,
@@ -597,8 +596,6 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 			blog.logger.Warnf("failed to convert metadata to struct: %v", err)
 		}
 	}
-
-	fmt.Println("activityReq: ", activityReq)
 
 	// Send activity tracking message
 	blog.sendActivityTrackingMessage(activityReq)
@@ -862,8 +859,6 @@ func (blog *BlogService) GetPublishedBlogByIdAndOwnerId(ctx context.Context, req
 
 func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq) (*pb.PublishBlogResp, error) {
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.BlogId)
-
-	fmt.Println("clientinfo in publishblog", req.ClientInfo)
 
 	// Check if the blog exists
 	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
