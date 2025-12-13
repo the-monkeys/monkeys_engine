@@ -465,6 +465,7 @@ func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActiv
 			"x_session_id":     clientInfo.GetXSessionId(),
 			"x_request_id":     clientInfo.GetXRequestId(),
 			"x_correlation_id": clientInfo.GetXCorrelationId(),
+			"visitor_id":       clientInfo.GetVisitorId(),
 
 			// Processed Information
 			"platform":        clientInfo.GetPlatform().String(),

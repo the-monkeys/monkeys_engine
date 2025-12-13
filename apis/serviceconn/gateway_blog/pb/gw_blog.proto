@@ -74,6 +74,7 @@ message ClientInfo {
   string forwarded_proto = 40;
   string forwarded_host = 41; 
   string forwarded_port = 42;
+  string visitor_id = 43;
 }
 
 message DraftBlogRequest {

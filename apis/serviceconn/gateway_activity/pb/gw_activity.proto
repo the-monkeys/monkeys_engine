@@ -510,6 +510,7 @@ message ClientInfo {
   int32 timezone_offset  = 57;
   bool javascript_enabled = 58;
   int32 request_count = 59;
+  string visitor_id = 60;
 }
 
 // Track Activity

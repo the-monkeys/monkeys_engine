@@ -41,6 +41,7 @@ func (asc *ServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo {
 		IpAddress: clientInfo.IPAddress,
 		Client:    clientInfo.ClientType,
 		SessionId: clientInfo.SessionID,
+		VisitorId: clientInfo.VisitorID,
 		UserAgent: clientInfo.UserAgent,
 		Referrer:  clientInfo.Referrer,
 		Platform:  platform,
@@ -176,6 +177,9 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 
 	// Get comprehensive client information using helper function
 	clientInfo := asc.createClientInfo(ctx)
+
+	// Todo: Remove this after testing
+	fmt.Printf("clientInfo: %v\n", clientInfo)
 
 	// Log registration attempt with enhanced tracking
 	asc.Log.Debug("Registration attempt from IP: %s, User-Agent: %s, Platform: %s, SessionID: %s",

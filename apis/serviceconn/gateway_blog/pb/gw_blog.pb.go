@@ -133,6 +133,7 @@ type ClientInfo struct {
 	ForwardedProto string `protobuf:"bytes,40,opt,name=forwarded_proto,json=forwardedProto,proto3" json:"forwarded_proto,omitempty"`
 	ForwardedHost  string `protobuf:"bytes,41,opt,name=forwarded_host,json=forwardedHost,proto3" json:"forwarded_host,omitempty"`
 	ForwardedPort  string `protobuf:"bytes,42,opt,name=forwarded_port,json=forwardedPort,proto3" json:"forwarded_port,omitempty"`
+	VisitorId      string `protobuf:"bytes,43,opt,name=visitor_id,json=visitorId,proto3" json:"visitor_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -457,6 +458,13 @@ func (x *ClientInfo) GetForwardedHost() string {
 func (x *ClientInfo) GetForwardedPort() string {
 	if x != nil {
 		return x.ForwardedPort
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetVisitorId() string {
+	if x != nil {
+		return x.VisitorId
 	}
 	return ""
 }
@@ -3208,8 +3216,7 @@ var File_apis_serviceconn_gateway_blog_pb_gw_blog_proto protoreflect.FileDescrip
 
 const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\n" +
-	".apis/serviceconn/gateway_blog/pb/gw_blog.proto\x12\bblog_svc\x1a\x19google/protobuf/any.proto\"\xf5\n" +
-	"\n" +
+	".apis/serviceconn/gateway_blog/pb/gw_blog.proto\x12\bblog_svc\x1a\x19google/protobuf/any.proto\"\x94\v\n" +
 	"\n" +
 	"ClientInfo\x12\x1d\n" +
 	"\n" +
@@ -3266,7 +3273,9 @@ const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\rforwarded_for\x18' \x01(\tR\fforwardedFor\x12'\n" +
 	"\x0fforwarded_proto\x18( \x01(\tR\x0eforwardedProto\x12%\n" +
 	"\x0eforwarded_host\x18) \x01(\tR\rforwardedHost\x12%\n" +
-	"\x0eforwarded_port\x18* \x01(\tR\rforwardedPort\"\x8c\x04\n" +
+	"\x0eforwarded_port\x18* \x01(\tR\rforwardedPort\x12\x1d\n" +
+	"\n" +
+	"visitor_id\x18+ \x01(\tR\tvisitorId\"\x8c\x04\n" +
 	"\x10DraftBlogRequest\x12\x17\n" +
 	"\ablog_id\x18\x01 \x01(\tR\x06blogId\x12(\n" +
 	"\x10owner_account_id\x18\x02 \x01(\tR\x0eownerAccountId\x12\"\n" +

@@ -58,6 +58,7 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 		IpAddress: clientInfo.IPAddress,
 		Client:    clientInfo.ClientType,
 		SessionId: clientInfo.SessionID,
+		VisitorId: clientInfo.VisitorID,
 		UserAgent: clientInfo.UserAgent,
 		Referrer:  clientInfo.Referrer,
 		Platform:  platform,

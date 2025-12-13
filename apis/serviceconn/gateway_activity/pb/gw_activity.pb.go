@@ -3048,6 +3048,7 @@ type ClientInfo struct {
 	TimezoneOffset    int32  `protobuf:"varint,57,opt,name=timezone_offset,json=timezoneOffset,proto3" json:"timezone_offset,omitempty"`
 	JavascriptEnabled bool   `protobuf:"varint,58,opt,name=javascript_enabled,json=javascriptEnabled,proto3" json:"javascript_enabled,omitempty"`
 	RequestCount      int32  `protobuf:"varint,59,opt,name=request_count,json=requestCount,proto3" json:"request_count,omitempty"`
+	VisitorId         string `protobuf:"bytes,60,opt,name=visitor_id,json=visitorId,proto3" json:"visitor_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -3493,6 +3494,13 @@ func (x *ClientInfo) GetRequestCount() int32 {
 		return x.RequestCount
 	}
 	return 0
+}
+
+func (x *ClientInfo) GetVisitorId() string {
+	if x != nil {
+		return x.VisitorId
+	}
+	return ""
 }
 
 // Track Activity
@@ -8879,7 +8887,7 @@ const file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc = "" +
 	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x129\n" +
 	"\n" +
 	"created_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf0\x0f\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x8f\x10\n" +
 	"\n" +
 	"ClientInfo\x12\x1d\n" +
 	"\n" +
@@ -8955,7 +8963,9 @@ const file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc = "" +
 	"\rdevice_memory\x188 \x01(\x05R\fdeviceMemory\x12'\n" +
 	"\x0ftimezone_offset\x189 \x01(\x05R\x0etimezoneOffset\x12-\n" +
 	"\x12javascript_enabled\x18: \x01(\bR\x11javascriptEnabled\x12#\n" +
-	"\rrequest_count\x18; \x01(\x05R\frequestCount\"\xa9\x03\n" +
+	"\rrequest_count\x18; \x01(\x05R\frequestCount\x12\x1d\n" +
+	"\n" +
+	"visitor_id\x18< \x01(\tR\tvisitorId\"\xa9\x03\n" +
 	"\x14TrackActivityRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +

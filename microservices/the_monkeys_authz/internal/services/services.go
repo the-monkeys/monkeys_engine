@@ -101,6 +101,7 @@ type ComprehensiveClientInfo struct {
 	XForwardedProto   string
 	XRealIp           string
 	Browser           string
+	VisitorID         string
 
 	// Timestamps
 	FirstSeen   string
@@ -174,6 +175,7 @@ func (as *AuthzSvc) extractClientInfo(req interface{}) *ComprehensiveClientInfo 
 		XForwardedHost:  clientInfo.GetForwardedHost(),
 		Accept:          clientInfo.GetAccept(),
 		Os:              clientInfo.GetOs(),
+		VisitorID:       clientInfo.GetVisitorId(),
 
 		// Enhanced Browser fingerprinting
 		AcceptLanguage:   clientInfo.GetAcceptLanguage(),
@@ -328,7 +330,7 @@ func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string
 		Browser:           clientInfo.Browser,
 		Os:                clientInfo.Os,
 		Accept:            clientInfo.Accept,
-
+		VisitorId:         clientInfo.VisitorID,
 		// XClientId:  clientInfo.Client, // TODO: Extract if available
 		XSessionId: clientInfo.SessionID,
 		// Additional fields that can be populated from comprehensive client info

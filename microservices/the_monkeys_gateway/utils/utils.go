@@ -193,6 +193,7 @@ type ClientInfo struct {
 	Referrer       string
 	ClientType     string // Better name than just "Client"
 	SessionID      string // Session identifier from context or generated
+	VisitorID      string // Visitor identifier for tracking across sessions
 	Platform       string // Platform category (web, mobile, tablet, etc.)
 	Origin         string
 	RealIP         string
@@ -251,6 +252,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 	referrer := ctx.Request.Referer()
 	clientType := getClientType(ctx)
 	sessionID := getSessionID(ctx)
+	visitorID := getVisitorID(ctx)
 	platform := getPlatform(ctx)
 	browser := getBrowser(ctx)
 	dnt := getDNT(ctx)
@@ -280,6 +282,7 @@ func GetClientInfo(ctx *gin.Context) ClientInfo {
 		Referrer:       referrer,
 		ClientType:     clientType,
 		SessionID:      sessionID,
+		VisitorID:      visitorID,
 		Platform:       platform,
 		Browser:        browser,
 		Origin:         ctx.Request.Header.Get("Origin"),
@@ -379,6 +382,13 @@ func getSessionID(ctx *gin.Context) string {
 	// get session ID from header first
 	if sessionID := ctx.Request.Header.Get("X-Session-ID"); sessionID != "" {
 		return sessionID
+	}
+	return ""
+}
+
+func getVisitorID(ctx *gin.Context) string {
+	if visitorID := ctx.Request.Header.Get("X-Visitor-ID"); visitorID != "" {
+		return visitorID
 	}
 	return ""
 }

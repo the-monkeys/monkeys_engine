@@ -184,6 +184,7 @@ type ClientInfo struct {
 	ForwardedFor   string `protobuf:"bytes,39,opt,name=forwarded_for,json=forwardedFor,proto3" json:"forwarded_for,omitempty"`
 	ForwardedProto string `protobuf:"bytes,40,opt,name=forwarded_proto,json=forwardedProto,proto3" json:"forwarded_proto,omitempty"`
 	RealIp         string `protobuf:"bytes,41,opt,name=real_ip,json=realIp,proto3" json:"real_ip,omitempty"`
+	VisitorId      string `protobuf:"bytes,42,opt,name=visitor_id,json=visitorId,proto3" json:"visitor_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -501,6 +502,13 @@ func (x *ClientInfo) GetForwardedProto() string {
 func (x *ClientInfo) GetRealIp() string {
 	if x != nil {
 		return x.RealIp
+	}
+	return ""
+}
+
+func (x *ClientInfo) GetVisitorId() string {
+	if x != nil {
+		return x.VisitorId
 	}
 	return ""
 }
@@ -2593,7 +2601,7 @@ var File_apis_serviceconn_gateway_authz_pb_gw_auth_proto protoreflect.FileDescri
 
 const file_apis_serviceconn_gateway_authz_pb_gw_auth_proto_rawDesc = "" +
 	"\n" +
-	"/apis/serviceconn/gateway_authz/pb/gw_auth.proto\x12\bauth_svc\"\xce\n" +
+	"/apis/serviceconn/gateway_authz/pb/gw_auth.proto\x12\bauth_svc\"\xed\n" +
 	"\n" +
 	"\n" +
 	"ClientInfo\x12\x1d\n" +
@@ -2650,7 +2658,9 @@ const file_apis_serviceconn_gateway_authz_pb_gw_auth_proto_rawDesc = "" +
 	"\x0eforwarded_host\x18& \x01(\tR\rforwardedHost\x12#\n" +
 	"\rforwarded_for\x18' \x01(\tR\fforwardedFor\x12'\n" +
 	"\x0fforwarded_proto\x18( \x01(\tR\x0eforwardedProto\x12\x17\n" +
-	"\areal_ip\x18) \x01(\tR\x06realIp\"\xd1\x02\n" +
+	"\areal_ip\x18) \x01(\tR\x06realIp\x12\x1d\n" +
+	"\n" +
+	"visitor_id\x18* \x01(\tR\tvisitorId\"\xd1\x02\n" +
 	"\x13RegisterUserRequest\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x01 \x01(\tR\tfirstName\x12\x1b\n" +

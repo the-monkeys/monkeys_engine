@@ -72,6 +72,7 @@ message ClientInfo {
   string forwarded_for = 39;
   string forwarded_proto = 40;
   string real_ip = 41;
+  string visitor_id = 42;
 }
 
 message RegisterUserRequest {
