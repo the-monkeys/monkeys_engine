@@ -334,8 +334,12 @@ func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string
 		// XClientId:  clientInfo.Client, // TODO: Extract if available
 		XSessionId: clientInfo.SessionID,
 		// Additional fields that can be populated from comprehensive client info
-		Connection: clientInfo.ConnectionType,
-		Origin:     clientInfo.Origin, // Use Referrer as Origin since it's available in ClientInfo
+		Connection:      clientInfo.ConnectionType,
+		Origin:          clientInfo.Origin, // Use Referrer as Origin since it's available in ClientInfo
+		XForwardedFor:   clientInfo.XForwardedFor,
+		XForwardedHost:  clientInfo.XForwardedHost,
+		XForwardedProto: clientInfo.XForwardedProto,
+		XRealIp:         clientInfo.XRealIp,
 	}
 
 	// Create enhanced activity tracking request with comprehensive client data
