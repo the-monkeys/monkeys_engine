@@ -153,7 +153,6 @@ var Technology = []string{
 	"Open Source",
 	"AI chip",
 	"Pixel smartphones",
-	"Monkeys",
 	"Twitter",
 	"BladeBattery",
 	"Microsoft news",

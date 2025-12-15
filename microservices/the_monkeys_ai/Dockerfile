@@ -11,7 +11,7 @@ WORKDIR /app
 
 # Copy requirements first for better layer caching
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY . .
@@ -35,8 +35,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy Python packages from builder stage
-COPY --from=builder /root/.local /home/appuser/.local
+# Copy Python packages from builder stage (installed to system site-packages)
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code and generated proto files
 COPY --from=builder /app .
@@ -47,8 +48,7 @@ RUN chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-# Make sure scripts in .local are usable
-ENV PATH=/home/appuser/.local/bin:$PATH
+# Set environment variables
 ENV PYTHONPATH=/app
 
 # Define port arguments from environment
