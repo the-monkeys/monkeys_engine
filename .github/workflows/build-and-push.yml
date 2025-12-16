@@ -18,8 +18,84 @@ env:
   NAMESPACE: ${{ github.repository_owner }}
 
 jobs:
+  detect-changes:
+    name: 🔍 Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ steps.filter.outputs.gateway }}
+      ai-engine: ${{ steps.filter.outputs.ai-engine }}
+      blog: ${{ steps.filter.outputs.blog }}
+      auth: ${{ steps.filter.outputs.auth }}
+      user: ${{ steps.filter.outputs.user }}
+      notification: ${{ steps.filter.outputs.notification }}
+      storage: ${{ steps.filter.outputs.storage }}
+      activity: ${{ steps.filter.outputs.activity }}
+    steps:
+      - name: 🛒 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔎 Check Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            gateway:
+              - 'microservices/the_monkeys_gateway/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'constants/**'
+              - 'go.mod'
+              - 'go.sum'
+            ai-engine:
+              - 'microservices/the_monkeys_ai/**'
+              - 'requirements.txt'
+            blog:
+              - 'microservices/the_monkeys_blog/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+            auth:
+              - 'microservices/the_monkeys_authz/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+            user:
+              - 'microservices/the_monkeys_users/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+            notification:
+              - 'microservices/the_monkeys_notification/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+            storage:
+              - 'microservices/the_monkeys_storage/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+            activity:
+              - 'microservices/the_monkeys_activity/**'
+              - 'apis/serviceconn/**'
+              - 'config/**'
+              - 'logger/**'
+              - 'go.mod'
+              - 'go.sum'
+
   build-and-push:
     name: Build & Push Container Images
+    needs: detect-changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -66,13 +142,54 @@ jobs:
             build_args: ""
 
     steps:
+      - name: ⏭️ Skip if no changes
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway != 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine != 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog != 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth != 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user != 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification != 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage != 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity != 'true')
+        run: |
+          echo "⏭️ Skipping ${{ matrix.service.name }} - no changes detected"
+          exit 0
+
       - name: 🛒 Checkout Repository
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine == 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog == 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth == 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user == 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification == 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage == 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity == 'true')
         uses: actions/checkout@v4
 
       - name: 🔧 Set up Docker Buildx
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine == 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog == 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth == 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user == 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification == 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage == 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity == 'true')
         uses: docker/setup-buildx-action@v3
 
       - name: 🔑 Login to GitHub Container Registry
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine == 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog == 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth == 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user == 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification == 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage == 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity == 'true')
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -80,6 +197,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🏷️ Extract Metadata
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine == 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog == 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth == 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user == 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification == 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage == 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity == 'true')
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -93,6 +219,15 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: 🔨 Build and Push ${{ matrix.service.name }}
+        if: |
+          (matrix.service.name == 'gateway' && needs.detect-changes.outputs.gateway == 'true') ||
+          (matrix.service.name == 'ai-engine' && needs.detect-changes.outputs.ai-engine == 'true') ||
+          (matrix.service.name == 'blog' && needs.detect-changes.outputs.blog == 'true') ||
+          (matrix.service.name == 'auth' && needs.detect-changes.outputs.auth == 'true') ||
+          (matrix.service.name == 'user' && needs.detect-changes.outputs.user == 'true') ||
+          (matrix.service.name == 'notification' && needs.detect-changes.outputs.notification == 'true') ||
+          (matrix.service.name == 'storage' && needs.detect-changes.outputs.storage == 'true') ||
+          (matrix.service.name == 'activity' && needs.detect-changes.outputs.activity == 'true')
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service.context }}
