@@ -56,14 +56,16 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 		IpAddress: clientInfo.IPAddress,
 		Client:    clientInfo.ClientType,
 		SessionId: clientInfo.SessionID,
+		VisitorId: clientInfo.VisitorID,
 		UserAgent: clientInfo.UserAgent,
 		Referrer:  clientInfo.Referrer,
 		Platform:  platform,
+		Browser:   clientInfo.Browser,
+		Dnt:       clientInfo.DNT,
 
 		// Enhanced Browser fingerprinting
 		AcceptLanguage:   clientInfo.AcceptLanguage,
 		AcceptEncoding:   clientInfo.AcceptEncoding,
-		Dnt:              clientInfo.DNT,
 		Timezone:         clientInfo.Timezone,
 		ScreenResolution: clientInfo.ScreenResolution,
 		ColorDepth:       clientInfo.ColorDepth,
@@ -93,9 +95,18 @@ func (bsc *BlogServiceClient) createClientInfo(ctx *gin.Context) *pb.ClientInfo 
 		JavascriptEnabled: clientInfo.JavaScriptEnabled,
 
 		// Timestamps
-		FirstSeen:   clientInfo.FirstSeen,
-		LastSeen:    clientInfo.LastSeen,
-		CollectedAt: clientInfo.CollectedAt,
+		FirstSeen:      clientInfo.FirstSeen,
+		LastSeen:       clientInfo.LastSeen,
+		CollectedAt:    clientInfo.CollectedAt,
+		Origin:         clientInfo.Origin,
+		RealIp:         clientInfo.RealIP,
+		DeviceType:     clientInfo.DeviceType,
+		Os:             clientInfo.Os,
+		Accept:         clientInfo.Accept,
+		Connection:     clientInfo.Connection,
+		ForwardedFor:   clientInfo.ForwardedFor,
+		ForwardedHost:  clientInfo.ForwardedHost,
+		ForwardedProto: clientInfo.ForwardedProto,
 	}
 }
 

@@ -17,6 +17,54 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Helper function to create pb.ClientInfo from utils.ClientInfo
+func createClientInfo(clientInfo utils.ClientInfo) *pb.ClientInfo {
+	return &pb.ClientInfo{
+		IpAddress:         clientInfo.IPAddress,
+		UserAgent:         clientInfo.UserAgent,
+		Referrer:          clientInfo.Referrer,
+		Client:            clientInfo.ClientType,
+		SessionId:         clientInfo.SessionID,
+		VisitorId:         clientInfo.VisitorID,
+		Platform:          pb.Platform(pb.Platform_value[clientInfo.Platform]),
+		Origin:            clientInfo.Origin,
+		RealIp:            clientInfo.RealIP,
+		DeviceType:        clientInfo.DeviceType,
+		Os:                clientInfo.Os,
+		Accept:            clientInfo.Accept,
+		Connection:        clientInfo.Connection,
+		ForwardedFor:      clientInfo.ForwardedFor,
+		ForwardedHost:     clientInfo.ForwardedHost,
+		ForwardedProto:    clientInfo.ForwardedProto,
+		AcceptLanguage:    clientInfo.AcceptLanguage,
+		AcceptEncoding:    clientInfo.AcceptEncoding,
+		Dnt:               clientInfo.DNT,
+		Timezone:          clientInfo.Timezone,
+		ScreenResolution:  clientInfo.ScreenResolution,
+		ColorDepth:        clientInfo.ColorDepth,
+		DeviceMemory:      clientInfo.DeviceMemory,
+		Languages:         clientInfo.Languages,
+		Country:           clientInfo.Country,
+		TimezoneOffset:    clientInfo.TimezoneOffset,
+		UtmSource:         clientInfo.UTMSource,
+		UtmMedium:         clientInfo.UTMMedium,
+		UtmCampaign:       clientInfo.UTMCampaign,
+		UtmContent:        clientInfo.UTMContent,
+		UtmTerm:           clientInfo.UTMTerm,
+		IsBot:             clientInfo.IsBot,
+		TrustScore:        clientInfo.TrustScore,
+		RequestCount:      int32(clientInfo.RequestCount),
+		IsSecureContext:   clientInfo.IsSecureContext,
+		ConnectionType:    clientInfo.ConnectionType,
+		BrowserEngine:     clientInfo.BrowserEngine,
+		JavascriptEnabled: clientInfo.JavaScriptEnabled,
+		FirstSeen:         clientInfo.FirstSeen,
+		LastSeen:          clientInfo.LastSeen,
+		CollectedAt:       clientInfo.CollectedAt,
+		Browser:           clientInfo.Browser,
+	}
+}
+
 func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	// Get Limits and Offset
 	limit := ctx.DefaultQuery("limit", "500")
@@ -46,15 +94,16 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Tags:      tags.Tags,
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Tags:       tags.Tags,
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -181,15 +230,16 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with comprehensive user and client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		AccountId: userAccountId, // Include user account ID for personalized feed tracking
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		AccountId:  userAccountId, // Include user account ID for personalized feed tracking
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -325,15 +375,16 @@ func (asc *BlogServiceClient) SearchBlogsQuery(ctx *gin.Context) {
 	// Create search request with client tracking
 	// TODO: Add AccountId field to SearchReq protobuf for user tracking
 	searchReq := &pb.SearchReq{
-		Query:     searchQuery,
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		Query:      searchQuery,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	}
 
 	asc.log.Debugf("Searching blogs with query: %s, limit: %d, offset: %d", searchQuery, limitInt, offsetInt)
@@ -517,15 +568,16 @@ func (asc *BlogServiceClient) getNewsByCategory(ctx *gin.Context, tags []string)
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Tags:      tags,
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Tags:       tags,
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -669,16 +721,17 @@ func (asc *BlogServiceClient) MetaUsersPublished(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
-		AccountId: userInfo.AccountId,
-		IsDraft:   false, // Only published blogs
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		AccountId:  userInfo.AccountId,
+		IsDraft:    false, // Only published blogs
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -822,16 +875,17 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
-		AccountId: userInfo.AccountId,
-		IsDraft:   true, // Only draft blogs
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		AccountId:  userInfo.AccountId,
+		IsDraft:    true, // Only draft blogs
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -969,16 +1023,17 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetBlogsByBlogIds(context.Background(), &pb.BlogListReq{
-		BlogIds:   blogResp,
-		IsDraft:   false, // Only published blogs
-		Limit:     int32(limitInt),
-		Offset:    int32(offsetInt),
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		BlogIds:    blogResp,
+		IsDraft:    false, // Only published blogs
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: createClientInfo(clientInfo),
 	})
 
 	if err != nil {

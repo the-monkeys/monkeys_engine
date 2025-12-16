@@ -61,6 +61,18 @@ message ClientInfo {
   string last_seen = 30;
   string collected_at = 31;
   string Origin = 32;
+  
+  // Additional client info fields
+  string browser = 33;
+  string device_type = 34;
+  string connection = 35;
+  string os = 36;
+  string accept = 37;
+  string forwarded_host = 38;
+  string forwarded_for = 39;
+  string forwarded_proto = 40;
+  string real_ip = 41;
+  string visitor_id = 42;
 }
 
 message RegisterUserRequest {

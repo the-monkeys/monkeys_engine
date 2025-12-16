@@ -92,6 +92,16 @@ type ComprehensiveClientInfo struct {
 	ConnectionType    string
 	BrowserEngine     string
 	JavaScriptEnabled bool
+	Connection        string
+	Os                string
+	DeviceType        string
+	Accept            string
+	XForwardedHost    string
+	XForwardedFor     string
+	XForwardedProto   string
+	XRealIp           string
+	Browser           string
+	VisitorID         string
 
 	// Timestamps
 	FirstSeen   string
@@ -149,12 +159,23 @@ func (as *AuthzSvc) extractClientInfo(req interface{}) *ComprehensiveClientInfo 
 	// Convert to comprehensive structure
 	return &ComprehensiveClientInfo{
 		// Basic client information
-		IPAddress: clientInfo.GetIpAddress(),
-		Client:    clientInfo.GetClient(),
-		SessionID: sessionID,
-		UserAgent: clientInfo.GetUserAgent(),
-		Referrer:  clientInfo.GetReferrer(),
-		Platform:  clientInfo.GetPlatform(),
+		IPAddress:       clientInfo.GetIpAddress(),
+		Client:          clientInfo.GetClient(),
+		SessionID:       sessionID,
+		UserAgent:       clientInfo.GetUserAgent(),
+		Referrer:        clientInfo.GetReferrer(),
+		Platform:        clientInfo.GetPlatform(),
+		Browser:         clientInfo.GetBrowser(),
+		DeviceType:      clientInfo.GetDeviceType(),
+		Connection:      clientInfo.GetConnection(),
+		Origin:          clientInfo.GetOrigin(),
+		XRealIp:         clientInfo.GetRealIp(),
+		XForwardedFor:   clientInfo.GetForwardedFor(),
+		XForwardedProto: clientInfo.GetForwardedProto(),
+		XForwardedHost:  clientInfo.GetForwardedHost(),
+		Accept:          clientInfo.GetAccept(),
+		Os:              clientInfo.GetOs(),
+		VisitorID:       clientInfo.GetVisitorId(),
 
 		// Enhanced Browser fingerprinting
 		AcceptLanguage:   clientInfo.GetAcceptLanguage(),
@@ -224,6 +245,25 @@ func (as *AuthzSvc) detectPlatform(userAgent string, reqPlatform pb.Platform) ac
 	}
 }
 
+// Helper method to convert device type string to activitypb.DeviceType enum
+func (as *AuthzSvc) convertDeviceType(deviceType string) activitypb.DeviceType {
+	// Convert string device type to enum
+	switch strings.ToLower(strings.TrimSpace(deviceType)) {
+	case "desktop":
+		return activitypb.DeviceType_DEVICE_TYPE_DESKTOP
+	case "mobile":
+		return activitypb.DeviceType_DEVICE_TYPE_MOBILE
+	case "tablet":
+		return activitypb.DeviceType_DEVICE_TYPE_TABLET
+	case "bot":
+		return activitypb.DeviceType_DEVICE_TYPE_BOT
+	case "unknown":
+		return activitypb.DeviceType_DEVICE_TYPE_UNKNOWN
+	default:
+		return activitypb.DeviceType_DEVICE_TYPE_UNSPECIFIED
+	}
+}
+
 // Helper method to send activity tracking message to RabbitMQ
 func (as *AuthzSvc) sendActivityTrackingMessage(activityReq *activitypb.TrackActivityRequest) {
 	go func() {
@@ -286,11 +326,20 @@ func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string
 		TimezoneOffset:    int32(timezone_offset),
 		JavascriptEnabled: clientInfo.JavaScriptEnabled,
 		RequestCount:      clientInfo.RequestCount,
+		DeviceType:        as.convertDeviceType(clientInfo.DeviceType),
+		Browser:           clientInfo.Browser,
+		Os:                clientInfo.Os,
+		Accept:            clientInfo.Accept,
+		VisitorId:         clientInfo.VisitorID,
 		// XClientId:  clientInfo.Client, // TODO: Extract if available
 		XSessionId: clientInfo.SessionID,
 		// Additional fields that can be populated from comprehensive client info
-		Connection: clientInfo.ConnectionType,
-		Origin:     clientInfo.Origin, // Use Referrer as Origin since it's available in ClientInfo
+		Connection:      clientInfo.ConnectionType,
+		Origin:          clientInfo.Origin, // Use Referrer as Origin since it's available in ClientInfo
+		XForwardedFor:   clientInfo.XForwardedFor,
+		XForwardedHost:  clientInfo.XForwardedHost,
+		XForwardedProto: clientInfo.XForwardedProto,
+		XRealIp:         clientInfo.XRealIp,
 	}
 
 	// Create enhanced activity tracking request with comprehensive client data
@@ -330,7 +379,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	as.logger.Debugf("got the request data for : %+v", req.Email)
 
 	// Extract comprehensive client information
-	clientInfo := as.extractClientInfo(req)
+	clientInfo := req.ClientInfo
 
 	// Cleanup request data
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
@@ -374,7 +423,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	}
 
 	// Set client information from comprehensive ClientInfo
-	user.IpAddress, user.Client = utils.IpClientConvert(clientInfo.IPAddress, clientInfo.Client)
+	user.IpAddress, user.Client = utils.IpClientConvert(clientInfo.IpAddress, clientInfo.Client)
 
 	as.logger.Debugf("registering the user with email %v", req.Email)
 	userId, err := as.dbConn.RegisterUser(user)

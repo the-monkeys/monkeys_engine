@@ -62,6 +62,19 @@ message ClientInfo {
   string first_seen = 29;
   string last_seen = 30;
   string collected_at = 31;
+  
+  string origin = 32;
+  string real_ip = 33;
+  string browser = 34;
+  string accept = 35;
+  string connection = 36;
+  string device_type = 37;
+  string os = 38;
+  string forwarded_for = 39;
+  string forwarded_proto = 40;
+  string forwarded_host = 41; 
+  string forwarded_port = 42;
+  string visitor_id = 43;
 }
 
 message DraftBlogRequest {
