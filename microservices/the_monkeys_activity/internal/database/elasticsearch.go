@@ -519,7 +519,12 @@ func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActiv
 
 	// Index the document with immediate refresh for critical data
 	indexReq := esapi.IndexRequest{
-		Index:      ActivityEventIndex,
+		// Index ex: activity_events_2025-12-22
+		Index: fmt.Sprintf(
+			"%s_%s",
+			ActivityEventIndex,
+			time.Now().Format(time.DateOnly),
+		),
 		DocumentID: activityID,
 		Body:       bytes.NewReader(docBytes),
 		Refresh:    "true", // Immediate refresh for critical data
