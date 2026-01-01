@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	activity_pb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
@@ -1236,4 +1237,31 @@ func generateRandomWordCloud(maxWords int) map[string]int {
 	}
 
 	return wordCloud
+}
+
+func (asc *BlogServiceClient) GetBlogStats(ctx *gin.Context) {
+	blogID := ctx.Param("blog_id")
+	if blogID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "blog_id is required"})
+		return
+	}
+
+	// Call Activity Service to get read count
+	// We use GetContentAnalytics as implemented in Activity Service
+	resp, err := asc.ActivityCli.GetContentAnalytics(context.Background(), &activity_pb.GetContentAnalyticsRequest{
+		ContentId:   blogID,
+		ContentType: "blog",
+	})
+
+	if err != nil {
+		asc.log.Errorw("failed to get blog stats", "error", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get blog stats"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"blog_id":    blogID,
+		"read_count": resp.TotalCount,
+		"analytics":  resp.AnalyticsSummary,
+	})
 }

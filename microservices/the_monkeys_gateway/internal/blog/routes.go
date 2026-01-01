@@ -13,9 +13,11 @@ import (
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
+	activity_pb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/activity"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/user_service"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
@@ -37,10 +39,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type BlogServiceClient struct {
-	Client  pb.BlogServiceClient
-	UserCli *user_service.UserServiceClient
-	config  *config.Config
-	log     *zap.SugaredLogger
+	Client      pb.BlogServiceClient
+	UserCli     *user_service.UserServiceClient
+	ActivityCli activity_pb.ActivityServiceClient
+	config      *config.Config
+	log         *zap.SugaredLogger
 }
 
 // createClientInfo creates a comprehensive ClientInfo protobuf message from gin context
@@ -127,10 +130,11 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	mware := auth.InitAuthMiddleware(authClient, log)
 
 	blogClient := &BlogServiceClient{
-		Client:  NewBlogServiceClient(cfg, log),
-		UserCli: userClient,
-		config:  cfg,
-		log:     log,
+		Client:      NewBlogServiceClient(cfg, log),
+		UserCli:     userClient,
+		ActivityCli: activity.NewActivityServiceClient(cfg, log),
+		config:      cfg,
+		log:         log,
 	}
 
 	// -------------------------------------------------- V1 API in use --------------------------------------------------
@@ -168,6 +172,7 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// routesV2.GET("/all/:username", rateLimiter, blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
 		routesV2.GET("/user/:username", rateLimiter, blogClient.MetaUsersPublished) // Get metadata of user's published blogs
 		// Get published blog by blog_id
+		routesV2.GET("/:blog_id/stats", rateLimiter, blogClient.GetBlogStats)       // Get blog stats
 		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
 
 		// User Tags API
