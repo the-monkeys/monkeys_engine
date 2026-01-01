@@ -15,3 +15,37 @@ node_modules/
 *.swp
 *.swo
 *~
+
+# Exclude large data directories
+blogs/
+profile/
+local/
+local_blogs/
+local_profiles/
+postgres_backup/
+elasticsearch_snapshots/
+backup/
+logs/
+test_data/
+static/
+monkeys-seo-cred.json/
+documents/
+
+# Exclude environment files
+dev.env
+*.env
+monkeys-cred.json
+server.json
+es.json
+
+# Exclude Docker files
+docker-compose.yml
+prod.docker-compose.yaml
+
+# Exclude scripts and tools
+restore-postgres.ps1
+restore-postgres.sh
+restore-snapshots.ps1
+restore-snapshots.sh
+Makefile
+action.Md

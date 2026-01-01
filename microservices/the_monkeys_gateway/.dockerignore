@@ -1,17 +1,93 @@
 # Ignore unnecessary files to reduce build context
+
+# Version control
 .git
 .gitignore
+.github/
+
+# Documentation
 README.md
-Dockerfile*
-.dockerignore
 *.md
 docs/
-test/
+contribution/
+documents/
+
+# Docker files
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+*.docker-compose.yaml
+
+# Build artifacts and binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+build/
+
+# Data directories (HUGE - exclude these!)
+blogs/
+profile/
+local/
+local_blogs/
+local_profiles/
+postgres_backup/
+elasticsearch_snapshots/
+backup/
+static/
+test_data/
+monkeys-seo-cred.json/
+
+# Logs
 *.log
-.env.example
-node_modules/
+logs/
+err.log
+
+# Environment files
+.env
+.env.*
+dev.env
+server.json
+es.json
+monkeys-cred.json
+
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv
+
+# Go
+vendor/
+*.out
+
+# Scripts (unless needed)
+scripts/
+*.sh
+*.ps1
+
+# Temp files
+tmp/
+temp/
+*.tmp
