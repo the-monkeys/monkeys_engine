@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -193,7 +194,61 @@ func (s *ActivityServiceServer) GetRecommendationAnalytics(ctx context.Context, 
 }
 
 func (s *ActivityServiceServer) GetContentAnalytics(ctx context.Context, req *pb.GetContentAnalyticsRequest) (*pb.GetContentAnalyticsResponse, error) {
+	s.logger.Debugw("GetContentAnalytics called",
+		"content_id", req.GetContentId(),
+		"content_type", req.GetContentType(),
+	)
+
+	if req.GetContentType() == "blog" && req.GetContentId() != "" {
+		analytics, err := s.db.GetBlogAnalytics(ctx, req.GetContentId())
+		if err != nil {
+			s.logger.Errorw("failed to get blog analytics", "error", err)
+			return &pb.GetContentAnalyticsResponse{
+				StatusCode: 500,
+				Error: &pb.Error{
+					Status:  500,
+					Error:   "database_error",
+					Message: "failed to get blog analytics",
+				},
+			}, nil
+		}
+
+		summary, err := structpb.NewStruct(map[string]interface{}{
+			"unique_readers":         analytics.UniqueReaders,
+			"total_likes":            analytics.TotalLikes,
+			"avg_read_time_ms":       analytics.AvgReadTimeMs,
+			"countries":              convertMap(analytics.Countries),
+			"referrers":              convertMap(analytics.Referrers),
+			"platforms":              convertMap(analytics.Platforms),
+			"cities":                 convertMap(analytics.Cities),
+			"isps":                   convertMap(analytics.ISPs),
+			"daily_activity":         convertMap(analytics.DailyActivity),
+			"hourly_activity":        convertMap(analytics.HourlyActivity),
+			"read_time_distribution": convertMap(analytics.ReadTimeDistribution),
+			"realtime_views":         convertMap(analytics.RealtimeViews),
+		})
+		if err != nil {
+			s.logger.Errorw("failed to create analytics summary struct", "error", err)
+			// Return partial response or error? Let's return what we have with empty summary if it fails,
+			// but logging it is important.
+		}
+
+		return &pb.GetContentAnalyticsResponse{
+			StatusCode:       200,
+			TotalCount:       analytics.TotalReads,
+			AnalyticsSummary: summary,
+		}, nil
+	}
+
 	return &pb.GetContentAnalyticsResponse{StatusCode: 200, Interactions: []*pb.ContentInteraction{}, TotalCount: 0}, nil
+}
+
+func convertMap(m map[string]int64) map[string]interface{} {
+	res := make(map[string]interface{})
+	for k, v := range m {
+		res[k] = v
+	}
+	return res
 }
 
 func (s *ActivityServiceServer) TrackContentInteraction(ctx context.Context, req *pb.TrackContentInteractionRequest) (*pb.TrackContentInteractionResponse, error) {

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -21,9 +23,45 @@ type ActivityDatabase interface {
 	SaveActivity(ctx context.Context, req *pb.TrackActivityRequest) (string, error)
 	GetUserActivities(ctx context.Context, req *pb.GetUserActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
 	SaveSecurityEvent(ctx context.Context, req *pb.TrackSecurityEventRequest) (string, error)
+	GetBlogAnalytics(ctx context.Context, blogID string) (*BlogAnalytics, error)
 	Health(ctx context.Context) error
+	StartIPResolver(ctx context.Context)
+	UpdateIPLocation(ctx context.Context, ip string, location *IPGeoLocation) error
 	UpdateTimeSeriesConfig(config TimeSeriesConfig)                   // Configure time-series behavior
 	GetIndexInfo(ctx context.Context) (map[string]interface{}, error) // Monitor index usage
+}
+
+type IPGeoLocation struct {
+	Status      string  `json:"status"`
+	Country     string  `json:"country"`
+	CountryCode string  `json:"countryCode"`
+	Region      string  `json:"region"`
+	RegionName  string  `json:"regionName"`
+	City        string  `json:"city"`
+	Zip         string  `json:"zip"`
+	Lat         float64 `json:"lat"`
+	Lon         float64 `json:"lon"`
+	Timezone    string  `json:"timezone"`
+	ISP         string  `json:"isp"`
+	Org         string  `json:"org"`
+	AS          string  `json:"as"`
+	Query       string  `json:"query"`
+}
+
+type BlogAnalytics struct {
+	TotalReads           int64
+	UniqueReaders        int64
+	TotalLikes           int64
+	AvgReadTimeMs        float64
+	Countries            map[string]int64
+	Referrers            map[string]int64
+	Platforms            map[string]int64
+	Cities               map[string]int64
+	ISPs                 map[string]int64
+	DailyActivity        map[string]int64
+	HourlyActivity       map[string]int64
+	ReadTimeDistribution map[string]int64
+	RealtimeViews        map[string]int64
 }
 
 const (
@@ -1226,4 +1264,448 @@ func (db *ActivityDB) GetIndexInfo(ctx context.Context) (map[string]interface{},
 	}
 
 	return info, nil
+}
+
+// GetBlogAnalytics calculates detailed analytics for a specific blog
+func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*BlogAnalytics, error) {
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"resource_id.keyword": blogID,
+						},
+					},
+				},
+			},
+		},
+		"aggs": map[string]interface{}{
+			// Filter for views (read_blog)
+			"views": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"term": map[string]interface{}{
+						"action.keyword": "read_blog",
+					},
+				},
+				"aggs": map[string]interface{}{
+					"unique_users": map[string]interface{}{
+						"cardinality": map[string]interface{}{
+							"field": "client_info.x_session_id.keyword",
+						},
+					},
+					"avg_read_time": map[string]interface{}{
+						"avg": map[string]interface{}{
+							"field": "duration_ms",
+						},
+					},
+					"read_time_dist": map[string]interface{}{
+						"range": map[string]interface{}{
+							"field": "duration_ms",
+							"ranges": []map[string]interface{}{
+								{"to": 30000, "key": "<30s"},
+								{"from": 30000, "to": 60000, "key": "30s-1m"},
+								{"from": 60000, "to": 180000, "key": "1m-3m"},
+								{"from": 180000, "key": ">3m"},
+							},
+						},
+					},
+					"countries": map[string]interface{}{
+						"terms": map[string]interface{}{
+							"field": "country.keyword",
+							"size":  20,
+						},
+					},
+					"referrers": map[string]interface{}{
+						"terms": map[string]interface{}{
+							"field": "referrer.keyword",
+							"size":  20,
+						},
+					},
+					"platforms": map[string]interface{}{
+						"terms": map[string]interface{}{
+							"field": "platform.keyword",
+							"size":  10,
+						},
+					},
+					"cities": map[string]interface{}{
+						"terms": map[string]interface{}{
+							"field": "city.keyword",
+							"size":  20,
+						},
+					},
+					"isps": map[string]interface{}{
+						"terms": map[string]interface{}{
+							"field": "isp.keyword",
+							"size":  20,
+						},
+					},
+					"daily_activity": map[string]interface{}{
+						"date_histogram": map[string]interface{}{
+							"field":             "@timestamp",
+							"calendar_interval": "day",
+							"format":            "yyyy-MM-dd",
+						},
+					},
+					"hourly_activity": map[string]interface{}{
+						"date_histogram": map[string]interface{}{
+							"field":             "@timestamp",
+							"calendar_interval": "hour",
+							"format":            "yyyy-MM-dd HH:00",
+						},
+					},
+					"realtime_views": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"@timestamp": map[string]interface{}{
+									"gte": "now-48h",
+								},
+							},
+						},
+						"aggs": map[string]interface{}{
+							"histogram": map[string]interface{}{
+								"date_histogram": map[string]interface{}{
+									"field":          "@timestamp",
+									"fixed_interval": "1h",
+									"format":         "yyyy-MM-dd HH:00",
+								},
+							},
+						},
+					},
+				},
+			},
+			// Filter for likes
+			"likes": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"term": map[string]interface{}{
+						"action.keyword": "blog_like",
+					},
+				},
+			},
+		},
+		"size": 0,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(query); err != nil {
+		return nil, fmt.Errorf("failed to encode query: %w", err)
+	}
+
+	// Search across all activity indices
+	res, err := db.client.Search(
+		db.client.Search.WithContext(ctx),
+		db.client.Search.WithIndex("activity-events*"),
+		db.client.Search.WithBody(&buf),
+		db.client.Search.WithTrackTotalHits(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute search: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return nil, fmt.Errorf("search request failed: %s", res.String())
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode search response: %w", err)
+	}
+
+	aggregations, ok := result["aggregations"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("aggregations not found in response")
+	}
+
+	analytics := &BlogAnalytics{
+		Countries:            make(map[string]int64),
+		Referrers:            make(map[string]int64),
+		Platforms:            make(map[string]int64),
+		Cities:               make(map[string]int64),
+		ISPs:                 make(map[string]int64),
+		DailyActivity:        make(map[string]int64),
+		HourlyActivity:       make(map[string]int64),
+		ReadTimeDistribution: make(map[string]int64),
+		RealtimeViews:        make(map[string]int64),
+	}
+
+	// Parse Likes
+	if likesAgg, ok := aggregations["likes"].(map[string]interface{}); ok {
+		if docCount, ok := likesAgg["doc_count"].(float64); ok {
+			analytics.TotalLikes = int64(docCount)
+		}
+	}
+
+	// Parse Views and nested aggregations
+	if viewsAgg, ok := aggregations["views"].(map[string]interface{}); ok {
+		if docCount, ok := viewsAgg["doc_count"].(float64); ok {
+			analytics.TotalReads = int64(docCount)
+		}
+
+		// Access nested aggregations inside "views"
+		// Note: In some ES versions/clients, filtered aggs might wrap results differently.
+		// Usually they are at the same level as doc_count in the response map.
+
+		if uniqueUsers, ok := viewsAgg["unique_users"].(map[string]interface{}); ok {
+			if val, ok := uniqueUsers["value"].(float64); ok {
+				analytics.UniqueReaders = int64(val)
+			}
+		}
+
+		if avgTime, ok := viewsAgg["avg_read_time"].(map[string]interface{}); ok {
+			if val, ok := avgTime["value"].(float64); ok {
+				analytics.AvgReadTimeMs = val
+			}
+		}
+
+		extractBuckets := func(aggMap map[string]interface{}, aggName string, targetMap map[string]int64) {
+			if agg, ok := aggMap[aggName].(map[string]interface{}); ok {
+				if buckets, ok := agg["buckets"].([]interface{}); ok {
+					for _, b := range buckets {
+						bucket := b.(map[string]interface{})
+						var key string
+						if k, ok := bucket["key_as_string"].(string); ok {
+							key = k
+						} else if k, ok := bucket["key"].(string); ok {
+							key = k
+						} else {
+							key = fmt.Sprintf("%v", bucket["key"])
+						}
+						docCount := int64(bucket["doc_count"].(float64))
+						targetMap[key] = docCount
+					}
+				}
+			}
+		}
+
+		extractBuckets(viewsAgg, "countries", analytics.Countries)
+		extractBuckets(viewsAgg, "referrers", analytics.Referrers)
+		extractBuckets(viewsAgg, "platforms", analytics.Platforms)
+		extractBuckets(viewsAgg, "cities", analytics.Cities)
+		extractBuckets(viewsAgg, "isps", analytics.ISPs)
+		extractBuckets(viewsAgg, "daily_activity", analytics.DailyActivity)
+		extractBuckets(viewsAgg, "hourly_activity", analytics.HourlyActivity)
+		extractBuckets(viewsAgg, "read_time_dist", analytics.ReadTimeDistribution)
+
+		// Realtime views is nested deeper
+		if realtime, ok := viewsAgg["realtime_views"].(map[string]interface{}); ok {
+			extractBuckets(realtime, "histogram", analytics.RealtimeViews)
+		}
+	}
+
+	return analytics, nil
+}
+
+// StartIPResolver starts a background routine to resolve missing countries from IPs
+func (db *ActivityDB) StartIPResolver(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Minute)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				db.resolveMissingCountries(ctx)
+			}
+		}
+	}()
+}
+
+func (db *ActivityDB) resolveMissingCountries(ctx context.Context) {
+	// Find documents with missing country but present IP
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"exists": map[string]interface{}{
+							"field": "client_ip",
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "country",
+								},
+							},
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"country.keyword": "",
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		},
+		"aggs": map[string]interface{}{
+			"ips": map[string]interface{}{
+				"terms": map[string]interface{}{
+					"field": "client_ip.keyword",
+					"size":  100, // Process 100 IPs at a time
+				},
+			},
+		},
+		"size": 0,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(query); err != nil {
+		db.logger.Errorw("failed to encode ip resolution query", "error", err)
+		return
+	}
+
+	res, err := db.client.Search(
+		db.client.Search.WithContext(ctx),
+		db.client.Search.WithIndex("activity-events*"),
+		db.client.Search.WithBody(&buf),
+	)
+	if err != nil {
+		db.logger.Errorw("failed to search for missing countries", "error", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		db.logger.Errorw("search for missing countries failed", "status", res.Status())
+		return
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return
+	}
+
+	aggregations, ok := result["aggregations"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	ipsAgg, ok := aggregations["ips"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	buckets, ok := ipsAgg["buckets"].([]interface{})
+	if !ok {
+		return
+	}
+
+	db.logger.Debugw("Found IPs to resolve", "count", len(buckets))
+
+	for _, b := range buckets {
+		bucket := b.(map[string]interface{})
+		ip := bucket["key"].(string)
+		db.logger.Debugw("Processing IP", "ip", ip)
+
+		// Resolve IP using external API
+		location, err := db.resolveIP(ip)
+		if err != nil {
+			db.logger.Errorw("failed to resolve ip", "ip", ip, "error", err)
+			continue
+		}
+
+		if location != nil && location.Status == "success" {
+			if err := db.UpdateIPLocation(ctx, ip, location); err != nil {
+				db.logger.Errorw("failed to update location for ip", "ip", ip, "error", err)
+			}
+		}
+
+		// Rate limiting for free API tier (45 req/min)
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func (db *ActivityDB) resolveIP(ip string) (*IPGeoLocation, error) {
+	// Handle local IPs
+	if strings.HasPrefix(ip, "10.") || strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "172.") || ip == "127.0.0.1" || ip == "::1" {
+		return &IPGeoLocation{
+			Status:     "success",
+			Country:    "Local Network",
+			City:       "Localhost",
+			RegionName: "Local",
+			Timezone:   "UTC",
+			ISP:        "Local",
+		}, nil
+	}
+
+	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", ip))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch IP geolocation: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var location IPGeoLocation
+	if err := json.Unmarshal(body, &location); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal geolocation response: %w", err)
+	}
+
+	return &location, nil
+}
+
+// UpdateIPLocation updates all documents with the given IP to have the specified location data
+func (db *ActivityDB) UpdateIPLocation(ctx context.Context, ip string, location *IPGeoLocation) error {
+	db.logger.Debugw("Updating IP location", "ip", ip, "location", location)
+	query := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": `
+				ctx._source.country = params.country;
+				ctx._source.city = params.city;
+				ctx._source.region = params.region;
+				ctx._source.timezone = params.timezone;
+				ctx._source.isp = params.isp;
+				if (ctx._source.client_info != null) {
+					ctx._source.client_info.country = params.country;
+					ctx._source.client_info.city = params.city;
+					ctx._source.client_info.timezone = params.timezone;
+				}
+			`,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"country":  location.Country,
+				"city":     location.City,
+				"region":   location.RegionName,
+				"timezone": location.Timezone,
+				"isp":      location.ISP,
+			},
+		},
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"client_ip.keyword": ip,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(query); err != nil {
+		return fmt.Errorf("failed to encode update query: %w", err)
+	}
+
+	res, err := db.client.UpdateByQuery(
+		[]string{"activity-events*"},
+		db.client.UpdateByQuery.WithContext(ctx),
+		db.client.UpdateByQuery.WithBody(&buf),
+		db.client.UpdateByQuery.WithConflicts("proceed"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to execute update by query: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("update by query failed: %s", res.String())
+	}
+
+	db.logger.Debugw("Updated IP location", "ip", ip, "country", location.Country, "city", location.City)
+
+	return nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -51,6 +52,10 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to initialize activity database", "error", err)
 	}
+
+	// Start IP Resolver background routine
+	log.Infow("starting IP resolver background routine")
+	db.StartIPResolver(context.Background())
 
 	// Initialize RabbitMQ connection using the standard reconnect method
 	log.Infow("connecting to RabbitMQ for activity tracking")

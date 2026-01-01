@@ -46,6 +46,26 @@ try {
         
         # Restore the latest snapshot
         Write-Host "Restoring snapshot: $latestSnapshot" -ForegroundColor Cyan
+        
+        # Close all indices first to avoid conflicts
+        Write-Host "Closing existing indices..." -ForegroundColor Yellow
+        try {
+            $indices = Invoke-RestMethod -Uri "http://localhost:9200/_cat/indices?format=json&expand_wildcards=all" -Method Get
+            foreach ($index in $indices) {
+                $name = $index.index
+                Write-Host "Closing index: $name" -ForegroundColor Gray
+                try {
+                    Invoke-RestMethod -Uri "http://localhost:9200/$name/_close" -Method Post
+                }
+                catch {
+                    Write-Host "Failed to close ${name}: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+        }
+        catch {
+            Write-Host "Warning: Failed to list/close indices: $($_.Exception.Message)" -ForegroundColor Gray
+        }
+
         $restoreBody = @{
             ignore_unavailable   = $true
             include_global_state = $false
@@ -60,7 +80,7 @@ try {
             
             # Check available indices
             Write-Host "Checking available indices..." -ForegroundColor Cyan
-            $indices = Invoke-WebRequest -Uri "http://localhost:9200/_cat/indices?v" -Method Get
+            $indices = Invoke-WebRequest -Uri "http://localhost:9200/_cat/indices?v" -Method Get -UseBasicParsing
             Write-Host $indices.Content -ForegroundColor White
             
             Write-Host "Snapshot restoration process completed!" -ForegroundColor Green
