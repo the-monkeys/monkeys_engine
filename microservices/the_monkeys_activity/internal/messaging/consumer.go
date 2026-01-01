@@ -86,7 +86,7 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 			continue
 		}
 
-		log.Infow("processing activity tracking message",
+		log.Debugw("processing activity tracking message",
 			"user_id", activityReq.UserId,
 			"action", activityReq.Action,
 			"category", activityReq.Category.String())
@@ -137,7 +137,7 @@ func storeActivity(db database.ActivityDatabase, req *pb.TrackActivityRequest, l
 		return fmt.Errorf("failed to save activity in Elasticsearch: %w", err)
 	}
 
-	log.Infow("activity successfully stored",
+	log.Debugw("activity successfully stored",
 		"activity_id", activityID,
 		"user_id", req.UserId,
 		"action", req.Action)
