@@ -185,6 +185,19 @@ func GetClientIP(ctx *gin.Context) string {
 	return ctx.ClientIP()
 }
 
+// GetIntQuery extracts an integer from query parameters with a default value
+func GetIntQuery(ctx *gin.Context, key string, defaultValue int) int {
+	val := ctx.Query(key)
+	if val == "" {
+		return defaultValue
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultValue
+	}
+	return i
+}
+
 // GetClientInfo extracts comprehensive client information from request headers
 type ClientInfo struct {
 	// Basic information (existing)

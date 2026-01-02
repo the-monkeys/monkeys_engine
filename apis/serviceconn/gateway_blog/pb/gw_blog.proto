@@ -3,6 +3,7 @@ syntax = "proto3";
 package blog_svc;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
@@ -75,6 +76,7 @@ message ClientInfo {
   string forwarded_host = 41; 
   string forwarded_port = 42;
   string visitor_id = 43;
+  int64 duration_ms = 44;
 }
 
 message DraftBlogRequest {
@@ -358,7 +360,9 @@ message BlogReq {
     string referrer = 10;
     Platform platform = 11;
     ClientInfo client_info = 12;
+    int64 duration_ms = 13;
 }
+
 
 message BlogResp {
     string message = 1;
@@ -440,4 +444,20 @@ service BlogService {
     rpc MetaGetUsersBlogs(BlogListReq) returns (stream google.protobuf.Any);
     rpc MetaGetBlogsByBlogIds(BlogListReq) returns (stream google.protobuf.Any);
     rpc UsersBlogData(BlogReq) returns (google.protobuf.Any);
+    // Track user interaction with a blog (e.g. read duration)
+    rpc TrackInteraction(TrackInteractionReq) returns (TrackInteractionResp);
+}
+
+message TrackInteractionReq {
+    string blog_id = 1;
+    string account_id = 2;
+    string interaction_type = 3; // e.g. "read_duration", "like", "share", "follow_topics", "follow_account"
+    int64 duration_ms = 4;
+    ClientInfo client_info = 5;
+    google.protobuf.Struct metadata = 6;
+}
+
+message TrackInteractionResp {
+    bool success = 1;
+    string message = 2;
 }

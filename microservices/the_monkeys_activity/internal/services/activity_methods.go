@@ -213,15 +213,23 @@ func (s *ActivityServiceServer) GetContentAnalytics(ctx context.Context, req *pb
 			}, nil
 		}
 
+		engagementRate := 0.0
+		if analytics.ValidViews > 0 {
+			engagementRate = float64(analytics.TotalLikes) / float64(analytics.ValidViews)
+		}
+
 		summary, err := structpb.NewStruct(map[string]interface{}{
-			"unique_readers":         analytics.UniqueReaders,
-			"total_likes":            analytics.TotalLikes,
-			"avg_read_time_ms":       analytics.AvgReadTimeMs,
-			"countries":              convertMap(analytics.Countries),
-			"referrers":              convertMap(analytics.Referrers),
-			"platforms":              convertMap(analytics.Platforms),
-			"cities":                 convertMap(analytics.Cities),
-			"isps":                   convertMap(analytics.ISPs),
+			"unique_readers":   analytics.UniqueReaders,
+			"total_likes":      analytics.TotalLikes,
+			"valid_views":      analytics.ValidViews,
+			"bounces":          analytics.Bounces,
+			"engagement_rate":  engagementRate,
+			"avg_read_time_ms": analytics.AvgReadTimeMs,
+			"countries":        convertMap(analytics.Countries),
+			"referrers":        convertMap(analytics.Referrers),
+			"platforms":        convertMap(analytics.Platforms),
+			"cities":           convertMap(analytics.Cities),
+			// "isps":                   convertMap(analytics.ISPs),
 			"daily_activity":         convertMap(analytics.DailyActivity),
 			"hourly_activity":        convertMap(analytics.HourlyActivity),
 			"read_time_distribution": convertMap(analytics.ReadTimeDistribution),

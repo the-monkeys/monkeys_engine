@@ -132,6 +132,7 @@ type ComprehensiveClientInfo struct {
 	Connection     string
 	Referer        string
 	DeviceType     string
+	DurationMs     int64
 }
 
 // Helper method to extract comprehensive client info from any request type
@@ -238,6 +239,10 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 		if r != nil && r.GetClientInfo() != nil {
 			clientInfo = r.GetClientInfo()
 		}
+	case *pb.TrackInteractionReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		}
 	default:
 		// Fallback for unknown request types
 		blog.logger.Debugf("Unknown request type for client tracking: %T", req)
@@ -313,6 +318,7 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 			FirstSeen:   clientInfo.GetFirstSeen(),
 			LastSeen:    clientInfo.GetLastSeen(),
 			CollectedAt: clientInfo.GetCollectedAt(),
+			DurationMs:  clientInfo.GetDurationMs(),
 		}
 	}
 
@@ -553,7 +559,7 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 		ResourceId: resourceId,
 		ClientInfo: activityClientInfo,
 		Success:    true,
-		DurationMs: 0, // TODO: Add timing if needed
+		DurationMs: clientInfo.DurationMs,
 	}
 
 	// Log comprehensive client tracking information for debugging
@@ -1135,4 +1141,30 @@ func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBl
 	blog.trackBlogActivity("", "get_blogs_by_ids", "search", strings.Join(req.BlogIds, ","), req)
 
 	return res, nil
+}
+
+func (blog *BlogService) TrackInteraction(ctx context.Context, req *pb.TrackInteractionReq) (*pb.TrackInteractionResp, error) {
+	blog.logger.Debugf("Tracking interaction: blog_id=%s, type=%s, duration=%d", req.BlogId, req.InteractionType, req.DurationMs)
+
+	if req.BlogId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "blog_id is required")
+	}
+
+	// Ensure ClientInfo exists and populate DurationMs from the top-level request field
+	if req.ClientInfo == nil {
+		req.ClientInfo = &pb.ClientInfo{}
+	}
+	if req.DurationMs > 0 {
+		req.ClientInfo.DurationMs = req.DurationMs
+	}
+
+	blog.logger.Debugf("TrackInteraction: Propagating DurationMs=%d to ClientInfo.DurationMs=%d for BlogID=%s, SessionID=%s",
+		req.DurationMs, req.ClientInfo.DurationMs, req.BlogId, req.ClientInfo.SessionId)
+
+	blog.trackBlogActivity(req.AccountId, req.InteractionType, "blog", req.BlogId, req)
+
+	return &pb.TrackInteractionResp{
+		Success: true,
+		Message: "Interaction tracked successfully",
+	}, nil
 }

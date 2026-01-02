@@ -62,6 +62,8 @@ type BlogAnalytics struct {
 	HourlyActivity       map[string]int64
 	ReadTimeDistribution map[string]int64
 	RealtimeViews        map[string]int64
+	ValidViews           int64
+	Bounces              int64
 }
 
 const (
@@ -280,10 +282,37 @@ func (db *ActivityDB) getIndexMapping(indexName string) string {
 					"resource": {"type": "keyword"},
 					"resource_id": {"type": "keyword"},
 					"client_ip": {"type": "ip"},
-					"user_agent": {"type": "text"},
+					"user_agent": {
+						"type": "text",
+						"fields": {
+							"keyword": {"type": "keyword", "ignore_above": 256}
+						}
+					},
 					"country": {"type": "keyword"},
 					"platform": {"type": "keyword"},
-					"referrer": {"type": "text"},
+					"referrer": {
+						"type": "text",
+						"fields": {
+							"keyword": {"type": "keyword", "ignore_above": 256}
+						}
+					},
+					"client_info": {
+						"type": "object",
+						"properties": {
+							"ip_address": {"type": "keyword"},
+							"user_agent": {"type": "keyword"},
+							"visitor_id": {"type": "keyword"},
+							"x_session_id": {"type": "keyword"},
+							"is_bot": {"type": "boolean"},
+							"country": {"type": "keyword"},
+							"city": {"type": "keyword"},
+							"browser": {"type": "keyword"},
+							"os": {"type": "keyword"},
+							"utm_source": {"type": "keyword"},
+							"utm_medium": {"type": "keyword"},
+							"utm_campaign": {"type": "keyword"}
+						}
+					},
 					"success": {"type": "boolean"},
 					"duration_ms": {"type": "long"},
 					"metadata": {"type": "object", "enabled": false}
@@ -433,6 +462,11 @@ func (db *ActivityDB) shouldUseTimeSeries(req *pb.TrackActivityRequest) bool {
 // saveToRegularIndex saves to the standard activity-events index
 func (db *ActivityDB) saveToRegularIndex(ctx context.Context, req *pb.TrackActivityRequest) (string, error) {
 	activityID := fmt.Sprintf("activity_%d_%s", time.Now().UnixNano(), req.GetUserId())
+	// Use deterministic ID for duration tracking to implement UPSERT (update existing instead of create)
+	if req.GetAction() == "read_duration" && req.GetSessionId() != "" && req.GetResourceId() != "" {
+		activityID = fmt.Sprintf("activity_duration_%s_%s", req.GetSessionId(), req.GetResourceId())
+		db.logger.Debugf("UPSERT: Using deterministic ID for duration tracking: %s", activityID)
+	}
 
 	// Extract client information
 	clientInfo := req.GetClientInfo()
@@ -600,6 +634,11 @@ func (db *ActivityDB) saveToTimeSeries(ctx context.Context, req *pb.TrackActivit
 	}
 
 	activityID := fmt.Sprintf("activity_%d_%s", time.Now().UnixNano(), req.GetUserId())
+	// Use deterministic ID for duration tracking to implement UPSERT (update existing instead of create)
+	if req.GetAction() == "read_duration" && req.GetSessionId() != "" && req.GetResourceId() != "" {
+		activityID = fmt.Sprintf("activity_duration_%s_%s", req.GetSessionId(), req.GetResourceId())
+		db.logger.Debugf("UPSERT (Time-Series): Using deterministic ID for duration tracking: %s", activityID)
+	}
 
 	// Extract client information
 	clientInfo := req.GetClientInfo()
@@ -1096,10 +1135,24 @@ func (db *ActivityDB) getTimeSeriesMapping(mappingType string) string {
 					"session_id": {"type": "keyword"},
 					"action": {"type": "keyword"},
 					"resource": {"type": "keyword"},
+					"resource_id": {"type": "keyword"},
 					"success": {"type": "boolean"},
 					"duration_ms": {"type": "long"},
 					"platform": {"type": "keyword"},
-					"client_ip": {"type": "ip"}
+					"client_ip": {"type": "ip"},
+					"client_info": {
+						"type": "object",
+						"properties": {
+							"ip_address": {"type": "keyword"},
+							"user_agent": {"type": "keyword"},
+							"visitor_id": {"type": "keyword"},
+							"x_session_id": {"type": "keyword"},
+							"is_bot": {"type": "boolean"},
+							"country": {"type": "keyword"},
+							"city": {"type": "keyword"},
+							"utm_source": {"type": "keyword"}
+						}
+					}
 				}
 			}
 		}`
@@ -1278,6 +1331,13 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 						},
 					},
 				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"client_info.is_bot": true,
+						},
+					},
+				},
 			},
 		},
 		"aggs": map[string]interface{}{
@@ -1291,7 +1351,25 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 				"aggs": map[string]interface{}{
 					"unique_users": map[string]interface{}{
 						"cardinality": map[string]interface{}{
-							"field": "client_info.x_session_id.keyword",
+							"field": "client_info.visitor_id.keyword",
+						},
+					},
+					"valid_views": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"duration_ms": map[string]interface{}{
+									"gte": 10000,
+								},
+							},
+						},
+					},
+					"bounces": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"duration_ms": map[string]interface{}{
+									"lt": 5000,
+								},
+							},
 						},
 					},
 					"avg_read_time": map[string]interface{}{
@@ -1442,13 +1520,21 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 			analytics.TotalReads = int64(docCount)
 		}
 
-		// Access nested aggregations inside "views"
-		// Note: In some ES versions/clients, filtered aggs might wrap results differently.
-		// Usually they are at the same level as doc_count in the response map.
-
 		if uniqueUsers, ok := viewsAgg["unique_users"].(map[string]interface{}); ok {
-			if val, ok := uniqueUsers["value"].(float64); ok {
-				analytics.UniqueReaders = int64(val)
+			if value, ok := uniqueUsers["value"].(float64); ok {
+				analytics.UniqueReaders = int64(value)
+			}
+		}
+
+		if validViews, ok := viewsAgg["valid_views"].(map[string]interface{}); ok {
+			if docCount, ok := validViews["doc_count"].(float64); ok {
+				analytics.ValidViews = int64(docCount)
+			}
+		}
+
+		if bounces, ok := viewsAgg["bounces"].(map[string]interface{}); ok {
+			if docCount, ok := bounces["doc_count"].(float64); ok {
+				analytics.Bounces = int64(docCount)
 			}
 		}
 
