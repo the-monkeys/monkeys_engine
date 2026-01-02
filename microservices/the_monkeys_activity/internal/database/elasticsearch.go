@@ -1341,7 +1341,7 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 			},
 		},
 		"aggs": map[string]interface{}{
-			// Filter for views (read_blog)
+			// Filter for hits (read_blog)
 			"views": map[string]interface{}{
 				"filter": map[string]interface{}{
 					"term": map[string]interface{}{
@@ -1352,40 +1352,6 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 					"unique_users": map[string]interface{}{
 						"cardinality": map[string]interface{}{
 							"field": "client_info.visitor_id.keyword",
-						},
-					},
-					"valid_views": map[string]interface{}{
-						"filter": map[string]interface{}{
-							"range": map[string]interface{}{
-								"duration_ms": map[string]interface{}{
-									"gte": 10000,
-								},
-							},
-						},
-					},
-					"bounces": map[string]interface{}{
-						"filter": map[string]interface{}{
-							"range": map[string]interface{}{
-								"duration_ms": map[string]interface{}{
-									"lt": 5000,
-								},
-							},
-						},
-					},
-					"avg_read_time": map[string]interface{}{
-						"avg": map[string]interface{}{
-							"field": "duration_ms",
-						},
-					},
-					"read_time_dist": map[string]interface{}{
-						"range": map[string]interface{}{
-							"field": "duration_ms",
-							"ranges": []map[string]interface{}{
-								{"to": 30000, "key": "<30s"},
-								{"from": 30000, "to": 60000, "key": "30s-1m"},
-								{"from": 60000, "to": 180000, "key": "1m-3m"},
-								{"from": 180000, "key": ">3m"},
-							},
 						},
 					},
 					"countries": map[string]interface{}{
@@ -1452,6 +1418,50 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 					},
 				},
 			},
+			// Filter for duration stats (read_duration)
+			"durations": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"term": map[string]interface{}{
+						"action.keyword": "read_duration",
+					},
+				},
+				"aggs": map[string]interface{}{
+					"valid_views": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"duration_ms": map[string]interface{}{
+									"gte": 10000,
+								},
+							},
+						},
+					},
+					"bounces": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"duration_ms": map[string]interface{}{
+									"lt": 5000,
+								},
+							},
+						},
+					},
+					"avg_read_time": map[string]interface{}{
+						"avg": map[string]interface{}{
+							"field": "duration_ms",
+						},
+					},
+					"read_time_dist": map[string]interface{}{
+						"range": map[string]interface{}{
+							"field": "duration_ms",
+							"ranges": []map[string]interface{}{
+								{"to": 30000, "key": "<30s"},
+								{"from": 30000, "to": 60000, "key": "30s-1m"},
+								{"from": 60000, "to": 180000, "key": "1m-3m"},
+								{"from": 180000, "key": ">3m"},
+							},
+						},
+					},
+				},
+			},
 			// Filter for likes
 			"likes": map[string]interface{}{
 				"filter": map[string]interface{}{
@@ -1507,6 +1517,26 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 		RealtimeViews:        make(map[string]int64),
 	}
 
+	extractBuckets := func(aggMap map[string]interface{}, aggName string, targetMap map[string]int64) {
+		if agg, ok := aggMap[aggName].(map[string]interface{}); ok {
+			if buckets, ok := agg["buckets"].([]interface{}); ok {
+				for _, b := range buckets {
+					bucket := b.(map[string]interface{})
+					var key string
+					if k, ok := bucket["key_as_string"].(string); ok {
+						key = k
+					} else if k, ok := bucket["key"].(string); ok {
+						key = k
+					} else {
+						key = fmt.Sprintf("%v", bucket["key"])
+					}
+					docCount := int64(bucket["doc_count"].(float64))
+					targetMap[key] = docCount
+				}
+			}
+		}
+	}
+
 	// Parse Likes
 	if likesAgg, ok := aggregations["likes"].(map[string]interface{}); ok {
 		if docCount, ok := likesAgg["doc_count"].(float64); ok {
@@ -1526,44 +1556,6 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 			}
 		}
 
-		if validViews, ok := viewsAgg["valid_views"].(map[string]interface{}); ok {
-			if docCount, ok := validViews["doc_count"].(float64); ok {
-				analytics.ValidViews = int64(docCount)
-			}
-		}
-
-		if bounces, ok := viewsAgg["bounces"].(map[string]interface{}); ok {
-			if docCount, ok := bounces["doc_count"].(float64); ok {
-				analytics.Bounces = int64(docCount)
-			}
-		}
-
-		if avgTime, ok := viewsAgg["avg_read_time"].(map[string]interface{}); ok {
-			if val, ok := avgTime["value"].(float64); ok {
-				analytics.AvgReadTimeMs = val
-			}
-		}
-
-		extractBuckets := func(aggMap map[string]interface{}, aggName string, targetMap map[string]int64) {
-			if agg, ok := aggMap[aggName].(map[string]interface{}); ok {
-				if buckets, ok := agg["buckets"].([]interface{}); ok {
-					for _, b := range buckets {
-						bucket := b.(map[string]interface{})
-						var key string
-						if k, ok := bucket["key_as_string"].(string); ok {
-							key = k
-						} else if k, ok := bucket["key"].(string); ok {
-							key = k
-						} else {
-							key = fmt.Sprintf("%v", bucket["key"])
-						}
-						docCount := int64(bucket["doc_count"].(float64))
-						targetMap[key] = docCount
-					}
-				}
-			}
-		}
-
 		extractBuckets(viewsAgg, "countries", analytics.Countries)
 		extractBuckets(viewsAgg, "referrers", analytics.Referrers)
 		extractBuckets(viewsAgg, "platforms", analytics.Platforms)
@@ -1571,12 +1563,33 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 		extractBuckets(viewsAgg, "isps", analytics.ISPs)
 		extractBuckets(viewsAgg, "daily_activity", analytics.DailyActivity)
 		extractBuckets(viewsAgg, "hourly_activity", analytics.HourlyActivity)
-		extractBuckets(viewsAgg, "read_time_dist", analytics.ReadTimeDistribution)
 
 		// Realtime views is nested deeper
 		if realtime, ok := viewsAgg["realtime_views"].(map[string]interface{}); ok {
 			extractBuckets(realtime, "histogram", analytics.RealtimeViews)
 		}
+	}
+
+	// Parse Durations
+	if durationsAgg, ok := aggregations["durations"].(map[string]interface{}); ok {
+		if validViews, ok := durationsAgg["valid_views"].(map[string]interface{}); ok {
+			if docCount, ok := validViews["doc_count"].(float64); ok {
+				analytics.ValidViews = int64(docCount)
+			}
+		}
+
+		if bounces, ok := durationsAgg["bounces"].(map[string]interface{}); ok {
+			if docCount, ok := bounces["doc_count"].(float64); ok {
+				analytics.Bounces = int64(docCount)
+			}
+		}
+
+		if avgTime, ok := durationsAgg["avg_read_time"].(map[string]interface{}); ok {
+			if val, ok := avgTime["value"].(float64); ok {
+				analytics.AvgReadTimeMs = val
+			}
+		}
+		extractBuckets(durationsAgg, "read_time_dist", analytics.ReadTimeDistribution)
 	}
 
 	return analytics, nil

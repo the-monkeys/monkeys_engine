@@ -472,14 +472,21 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 			return
 		}
 
-		// Send to activity tracking queue via RabbitMQ
-		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
-		if err != nil {
-			blog.logger.Errorf("failed to publish activity tracking message: %v", err)
-			return
+		// Send to activity tracking queue via RabbitMQ with a simple retry
+		maxRetries := 2
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
+			if err == nil {
+				blog.logger.Debugf("activity tracking message sent for user %s, action %s (attempt %d)", activityReq.UserId, activityReq.Action, i+1)
+				return
+			}
+			lastErr = err
+			blog.logger.Warnf("failed to publish activity tracking message (attempt %d/%d): %v", i+1, maxRetries, err)
+			time.Sleep(time.Duration(i+1) * time.Second)
 		}
 
-		blog.logger.Debugf("activity tracking message sent for user %s, action %s", activityReq.UserId, activityReq.Action)
+		blog.logger.Errorf("failed to publish activity tracking message after %d attempts: %v", maxRetries, lastErr)
 	}()
 }
 
@@ -647,15 +654,13 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 
 	// Blog tags for content-based recommendations
 	if tags, ok := blogData["tags"].([]interface{}); ok {
-		stringTags := make([]string, len(tags))
-		for i, tag := range tags {
-			if tagStr, ok := tag.(string); ok {
-				stringTags[i] = tagStr
-			}
-		}
-		metadata["blog_tags"] = stringTags
-	} else if tags, ok := blogData["tags"].([]string); ok {
 		metadata["blog_tags"] = tags
+	} else if tags, ok := blogData["tags"].([]string); ok {
+		interfaceTags := make([]interface{}, len(tags))
+		for i, v := range tags {
+			interfaceTags[i] = v
+		}
+		metadata["blog_tags"] = interfaceTags
 	}
 
 	// Temporal metadata
@@ -681,15 +686,13 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 
 	// Author information for collaborative filtering
 	if authorList, ok := blogData["author_list"].([]interface{}); ok {
-		stringAuthors := make([]string, len(authorList))
-		for i, author := range authorList {
-			if authorStr, ok := author.(string); ok {
-				stringAuthors[i] = authorStr
-			}
-		}
-		metadata["blog_authors"] = stringAuthors
-	} else if authorList, ok := blogData["author_list"].([]string); ok {
 		metadata["blog_authors"] = authorList
+	} else if authorList, ok := blogData["author_list"].([]string); ok {
+		interfaceAuthors := make([]interface{}, len(authorList))
+		for i, v := range authorList {
+			interfaceAuthors[i] = v
+		}
+		metadata["blog_authors"] = interfaceAuthors
 	}
 
 	// Add source and confidence for data quality
