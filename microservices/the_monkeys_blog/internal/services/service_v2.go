@@ -418,6 +418,9 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogSer
 		action = "browse_by_tags"
 		resource = "tags"
 		resourceId = strings.Join(req.Tags, ",")
+	} else {
+		// Track the activity
+		blog.trackBlogActivity(req.AccountId, action, resource, resourceId, req)
 	}
 
 	if req.AccountId != "" {
@@ -436,9 +439,6 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogSer
 		resource = "bookmarks"
 		resourceId = strings.Join(req.BlogIds, ",")
 	}
-
-	// Track the activity
-	blog.trackBlogActivity(req.AccountId, action, resource, resourceId, req)
 
 	// Find blog by tags
 	if len(req.Tags) > 0 {

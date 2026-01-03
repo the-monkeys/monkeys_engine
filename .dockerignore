@@ -1,0 +1,59 @@
+# Version Control
+.git
+.gitignore
+.github
+
+# IDE Settings
+.vscode
+.idea
+
+# Large Data Directories (Must be excluded from build context)
+blogs/
+profile/
+local_blogs/
+local_profiles/
+backup/
+postgres_backup/
+elasticsearch_snapshots/
+logs/
+test_data/
+documents/
+docs/
+
+# Build Artifacts & Binaries
+bin/
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.test
+*.out
+
+# Environment & Config
+.env
+dev.env
+*.env
+monkeys-cred.json
+
+# Docker related
+docker-compose.yml
+.dockerignore
+Dockerfile*
+
+# Scripts
+Makefile
+*.sh
+*.ps1
+*.bat
+
+# Documentation & Misc
+*.md
+*.txt
+LICENSE
+requirements.txt
+
+# Explicitly allow necessary files
+!go.mod
+!go.sum
+!requirements.txt
