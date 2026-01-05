@@ -17,16 +17,38 @@ type ActivityEvent struct {
 	Action     string           `json:"action" db:"action" validate:"required"`
 	Resource   string           `json:"resource,omitempty" db:"resource"`       // blog, user, comment, etc.
 	ResourceID string           `json:"resource_id,omitempty" db:"resource_id"` // specific ID of the resource
-	ClientIP   string           `json:"client_ip" db:"client_ip"`               // User's IP address
-	UserAgent  string           `json:"user_agent" db:"user_agent"`             // Browser/device info
-	Country    string           `json:"country,omitempty" db:"country"`         // Derived from IP
-	Platform   string           `json:"platform" db:"platform"`                 // web, mobile, api
-	Referrer   string           `json:"referrer,omitempty" db:"referrer"`       // Where user came from
+	ClientIP   string           `json:"client_ip" db:"client_ip"`               // User's IP address (backward compat)
+	UserAgent  string           `json:"user_agent" db:"user_agent"`             // Browser/device info (backward compat)
+	Country    string           `json:"country,omitempty" db:"country"`         // Derived from IP (backward compat)
+	Platform   string           `json:"platform" db:"platform"`                 // web, mobile, api (backward compat)
+	Referrer   string           `json:"referrer,omitempty" db:"referrer"`       // Where user came from (backward compat)
+	ClientInfo *ClientInfo      `json:"client_info,omitempty" db:"client_info"` // Nested client information
 	Metadata   JSONMap          `json:"metadata,omitempty" db:"metadata"`       // Additional flexible data
 	Success    bool             `json:"success" db:"success"`                   // Did action succeed
 	Duration   int64            `json:"duration_ms,omitempty" db:"duration_ms"` // Action duration
 	Timestamp  time.Time        `json:"timestamp" db:"timestamp"`
 	CreatedAt  time.Time        `json:"created_at" db:"created_at"`
+}
+
+// ClientInfo encapsulates detailed client environment information
+type ClientInfo struct {
+	IPAddress      string `json:"ip_address" db:"ip_address"`
+	UserAgent      string `json:"user_agent" db:"user_agent"`
+	Referrer       string `json:"referrer" db:"referrer"`
+	Platform       string `json:"platform" db:"platform"`
+	Browser        string `json:"browser" db:"browser"`
+	BrowserVersion string `json:"browser_version" db:"browser_version"`
+	Os             string `json:"os" db:"os"`
+	OsVersion      string `json:"os_version" db:"os_version"`
+	DeviceType     string `json:"device_type" db:"device_type"`
+	Country        string `json:"country" db:"country"`
+	City           string `json:"city" db:"city"`
+	VisitorID      string `json:"visitor_id" db:"visitor_id"`
+	SessionID      string `json:"session_id" db:"session_id"`
+	IsBot          bool   `json:"is_bot" db:"is_bot"`
+	UTMSource      string `json:"utm_source" db:"utm_source"`
+	UTMMedium      string `json:"utm_medium" db:"utm_medium"`
+	UTMCampaign    string `json:"utm_campaign" db:"utm_campaign"`
 }
 
 // Activity Categories for blogging platform (matches comprehensive specification)

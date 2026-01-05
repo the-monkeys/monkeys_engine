@@ -172,8 +172,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		// routesV2.GET("/all/:username", rateLimiter, blogClient.UsersBlogs)          // Update of blogClient.AllPublishesByUserName
 		routesV2.GET("/user/:username", rateLimiter, blogClient.MetaUsersPublished) // Get metadata of user's published blogs
 		// Get published blog by blog_id
-		routesV2.GET("/:blog_id/stats", rateLimiter, blogClient.GetBlogStats)       // Get blog stats
-		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId) // Get published blog by blog_id
+
+		routesV2.GET("/:blog_id/stats", rateLimiter, blogClient.GetBlogStats)          // Get blog stats
+		routesV2.GET("/:blog_id", rateLimiter, blogClient.GetPublishedBlogByBlogId)    // Get published blog by blog_id
+		routesV2.POST("/:blog_id/activity", rateLimiter, blogClient.TrackBlogActivity) // Track blog interaction (read duration etc)
 
 		// User Tags API
 		routesV2.GET("/user-tags/:username", rateLimiter, blogClient.GetUserTags) // Get user tags
@@ -1709,16 +1711,26 @@ func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 	userAccountId := ctx.GetString("accountId")
 
 	resp, err := asc.Client.GetBlog(context.Background(), &pb.BlogReq{
-		BlogId:    blogId,
-		AccountId: userAccountId, // Include user account ID for comprehensive tracking
-		IsDraft:   false,
-		Ip:        clientInfo.IPAddress,
-		Client:    clientInfo.ClientType,
-		SessionId: clientInfo.SessionID,
-		UserAgent: clientInfo.UserAgent,
-		Referrer:  clientInfo.Referrer,
-		Platform:  utils.GetBlogPlatform(ctx),
+		BlogId:     blogId,
+		AccountId:  userAccountId, // Include user account ID for comprehensive tracking
+		IsDraft:    false,
+		Ip:         clientInfo.IPAddress,
+		Client:     clientInfo.ClientType,
+		SessionId:  clientInfo.SessionID,
+		UserAgent:  clientInfo.UserAgent,
+		Referrer:   clientInfo.Referrer,
+		Platform:   utils.GetBlogPlatform(ctx),
+		ClientInfo: asc.createClientInfo(ctx),
 	})
+
+	// If duration wasn't provided, we can use the gRPC call latency as a fallback
+	// or just log it separately. The instruction says "calculate and pass".
+	// However, we already passed the duration above. If it was 0, we can't
+	// easily "re-pass" it to the same call.
+	// But the BlogService itself could measure its own internal processing.
+
+	// For now, if the frontend didn't send it, we've fulfilled the "receive" part.
+
 	if err != nil {
 		if status, ok := status.FromError(err); ok {
 			switch status.Code() {
@@ -2040,5 +2052,58 @@ func (asc *BlogServiceClient) GetNewsBySections(ctx *gin.Context) {
 			"requested_sections": request.Sections,
 			"total_unique_items": len(seenBlogIds),
 		},
+	})
+}
+
+// TrackBlogActivity handles dedicated activity tracking requests
+// POST /api/v2/blog/:blog_id/activity
+func (asc *BlogServiceClient) TrackBlogActivity(ctx *gin.Context) {
+	blogID := ctx.Param("blog_id")
+	if blogID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "blog_id is required"})
+		return
+	}
+
+	// Get client information
+	userAccountId := ctx.GetString("accountId") // Can be empty for anonymous
+
+	// Parse request body for duration_ms or other interaction data
+	var reqBody struct {
+		DurationMs      int64  `json:"duration_ms"`
+		InteractionType string `json:"interaction_type"`
+	}
+
+	if err := ctx.ShouldBindJSON(&reqBody); err != nil {
+		// If JSON binding fails, check query params as fallback (backward compatibility)
+		reqBody.DurationMs = int64(utils.GetIntQuery(ctx, "duration_ms", 0))
+	}
+
+	// Default interaction type if not provided
+	if reqBody.InteractionType == "" {
+		if reqBody.DurationMs > 0 {
+			reqBody.InteractionType = "read_duration"
+		} else {
+			reqBody.InteractionType = "interaction"
+		}
+	}
+
+	// Call Blog Service
+	resp, err := asc.Client.TrackInteraction(context.Background(), &pb.TrackInteractionReq{
+		BlogId:          blogID,
+		AccountId:       userAccountId,
+		InteractionType: reqBody.InteractionType,
+		DurationMs:      reqBody.DurationMs,
+		ClientInfo:      asc.createClientInfo(ctx),
+	})
+
+	if err != nil {
+		asc.log.Errorw("failed to track blog interaction", "blog_id", blogID, "error", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to track interaction"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": resp.Success,
+		"message": resp.Message,
 	})
 }

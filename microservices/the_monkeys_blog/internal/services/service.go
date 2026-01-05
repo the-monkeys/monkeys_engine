@@ -132,6 +132,7 @@ type ComprehensiveClientInfo struct {
 	Connection     string
 	Referer        string
 	DeviceType     string
+	DurationMs     int64
 }
 
 // Helper method to extract comprehensive client info from any request type
@@ -238,6 +239,10 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 		if r != nil && r.GetClientInfo() != nil {
 			clientInfo = r.GetClientInfo()
 		}
+	case *pb.TrackInteractionReq:
+		if r != nil && r.GetClientInfo() != nil {
+			clientInfo = r.GetClientInfo()
+		}
 	default:
 		// Fallback for unknown request types
 		blog.logger.Debugf("Unknown request type for client tracking: %T", req)
@@ -313,6 +318,7 @@ func (blog *BlogService) extractClientInfo(req interface{}) *ComprehensiveClient
 			FirstSeen:   clientInfo.GetFirstSeen(),
 			LastSeen:    clientInfo.GetLastSeen(),
 			CollectedAt: clientInfo.GetCollectedAt(),
+			DurationMs:  clientInfo.GetDurationMs(),
 		}
 	}
 
@@ -466,14 +472,21 @@ func (blog *BlogService) sendActivityTrackingMessage(activityReq *activitypb.Tra
 			return
 		}
 
-		// Send to activity tracking queue via RabbitMQ
-		err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
-		if err != nil {
-			blog.logger.Errorf("failed to publish activity tracking message: %v", err)
-			return
+		// Send to activity tracking queue via RabbitMQ with a simple retry
+		maxRetries := 2
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			err = blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, "activity.track", activityMsg)
+			if err == nil {
+				blog.logger.Debugf("activity tracking message sent for user %s, action %s (attempt %d)", activityReq.UserId, activityReq.Action, i+1)
+				return
+			}
+			lastErr = err
+			blog.logger.Warnf("failed to publish activity tracking message (attempt %d/%d): %v", i+1, maxRetries, err)
+			time.Sleep(time.Duration(i+1) * time.Second)
 		}
 
-		blog.logger.Debugf("activity tracking message sent for user %s, action %s", activityReq.UserId, activityReq.Action)
+		blog.logger.Errorf("failed to publish activity tracking message after %d attempts: %v", maxRetries, lastErr)
 	}()
 }
 
@@ -553,7 +566,7 @@ func (blog *BlogService) trackBlogActivity(accountId, action, resource, resource
 		ResourceId: resourceId,
 		ClientInfo: activityClientInfo,
 		Success:    true,
-		DurationMs: 0, // TODO: Add timing if needed
+		DurationMs: clientInfo.DurationMs,
 	}
 
 	// Log comprehensive client tracking information for debugging
@@ -641,15 +654,13 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 
 	// Blog tags for content-based recommendations
 	if tags, ok := blogData["tags"].([]interface{}); ok {
-		stringTags := make([]string, len(tags))
-		for i, tag := range tags {
-			if tagStr, ok := tag.(string); ok {
-				stringTags[i] = tagStr
-			}
-		}
-		metadata["blog_tags"] = stringTags
-	} else if tags, ok := blogData["tags"].([]string); ok {
 		metadata["blog_tags"] = tags
+	} else if tags, ok := blogData["tags"].([]string); ok {
+		interfaceTags := make([]interface{}, len(tags))
+		for i, v := range tags {
+			interfaceTags[i] = v
+		}
+		metadata["blog_tags"] = interfaceTags
 	}
 
 	// Temporal metadata
@@ -675,15 +686,13 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 
 	// Author information for collaborative filtering
 	if authorList, ok := blogData["author_list"].([]interface{}); ok {
-		stringAuthors := make([]string, len(authorList))
-		for i, author := range authorList {
-			if authorStr, ok := author.(string); ok {
-				stringAuthors[i] = authorStr
-			}
-		}
-		metadata["blog_authors"] = stringAuthors
-	} else if authorList, ok := blogData["author_list"].([]string); ok {
 		metadata["blog_authors"] = authorList
+	} else if authorList, ok := blogData["author_list"].([]string); ok {
+		interfaceAuthors := make([]interface{}, len(authorList))
+		for i, v := range authorList {
+			interfaceAuthors[i] = v
+		}
+		metadata["blog_authors"] = interfaceAuthors
 	}
 
 	// Add source and confidence for data quality
@@ -1135,4 +1144,30 @@ func (blog *BlogService) GetAllBlogsByBlogIds(ctc context.Context, req *pb.GetBl
 	blog.trackBlogActivity("", "get_blogs_by_ids", "search", strings.Join(req.BlogIds, ","), req)
 
 	return res, nil
+}
+
+func (blog *BlogService) TrackInteraction(ctx context.Context, req *pb.TrackInteractionReq) (*pb.TrackInteractionResp, error) {
+	blog.logger.Debugf("Tracking interaction: blog_id=%s, type=%s, duration=%d", req.BlogId, req.InteractionType, req.DurationMs)
+
+	if req.BlogId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "blog_id is required")
+	}
+
+	// Ensure ClientInfo exists and populate DurationMs from the top-level request field
+	if req.ClientInfo == nil {
+		req.ClientInfo = &pb.ClientInfo{}
+	}
+	if req.DurationMs > 0 {
+		req.ClientInfo.DurationMs = req.DurationMs
+	}
+
+	blog.logger.Debugf("TrackInteraction: Propagating DurationMs=%d to ClientInfo.DurationMs=%d for BlogID=%s, SessionID=%s",
+		req.DurationMs, req.ClientInfo.DurationMs, req.BlogId, req.ClientInfo.SessionId)
+
+	blog.trackBlogActivity(req.AccountId, req.InteractionType, "blog", req.BlogId, req)
+
+	return &pb.TrackInteractionResp{
+		Success: true,
+		Message: "Interaction tracked successfully",
+	}, nil
 }
