@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS user_account (
     twitter VARCHAR(255),
     instagram VARCHAR(255),
     view_permission VARCHAR(50) DEFAULT 'public',
+    is_verified BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_status) REFERENCES user_status(id) ON DELETE CASCADE
 );
 
@@ -145,6 +146,10 @@ CREATE TABLE IF NOT EXISTS blog_permissions (
     FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES user_account(id) ON DELETE CASCADE
 );
+
+-- Adding indexes to blog_permissions table
+CREATE INDEX idx_blog_permissions_blog_id ON blog_permissions(blog_id);
+CREATE INDEX idx_blog_permissions_user_id ON blog_permissions(user_id);
 
 -- Table to store co-author invites
 CREATE TABLE IF NOT EXISTS co_author_invites (
