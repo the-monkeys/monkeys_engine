@@ -448,7 +448,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	as.logger.Debugf("user %s is successfully registered.", user.Email)
 
 	// Generate and return token
-	token, err := as.jwt.GenerateToken(user)
+	token, refreshToken, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Errorf("failed to generate token for user %s: %v", user.Email, err)
 		return nil, status.Errorf(codes.Aborted, "The user with email %s is successfully registered, try to log in", user.Email)
@@ -479,6 +479,7 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	return &pb.RegisterUserResponse{
 		StatusCode:              http.StatusCreated,
 		Token:                   token,
+		RefreshToken:            refreshToken,
 		EmailVerified:           false,
 		Username:                user.Username,
 		Email:                   user.Email,
@@ -509,6 +510,11 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 		return nil, status.Errorf(codes.NotFound, "email does not exist")
 	}
 
+	if claims.TokenType != "" && claims.TokenType != "access" {
+		as.logger.Errorf("invalid token type: expected access, got %s", claims.TokenType)
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token type")
+	}
+
 	as.logger.Debugf("User with email %s successfully verified!", claims.Email)
 	return &pb.ValidateResponse{
 		StatusCode: http.StatusOK,
@@ -531,6 +537,11 @@ func (as *AuthzSvc) DecodeSignedJWT(ctx context.Context, req *pb.DecodeSignedJWT
 	if err != nil {
 		as.logger.Errorf("cannot validate token as the email %s doesn't exist, error: %+v", claims.Email, err)
 		return nil, status.Errorf(codes.NotFound, "email does not exist")
+	}
+
+	if claims.TokenType != "" && claims.TokenType != "access" {
+		as.logger.Errorf("invalid token type: expected access, got %s", claims.TokenType)
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token type")
 	}
 
 	return &pb.DecodeSignedJWTResponse{
@@ -590,7 +601,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 		return nil, status.Errorf(codes.Unauthenticated, "email/password incorrect")
 	}
 
-	token, err := as.jwt.GenerateToken(user)
+	token, refreshToken, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Error(service_types.CannotCreateToken(req.Email, err))
 		return nil, status.Errorf(codes.Internal, "cannot generate the token: %v", err)
@@ -605,6 +616,7 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 	resp := &pb.LoginUserResponse{
 		StatusCode:              http.StatusOK,
 		Token:                   token,
+		RefreshToken:            refreshToken,
 		EmailVerificationStatus: user.EmailVerificationStatus,
 		Username:                user.Username,
 		Email:                   user.Email,
@@ -614,6 +626,37 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 		AccountId:               user.AccountId,
 	}
 	return resp, nil
+}
+
+func (as *AuthzSvc) RefreshToken(ctx context.Context, req *pb.RefreshTokenReq) (*pb.RefreshTokenRes, error) {
+	claims, err := as.jwt.ValidateToken(req.RefreshToken)
+	if err != nil {
+		as.logger.Errorf("cannot validate the refresh token, error: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "couldn't validate refresh token")
+	}
+
+	if claims.TokenType != "refresh" {
+		as.logger.Errorf("invalid token type for refresh: expected refresh, got %s", claims.TokenType)
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token type")
+	}
+
+	user, err := as.dbConn.CheckIfAccountIdExist(claims.AccountId)
+	if err != nil {
+		as.logger.Errorf("cannot refresh token as the account %s doesn't exist, error: %+v", claims.AccountId, err)
+		return nil, status.Errorf(codes.NotFound, "user does not exist")
+	}
+
+	token, refreshToken, err := as.jwt.GenerateToken(user)
+	if err != nil {
+		as.logger.Errorf("failed to generate new tokens for user %s: %v", user.Email, err)
+		return nil, status.Errorf(codes.Internal, "cannot generate tokens")
+	}
+
+	return &pb.RefreshTokenRes{
+		StatusCode:   http.StatusOK,
+		Token:        token,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordReq) (*pb.ForgotPasswordRes, error) {
@@ -701,7 +744,7 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 
 	as.logger.Debugf("Assigning a token to the user: %s having email: %s to reset their password", user.Username, user.Email)
 	// Generate and return token
-	token, err := as.jwt.GenerateToken(user)
+	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Error(service_types.CannotCreateToken(req.Email, err))
 		return nil, status.Errorf(codes.Internal, "could not create token")
@@ -866,7 +909,7 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	as.trackAuthActivity(user, "verify_email", req)
 
 	user.Email = req.Email
-	token, err := as.jwt.GenerateToken(user)
+	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Errorf("Unable to generate new token for existing user %s, error %v", user.Email, err)
 	}
@@ -933,7 +976,7 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 	as.trackAuthActivity(user, "update_username", req)
 
 	user.Username = req.NewUsername
-	token, err := as.jwt.GenerateToken(user)
+	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Error(service_types.CannotCreateToken(req.NewUsername, err))
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
@@ -1050,7 +1093,7 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	as.trackAuthActivity(user, "update_email", req)
 
 	user.Email = req.NewEmail
-	token, err := as.jwt.GenerateToken(user)
+	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Error(service_types.CannotCreateToken(user.Username, err))
 		as.logger.Errorf("error while marshalling the message queue data, err: %v", err)
@@ -1084,7 +1127,7 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 		} else {
 			as.logger.Debugf("google login: user with email %s already exists", req.Email)
 			// Generate and return token
-			token, err := as.jwt.GenerateToken(existingUser)
+			token, refreshToken, err := as.jwt.GenerateToken(existingUser)
 			if err != nil {
 				as.logger.Errorf("google login: failed to generate token for user %s: %v", user.Email, err)
 				return nil, status.Errorf(codes.Aborted, "user cannot login using google at this time")
@@ -1093,6 +1136,7 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 			return &pb.RegisterUserResponse{
 				StatusCode:              http.StatusOK,
 				Token:                   token,
+				RefreshToken:            refreshToken,
 				EmailVerified:           false,
 				Username:                existingUser.Username,
 				Email:                   existingUser.Email,
@@ -1152,7 +1196,7 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 	as.logger.Debugf("user %s is successfully registered.", user.Email)
 
 	// Generate and return token
-	token, err := as.jwt.GenerateToken(user)
+	token, refreshToken, err := as.jwt.GenerateToken(user)
 	if err != nil {
 		as.logger.Errorf("failed to generate token for user %s: %v", user.Email, err)
 		return nil, status.Errorf(codes.Aborted, "The user with email %s is successfully registered, try to log in", user.Email)
@@ -1183,6 +1227,7 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 	return &pb.RegisterUserResponse{
 		StatusCode:              http.StatusCreated,
 		Token:                   token,
+		RefreshToken:            refreshToken,
 		EmailVerified:           false,
 		Username:                user.Username,
 		Email:                   user.Email,

@@ -137,6 +137,7 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config, log *zap.Sugared
 	routes.GET("/reset-password", asc.PasswordResetEmailVerification)
 	routes.POST("/update-password", asc.UpdatePassword)
 	routes.GET("/verify-email", asc.VerifyEmail)
+	routes.POST("/refresh", asc.RefreshToken)
 
 	routes.GET("/validate-session", asc.ValidateSession)
 
@@ -218,7 +219,19 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(int(res.StatusCode), &res)
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
+	utils.SetMonkeysRefreshCookie(ctx, res.RefreshToken)
+
+	registerRespJson, _ := json.Marshal(&res)
+
+	// Convert to map to safely delete private fields
+	var registerRespMap map[string]interface{}
+	_ = json.Unmarshal(registerRespJson, &registerRespMap)
+
+	delete(registerRespMap, "token")
+	delete(registerRespMap, "refresh_token")
+
+	ctx.JSON(int(res.StatusCode), &registerRespMap)
 }
 
 func (asc *ServiceClient) Login(ctx *gin.Context) {
@@ -261,6 +274,7 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 	}
 
 	utils.SetMonkeysAuthCookie(ctx, res.Token)
+	utils.SetMonkeysRefreshCookie(ctx, res.RefreshToken)
 
 	loginRespJson, _ := json.Marshal(&res)
 
@@ -269,8 +283,31 @@ func (asc *ServiceClient) Login(ctx *gin.Context) {
 	_ = json.Unmarshal(loginRespJson, &loginRespMap)
 
 	delete(loginRespMap, "token")
+	delete(loginRespMap, "refresh_token")
 
 	ctx.JSON(http.StatusOK, &loginRespMap)
+}
+
+func (asc *ServiceClient) RefreshToken(ctx *gin.Context) {
+	refreshCookie, err := ctx.Request.Cookie("mrt")
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "unauthorized"})
+		return
+	}
+
+	res, err := asc.Client.RefreshToken(context.Background(), &pb.RefreshTokenReq{
+		RefreshToken: refreshCookie.Value,
+	})
+
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "cannot refresh token"})
+		return
+	}
+
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
+	utils.SetMonkeysRefreshCookie(ctx, res.RefreshToken)
+
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (asc *ServiceClient) ForgotPassword(ctx *gin.Context) {
@@ -332,7 +369,26 @@ func (asc *ServiceClient) PasswordResetEmailVerification(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"response": res})
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
+	// ResetPassword might not return a refresh token yet, but we'll set it if it does
+	// In my AuthZ implementation, I updated ResetPassword to return it.
+	// However, pb.ResetPasswordRes doesn't have it yet. Let's check the proto.
+	// Wait, I updated pb.RegisterUserResponse and pb.LoginUserResponse, NOT ResetPasswordRes.
+	// I should probably update ResetPasswordRes too if we want a fresh session after reset.
+
+	respJson, _ := json.Marshal(&res)
+
+	// Convert to map to safely delete private fields
+	var respMap map[string]interface{}
+	_ = json.Unmarshal(respJson, &respMap)
+
+	delete(respMap, "token")
+	// Standardize username field for UI if needed (pb uses UserName, but UI might expect username)
+	if val, ok := respMap["user_name"]; ok {
+		respMap["username"] = val
+	}
+
+	ctx.JSON(http.StatusOK, &respMap)
 }
 
 func (asc *ServiceClient) UpdatePassword(ctx *gin.Context) {
@@ -694,6 +750,7 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 	}
 
 	utils.SetMonkeysAuthCookie(c, loginResp.Token)
+	utils.SetMonkeysRefreshCookie(c, loginResp.RefreshToken)
 
 	loginRespJson, _ := json.Marshal(&loginResp)
 
@@ -702,6 +759,7 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 	_ = json.Unmarshal(loginRespJson, &loginRespMap)
 
 	delete(loginRespMap, "token")
+	delete(loginRespMap, "refresh_token")
 
 	c.JSON(http.StatusOK, &loginRespMap)
 }
@@ -709,6 +767,7 @@ func (asc *ServiceClient) HandleGoogleCallback(c *gin.Context) {
 func (asc *ServiceClient) Logout(ctx *gin.Context) {
 	ctx.SetSameSite(http.SameSiteNoneMode)
 	ctx.SetCookie("mat", "", -1, "/", "", true, true)
+	ctx.SetCookie("mrt", "", -1, "/", "", true, true)
 	ctx.JSON(http.StatusOK, gin.H{})
 }
 

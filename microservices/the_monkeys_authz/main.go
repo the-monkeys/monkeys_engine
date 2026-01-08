@@ -46,7 +46,7 @@ func main() {
 	jwt := utils.JwtWrapper{
 		SecretKey:       cfg.JWT.SecretKey,
 		Issuer:          "tm-authz",
-		ExpirationHours: 24 * 365,
+		ExpirationHours: 24 * 7,
 	}
 
 	host := fmt.Sprintf("%s:%d", cfg.Microservices.TheMonkeysAuthz, cfg.Microservices.AuthzPort)
