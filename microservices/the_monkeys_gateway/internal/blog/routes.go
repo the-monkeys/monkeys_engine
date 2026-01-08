@@ -871,34 +871,21 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 		}
 	}
 
-	// Save the incoming message for debugging purposes
-	// os.WriteFile("draft.json", msg, 0644)
-
 	// Step 1: Unmarshal into a generic map
-	var genericMap map[string]interface{}
-	if err := json.Unmarshal(msg, &genericMap); err != nil {
-		return fmt.Errorf("error unmarshalling message into generic map: %w", err)
-	}
-
-	// Step 3: Marshal back into JSON
-	updatedJSON, err := json.Marshal(genericMap)
-	if err != nil {
-		return fmt.Errorf("error marshalling updated JSON: %w", err)
-	}
-
-	// Step 4: Unmarshal into pb.DraftBlogRequest
 	var draftBlog map[string]interface{}
-	if err := json.Unmarshal(updatedJSON, &draftBlog); err != nil {
-		return fmt.Errorf("error unmarshalling updated JSON into pb.DraftBlogRequest: %w", err)
+	if err := json.Unmarshal(msg, &draftBlog); err != nil {
+		asc.log.Errorf("Error unmarshalling websocket message for blog %s: %v", id, err)
+		return fmt.Errorf("error unmarshalling message: %w", err)
 	}
 
+	// Enrich the blog data with metadata
 	draftBlog["blog_id"] = id
 	draftBlog["ip"] = clientInfo.IPAddress
 	draftBlog["client"] = clientInfo.ClientType
 	draftBlog["session_id"] = clientInfo.SessionID
 	draftBlog["user_agent"] = clientInfo.UserAgent
 	draftBlog["referrer"] = clientInfo.Referrer
-	draftBlog["platform"] = int32(platform) // Convert enum to int32 for protobuf Any
+	draftBlog["platform"] = int32(platform)
 
 	// Only set the action and log the initial creation or update once
 	if !*initialLogDone {
@@ -909,25 +896,31 @@ func (asc *BlogServiceClient) handleTextMessage(msg []byte, conn *websocket.Conn
 	// Convert draftBlog to google.protobuf.Any
 	draftStruct, err := structpb.NewStruct(draftBlog)
 	if err != nil {
+		asc.log.Errorf("Error converting blog map to structpb.Struct for blog %s: %v", id, err)
 		return fmt.Errorf("error converting draftBlog to structpb.Struct: %w", err)
 	}
 
 	// Wrap *structpb.Struct in *anypb.Any
 	anyMsg, err := anypb.New(draftStruct)
 	if err != nil {
+		asc.log.Errorf("Error wrapping blog struct in anypb.Any for blog %s: %v", id, err)
 		return fmt.Errorf("error wrapping structpb.Struct in anypb.Any: %w", err)
 	}
 
 	// Send the draft blog to the gRPC service
 	if err := stream.Send(anyMsg); err != nil {
+		asc.log.Errorf("Error sending draft blog to gRPC stream for blog %s: %v", id, err)
 		return fmt.Errorf("error sending draft blog to gRPC stream: %w", err)
 	}
 
 	// Receive the response from the gRPC service
 	grpcResp, err := stream.Recv()
 	if err != nil {
+		asc.log.Errorf("Error receiving response from gRPC stream for blog %s: %v", id, err)
 		return fmt.Errorf("error receiving response from gRPC stream: %w", err)
 	}
+
+	asc.log.Debugf("Received gRPC response for blog %s: %+v", id, grpcResp)
 
 	// Create success response
 	response := map[string]interface{}{
