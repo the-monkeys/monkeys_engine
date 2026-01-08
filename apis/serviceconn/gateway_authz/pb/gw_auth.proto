@@ -103,6 +103,7 @@ message RegisterUserResponse {
   string email_verification_status = 9;
   Error error = 10;
   string account_id = 11;
+  string refresh_token = 12;
 }
 
 message Error {
@@ -181,6 +182,7 @@ message LoginUserResponse {
   string email_verification_status = 9;
   Error error = 10;
   string account_id = 11;
+  string refresh_token = 12;
 }
 
 message ForgotPasswordReq {
@@ -213,6 +215,8 @@ message ResetPasswordRes {
   string email = 8;
   bool email_verification_status = 9;
   Error error = 10;
+  string refresh_token = 11;
+  string account_id = 12;
 }
 
 message UpdatePasswordReq {
@@ -302,6 +306,17 @@ message UpdateEmailIdRes {
   string account_id = 11;
 }
 
+message RefreshTokenReq {
+  string refresh_token = 1;
+}
+
+message RefreshTokenRes {
+  int64 status_code = 1;
+  string token = 2;
+  string refresh_token = 3;
+  Error error = 4;
+}
+
 service AuthService {
   rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse) {}
   rpc Validate(ValidateRequest) returns (ValidateResponse) {}
@@ -317,4 +332,5 @@ service AuthService {
   rpc UpdateEmailId(UpdateEmailIdReq) returns (UpdateEmailIdRes) {}
   rpc GoogleLogin(RegisterUserRequest) returns (RegisterUserResponse) {}
   rpc DecodeSignedJWT(DecodeSignedJWTRequest) returns (DecodeSignedJWTResponse) {}
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenRes) {}
 }

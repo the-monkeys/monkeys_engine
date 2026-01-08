@@ -23,10 +23,11 @@ type jwtClaims struct {
 	ClientId                string `json:"client_id"`
 	Client                  string `json:"client"`
 	IpAddress               string `json:"ip"`
+	TokenType               string `json:"token_type"` // "access" or "refresh"
 }
 
 // TODO: Add Username, profile_name and client_id
-func (w *JwtWrapper) GenerateToken(user *models.TheMonkeysUser) (signedToken string, err error) {
+func (w *JwtWrapper) GenerateToken(user *models.TheMonkeysUser) (signedToken string, refreshToken string, err error) {
 	claims := &jwtClaims{
 		AccountId:               user.AccountId,
 		Email:                   user.Email,
@@ -35,6 +36,7 @@ func (w *JwtWrapper) GenerateToken(user *models.TheMonkeysUser) (signedToken str
 		ClientId:                user.ClientId,
 		Client:                  user.Client,
 		IpAddress:               user.IpAddress,
+		TokenType:               "access",
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(w.ExpirationHours)).Unix(),
 			Issuer:    w.Issuer,
@@ -46,10 +48,36 @@ func (w *JwtWrapper) GenerateToken(user *models.TheMonkeysUser) (signedToken str
 	signedToken, err = token.SignedString([]byte(w.SecretKey))
 
 	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err = w.GenerateRefreshToken(user)
+	if err != nil {
+		return "", "", err
+	}
+
+	return signedToken, refreshToken, nil
+}
+
+func (w *JwtWrapper) GenerateRefreshToken(user *models.TheMonkeysUser) (refreshToken string, err error) {
+	claims := &jwtClaims{
+		AccountId: user.AccountId,
+		TokenType: "refresh",
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Local().Add(time.Hour * 720).Unix(), // 720 hours (30 days)
+			Issuer:    w.Issuer,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	refreshToken, err = token.SignedString([]byte(w.SecretKey))
+
+	if err != nil {
 		return "", err
 	}
 
-	return signedToken, nil
+	return refreshToken, nil
 }
 
 func (w *JwtWrapper) ValidateToken(signedToken string) (claims *jwtClaims, err error) {
