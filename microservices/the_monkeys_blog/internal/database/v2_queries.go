@@ -12,15 +12,17 @@ import (
 )
 
 func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error) {
+	blogId, _ := blog["blog_id"].(string)
+
 	bs, err := json.Marshal(blog)
 	if err != nil {
-		es.log.Errorf("DraftABlog: cannot marshal the blog, error: %v", err)
+		es.log.Errorf("SaveBlog: cannot marshal the blog %s, error: %v", blogId, err)
 		return nil, err
 	}
 
-	document := strings.NewReader(string(bs))
+	jsonStr := string(bs)
+	document := strings.NewReader(jsonStr)
 
-	blogId := blog["blog_id"].(string)
 	req := esapi.IndexRequest{
 		Index:      constants.ElasticsearchBlogIndex,
 		DocumentID: blogId,
@@ -29,16 +31,17 @@ func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]in
 
 	insertResponse, err := req.Do(ctx, es.client)
 	if err != nil {
-		es.log.Errorf("DraftABlog: error while indexing blog, error: %+v", err)
+		es.log.Errorf("SaveBlog: error while indexing blog %s, error: %+v", blogId, err)
 		return insertResponse, err
 	}
 
 	if insertResponse.IsError() {
-		err = fmt.Errorf("DraftABlog: error indexing blog, response: %+v", insertResponse)
+		err = fmt.Errorf("SaveBlog: error indexing blog %s, response: %+v", blogId, insertResponse)
 		es.log.Error(err)
 		return insertResponse, err
 	}
 
+	es.log.Infof("SaveBlog: successfully indexed blog %s", blogId)
 	return insertResponse, nil
 }
 
