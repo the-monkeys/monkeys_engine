@@ -295,8 +295,12 @@ func (as *AuthzSvc) trackAuthActivity(user *models.TheMonkeysUser, action string
 		color_depth = -1
 	}
 
-	screen_width, _ := strconv.ParseInt(strings.Split(clientInfo.ScreenResolution, "x")[0], 10, 16)
-	screen_height, _ := strconv.ParseInt(strings.Split(clientInfo.ScreenResolution, "x")[1], 10, 16)
+	resolution := strings.Split(clientInfo.ScreenResolution, "x")
+	var screen_width, screen_height int64
+	if len(resolution) == 2 {
+		screen_width, _ = strconv.ParseInt(resolution[0], 10, 16)
+		screen_height, _ = strconv.ParseInt(resolution[1], 10, 16)
+	}
 	timezone_offset, _ := strconv.ParseInt(clientInfo.TimezoneOffset, 10, 16)
 
 	// Create comprehensive ClientInfo for activity tracking
