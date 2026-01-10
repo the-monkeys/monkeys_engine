@@ -16,8 +16,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/admin"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/monkeys_ai"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage_v2"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/systems"
@@ -95,8 +93,8 @@ func main() {
 	blog.RegisterBlogRouter(server.router, cfg, authClient, userClient, log)
 	storage.RegisterFileStorageRouter(server.router, cfg, authClient, log)
 	storage_v2.RegisterRoutes(server.router, cfg, authClient, log)
-	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
-	monkeys_ai.RegisterRecommendationRoute(server.router, cfg, authClient, log)
+	// notification.RegisterNotificationRoute(server.router, cfg, authClient, log)
+	// monkeys_ai.RegisterRecommendationRoute(server.router, cfg, authClient, log)
 	admin.RegisterAdminRouter(server.router, cfg, log)
 	systems.RegisterSystemRouter(server.router, cfg, log)
 
