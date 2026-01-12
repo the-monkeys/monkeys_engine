@@ -1,3 +1,19 @@
+x-service-defaults: &service-defaults
+  networks:
+    - monkeys-network
+  restart: unless-stopped
+  env_file:
+    - .env
+  user: "1001:1001"
+  deploy:
+    resources:
+      limits:
+        memory: 256M
+        cpus: '0.7'
+      reservations:
+        memory: 128M
+        cpus: '0.2'
+
 services:
   the_monkeys_db:
     container_name: "the-monkeys-psql"
@@ -196,8 +212,7 @@ services:
         GATEWAY_HTTPS_PORT: ${THE_MONKEYS_GATEWAY_HTTPS}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_gateway/Dockerfile.distroless
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
@@ -205,22 +220,10 @@ services:
       - minio
     ports:
       - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
+
     environment:
       - NO_TLS=1
-    # Security: Run as non-root user
-    user: "1001:1001"
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.7'
-        reservations:
-          memory: 128M
-          cpus: '0.2'
+
     # Health check using existing /healthz endpoint
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
@@ -238,19 +241,14 @@ services:
         AUTHZ_SERVICE_PORT: ${MICROSERVICES_AUTHZ_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_authz/Dockerfile.distroless
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
     ports:
       - "${MICROSERVICES_AUTHZ_PORT}:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
+
     # Resource limits for production
     deploy:
       resources:
@@ -277,8 +275,7 @@ services:
         STORAGE_SERVICE_PORT: ${MICROSERVICES_STORAGE_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_storage/Dockerfile.distroless
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
@@ -290,18 +287,7 @@ services:
       - ./local_blogs:/app/local_blogs # Mount local blogs sync directory
     ports:
       - "${MICROSERVICES_STORAGE_PORT}:${MICROSERVICES_STORAGE_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.7'
-        reservations:
-          memory: 128M
-          cpus: '0.2'
+
     # Health check
     healthcheck:
       test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_STORAGE_INTERNAL_PORT}" ]
@@ -319,28 +305,14 @@ services:
         USER_SERVICE_PORT: ${MICROSERVICES_USER_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_users/Dockerfile.distroless
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
     ports:
       - "${MICROSERVICES_USER_PORT}:${MICROSERVICES_USER_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.7'
-        reservations:
-          memory: 128M
-          cpus: '0.2'
+
     # Health check
     healthcheck:
       test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_USER_INTERNAL_PORT}" ]
@@ -358,8 +330,7 @@ services:
         BLOG_SERVICE_PORT: ${MICROSERVICES_BLOG_PORT}
     # For production, you can switch to:
     # dockerfile: microservices/the_monkeys_blog/Dockerfile.distroless
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
@@ -367,20 +338,7 @@ services:
       - elasticsearch-node1
     ports:
       - "${MICROSERVICES_BLOG_PORT}:${MICROSERVICES_BLOG_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.7'
-        reservations:
-          memory: 128M
-          cpus: '0.2'
+
     # Health check
     healthcheck:
       test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_BLOG_INTERNAL_PORT}" ]
@@ -479,19 +437,14 @@ services:
       dockerfile: microservices/the_monkeys_activity/Dockerfile
       args:
         ACTIVITY_SERVICE_PORT: ${MICROSERVICES_ACTIVITY_PORT}
-    networks:
-      - monkeys-network
+    <<: *service-defaults
     depends_on:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
     ports:
       - "${MICROSERVICES_ACTIVITY_PORT}:${MICROSERVICES_ACTIVITY_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
+
     # Resource limits for production
     deploy:
       resources:
