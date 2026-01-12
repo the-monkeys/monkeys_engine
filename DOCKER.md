@@ -27,9 +27,9 @@ We use a split-configuration strategy to optimize for both *Developer Experience
 
 | File | Purpose | Key Features |
 | :--- | :--- | :--- |
-| **`docker-compose-dev.yml`** | **Development** | • **Hot-Reload**: Source code mounted via volumes.<br>• **Debuggable**: All internal ports exposed (e.g., Authz on `50051`).<br>• **Fast Iteration**: Changes reflect instantly. |
-| **`docker-compose-prod.yml`** | **Production** | • **Secure**: Internal ports hidden; only Gateway exposed.<br>• **Immutable**: Code is built into images; no volume mounts.<br>• **Efficient**: ~45% less RAM usage. |
-| **`docker-compose.yml`** | **Base / Legacy** | • The original hybrid config. Kept for reference. Currently identical to `dev`. |
+| **`docker-compose-dev.yml`** | **Development** | • **DRY / Optimized**: Uses YAML anchors for clean, shared settings.<br>• **Hot-Reload**: Source code mounted via volumes.<br>• **Debuggable**: All internal ports exposed. |
+| **`docker-compose-prod.yml`** | **Production** | • **Secure**: Internal ports hidden; only Gateway exposed.<br>• **Immutable**: Code is built into images; no volume mounts.<br>• **Efficient**: Lowest resource overhead. |
+| **`docker-compose.yml`** | **Manual / Standard** | • **Legacy Structure**: No YAML anchors; settings are repeated manually.<br>• **Granular**: Easier to tweak single service settings without affecting others.<br>• **Standard**: Uses standard YAML syntax familiar to all developers. |
 
 ---
 
@@ -38,8 +38,9 @@ We use a split-configuration strategy to optimize for both *Developer Experience
 ### Starting Services
 | Environment | Command |
 | :--- | :--- |
-| **Development** | `docker compose -f docker-compose-dev.yml up -d` |
-| **Production** | `docker compose -f docker-compose-prod.yml up -d --build` |
+| **Development** | `docker compose -f docker-compose-dev.yml up` |
+| **Production** | `docker compose -f docker-compose-prod.yml up --build` |
+| **original** | `docker compose -f docker-compose.yml up --build` |
 
 ### Viewing Logs
 Tail logs for a specific service (e.g., Gateway):
@@ -90,12 +91,12 @@ In **Development**, all these ports are exposed. In **Production**, ONLY the Gat
 Why use `prod` config for deployment? It is significantly more efficient.
 *(Benchmarks run on local machine)*
 
-| Metric | Production (`prod`) | Development (`dev`) | Improvement |
-| :--- | :--- | :--- | :--- |
-| **Startup Time (Warm)** | **12.8s** | **9.1s** | Dev cached layers are slightly faster. |
-| **MinIO RAM** | **84 MB** | 152 MB | **45% Less RAM** |
-| **Microservices RAM** | **~6 MB** | ~10 MB | **40% Less RAM** |
-| **Elasticsearch RAM** | **1.47 GB** | 1.8 GB | **18% Less RAM** |
+| Metric | Production (`prod`) | Development (`dev`) | Original (`current`) | Improvement |
+| :--- | :--- | :--- | :--- | :--- |
+| **Startup Time (Warm)** | **12.8s** | **9.1s** | **~9s** | Dev/Original are identical in structure. |
+| **MinIO RAM** | **84.5 MB** | 152.4 MB | 77.9 MB | Prod/Original are more efficient. |
+| **Microservices RAM** | **~6.7 MB** | ~10.6 MB | ~10-32 MB | Prod binaries are the most efficient. |
+| **Elasticsearch RAM** | **1.47 GB** | 1.81 GB | 1.56 GB | Prod setup is the most optimized. |
 
 ---
 
