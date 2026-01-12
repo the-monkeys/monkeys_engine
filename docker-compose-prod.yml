@@ -1,0 +1,265 @@
+x-service-defaults: &service-defaults
+  networks:
+    - monkeys-network
+  restart: always
+  env_file:
+    - .env
+  user: "1001:1001"
+  deploy:
+    resources:
+      limits:
+        memory: 256M
+        cpus: '0.7'
+      reservations:
+        memory: 128M
+        cpus: '0.2'
+
+services:
+  the_monkeys_db:
+    container_name: "the-monkeys-psql"
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}
+      POSTGRES_USER: ${POSTGRESQL_PRIMARY_DB_DB_USERNAME}
+      POSTGRES_DB: ${POSTGRESQL_PRIMARY_DB_DB_NAME}
+    ports:
+      - "${POSTGRESQL_PRIMARY_DB_DB_PORT}:${POSTGRESQL_PRIMARY_DB_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backup:/backup
+      - ./postgres_backup:/backup_source
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRESQL_PRIMARY_DB_DB_USERNAME} -d ${POSTGRESQL_PRIMARY_DB_DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db-migrations:
+    container_name: "the-monkeys-migrate"
+    image: migrate/migrate:v4.15.2
+    volumes:
+      - ./schema:/migrations
+    networks:
+      - monkeys-network
+    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://${POSTGRESQL_PRIMARY_DB_DB_USERNAME}:${POSTGRESQL_PRIMARY_DB_DB_PASSWORD}@${POSTGRESQL_PRIMARY_DB_DB_HOST}:5432/${POSTGRESQL_PRIMARY_DB_DB_NAME}?sslmode=disable" ]
+    command: [ "up" ]
+    depends_on:
+      the_monkeys_db:
+        condition: service_healthy
+    restart: on-failure
+
+  elasticsearch-node1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    container_name: elasticsearch-node1
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - ELASTIC_PASSWORD=${OPENSEARCH_OS_PASSWORD}
+      - xpack.security.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - path.repo=/usr/share/elasticsearch/snapshots
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch-data1:/usr/share/elasticsearch/data
+      - ./elasticsearch_snapshots:/usr/share/elasticsearch/snapshots
+    ports:
+      - "${OPENSEARCH_HTTP_PORT}:${OPENSEARCH_HTTP_INTERNAL_PORT}"
+      - "${OPENSEARCH_TRANSPORT_PORT}:${OPENSEARCH_TRANSPORT_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${OPENSEARCH_HTTP_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: the-monkeys-rabbitmq
+    ports:
+      - "${RABBITMQ_PORT}:${RABBITMQ_INTERNAL_PORT}"
+      - "${RABBITMQ_MANAGEMENT_PORT}:${RABBITMQ_MANAGEMENT_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DISK_FREE_LIMIT: "50MB"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  minio:
+    image: minio/minio:latest
+    container_name: the-monkeys-minio
+    ports:
+      - "${MINIO_API_PORT}:${MINIO_API_INTERNAL_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_INTERNAL_PORT}"
+    networks:
+      - monkeys-network
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":${MINIO_CONSOLE_INTERNAL_PORT}"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_API_INTERNAL_PORT}/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: always
+
+  the_monkeys_gateway:
+    container_name: "the-monkeys-gateway"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_gateway/Dockerfile
+      args:
+        GATEWAY_HTTP_PORT: ${THE_MONKEYS_GATEWAY_HTTP_PORT}
+        GATEWAY_HTTPS_PORT: ${THE_MONKEYS_GATEWAY_HTTPS}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - minio
+    ports:
+      - "${THE_MONKEYS_GATEWAY_HTTP_PORT}:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}"
+    environment:
+      - NO_TLS=1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  the_monkeys_authz:
+    container_name: "the-monkeys-auth"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_authz/Dockerfile
+      args:
+        AUTHZ_SERVICE_PORT: ${MICROSERVICES_AUTHZ_PORT}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_AUTHZ_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  the_monkeys_storage:
+    container_name: "the_monkeys_storage"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_storage/Dockerfile
+      args:
+        STORAGE_SERVICE_PORT: ${MICROSERVICES_STORAGE_PORT}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+    volumes:
+      - ./profile:/app/profile
+      - ./blogs:/app/blogs
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_STORAGE_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  the_monkeys_user:
+    container_name: "the-monkeys-user"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_users/Dockerfile
+      args:
+        USER_SERVICE_PORT: ${MICROSERVICES_USER_PORT}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_USER_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  the_monkeys_blog:
+    container_name: "the-monkeys-blog"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_blog/Dockerfile
+      args:
+        BLOG_SERVICE_PORT: ${MICROSERVICES_BLOG_PORT}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+      - elasticsearch-node1
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_BLOG_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  the_monkeys_activity:
+    container_name: "the_monkeys_activity"
+    build:
+      context: .
+      dockerfile: microservices/the_monkeys_activity/Dockerfile
+      args:
+        ACTIVITY_SERVICE_PORT: ${MICROSERVICES_ACTIVITY_PORT}
+    <<: *service-defaults
+    depends_on:
+      - rabbitmq
+      - db-migrations
+      - the_monkeys_db
+    healthcheck:
+      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_ACTIVITY_INTERNAL_PORT}" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  monkeys-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  elasticsearch-data1:
+    driver: local
+  minio_data:
+    driver: local
