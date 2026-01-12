@@ -8,13 +8,13 @@ WORKDIR /app
 
 # Copy go mod files first (for better caching)
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 # Copy source code
 COPY . .
 
 # Build the binary with optimizations for production
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -a -installsuffix cgo \
     -ldflags='-w -s -extldflags "-static"' \
     -o authz-service ./microservices/the_monkeys_authz/main.go
