@@ -1,0 +1,11 @@
+{
+    "source": {
+        "index": "the_monkeys_blogs"
+    },
+    "dest": {
+        "index": "the_monkeys_blogs_v2"
+    },
+    "script": {
+        "source": "if (ctx._source.blog != null && ctx._source.blog.blocks != null) { for (def block : ctx._source.blog.blocks) { if (block.type == 'list' && block.data != null && block.data.items != null) { if (block.data.items instanceof List) { def oldItems = block.data.items; boolean needsConversion = false; if (oldItems.size() > 0 && oldItems[0] instanceof String) { needsConversion = true; } if (needsConversion) { def newItems = []; for (def str : oldItems) { def newItem = ['content': str, 'items': []]; newItems.add(newItem); } block.data.items = newItems; } } } } }"
+    }
+}

@@ -62,6 +62,12 @@ service ActivityService {
   rpc TrackPerformanceEvent(TrackPerformanceEventRequest) returns (TrackPerformanceEventResponse);
   rpc GetPerformanceAnalytics(GetPerformanceAnalyticsRequest) returns (GetPerformanceAnalyticsResponse);
   
+  // Advanced analytics
+  rpc GetTrendingBlogs(GetTrendingBlogsRequest) returns (GetTrendingBlogsResponse);
+  rpc GetActiveUsers(GetActiveUsersRequest) returns (GetActiveUsersResponse);
+  rpc GetAccountActivities(GetAccountActivitiesRequest) returns (GetAccountActivitiesResponse);
+  rpc GetAdvancedAnalytics(GetAdvancedAnalyticsRequest) returns (GetAdvancedAnalyticsResponse);
+
   // Health check
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
@@ -1061,6 +1067,93 @@ message GetPerformanceAnalyticsResponse {
   int64 total_count = 3;
   google.protobuf.Struct performance_summary = 4;
   Error error = 5;
+}
+
+// Get Trending Blogs
+message GetTrendingBlogsRequest {
+  string account_id = 1;
+  string time_range = 2; // "24h", "7d", etc.
+  int32 limit = 3;
+}
+
+message TrendingBlog {
+  string blog_id = 1;
+  int64 views = 2;
+  int64 likes = 3;
+  double score = 4;
+}
+
+message GetTrendingBlogsResponse {
+  int32 status_code = 1;
+  repeated TrendingBlog blogs = 2;
+  Error error = 3;
+}
+
+// Get Active Users
+message GetActiveUsersRequest {
+  string account_id = 1;
+  string time_range = 2;
+}
+
+message ActiveUser {
+  string user_id = 1;
+  google.protobuf.Timestamp last_active = 2;
+}
+
+message GetActiveUsersResponse {
+  int32 status_code = 1;
+  int64 active_users = 2;
+  Error error = 3;
+  repeated ActiveUser user_list = 4;
+}
+
+// Get Account Activities
+message GetAccountActivitiesRequest {
+  string account_id = 1;
+  ActivityCategory category = 2;
+  string action = 3;
+  google.protobuf.Timestamp start_time = 4;
+  google.protobuf.Timestamp end_time = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message GetAccountActivitiesResponse {
+  int32 status_code = 1;
+  repeated ActivityEvent activities = 2;
+  int64 total_count = 3;
+  Error error = 4;
+}
+
+// Advanced Analytics (The 5-point suite)
+message GetAdvancedAnalyticsRequest {
+  string account_id = 1;
+  string time_range = 2;
+}
+
+message AdvancedAnalytics {
+  // 1. User Retention
+  double retention_rate = 1;
+  int64 new_users = 2;
+  int64 returning_users = 3;
+
+  // 2. Conversion Funnel
+  google.protobuf.Struct conversion_funnel = 4;
+
+  // 3. Geographic Hotspots
+  map<string, int64> geographic_hotspots = 5;
+
+  // 4. Peak Reading Times
+  map<string, int64> peak_reading_times = 6;
+
+  // 5. Platform Bias
+  map<string, int64> platform_bias = 7;
+}
+
+message GetAdvancedAnalyticsResponse {
+  int32 status_code = 1;
+  AdvancedAnalytics analytics = 2;
+  Error error = 3;
 }
 
 // Health Check

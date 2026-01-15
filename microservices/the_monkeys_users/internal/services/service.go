@@ -950,3 +950,32 @@ func (us *UserSvc) GetBookMarks(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 		BlogIds: blogIds,
 	}, nil
 }
+
+func (us *UserSvc) GetBatchUserDetails(ctx context.Context, req *pb.GetBatchUserDetailsReq) (*pb.GetBatchUserDetailsRes, error) {
+	if len(req.AccountIds) == 0 {
+		return &pb.GetBatchUserDetailsRes{}, nil
+	}
+
+	users, err := us.dbConn.GetUsersByAccountIds(req.AccountIds)
+	if err != nil {
+		us.log.Errorf("failed to fetch batch user details: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to fetch user details")
+	}
+
+	var res []*pb.UserDetailsResp
+	for _, u := range users {
+		res = append(res, &pb.UserDetailsResp{
+			AccountId: u.AccountId,
+			Username:  u.Username,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			Bio:       u.Bio.String,
+			AvatarUrl: u.AvatarUrl.String,
+			Location:  u.Address.String,
+		})
+	}
+
+	return &pb.GetBatchUserDetailsRes{
+		Users: res,
+	}, nil
+}

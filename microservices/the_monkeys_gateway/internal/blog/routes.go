@@ -179,6 +179,11 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 		// User Tags API
 		routesV2.GET("/user-tags/:username", rateLimiter, blogClient.GetUserTags) // Get user tags
+
+		// Activity & Analytics APIs
+		routesV2.GET("/trending", rateLimiter, blogClient.GetTrendingBlogs)                     // Get trending blogs
+		routesV2.GET("/account/:acc_id/activity", rateLimiter, blogClient.GetAccountActivities) // Get account activities
+		routesV2.GET("/analytics/advanced", rateLimiter, blogClient.GetAdvancedAnalytics)       // Get advanced analytics
 	}
 
 	routesV2.Use(mware.AuthRequired)
@@ -1586,113 +1591,113 @@ func (asc *BlogServiceClient) MoveBlogToDraft(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
-	tokenAccountId := ctx.GetString("userName")
+// func (asc *BlogServiceClient) MyBookmarks(ctx *gin.Context) {
+// 	tokenAccountId := ctx.GetString("userName")
 
-	// Get limit and offset and convert into int32
-	limit := ctx.DefaultQuery("limit", "10")
-	offset := ctx.DefaultQuery("offset", "0")
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		limitInt = 10
-	}
+// 	// Get limit and offset and convert into int32
+// 	limit := ctx.DefaultQuery("limit", "10")
+// 	offset := ctx.DefaultQuery("offset", "0")
+// 	limitInt, err := strconv.Atoi(limit)
+// 	if err != nil {
+// 		limitInt = 10
+// 	}
 
-	offsetInt, err := strconv.Atoi(offset)
-	if err != nil {
-		offsetInt = 0
-	}
+// 	offsetInt, err := strconv.Atoi(offset)
+// 	if err != nil {
+// 		offsetInt = 0
+// 	}
 
-	// Get all the draft blogs by my username
-	blogResp, err := asc.UserCli.GetUsersBookmarks(tokenAccountId)
+// 	// Get all the draft blogs by my username
+// 	blogResp, err := asc.UserCli.GetUsersBookmarks(tokenAccountId)
 
-	if err != nil {
-		asc.log.Errorf("cannot get the bookmarks, error: %v", err)
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the bookmarks"})
-		return
-	}
+// 	if err != nil {
+// 		asc.log.Errorf("cannot get the bookmarks, error: %v", err)
+// 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the bookmarks"})
+// 		return
+// 	}
 
-	if len(blogResp) == 0 {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found"})
-		return
-	}
+// 	if len(blogResp) == 0 {
+// 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found"})
+// 		return
+// 	}
 
-	stream, err := asc.Client.GetBlogsBySlice(context.Background(), &pb.GetBlogsBySliceReq{
-		BlogIds:    blogResp,
-		IsDraft:    false,
-		Limit:      int32(limitInt),
-		Offset:     int32(offsetInt),
-		ClientInfo: asc.createClientInfo(ctx),
-	})
+// 	stream, err := asc.Client.GetBlogsBySlice(context.Background(), &pb.GetBlogsBySliceReq{
+// 		BlogIds:    blogResp,
+// 		IsDraft:    false,
+// 		Limit:      int32(limitInt),
+// 		Offset:     int32(offsetInt),
+// 		ClientInfo: asc.createClientInfo(ctx),
+// 	})
 
-	if err != nil {
-		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.NotFound:
-				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the blogs for the given tags"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs by tags"})
-				return
-			default:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-				return
-			}
-		}
-	}
+// 	if err != nil {
+// 		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
+// 		if status, ok := status.FromError(err); ok {
+// 			switch status.Code() {
+// 			case codes.NotFound:
+// 				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the blogs for the given tags"})
+// 				return
+// 			case codes.Internal:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs by tags"})
+// 				return
+// 			default:
+// 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+// 				return
+// 			}
+// 		}
+// 	}
 
-	var allBlogs []map[string]interface{}
-	for {
-		blog, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				switch status.Code() {
-				case codes.NotFound:
-					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
-					return
-				case codes.Internal:
-					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
-					return
-				default:
-					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
-					return
-				}
-			}
-		}
+// 	var allBlogs []map[string]interface{}
+// 	for {
+// 		blog, err := stream.Recv()
+// 		if err == io.EOF {
+// 			break
+// 		}
+// 		if err != nil {
+// 			if status, ok := status.FromError(err); ok {
+// 				switch status.Code() {
+// 				case codes.NotFound:
+// 					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
+// 					return
+// 				case codes.Internal:
+// 					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+// 					return
+// 				default:
+// 					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+// 					return
+// 				}
+// 			}
+// 		}
 
-		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
-			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
-			return
-		}
-		allBlogs = append(allBlogs, blogMaps...)
-	}
+// 		var blogMaps []map[string]interface{}
+// 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+// 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
+// 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+// 			return
+// 		}
+// 		allBlogs = append(allBlogs, blogMaps...)
+// 	}
 
-	for _, blog := range allBlogs {
-		blogID, ok := blog["blog_id"].(string)
-		if !ok {
-			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
-			continue
-		}
+// 	for _, blog := range allBlogs {
+// 		blogID, ok := blog["blog_id"].(string)
+// 		if !ok {
+// 			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
+// 			continue
+// 		}
 
-		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
-		blog["LikeCount"] = likeCount
+// 		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
+// 		blog["LikeCount"] = likeCount
 
-		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
-		blog["BookmarkCount"] = bookmarkCount
+// 		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
+// 		blog["BookmarkCount"] = bookmarkCount
 
-	}
+// 	}
 
-	responseBlogs := map[string]interface{}{
-		"blogs": allBlogs,
-	}
+// 	responseBlogs := map[string]interface{}{
+// 		"blogs": allBlogs,
+// 	}
 
-	ctx.JSON(http.StatusOK, responseBlogs)
-}
+// 	ctx.JSON(http.StatusOK, responseBlogs)
+// }
 
 func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
@@ -2099,4 +2104,205 @@ func (asc *BlogServiceClient) TrackBlogActivity(ctx *gin.Context) {
 		"success": resp.Success,
 		"message": resp.Message,
 	})
+}
+
+// GetTrendingBlogs returns trending blogs from the activity service
+// GET /api/v2/blog/trending
+func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
+	accID := ctx.Query("account_id")
+	timeRange := ctx.DefaultQuery("time_range", "24h")
+	limitInt := utils.GetIntQuery(ctx, "limit", 10)
+	offsetInt := utils.GetIntQuery(ctx, "offset", 0)
+	clientInfo := utils.GetClientInfo(ctx)
+
+	resp, err := asc.ActivityCli.GetTrendingBlogs(context.Background(), &activity_pb.GetTrendingBlogsRequest{
+		AccountId: accID,
+		TimeRange: timeRange,
+		Limit:     int32(limitInt),
+	})
+
+	if err != nil {
+		asc.log.Errorf("failed to get trending blogs: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch trending blogs"})
+		return
+	}
+
+	blogIds := []string{}
+	blogStats := make(map[string]struct {
+		Views int64
+		Score float64
+	})
+	for _, blog := range resp.Blogs {
+		blogIds = append(blogIds, blog.BlogId)
+		blogStats[blog.BlogId] = struct {
+			Views int64
+			Score float64
+		}{
+			Views: blog.Views,
+			Score: blog.Score,
+		}
+	}
+
+	// Call gRPC to get blog metadata with client tracking
+	stream, err := asc.Client.MetaGetBlogsByBlogIds(context.Background(), &pb.BlogListReq{
+		BlogIds:   blogIds,
+		IsDraft:   false, // Only published blogs
+		Limit:     int32(limitInt),
+		Offset:    int32(offsetInt),
+		Ip:        clientInfo.IPAddress,
+		Client:    clientInfo.ClientType,
+		SessionId: clientInfo.SessionID,
+		UserAgent: clientInfo.UserAgent,
+		Referrer:  clientInfo.Referrer,
+		Platform:  utils.GetBlogPlatform(ctx),
+	})
+
+	if err != nil {
+		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "cannot find the blogs for the given tags"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the blogs by tags"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	var allBlogs []map[string]interface{}
+	var totalBlogs int // Store total number of blogs
+
+	for {
+		blog, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if status, ok := status.FromError(err); ok {
+				switch status.Code() {
+				case codes.NotFound:
+					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
+					return
+				case codes.Internal:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+					return
+				default:
+					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+					return
+				}
+			}
+		}
+
+		// Unmarshal into a map since response structure has changed
+		var blogMap map[string]interface{}
+		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
+			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
+			return
+		}
+
+		// Extract "total_blogs" if present
+		if total, ok := blogMap["total_blogs"].(float64); ok { // JSON numbers default to float64
+			totalBlogs = int(total)
+		}
+
+		// Extract the "blogs" array safely
+		blogsData, ok := blogMap["blogs"]
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "missing blogs data in response"})
+			return
+		}
+
+		// Convert blogsData to []map[string]interface{}
+		blogList, ok := blogsData.([]interface{})
+		if !ok {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "invalid blogs format in response"})
+			return
+		}
+
+		// Convert []interface{} to []map[string]interface{}
+		for _, b := range blogList {
+			if blogEntry, valid := b.(map[string]interface{}); valid {
+				allBlogs = append(allBlogs, blogEntry)
+			}
+		}
+	}
+
+	// Add additional metadata (like & bookmark count) for each blog
+	for _, blog := range allBlogs {
+		blogID, ok := blog["blog_id"].(string)
+		if !ok {
+			asc.log.Errorf("BlogId is either missing or not a string: %v", blog)
+			continue
+		}
+
+		likeCount, _ := asc.UserCli.GetNoOfLikeCounts(blogID)
+		blog["like_count"] = likeCount
+
+		bookmarkCount, _ := asc.UserCli.GetNoOfBookmarkCounts(blogID)
+		blog["bookmark_count"] = bookmarkCount
+
+		// Add views and score from activity service
+		if stats, exists := blogStats[blogID]; exists {
+			blog["views"] = stats.Views
+			blog["score"] = stats.Score
+		}
+	}
+
+	// Final response including total blogs count
+	responseBlogs := map[string]interface{}{
+		"total_blogs": totalBlogs,
+		"blogs":       allBlogs,
+	}
+
+	ctx.JSON(http.StatusOK, responseBlogs)
+}
+
+// GetAccountActivities returns activity history for a specific account
+// GET /api/v2/blog/account/:acc_id/activity
+func (asc *BlogServiceClient) GetAccountActivities(ctx *gin.Context) {
+	accID := ctx.Param("acc_id")
+	action := ctx.Query("action")
+	limit := int32(utils.GetIntQuery(ctx, "limit", 20))
+	offset := int32(utils.GetIntQuery(ctx, "offset", 0))
+
+	resp, err := asc.ActivityCli.GetAccountActivities(context.Background(), &activity_pb.GetAccountActivitiesRequest{
+		AccountId: accID,
+		Action:    action,
+		Limit:     limit,
+		Offset:    offset,
+	})
+
+	if err != nil {
+		asc.log.Errorf("failed to get account activities: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch activities"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+// GetAdvancedAnalytics returns complex insights like retention and hotspots
+// GET /api/v2/blog/analytics/advanced
+func (asc *BlogServiceClient) GetAdvancedAnalytics(ctx *gin.Context) {
+	accID := ctx.Query("account_id")
+	timeRange := ctx.DefaultQuery("time_range", "7d")
+
+	resp, err := asc.ActivityCli.GetAdvancedAnalytics(context.Background(), &activity_pb.GetAdvancedAnalyticsRequest{
+		AccountId: accID,
+		TimeRange: timeRange,
+	})
+
+	if err != nil {
+		asc.log.Errorf("failed to get advanced analytics: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch advanced analytics"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }
