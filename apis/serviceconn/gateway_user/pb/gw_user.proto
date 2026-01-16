@@ -313,5 +313,14 @@ service UserService {
     rpc RevokeCoAuthorAccess(CoAuthorAccessReq) returns (CoAuthorAccessRes) {}
     rpc GetBlogsByUserIds(BlogsByUserIdsReq) returns (BlogsByUserNameRes) {}
     rpc CreateNewTopics(CreateTopicsReq) returns (CreateTopicsRes) {}
+    rpc GetBatchUserDetails(GetBatchUserDetailsReq) returns (GetBatchUserDetailsRes) {}
+}
+
+message GetBatchUserDetailsReq {
+    repeated string account_ids = 1;
+}
+
+message GetBatchUserDetailsRes {
+    repeated UserDetailsResp users = 1;
 }
 

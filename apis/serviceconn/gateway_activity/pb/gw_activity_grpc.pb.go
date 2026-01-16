@@ -46,6 +46,10 @@ const (
 	ActivityService_GetSearchAnalytics_FullMethodName             = "/activity_svc.ActivityService/GetSearchAnalytics"
 	ActivityService_TrackPerformanceEvent_FullMethodName          = "/activity_svc.ActivityService/TrackPerformanceEvent"
 	ActivityService_GetPerformanceAnalytics_FullMethodName        = "/activity_svc.ActivityService/GetPerformanceAnalytics"
+	ActivityService_GetTrendingBlogs_FullMethodName               = "/activity_svc.ActivityService/GetTrendingBlogs"
+	ActivityService_GetActiveUsers_FullMethodName                 = "/activity_svc.ActivityService/GetActiveUsers"
+	ActivityService_GetAccountActivities_FullMethodName           = "/activity_svc.ActivityService/GetAccountActivities"
+	ActivityService_GetAdvancedAnalytics_FullMethodName           = "/activity_svc.ActivityService/GetAdvancedAnalytics"
 	ActivityService_HealthCheck_FullMethodName                    = "/activity_svc.ActivityService/HealthCheck"
 )
 
@@ -95,6 +99,11 @@ type ActivityServiceClient interface {
 	// Performance tracking
 	TrackPerformanceEvent(ctx context.Context, in *TrackPerformanceEventRequest, opts ...grpc.CallOption) (*TrackPerformanceEventResponse, error)
 	GetPerformanceAnalytics(ctx context.Context, in *GetPerformanceAnalyticsRequest, opts ...grpc.CallOption) (*GetPerformanceAnalyticsResponse, error)
+	// Advanced analytics
+	GetTrendingBlogs(ctx context.Context, in *GetTrendingBlogsRequest, opts ...grpc.CallOption) (*GetTrendingBlogsResponse, error)
+	GetActiveUsers(ctx context.Context, in *GetActiveUsersRequest, opts ...grpc.CallOption) (*GetActiveUsersResponse, error)
+	GetAccountActivities(ctx context.Context, in *GetAccountActivitiesRequest, opts ...grpc.CallOption) (*GetAccountActivitiesResponse, error)
+	GetAdvancedAnalytics(ctx context.Context, in *GetAdvancedAnalyticsRequest, opts ...grpc.CallOption) (*GetAdvancedAnalyticsResponse, error)
 	// Health check
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -377,6 +386,46 @@ func (c *activityServiceClient) GetPerformanceAnalytics(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *activityServiceClient) GetTrendingBlogs(ctx context.Context, in *GetTrendingBlogsRequest, opts ...grpc.CallOption) (*GetTrendingBlogsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTrendingBlogsResponse)
+	err := c.cc.Invoke(ctx, ActivityService_GetTrendingBlogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *activityServiceClient) GetActiveUsers(ctx context.Context, in *GetActiveUsersRequest, opts ...grpc.CallOption) (*GetActiveUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActiveUsersResponse)
+	err := c.cc.Invoke(ctx, ActivityService_GetActiveUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *activityServiceClient) GetAccountActivities(ctx context.Context, in *GetAccountActivitiesRequest, opts ...grpc.CallOption) (*GetAccountActivitiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountActivitiesResponse)
+	err := c.cc.Invoke(ctx, ActivityService_GetAccountActivities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *activityServiceClient) GetAdvancedAnalytics(ctx context.Context, in *GetAdvancedAnalyticsRequest, opts ...grpc.CallOption) (*GetAdvancedAnalyticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAdvancedAnalyticsResponse)
+	err := c.cc.Invoke(ctx, ActivityService_GetAdvancedAnalytics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *activityServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthCheckResponse)
@@ -433,6 +482,11 @@ type ActivityServiceServer interface {
 	// Performance tracking
 	TrackPerformanceEvent(context.Context, *TrackPerformanceEventRequest) (*TrackPerformanceEventResponse, error)
 	GetPerformanceAnalytics(context.Context, *GetPerformanceAnalyticsRequest) (*GetPerformanceAnalyticsResponse, error)
+	// Advanced analytics
+	GetTrendingBlogs(context.Context, *GetTrendingBlogsRequest) (*GetTrendingBlogsResponse, error)
+	GetActiveUsers(context.Context, *GetActiveUsersRequest) (*GetActiveUsersResponse, error)
+	GetAccountActivities(context.Context, *GetAccountActivitiesRequest) (*GetAccountActivitiesResponse, error)
+	GetAdvancedAnalytics(context.Context, *GetAdvancedAnalyticsRequest) (*GetAdvancedAnalyticsResponse, error)
 	// Health check
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedActivityServiceServer()
@@ -525,6 +579,18 @@ func (UnimplementedActivityServiceServer) TrackPerformanceEvent(context.Context,
 }
 func (UnimplementedActivityServiceServer) GetPerformanceAnalytics(context.Context, *GetPerformanceAnalyticsRequest) (*GetPerformanceAnalyticsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPerformanceAnalytics not implemented")
+}
+func (UnimplementedActivityServiceServer) GetTrendingBlogs(context.Context, *GetTrendingBlogsRequest) (*GetTrendingBlogsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTrendingBlogs not implemented")
+}
+func (UnimplementedActivityServiceServer) GetActiveUsers(context.Context, *GetActiveUsersRequest) (*GetActiveUsersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetActiveUsers not implemented")
+}
+func (UnimplementedActivityServiceServer) GetAccountActivities(context.Context, *GetAccountActivitiesRequest) (*GetAccountActivitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccountActivities not implemented")
+}
+func (UnimplementedActivityServiceServer) GetAdvancedAnalytics(context.Context, *GetAdvancedAnalyticsRequest) (*GetAdvancedAnalyticsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAdvancedAnalytics not implemented")
 }
 func (UnimplementedActivityServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HealthCheck not implemented")
@@ -1036,6 +1102,78 @@ func _ActivityService_GetPerformanceAnalytics_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ActivityService_GetTrendingBlogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTrendingBlogsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServiceServer).GetTrendingBlogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActivityService_GetTrendingBlogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServiceServer).GetTrendingBlogs(ctx, req.(*GetTrendingBlogsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ActivityService_GetActiveUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActiveUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServiceServer).GetActiveUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActivityService_GetActiveUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServiceServer).GetActiveUsers(ctx, req.(*GetActiveUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ActivityService_GetAccountActivities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountActivitiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServiceServer).GetAccountActivities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActivityService_GetAccountActivities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServiceServer).GetAccountActivities(ctx, req.(*GetAccountActivitiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ActivityService_GetAdvancedAnalytics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAdvancedAnalyticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServiceServer).GetAdvancedAnalytics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActivityService_GetAdvancedAnalytics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServiceServer).GetAdvancedAnalytics(ctx, req.(*GetAdvancedAnalyticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ActivityService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)
 	if err := dec(in); err != nil {
@@ -1168,6 +1306,22 @@ var ActivityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPerformanceAnalytics",
 			Handler:    _ActivityService_GetPerformanceAnalytics_Handler,
+		},
+		{
+			MethodName: "GetTrendingBlogs",
+			Handler:    _ActivityService_GetTrendingBlogs_Handler,
+		},
+		{
+			MethodName: "GetActiveUsers",
+			Handler:    _ActivityService_GetActiveUsers_Handler,
+		},
+		{
+			MethodName: "GetAccountActivities",
+			Handler:    _ActivityService_GetAccountActivities_Handler,
+		},
+		{
+			MethodName: "GetAdvancedAnalytics",
+			Handler:    _ActivityService_GetAdvancedAnalytics_Handler,
 		},
 		{
 			MethodName: "HealthCheck",

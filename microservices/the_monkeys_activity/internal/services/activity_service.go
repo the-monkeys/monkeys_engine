@@ -3,6 +3,9 @@ package services
 import (
 	"context"
 
+	"sync"
+	"time"
+
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_activity/internal/database"
@@ -16,15 +19,70 @@ type ActivityServiceServer struct {
 	config *config.Config
 	logger *zap.SugaredLogger
 	db     *database.ActivityDB
+
+	// Cache for periodic analytics
+	trendingCache    []*pb.TrendingBlog
+	activeUsersCache int64
+	advancedCache    *pb.AdvancedAnalytics
+	cacheMutex       sync.RWMutex
+	lastRefresh      time.Time
 }
 
 // NewActivityServiceServer creates a new ActivityServiceServer
 func NewActivityServiceServer(cfg *config.Config, logger *zap.SugaredLogger, db *database.ActivityDB) *ActivityServiceServer {
-	return &ActivityServiceServer{
+	s := &ActivityServiceServer{
 		config: cfg,
 		logger: logger,
 		db:     db,
 	}
+	go s.startPeriodicAnalyticsRefresher()
+	return s
+}
+
+func (s *ActivityServiceServer) startPeriodicAnalyticsRefresher() {
+	ticker := time.NewTicker(3 * time.Hour)
+	defer ticker.Stop()
+
+	// Initial refresh
+	s.refreshAnalytics()
+
+	for range ticker.C {
+		s.refreshAnalytics()
+	}
+}
+
+func (s *ActivityServiceServer) refreshAnalytics() {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	s.logger.Info("Refreshing periodic analytics cache...")
+
+	// 1. Trending Blogs (last 24h)
+	trending, err := s.db.GetTrendingBlogs(ctx, &pb.GetTrendingBlogsRequest{TimeRange: "24h", Limit: 10})
+	if err != nil {
+		s.logger.Errorw("failed to refresh trending blogs", "error", err)
+	}
+
+	// 2. Active Users (last 3h)
+	activeUsers, _, err := s.db.GetActiveUsers(ctx, &pb.GetActiveUsersRequest{TimeRange: "3h"})
+	if err != nil {
+		s.logger.Errorw("failed to refresh active users", "error", err)
+	}
+
+	// 3. Advanced Analytics (last 7d)
+	advanced, err := s.db.GetAdvancedAnalytics(ctx, &pb.GetAdvancedAnalyticsRequest{TimeRange: "7d"})
+	if err != nil {
+		s.logger.Errorw("failed to refresh advanced analytics", "error", err)
+	}
+
+	s.cacheMutex.Lock()
+	s.trendingCache = trending
+	s.activeUsersCache = activeUsers
+	s.advancedCache = advanced
+	s.lastRefresh = time.Now()
+	s.cacheMutex.Unlock()
+
+	s.logger.Info("Periodic analytics cache refreshed successfully")
 }
 
 // TrackActivity records a user activity event

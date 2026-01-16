@@ -13,17 +13,22 @@ import (
 	"github.com/the-monkeys/the_monkeys/constants"
 
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/middleware"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+
+	activity_pb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/activity"
 )
 
 type UserServiceClient struct {
-	Client pb.UserServiceClient
-	log    *zap.SugaredLogger
+	Client      pb.UserServiceClient
+	ActivityCli activity_pb.ActivityServiceClient
+	log         *zap.SugaredLogger
 }
 
 func NewUserServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.UserServiceClient {
@@ -40,8 +45,9 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	mware := auth.InitAuthMiddleware(authClient, log)
 
 	usc := &UserServiceClient{
-		Client: NewUserServiceClient(cfg, log),
-		log:    log,
+		Client:      NewUserServiceClient(cfg, log),
+		ActivityCli: activity.NewActivityServiceClient(cfg, log),
+		log:         log,
 	}
 	routes := router.Group("/api/v1/user")
 	routes.GET("/topics", usc.GetAllTopics)
@@ -88,6 +94,12 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 
 	{
 		routes.POST("/topics", usc.CreateNewTopics)
+	}
+
+	routesV2 := router.Group("/api/v2/user")
+	rateLimiter := middleware.RateLimiterMiddleware("100-S")
+	{
+		routesV2.GET("/active-users", rateLimiter, usc.GetActiveUsers)
 	}
 
 	return usc
@@ -988,4 +1000,50 @@ func (asc *UserServiceClient) ConnectionCount(ctx *gin.Context) {
 		}
 	}
 	ctx.JSON(http.StatusOK, res)
+}
+
+// GetActiveUsers returns the count of active users
+// GET /api/v2/user/active-users
+func (usc *UserServiceClient) GetActiveUsers(ctx *gin.Context) {
+	accID := ctx.Query("account_id")
+	timeRange := ctx.DefaultQuery("time_range", "3h")
+
+	resp, err := usc.ActivityCli.GetActiveUsers(context.Background(), &activity_pb.GetActiveUsersRequest{
+		AccountId: accID,
+		TimeRange: timeRange,
+	})
+
+	if err != nil {
+		usc.log.Errorf("failed to get active users: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch active users"})
+		return
+	}
+
+	// Collect usernames from the active users list
+	var accIds []string
+	for _, user := range resp.UserList {
+		if user.UserId != "" {
+			accIds = append(accIds, user.UserId)
+		}
+	}
+
+	var userDetails []*pb.UserDetailsResp
+	if len(accIds) > 0 {
+		usersResp, err := usc.Client.GetBatchUserDetails(context.Background(), &pb.GetBatchUserDetailsReq{
+			AccountIds: accIds,
+		})
+
+		if err != nil {
+			usc.log.Errorf("failed to get user details: %v", err)
+			// We don't return here to allow the count to be returned even if details fail
+		} else {
+			userDetails = usersResp.Users
+		}
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"active_users": resp.ActiveUsers,
+		"user_details": userDetails,
+		"status_code":  resp.StatusCode,
+	})
 }
