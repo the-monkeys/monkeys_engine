@@ -181,9 +181,9 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routesV2.GET("/user-tags/:username", rateLimiter, blogClient.GetUserTags) // Get user tags
 
 		// Activity & Analytics APIs
-		routesV2.GET("/trending", rateLimiter, blogClient.GetTrendingBlogs)                     // Get trending blogs
-		routesV2.GET("/account/:acc_id/activity", rateLimiter, blogClient.GetAccountActivities) // Get account activities
-		routesV2.GET("/analytics/advanced", rateLimiter, blogClient.GetAdvancedAnalytics)       // Get advanced analytics
+		routesV2.GET("/trending", rateLimiter, blogClient.GetTrendingBlogs) // Get trending blogs
+		// routesV2.GET("/account/:acc_id/activity", rateLimiter, blogClient.GetAccountActivities) // Get account activities
+		// routesV2.GET("/analytics/advanced", rateLimiter, blogClient.GetAdvancedAnalytics) // Get advanced analytics
 	}
 
 	routesV2.Use(mware.AuthRequired)
