@@ -102,6 +102,19 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 				log.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
 			}
 			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
+
+		case constants.BLOG_SCHEDULE:
+			fmt.Printf("User schedule a blog: %+v", user)
+			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
+				log.Errorf("Can't update blog status to schedule: %v", err)
+			}
+			for _, tag := range user.Tags {
+				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
+					log.Errorf("Can't update blog status to schedule: %v", err)
+				}
+			}
+			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.ScheduleBlog, user.BlogId), constants.ServiceBlog, constants.EventScheduledBlog, userCon.log)
+
 		default:
 			log.Errorf("Unknown action: %s", user.Action)
 		}

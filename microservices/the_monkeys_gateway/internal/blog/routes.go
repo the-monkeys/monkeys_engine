@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var upgrader = websocket.Upgrader{
@@ -207,6 +208,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
 		// Get my draft blog by id
 		routesV2.GET("/my-draft/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogIdV2)
+		routesV2.POST("/:blog_id/schedule_blog", mware.AuthzRequired, blogClient.ScheduleBlog)
+		routesV2.GET("/my-scheduled_blog", mware.AuthRequired, blogClient.GetAllScheduleBlogs)
+		routesV2.DELETE("/:blog_id/schedule", mware.AuthzRequired, blogClient.DeleteScheduleBlog)
+		routesV2.POST("/:blog_id/schedule/to-draft", mware.AuthzRequired, blogClient.MoveScheduleBlogToDraft)
 	}
 
 	// -------------------------------------------------- Section-based News APIs --------------------------------------------------
@@ -470,6 +475,63 @@ func (asc *BlogServiceClient) PublishBlogById(ctx *gin.Context) {
 		Slug:       publishBody.Slug,
 		ClientInfo: asc.createClientInfo(ctx),
 	})
+
+	if err != nil {
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the draft blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+// Todo: have to fix this
+func (asc *BlogServiceClient) ScheduleBlog(ctx *gin.Context) {
+
+	// Check permissions:
+	if !utils.CheckUserAccessInContext(ctx, "Publish") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform schedule blog action"})
+		return
+	}
+
+	accId := ctx.GetString("accountId")
+	// Bind tags from request body
+	var scheduleBody ScheduleBlogReq
+	if err := ctx.ShouldBindBodyWithJSON(&scheduleBody); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "cannot bind the tags"})
+		return
+	}
+
+	id := ctx.Param("blog_id")
+
+	fmt.Printf("accId: %v\n", accId)
+	fmt.Printf("id: %v\n", id)
+	fmt.Printf("publishBody: %+v\n", scheduleBody)
+
+	resp, err := asc.Client.ScheduleBlog(
+		context.Background(),
+		&pb.ScheduleBlogReq{
+			Publish: &pb.PublishBlogReq{
+				BlogId:     id,
+				AccountId:  accId,
+				Tags:       scheduleBody.Tags,
+				Slug:       scheduleBody.Slug,
+				ClientInfo: asc.createClientInfo(ctx),
+			},
+			ScheduleTime: timestamppb.New(scheduleBody.ScheduleTime),
+			Timezone:     scheduleBody.Timezone,
+		},
+	)
 
 	if err != nil {
 		if status, ok := status.FromError(err); ok {

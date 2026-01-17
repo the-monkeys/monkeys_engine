@@ -4,6 +4,7 @@ package blog_svc;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
@@ -193,9 +194,20 @@ message PublishBlogReq {
     ClientInfo client_info = 11;
 }
 
+message ScheduleBlogReq {
+    PublishBlogReq publish = 1;
+    google.protobuf.Timestamp schedule_time = 2;
+    string timezone = 3;
+}
+
 message PublishBlogResp {
     string message = 1;
     string error = 2;
+}
+
+message ScheduleBlogResp {
+     string message = 1;
+     string error = 2;
 }
 
 message BlogByIdReq {
@@ -403,12 +415,44 @@ message SearchReq {
     ClientInfo client_info = 11;
 }
 
+message GetAllScheduleBlogsReq {
+    // Account ID to filter blogs (if empty, returns all - only for admin)
+    string account_id = 1;
+    // Enhanced client tracking fields
+    ClientInfo client_info = 2;
+}
+
+// Delete a scheduled blog
+message DeleteScheduleBlogReq {
+    string blog_id = 1;
+    string account_id = 2;
+    ClientInfo client_info = 3;
+}
+
+message DeleteScheduleBlogResp {
+    string message = 1;
+    string error = 2;
+}
+
+// Move scheduled blog to draft (cancel scheduling)
+message MoveScheduleBlogToDraftReq {
+    string blog_id = 1;
+    string account_id = 2;
+    ClientInfo client_info = 3;
+}
+
+message MoveScheduleBlogToDraftResp {
+    string message = 1;
+    string error = 2;
+}
+
 service BlogService {
     // Metadata may contain the blog id, owner account id, title, first paragraph, 
     // tags, first image, publish time, author name, etc.
     rpc GetBlogsMetadata(BlogListReq) returns (stream google.protobuf.Any);
     rpc SearchBlogsMetadata(SearchReq) returns (stream google.protobuf.Any);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id\
+    rpc ScheduleBlog(ScheduleBlogReq) returns (ScheduleBlogResp); 
     
     // --------------------------------------------------------------------- Deprecated APIs ---------------------------------------------------------------------
     // TODO: Remove the deprecated APIs
@@ -421,6 +465,9 @@ service BlogService {
     rpc GetPublishedBlogsByAccID(BlogByIdReq) returns (GetPublishedBlogsRes);
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
     rpc GetPublishedBlogByIdAndOwnerId(BlogByIdReq) returns (BlogByIdRes);
+    rpc GetAllScheduleBlogs(GetAllScheduleBlogsReq) returns (GetPublishedBlogsRes);
+    rpc DeleteScheduleBlog(DeleteScheduleBlogReq) returns (DeleteScheduleBlogResp);
+    rpc MoveScheduleBlogToDraft(MoveScheduleBlogToDraftReq) returns (MoveScheduleBlogToDraftResp);
 
     rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes) {};
 

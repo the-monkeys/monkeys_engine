@@ -1265,3 +1265,119 @@ func (asc *BlogServiceClient) GetBlogStats(ctx *gin.Context) {
 		"analytics":  resp.AnalyticsSummary,
 	})
 }
+
+func (asc *BlogServiceClient) GetAllScheduleBlogs(ctx *gin.Context) {
+	// Get the authenticated user's account ID
+	accId := ctx.GetString("accountId")
+
+	clientInfo := utils.GetClientInfo(ctx)
+
+	resp, err := asc.Client.GetAllScheduleBlogs(context.Background(), &pb.GetAllScheduleBlogsReq{
+		AccountId:  accId,
+		ClientInfo: createClientInfo(clientInfo),
+	})
+
+	if err != nil {
+		asc.log.Errorf("cannot get scheduled blogs, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot get the scheduled blogs"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *BlogServiceClient) DeleteScheduleBlog(ctx *gin.Context) {
+	// Check permissions
+	if !utils.CheckUserAccessInContext(ctx, "Delete") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
+	blogId := ctx.Param("blog_id")
+	accId := ctx.GetString("accountId")
+
+	clientInfo := utils.GetClientInfo(ctx)
+
+	resp, err := asc.Client.DeleteScheduleBlog(context.Background(), &pb.DeleteScheduleBlogReq{
+		BlogId:     blogId,
+		AccountId:  accId,
+		ClientInfo: createClientInfo(clientInfo),
+	})
+
+	if err != nil {
+		asc.log.Errorf("cannot delete scheduled blog, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.PermissionDenied:
+				ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "you don't have permission to delete this blog"})
+				return
+			case codes.FailedPrecondition:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blog is not scheduled"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot delete the scheduled blog"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func (asc *BlogServiceClient) MoveScheduleBlogToDraft(ctx *gin.Context) {
+	// Check permissions
+	if !utils.CheckUserAccessInContext(ctx, "Edit") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
+		return
+	}
+
+	blogId := ctx.Param("blog_id")
+	accId := ctx.GetString("accountId")
+
+	clientInfo := utils.GetClientInfo(ctx)
+
+	resp, err := asc.Client.MoveScheduleBlogToDraft(context.Background(), &pb.MoveScheduleBlogToDraftReq{
+		BlogId:     blogId,
+		AccountId:  accId,
+		ClientInfo: createClientInfo(clientInfo),
+	})
+
+	if err != nil {
+		asc.log.Errorf("cannot move scheduled blog to draft, error: %v", err)
+		if status, ok := status.FromError(err); ok {
+			switch status.Code() {
+			case codes.NotFound:
+				ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "the blog does not exist"})
+				return
+			case codes.PermissionDenied:
+				ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "you don't have permission to modify this blog"})
+				return
+			case codes.FailedPrecondition:
+				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "the blog is not scheduled"})
+				return
+			case codes.Internal:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot cancel the scheduled blog"})
+				return
+			default:
+				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "unknown error"})
+				return
+			}
+		}
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}

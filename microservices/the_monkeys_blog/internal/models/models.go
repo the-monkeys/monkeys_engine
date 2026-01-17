@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // End of the struct
 
 // type Blog struct {
@@ -25,14 +27,16 @@ package models
 // }
 
 type InterServiceMessage struct {
-	AccountId  string   `json:"account_id"`
-	UserStatus string   `json:"user_status"`
-	BlogId     string   `json:"blog_id"`
-	Action     string   `json:"action"`
-	BlogStatus string   `json:"blog_status"`
-	IpAddress  string   `json:"ip_address"`
-	Client     string   `json:"client"`
-	Tags       []string `json:"tags"`
+	AccountId    string    `json:"account_id"`
+	UserStatus   string    `json:"user_status"`
+	BlogId       string    `json:"blog_id"`
+	Action       string    `json:"action"`
+	BlogStatus   string    `json:"blog_status"`
+	IpAddress    string    `json:"ip_address"`
+	Client       string    `json:"client"`
+	Tags         []string  `json:"tags"`
+	ScheduleTime time.Time `json:"schedule_time"`
+	Timezone     string    `json:"timezone"`
 }
 
 type DraftBlogRequest struct {
