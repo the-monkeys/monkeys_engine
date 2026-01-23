@@ -64,11 +64,11 @@ func main() {
 	server.router.Use(gin.Recovery())
 	// retain default gin logger? use custom zap middleware later
 	// server.router.Use(gin.Logger())
-	server.router.MaxMultipartMemory = 8 << 20
+	server.router.MaxMultipartMemory = 100 << 20
 
 	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{
-		FrameDeny:             true,
+		FrameDeny:             false,
 		ContentTypeNosniff:    true,
 		BrowserXssFilter:      true,
 		ContentSecurityPolicy: "default-src 'self';", // Customize as needed

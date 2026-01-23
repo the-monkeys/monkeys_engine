@@ -246,29 +246,37 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 	objectName := "posts/" + blogID + "/" + fname
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	// Read into memory once so we can compute image metadata (BlurHash) and upload
-	data, err := io.ReadAll(file)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
-		return
-	}
-	reader := bytes.NewReader(data)
-
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
 	}
-	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
-			opts.UserMetadata = map[string]string{
-				"x-blurhash": hash,
-				"x-width":    strconv.Itoa(w),
-				"x-height":   strconv.Itoa(h),
+
+	// Read a small prefix for image metadata if it's an image
+	// 5MB limit for metadata processing to keep memory low
+	const metadataLimit = 5 * 1024 * 1024
+	var finalReader io.Reader = file
+	var objectSize int64 = fileHeader.Size
+
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
+		// Read into memory ONLY if small enough for metadata
+		data, err := io.ReadAll(file)
+		if err == nil {
+			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+				opts.UserMetadata = map[string]string{
+					"x-blurhash": hash,
+					"x-width":    strconv.Itoa(w),
+					"x-height":   strconv.Itoa(h),
+				}
 			}
+			finalReader = bytes.NewReader(data)
+			objectSize = int64(len(data))
+		} else {
+			// Fallback to streaming if read fails
+			_, _ = file.Seek(0, io.SeekStart)
 		}
 	}
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
 	if err != nil {
 		s.log.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
@@ -473,6 +481,11 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 		}
 	}
 
+	// For PDFs, ensure inline display in iframes
+	if strings.Contains(strings.ToLower(stat.ContentType), "application/pdf") {
+		ctx.Header("Content-Disposition", "inline")
+	}
+
 	// Stream body
 	if _, err := io.Copy(ctx.Writer, obj); err != nil {
 		s.log.Errorf("stream write error: %v", err)
@@ -535,28 +548,34 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 	objectName := "profiles/" + userID + "/profile" // single canonical key for profile image
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
-		return
-	}
-	reader := bytes.NewReader(data)
+	// Streaming upload
+	const metadataLimit = 5 * 1024 * 1024
+	var finalReader io.Reader = file
+	var objectSize int64 = fileHeader.Size
 
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000, immutable",
 	}
-	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
-			opts.UserMetadata = map[string]string{
-				"x-blurhash": hash,
-				"x-width":    strconv.Itoa(w),
-				"x-height":   strconv.Itoa(h),
+
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
+		data, err := io.ReadAll(file)
+		if err == nil {
+			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+				opts.UserMetadata = map[string]string{
+					"x-blurhash": hash,
+					"x-width":    strconv.Itoa(w),
+					"x-height":   strconv.Itoa(h),
+				}
 			}
+			finalReader = bytes.NewReader(data)
+			objectSize = int64(len(data))
+		} else {
+			_, _ = file.Seek(0, io.SeekStart)
 		}
 	}
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
 	if err != nil {
 		s.log.Errorf("minio PutObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
