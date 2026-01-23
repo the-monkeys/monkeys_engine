@@ -1,7 +1,7 @@
 # Definitive API Integration Status Report (Highly Detailed)
 
-**Date**: 2026-01-25 10:45 AM
-**Status**: 100% Manually Traced & Verified
+**Date**: 2026-01-25 07:55 PM
+**Status**: 100% Manually Traced & Verified (Updated with Storage V2)
 **Scope**: All 9 Gateway Internal Services (Auth, User, Blog, Notification, Storage v1/v2, AI, Admin, Systems, Activity)
 
 ---
@@ -34,6 +34,17 @@ These APIs are actively used in the frontend codebase. They are grouped by their
 | **V1** | **POST** | `/files/profile/:id/profile` | Profile pic upload | Update profile dialog integration. |
 | **V1** | **GET** | `/files/profile/:id/profile` | Serve avatar | Global layout sidebar and public profile usage. |
 | **V1.1** | **GET** | `/files/profile/:id/profile` | Avatar stream | High-performance binary stream for profile images. |
+
+### 🟢 Modern Storage Stack (V2 MinIO - Migration Active)
+*The frontend has successfully migrated core asset handling to Storage V2.*
+| Version | Method | Endpoint Path | Description | Integration Detail |
+|:---:|:---:|:---|:---|:---|
+| **V2** | **POST** | `/storage/posts/:id` | Blog asset upload | Integrated in EditorJS (Images, Videos, PDFs). |
+| **V2** | **GET** | `/storage/posts/:id/:file/url` | Asset delivery | Used for dynamic resolution in Editor and Reader. |
+| **V2** | **DELETE** | `/storage/posts/:id/:file` | Asset cleanup | **Automatic deletion hook** on block removal. |
+| **V2** | **POST** | `/storage/profiles/:id/profile`| Profile upload | Migrated in `UpdateProfileDialog`. |
+| **V2** | **GET** | `/storage/profiles/:id/profile/url`| Avatar delivery | Migrated in `useProfileImage` hook. |
+| **V2** | **DELETE** | `/storage/profiles/:id/profile`| Profile delete | **Active** in `UpdateProfileDialog` (Confirmation UI). |
 
 ### 🟢 User & Profile Service (V1)
 | Version | Method | Endpoint Path | Description | Integration Detail |
@@ -70,13 +81,9 @@ These APIs are actively used in the frontend codebase. They are grouped by their
 
 These APIs represent implemented backend features that are not yet exposed or utilized in the frontend UI.
 
-### 🔴 Modern Storage Stack (V2 MinIO)
-*These represent the "Next Gen" storage system ready for migration.*
-| Version | Method | Endpoint Path | Description | Status |
-|:---:|:---:|:---|:---|:---|
-| **V2** | **PROV** | `/storage/profiles/:id/url` | Presigned avatar | Pending Frontend Migration. |
 | **V2** | **HEAD** | `/storage/posts/:id/:file` | Asset metadata | Pending Frontend Migration. |
 | **V2** | **LIST** | `/storage/posts/:id` | Folder listing | Pending Frontend Migration. |
+| **V2** | **GET** | `/storage/posts/:id/:fileName/meta` | Deep metadata | Pending Metadata rendering (Blurhash/Dimensions). |
 
 ### 🔴 Secure Administrative Tools (Admin Service)
 | Version | Method | Endpoint Path | Description | Status |

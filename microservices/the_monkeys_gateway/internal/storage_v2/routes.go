@@ -248,7 +248,7 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000, immutable",
+		CacheControl: "public, max-age=31536000",
 	}
 
 	// Read a small prefix for image metadata if it's an image
@@ -404,7 +404,7 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000, immutable",
+		CacheControl: "public, max-age=31536000",
 	}
 	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
 		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
@@ -808,6 +808,12 @@ func (s *Service) GetPostFileURL(ctx *gin.Context) {
 		}
 	}
 
+	// Check existence first
+	if _, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{}); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "file not found"})
+		return
+	}
+
 	urlStr, err := s.presignedOrCDNURL(ctx.Request.Context(), objectName, time.Duration(expires)*time.Second)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "could not generate url"})
@@ -834,6 +840,12 @@ func (s *Service) GetProfileURL(ctx *gin.Context) {
 				expires = vi
 			}
 		}
+	}
+
+	// Check existence first
+	if _, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{}); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
 	}
 
 	urlStr, err := s.presignedOrCDNURL(ctx.Request.Context(), objectName, time.Duration(expires)*time.Second)
