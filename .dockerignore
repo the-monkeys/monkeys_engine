@@ -10,6 +10,8 @@
 # Large Data Directories (Must be excluded from build context)
 blogs/
 profile/
+local/
+node_modules/
 local_blogs/
 local_profiles/
 backup/

@@ -274,6 +274,9 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 			// Fallback to streaming if read fails
 			_, _ = file.Seek(0, io.SeekStart)
 		}
+	} else {
+		// For videos or large images, we MUST ensure we are at the start
+		_, _ = file.Seek(0, io.SeekStart)
 	}
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
@@ -394,29 +397,35 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	defer file.Close()
 
 	contentType := fileHeader.Header.Get("Content-Type")
-
-	data, err := io.ReadAll(file)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
-		return
-	}
-	reader := bytes.NewReader(data)
-
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		CacheControl: "public, max-age=31536000",
 	}
-	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
-			opts.UserMetadata = map[string]string{
-				"x-blurhash": hash,
-				"x-width":    strconv.Itoa(w),
-				"x-height":   strconv.Itoa(h),
+
+	const metadataLimit = 5 * 1024 * 1024
+	var finalReader io.Reader = file
+	var objectSize int64 = fileHeader.Size
+
+	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
+		data, err := io.ReadAll(file)
+		if err == nil {
+			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+				opts.UserMetadata = map[string]string{
+					"x-blurhash": hash,
+					"x-width":    strconv.Itoa(w),
+					"x-height":   strconv.Itoa(h),
+				}
 			}
+			finalReader = bytes.NewReader(data)
+			objectSize = int64(len(data))
+		} else {
+			_, _ = file.Seek(0, io.SeekStart)
 		}
+	} else {
+		_, _ = file.Seek(0, io.SeekStart)
 	}
 
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, reader, int64(len(data)), opts)
+	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
 	if err != nil {
 		s.log.Errorf("minio PutObject (update) error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
@@ -555,7 +564,7 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000, immutable",
+		CacheControl: "public, max-age=3600, must-revalidate",
 	}
 
 	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
@@ -573,6 +582,8 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 		} else {
 			_, _ = file.Seek(0, io.SeekStart)
 		}
+	} else {
+		_, _ = file.Seek(0, io.SeekStart)
 	}
 
 	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
@@ -664,7 +675,7 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000, immutable",
+		CacheControl: "public, max-age=3600, must-revalidate",
 	}
 	if strings.HasPrefix(strings.ToLower(contentType), "image/") {
 		if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {

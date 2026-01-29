@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -62,6 +63,19 @@ func NewCorsMiddleware() gin.HandlerFunc {
 func LogRequestBody() gin.HandlerFunc {
 	lg := zap.S().With("middleware", "req_body")
 	return func(c *gin.Context) {
+		// Skip logging for multipart form data (large files/videos)
+		contentType := c.Request.Header.Get("Content-Type")
+		if strings.Contains(contentType, "multipart/form-data") {
+			c.Next()
+			return
+		}
+
+		// Skip logging if Content-Length is too large (> 1MB)
+		if c.Request.ContentLength > 1024*1024 {
+			c.Next()
+			return
+		}
+
 		var bodyBuffer bytes.Buffer
 		if _, err := io.Copy(&bodyBuffer, c.Request.Body); err != nil {
 			lg.Errorw("copy body failed", "err", err)

@@ -147,9 +147,9 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	httpSrv := &http.Server{
 		Addr:           httpAddr,
 		Handler:        s.router,
-		MaxHeaderBytes: 1 << 20,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 5 << 20,
+		ReadTimeout:    1 * time.Hour,
+		WriteTimeout:   1 * time.Hour,
 	}
 
 	// HTTPS server (with TLS)
@@ -160,9 +160,9 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	httpsSrv := &http.Server{
 		Addr:           httpsAddr,
 		Handler:        s.router,
-		MaxHeaderBytes: 1 << 20,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 5 << 20,
+		ReadTimeout:    1 * time.Hour,
+		WriteTimeout:   1 * time.Hour,
 	}
 
 	// Start the HTTP server in a background goroutine
