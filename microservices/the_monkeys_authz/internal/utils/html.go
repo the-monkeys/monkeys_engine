@@ -20,6 +20,7 @@ func init() {
 func ResetPasswordTemplate(firstName, lastName, secret string, username string) string {
 	return `<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -121,11 +122,14 @@ func ResetPasswordTemplate(firstName, lastName, secret string, username string) 
         </a>
 
         <p style="color: #ed3232">
-            This link will expire in 1 hours for your security. If you don't reset your password within that time, you can request a new link anytime.
+            This link will expire in 1 hours for your security. If you don't reset your password within that time, you
+            can request a new link anytime.
         </p>
 
         <p>
-            Once your password is reset, you can dive in and start using <span style="font-weight: bold">The Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy to help.
+            Once your password is reset, you can dive in and start using <span style="font-weight: bold">The
+                Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our
+            support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy to help.
         </p>
 
         <p>We always welcome to the community,</p>
@@ -146,8 +150,8 @@ func ResetPasswordTemplate(firstName, lastName, secret string, username string) 
         </footer>
     </main>
 </body>
-</html>
-`
+
+</html>`
 }
 
 func EmailVerificationHTML(firstName, lastName, username, secret string) string {
