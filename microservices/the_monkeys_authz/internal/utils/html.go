@@ -125,7 +125,7 @@ func ResetPasswordTemplate(firstName, lastName, secret string, username string) 
         </p>
 
         <p>
-            Once your password is reset, you can dive in and start using <span style="font-weight: bold">The Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our support team at <b>mail.themonkeys.life@gmail.com</b>. We're happy to help.
+            Once your password is reset, you can dive in and start using <span style="font-weight: bold">The Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy to help.
         </p>
 
         <p>We always welcome to the community,</p>
@@ -315,7 +315,7 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 				Once you verify your email, you'll be ready to dive in and start
 				using <span style="font-weight: bold">The Monkeys</span>. If you
 				have any trouble verifying your email, please feel free to
-				contact our support team at <b>mail.themonkeys.life@gmail.com</b>. We're happy
+				contact our support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy
 				to help.
 			</p>
 

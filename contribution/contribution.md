@@ -4,7 +4,7 @@ We're glad you're thinking about contributing to The Monkeys. If you think somet
 
 ## Reporting Issues
 
-If you find any issue or bug, please create a Github issue or mail us at mail.themonkeys.life@gmail.com. 
+If you find any issue or bug, please create a Github issue or mail us at monkeys.admin@monkeys.com.co. 
 
 ## Submitting Pull Requests
 
