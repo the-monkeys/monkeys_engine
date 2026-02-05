@@ -47,8 +47,8 @@ type ElasticsearchStorage interface {
 	GetAllTagsFromUserPublishedBlogs(ctx context.Context, accountID string) ([]string, error)
 
 	// -------------------------------------------------------------------------------- Metadata --------------------------------------------------------------------------------
-	GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
-	GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, int, error)
+	GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32, cursor string) ([]map[string]interface{}, int, error)
+	GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int, cursor string) ([]map[string]interface{}, int, error)
 	GetBlogsMetadataByQuery(ctx context.Context, queryTexts []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 	GetBlogsMetaByAccountId(ctx context.Context, accountId string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 	GetBlogsMetaByBlogIdsV2(ctx context.Context, blogIds []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)

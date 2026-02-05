@@ -16,6 +16,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Helper function to create pb.ClientInfo from utils.ClientInfo
@@ -70,6 +71,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	// Get Limits and Offset
 	limit := ctx.DefaultQuery("limit", "500")
 	offset := ctx.DefaultQuery("offset", "0")
+	cursor := ctx.Query("cursor")
 
 	// Convert to int
 	limitInt, err := strconv.Atoi(limit)
@@ -105,6 +107,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		Referrer:   clientInfo.Referrer,
 		Platform:   utils.GetBlogPlatform(ctx),
 		ClientInfo: createClientInfo(clientInfo),
+		Cursor:     cursor,
 	})
 
 	if err != nil {
@@ -126,6 +129,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 
 	var allBlogs []map[string]interface{}
 	var totalBlogs int // Store total number of blogs
+	var nextCursor string
 
 	for {
 		blog, err := stream.Recv()
@@ -159,6 +163,10 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 		// Extract "total_blogs" if present
 		if total, ok := blogMap["total_blogs"].(float64); ok { // JSON numbers default to float64
 			totalBlogs = int(total)
+		}
+
+		if nc, ok := blogMap["next_cursor"].(string); ok {
+			nextCursor = nc
 		}
 
 		// Extract the "blogs" array safely
@@ -202,6 +210,7 @@ func (asc *BlogServiceClient) GetFeedPostsMeta(ctx *gin.Context) {
 	responseBlogs := map[string]interface{}{
 		"total_blogs": totalBlogs,
 		"blogs":       allBlogs,
+		"next_cursor": nextCursor,
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
@@ -211,6 +220,10 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 	// Get Limits and Offset
 	limit := ctx.DefaultQuery("limit", "500")
 	offset := ctx.DefaultQuery("offset", "0")
+	cursor := ctx.Query("cursor")
+	mode := ctx.Query("mode")
+
+	var tags []string
 
 	// Convert to int
 	limitInt, err := strconv.Atoi(limit)
@@ -229,11 +242,16 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 	// Get user account ID if authenticated (can be empty for anonymous users)
 	userAccountId := ctx.GetString("accountId")
 
-	// Call gRPC to get blog metadata with comprehensive user and client tracking
-	stream, err := asc.Client.GetBlogsMetadata(context.Background(), &pb.BlogListReq{
-		AccountId:  userAccountId, // Include user account ID for personalized feed tracking
+	// Call gRPC to get blog metadata
+	var stream interface {
+		Recv() (*anypb.Any, error)
+	}
+
+	req := &pb.BlogListReq{
+		AccountId:  userAccountId,
 		Limit:      int32(limitInt),
 		Offset:     int32(offsetInt),
+		Tags:       tags,
 		Ip:         clientInfo.IPAddress,
 		Client:     clientInfo.ClientType,
 		SessionId:  clientInfo.SessionID,
@@ -241,7 +259,14 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 		Referrer:   clientInfo.Referrer,
 		Platform:   utils.GetBlogPlatform(ctx),
 		ClientInfo: createClientInfo(clientInfo),
-	})
+		Cursor:     cursor,
+	}
+
+	if mode == "for_you" {
+		stream, err = asc.Client.MetaGetPersonalizedFeed(context.Background(), req)
+	} else {
+		stream, err = asc.Client.GetBlogsMetadata(context.Background(), req)
+	}
 
 	if err != nil {
 		asc.log.Errorf("cannot get the blogs by tags, error: %v", err)
@@ -262,6 +287,7 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 
 	var allBlogs []map[string]interface{}
 	var totalBlogs int // Store total number of blogs
+	var nextCursor string
 
 	for {
 		blog, err := stream.Recv()
@@ -338,6 +364,7 @@ func (asc *BlogServiceClient) GetsMetaFeed(ctx *gin.Context) {
 	responseBlogs := map[string]interface{}{
 		"total_blogs": totalBlogs,
 		"blogs":       allBlogs,
+		"next_cursor": nextCursor,
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)
@@ -1264,4 +1291,117 @@ func (asc *BlogServiceClient) GetBlogStats(ctx *gin.Context) {
 		"read_count": resp.TotalCount,
 		"analytics":  resp.AnalyticsSummary,
 	})
+}
+
+// FeedStream handles WebSocket connections for real-time feed updates
+// GET /v2/blog/feed/stream
+func (asc *BlogServiceClient) FeedStream(ctx *gin.Context) {
+	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		asc.log.Errorf("Failed to upgrade to websocket: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	asc.log.Info("New Feed WebSocket connection established")
+
+	// Baseline: Get the latest blog ID to avoid sending old data immediately as "new"
+	var lastBlogID string
+
+	// Create a dummy client info
+	clientInfo := utils.GetClientInfo(ctx)
+	clientInfoPb := createClientInfo(clientInfo)
+
+	// Initial fetch to set baseline
+	initCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	stream, err := asc.Client.GetBlogsMetadata(initCtx, &pb.BlogListReq{
+		Limit:      1,
+		Offset:     0,
+		ClientInfo: clientInfoPb,
+		Ip:         clientInfo.IPAddress,
+	})
+	if err == nil {
+		// Try to read one
+		blog, err := stream.Recv()
+		if err == nil {
+			var blogMap map[string]interface{}
+			if json.Unmarshal(blog.Value, &blogMap) == nil {
+				if blogsData, ok := blogMap["blogs"].([]interface{}); ok && len(blogsData) > 0 {
+					if firstBlog, ok := blogsData[0].(map[string]interface{}); ok {
+						if bid, ok := firstBlog["blog_id"].(string); ok {
+							lastBlogID = bid
+						}
+					}
+				}
+			}
+		}
+	}
+	cancel()
+
+	// Polling loop
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check for new post
+			pollCtx, pollCancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+			stream, err := asc.Client.GetBlogsMetadata(pollCtx, &pb.BlogListReq{
+				Limit:      1,
+				Offset:     0,
+				ClientInfo: clientInfoPb, // Re-use client info
+				Ip:         clientInfo.IPAddress,
+			})
+
+			if err != nil {
+				pollCancel()
+				continue
+			}
+
+			// Read response
+			blog, err := stream.Recv()
+			pollCancel()
+
+			if err != nil && err != io.EOF {
+				continue
+			}
+
+			if blog == nil {
+				continue
+			}
+
+			var blogMap map[string]interface{}
+			if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
+				continue
+			}
+
+			if blogsData, ok := blogMap["blogs"].([]interface{}); ok && len(blogsData) > 0 {
+				if firstBlog, ok := blogsData[0].(map[string]interface{}); ok {
+					newBlogID, _ := firstBlog["blog_id"].(string)
+
+					// If we have a new blog ID and it's different from the last one we knew
+					if newBlogID != "" && newBlogID != lastBlogID {
+						// It's a new post!
+						lastBlogID = newBlogID
+
+						event := map[string]interface{}{
+							"type":    "NEW_POST",
+							"payload": firstBlog,
+						}
+
+						if err := conn.WriteJSON(event); err != nil {
+							asc.log.Errorf("Error writing to websocket: %v", err)
+							return // Break loop on connection error
+						}
+					}
+				}
+			}
+		case <-ctx.Done():
+			// Gin context cancelled (client disconnected)
+			return
+		}
+	}
 }

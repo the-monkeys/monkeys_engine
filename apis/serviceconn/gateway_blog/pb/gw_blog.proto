@@ -385,6 +385,7 @@ message BlogListReq {
     string referrer = 11;
     Platform platform = 12;
     ClientInfo client_info = 13;
+    string cursor = 14;
 }
 
 message SearchReq {
@@ -440,6 +441,7 @@ service BlogService {
     rpc GetBlog(BlogReq) returns (google.protobuf.Any); // By blog id
     rpc MoveBlogToDraftStatus(BlogReq) returns (BlogResp); // By from published status to draft status by blog id
     rpc GetBlogsBySlice(GetBlogsBySliceReq) returns (stream google.protobuf.Any);
+    rpc MetaGetPersonalizedFeed(BlogListReq) returns (stream google.protobuf.Any);
     rpc MetaGetFeedBlogs(BlogListReq) returns (stream google.protobuf.Any);
     rpc MetaGetUsersBlogs(BlogListReq) returns (stream google.protobuf.Any);
     rpc MetaGetBlogsByBlogIds(BlogListReq) returns (stream google.protobuf.Any);

@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -42,8 +44,27 @@ func getStringOrDefault(value interface{}, defaultValue string) string {
 	return defaultValue
 }
 
+func decodeCursor(cursor string) (int64, string, error) {
+	if cursor == "" {
+		return 0, "", nil
+	}
+	bytes, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, "", err
+	}
+	parts := strings.Split(string(bytes), ",")
+	if len(parts) != 2 {
+		return 0, "", fmt.Errorf("invalid cursor format")
+	}
+	timestamp, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, "", err
+	}
+	return timestamp, parts[1], nil
+}
+
 // Returns metadata, total counts of blogs, and errors
-func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
+func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32, cursor string) ([]map[string]interface{}, int, error) {
 	// Ensure tags are not empty
 	if len(tags) == 0 {
 		es.log.Error("GetBlogsMetadataByTags: tags array is empty")
@@ -115,6 +136,13 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 	}
 
 	// Marshal the query to JSON
+	if cursor != "" {
+		timestamp, blogID, err := decodeCursor(cursor)
+		if err == nil && timestamp > 0 {
+			query["search_after"] = []interface{}{timestamp, blogID}
+			query["from"] = 0
+		}
+	}
 	bs, err := json.Marshal(query)
 	if err != nil {
 		es.log.Errorf("GetBlogsMetadataByTags: cannot marshal the query, error: %v", err)
@@ -228,7 +256,7 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 	return blogsMetadata, totalCount, nil
 }
 
-func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, int, error) {
+func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int, cursor string) ([]map[string]interface{}, int, error) {
 	// Build the query to get all published blogs with sorting by published_time or blog.time as fallback
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
@@ -274,6 +302,13 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 		},
 	}
 
+	if cursor != "" {
+		timestamp, blogID, err := decodeCursor(cursor)
+		if err == nil && timestamp > 0 {
+			query["search_after"] = []interface{}{timestamp, blogID}
+			query["from"] = 0
+		}
+	}
 	bs, err := json.Marshal(query)
 	if err != nil {
 		es.log.Errorf("GetAllPublishedBlogsMetadata: cannot marshal the query, error: %v", err)

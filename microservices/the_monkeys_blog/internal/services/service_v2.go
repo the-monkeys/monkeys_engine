@@ -2,9 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"strings"
+	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -423,6 +427,8 @@ func (blog *BlogService) MetaGetFeedBlogs(req *pb.BlogListReq, stream pb.BlogSer
 func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogService_GetBlogsMetadataServer) error {
 	returnData := make(map[string]interface{})
 	var blogs []map[string]interface{}
+	var count int
+	var err error
 
 	// Track blog activity - determine action based on request type
 	action := "browse_feed"
@@ -458,41 +464,42 @@ func (blog *BlogService) GetBlogsMetadata(req *pb.BlogListReq, stream pb.BlogSer
 	// Find blog by tags
 	if len(req.Tags) > 0 {
 		blog.logger.Debug("Fetching published blogs by tags")
-		blogs, count, err := blog.osClient.GetBlogsMetadataByTags(stream.Context(), req.Tags, false, req.Limit, req.Offset)
+		blogs, count, err = blog.osClient.GetBlogsMetadataByTags(stream.Context(), req.Tags, false, req.Limit, req.Offset, req.Cursor)
 		if err != nil {
 			blog.logger.Errorf("Error fetching blogs by tags: %v", err)
 			return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
 		}
 
-		returnData["total_blogs"] = count
-		returnData["blogs"] = blogs
-
-		blogBytes, err := json.Marshal(returnData)
+	} else {
+		blog.logger.Debug("Fetching feed metadata")
+		blogs, count, err = blog.osClient.GetAllPublishedBlogsMetadata(stream.Context(), int(req.Limit), int(req.Offset), req.Cursor)
 		if err != nil {
-			blog.logger.Errorf("Error marshalling blogs: %v", err)
-			return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+			blog.logger.Errorf("Error fetching blogs by tags: %v", err)
+			return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
 		}
-
-		// Send the packed message over the stream
-		if err := stream.Send(&anypb.Any{
-			TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
-			Value:   blogBytes,
-		}); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	blog.logger.Debug("Fetching feed metadata")
-	blogs, count, err := blog.osClient.GetAllPublishedBlogsMetadata(stream.Context(), int(req.Limit), int(req.Offset))
-	if err != nil {
-		blog.logger.Errorf("Error fetching blogs by tags: %v", err)
-		return status.Errorf(codes.Internal, "Error fetching blogs by tags: %v", err)
 	}
 
 	returnData["total_blogs"] = count
 	returnData["blogs"] = blogs
+
+	// Calculate Editorial Score for all blogs
+	for _, b := range blogs {
+		b["editorial_score"] = calculateEditorialScore(b)
+	}
+
+	if len(blogs) > 0 {
+		lastBlog := blogs[len(blogs)-1]
+		if publishedTimeStr, ok := lastBlog["published_time"].(string); ok {
+			publishedTime, err := time.Parse(time.RFC3339, publishedTimeStr)
+			if err == nil {
+				if blogID, ok := lastBlog["blog_id"].(string); ok {
+					cursor := fmt.Sprintf("%d,%s", publishedTime.UnixMilli(), blogID)
+					encodedCursor := base64.StdEncoding.EncodeToString([]byte(cursor))
+					returnData["next_cursor"] = encodedCursor
+				}
+			}
+		}
+	}
 
 	blogBytes, err := json.Marshal(returnData)
 	if err != nil {
@@ -666,6 +673,64 @@ func (blog *BlogService) MetaGetBlogsByBlogIds(req *pb.BlogListReq, stream pb.Bl
 	return nil
 }
 
+func (blog *BlogService) MetaGetPersonalizedFeed(req *pb.BlogListReq, stream pb.BlogService_MetaGetPersonalizedFeedServer) error {
+	blog.logger.Debug("Received request for personalized feed")
+
+	// Track activity
+	blog.trackBlogActivity(req.AccountId, "browse_personalized_feed", "feed", "personalized_feed", req)
+
+	returnData := make(map[string]interface{})
+	var blogs []map[string]interface{}
+	var count int
+	var err error
+
+	// For now, personalized feed starts with "Latest Published" as the base set
+	blogs, count, err = blog.osClient.GetAllPublishedBlogsMetadata(stream.Context(), int(req.Limit), int(req.Offset), req.Cursor)
+	if err != nil {
+		blog.logger.Errorf("Error fetching personalized feed: %v", err)
+		return status.Errorf(codes.Internal, "Error fetching personalized feed: %v", err)
+	}
+
+	returnData["total_blogs"] = count
+	returnData["blogs"] = blogs
+
+	// Calculate Editorial Score for all blogs
+	for _, b := range blogs {
+		b["editorial_score"] = calculateEditorialScore(b)
+	}
+
+	// Calculate Next Cursor
+	if len(blogs) > 0 {
+		lastBlog := blogs[len(blogs)-1]
+		if publishedTimeStr, ok := lastBlog["published_time"].(string); ok {
+			publishedTime, err := time.Parse(time.RFC3339, publishedTimeStr)
+			if err == nil {
+				if blogID, ok := lastBlog["blog_id"].(string); ok {
+					cursor := fmt.Sprintf("%d,%s", publishedTime.UnixMilli(), blogID)
+					encodedCursor := base64.StdEncoding.EncodeToString([]byte(cursor))
+					returnData["next_cursor"] = encodedCursor
+				}
+			}
+		}
+	}
+
+	blogBytes, err := json.Marshal(returnData)
+	if err != nil {
+		blog.logger.Errorf("Error marshalling blogs: %v", err)
+		return status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+	}
+
+	// Send the packed message over the stream
+	if err := stream.Send(&anypb.Any{
+		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
+		Value:   blogBytes,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (blog *BlogService) UsersBlogData(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
 	blog.logger.Debugf("Received request for user blog data: %v", req)
 
@@ -696,4 +761,37 @@ func (blog *BlogService) UsersBlogData(ctx context.Context, req *pb.BlogReq) (*a
 		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
 		Value:   blogBytes,
 	}, nil
+}
+
+func calculateEditorialScore(blog map[string]interface{}) float64 {
+	// Score = (Likes + Bookmarks * 2) / (HoursOld + 2)^1.5
+	// Note: Likes and Bookmarks are currently 0 from ES, so this is dominated by Recency
+
+	likes := 0.0
+	if val, ok := blog["like_count"].(float64); ok {
+		likes = val
+	}
+
+	bookmarks := 0.0
+	if val, ok := blog["bookmark_count"].(float64); ok {
+		bookmarks = val
+	}
+
+	publishedTimeStr, ok := blog["published_time"].(string)
+	hoursOld := 0.0
+	if ok {
+		pt, err := time.Parse(time.RFC3339, publishedTimeStr)
+		if err == nil {
+			hoursOld = time.Since(pt).Hours()
+		}
+	}
+	if hoursOld < 0 {
+		hoursOld = 0
+	}
+
+	// Add a small random factor to simulate engagement if missing (deterministic by blogID would be better but complex here)
+	// For now, pure recency:
+	score := (10.0 + likes + bookmarks*2) / math.Pow(hoursOld+2, 1.5)
+
+	return score
 }
