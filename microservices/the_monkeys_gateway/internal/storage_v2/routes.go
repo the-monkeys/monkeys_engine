@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -174,25 +175,46 @@ func metaValue(m map[string]string, key string) string {
 // Returns ok=false if data is not a supported image.
 func (s *Service) computeImageMetadata(contentType string, data []byte) (hash string, w, h int, ok bool) {
 	var img image.Image
-	if strings.Contains(contentType, "image/webp") {
+	if strings.Contains(strings.ToLower(contentType), "image/webp") {
 		m, err := webp.Decode(bytes.NewReader(data))
 		if err != nil {
+			s.log.Warnf("webp decode failed for blurhash (ct=%s, len=%d): %v", contentType, len(data), err)
 			return "", 0, 0, false
 		}
 		img = m
 	} else {
 		m, _, err := image.Decode(bytes.NewReader(data))
 		if err != nil {
+			s.log.Warnf("image decode failed for blurhash (ct=%s, len=%d): %v", contentType, len(data), err)
 			return "", 0, 0, false
 		}
 		img = m
 	}
 	hash, err := blurhash.Encode(4, 3, img)
 	if err != nil {
+		s.log.Warnf("blurhash encode failed (ct=%s, bounds=%v): %v", contentType, img.Bounds(), err)
 		return "", 0, 0, false
 	}
 	b := img.Bounds()
 	return hash, b.Dx(), b.Dy(), true
+}
+
+// enrichResponse adds computed image metadata, cacheControl, and a direct URL
+// to an upload/update JSON response so the client gets everything in one round-trip.
+func (s *Service) enrichResponse(ctx context.Context, resp gin.H, objectName string, opts minio.PutObjectOptions) {
+	resp["cacheControl"] = opts.CacheControl
+	if opts.UserMetadata != nil {
+		resp["blurhash"] = opts.UserMetadata["x-blurhash"]
+		if w, err := strconv.Atoi(opts.UserMetadata["x-width"]); err == nil {
+			resp["width"] = w
+		}
+		if h, err := strconv.Atoi(opts.UserMetadata["x-height"]); err == nil {
+			resp["height"] = h
+		}
+	}
+	if urlStr, err := s.presignedOrCDNURL(ctx, objectName, 10*time.Minute); err == nil {
+		resp["url"] = urlStr
+	}
 }
 
 // presignedOrCDNURL returns a CDN URL if MINIO_CDN_URL is set; otherwise a presigned GET URL
@@ -286,7 +308,8 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 		return
 	}
 
-	// Respond with stored file info
+	// Respond with stored file info + computed metadata so the client
+	// receives blurhash, dimensions, cacheControl, and URL in one round-trip.
 	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
@@ -295,6 +318,7 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 		"size":        info.Size,
 		"contentType": contentType,
 	}
+	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
 	ctx.JSON(http.StatusCreated, resp)
 }
 
@@ -432,13 +456,15 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
 		"etag":        info.ETag,
 		"size":        info.Size,
 		"contentType": contentType,
-	})
+	}
+	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // GetPostFile
@@ -593,13 +619,15 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
+	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
 		"etag":        info.ETag,
 		"size":        info.Size,
 		"contentType": contentType,
-	})
+	}
+	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
+	ctx.JSON(http.StatusCreated, resp)
 }
 
 // HeadProfileImage
@@ -694,13 +722,15 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
 		"etag":        info.ETag,
 		"size":        info.Size,
 		"contentType": contentType,
-	})
+	}
+	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // GetPostFileMeta
