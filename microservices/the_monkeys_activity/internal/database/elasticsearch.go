@@ -24,6 +24,10 @@ type ActivityDatabase interface {
 	GetUserActivities(ctx context.Context, req *pb.GetUserActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
 	SaveSecurityEvent(ctx context.Context, req *pb.TrackSecurityEventRequest) (string, error)
 	GetBlogAnalytics(ctx context.Context, blogID string) (*BlogAnalytics, error)
+	GetTrendingBlogs(ctx context.Context, req *pb.GetTrendingBlogsRequest) ([]*pb.TrendingBlog, error)
+	GetActiveUsers(ctx context.Context, req *pb.GetActiveUsersRequest) (int64, []*pb.ActiveUser, error)
+	GetAccountActivities(ctx context.Context, req *pb.GetAccountActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
+	GetAdvancedAnalytics(ctx context.Context, req *pb.GetAdvancedAnalyticsRequest) (*pb.AdvancedAnalytics, error)
 	Health(ctx context.Context) error
 	StartIPResolver(ctx context.Context)
 	UpdateIPLocation(ctx context.Context, ip string, location *IPGeoLocation) error
@@ -1807,4 +1811,420 @@ func (db *ActivityDB) UpdateIPLocation(ctx context.Context, ip string, location 
 	db.logger.Debugw("Updated IP location", "ip", ip, "country", location.Country, "city", location.City)
 
 	return nil
+}
+
+// GetTrendingBlogs calculates trending blogs based on views and likes
+func (db *ActivityDB) GetTrendingBlogs(ctx context.Context, req *pb.GetTrendingBlogsRequest) ([]*pb.TrendingBlog, error) {
+	timeRange := req.GetTimeRange()
+	if timeRange == "" {
+		timeRange = "24h"
+	}
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{"term": map[string]interface{}{"action.keyword": "read_blog"}},
+					{"range": map[string]interface{}{"@timestamp": map[string]interface{}{"gte": "now-" + timeRange}}},
+				},
+				"must_not": []map[string]interface{}{
+					{"term": map[string]interface{}{"client_info.is_bot": true}},
+				},
+			},
+		},
+		"aggs": map[string]interface{}{
+			"trending": map[string]interface{}{
+				"terms": map[string]interface{}{
+					"field": "resource_id.keyword",
+					"size":  req.GetLimit(),
+				},
+				"aggs": map[string]interface{}{
+					"likes": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"term": map[string]interface{}{"action.keyword": "blog_like"},
+						},
+					},
+				},
+			},
+		},
+		"size": 0,
+	}
+
+	if req.GetAccountId() != "" {
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, map[string]interface{}{"term": map[string]interface{}{"account_id": req.GetAccountId()}})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	res, err := db.performSearch(ctx, ActivityEventIndex+"*", query)
+	if err != nil {
+		return nil, err
+	}
+
+	var searchRes struct {
+		Aggregations struct {
+			Trending struct {
+				Buckets []struct {
+					Key      string `json:"key"`
+					DocCount int64  `json:"doc_count"`
+					Likes    struct {
+						DocCount int64 `json:"doc_count"`
+					} `json:"likes"`
+				} `json:"buckets"`
+			} `json:"trending"`
+		} `json:"aggregations"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&searchRes); err != nil {
+		return nil, err
+	}
+
+	trending := make([]*pb.TrendingBlog, 0)
+	for _, b := range searchRes.Aggregations.Trending.Buckets {
+		// Simple scoring: views + (likes * 5)
+		score := float64(b.DocCount) + float64(b.Likes.DocCount*5)
+		trending = append(trending, &pb.TrendingBlog{
+			BlogId: b.Key,
+			Views:  b.DocCount,
+			Likes:  b.Likes.DocCount,
+			Score:  score,
+		})
+	}
+
+	return trending, nil
+}
+
+// GetActiveUsers returns the number of unique active users and their details
+func (db *ActivityDB) GetActiveUsers(ctx context.Context, req *pb.GetActiveUsersRequest) (int64, []*pb.ActiveUser, error) {
+	timeRange := req.GetTimeRange()
+	if timeRange == "" {
+		timeRange = "3h"
+	}
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{"range": map[string]interface{}{"@timestamp": map[string]interface{}{"gte": "now-" + timeRange}}},
+					{"exists": map[string]interface{}{"field": "user_id"}}, // Ensure user_id exists
+				},
+				"must_not": []map[string]interface{}{
+					{"term": map[string]interface{}{"client_info.is_bot": true}},
+					{"term": map[string]interface{}{"user_id.keyword": ""}}, // Exclude empty user_ids
+				},
+			},
+		},
+		"aggs": map[string]interface{}{
+			"active_users_count": map[string]interface{}{
+				"cardinality": map[string]interface{}{
+					"field": "user_id.keyword",
+				},
+			},
+			"active_users_list": map[string]interface{}{
+				"terms": map[string]interface{}{
+					"field": "user_id.keyword",
+					"size":  100, // Limit to top 100 active users for now
+				},
+				"aggs": map[string]interface{}{
+					"last_active": map[string]interface{}{
+						"max": map[string]interface{}{
+							"field": "@timestamp",
+						},
+					},
+				},
+			},
+		},
+		"size": 0,
+	}
+
+	if req.GetAccountId() != "" {
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, map[string]interface{}{"term": map[string]interface{}{"account_id": req.GetAccountId()}})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	res, err := db.performSearch(ctx, ActivityEventIndex+"*", query)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	var searchRes struct {
+		Aggregations struct {
+			ActiveUsersCount struct {
+				Value int64 `json:"value"`
+			} `json:"active_users_count"`
+			ActiveUsersList struct {
+				Buckets []struct {
+					Key        string `json:"key"`
+					LastActive struct {
+						ValueAsString string  `json:"value_as_string"`
+						Value         float64 `json:"value"`
+					} `json:"last_active"`
+				} `json:"buckets"`
+			} `json:"active_users_list"`
+		} `json:"aggregations"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&searchRes); err != nil {
+		return 0, nil, err
+	}
+
+	var activeUsersList []*pb.ActiveUser
+	for _, bucket := range searchRes.Aggregations.ActiveUsersList.Buckets {
+		// Use Value (epoch millis) instead of parsing string to avoid format issues
+		// and handle potential scientific notation in JSON numbers
+		sec := int64(bucket.LastActive.Value) / 1000
+		nsec := int64(bucket.LastActive.Value) % 1000 * 1000000
+		lastActiveTime := time.Unix(sec, nsec)
+
+		activeUsersList = append(activeUsersList, &pb.ActiveUser{
+			UserId:     bucket.Key,
+			LastActive: timestamppb.New(lastActiveTime),
+		})
+	}
+
+	return searchRes.Aggregations.ActiveUsersCount.Value, activeUsersList, nil
+}
+
+// GetAccountActivities retrieves activities filtered by account_id
+func (db *ActivityDB) GetAccountActivities(ctx context.Context, req *pb.GetAccountActivitiesRequest) ([]*pb.ActivityEvent, int64, error) {
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{"term": map[string]interface{}{"account_id": req.GetAccountId()}},
+				},
+			},
+		},
+		"sort": []map[string]interface{}{
+			{"@timestamp": map[string]interface{}{"order": "desc"}},
+		},
+		"size": req.GetLimit(),
+		"from": req.GetOffset(),
+	}
+
+	if req.GetAction() != "" {
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, map[string]interface{}{"term": map[string]interface{}{"action.keyword": req.GetAction()}})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	if req.GetCategory() != pb.ActivityCategory_CATEGORY_UNSPECIFIED {
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, map[string]interface{}{"term": map[string]interface{}{"category": req.GetCategory().String()}})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	// Add time range
+	if req.GetStartTime() != nil || req.GetEndTime() != nil {
+		rangeFilter := map[string]interface{}{"range": map[string]interface{}{"@timestamp": map[string]interface{}{}}}
+		if req.GetStartTime() != nil {
+			rangeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["gte"] = req.GetStartTime().AsTime().Format(time.RFC3339)
+		}
+		if req.GetEndTime() != nil {
+			rangeFilter["range"].(map[string]interface{})["@timestamp"].(map[string]interface{})["lte"] = req.GetEndTime().AsTime().Format(time.RFC3339)
+		}
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, rangeFilter)
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	res, err := db.performSearch(ctx, ActivityEventIndex+"*", query)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Reusing the same parsing logic as GetUserActivities
+	return db.parseActivityEvents(res)
+}
+
+// GetAdvancedAnalytics performs complex aggregations for the 5-point suite
+func (db *ActivityDB) GetAdvancedAnalytics(ctx context.Context, req *pb.GetAdvancedAnalyticsRequest) (*pb.AdvancedAnalytics, error) {
+	timeRange := req.GetTimeRange()
+	if timeRange == "" {
+		timeRange = "7d"
+	}
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{"range": map[string]interface{}{"@timestamp": map[string]interface{}{"gte": "now-" + timeRange}}},
+				},
+				"must_not": []map[string]interface{}{
+					{"term": map[string]interface{}{"client_info.is_bot": true}},
+				},
+			},
+		},
+		"aggs": map[string]interface{}{
+			"geo_hotspots": map[string]interface{}{
+				"terms": map[string]interface{}{"field": "client_info.country.keyword", "size": 10},
+			},
+			"platforms": map[string]interface{}{
+				"terms": map[string]interface{}{"field": "client_info.platform.keyword"},
+			},
+			"peak_times": map[string]interface{}{
+				"date_histogram": map[string]interface{}{
+					"field":             "@timestamp",
+					"calendar_interval": "hour",
+				},
+			},
+			"retention": map[string]interface{}{
+				"filters": map[string]interface{}{
+					"filters": map[string]interface{}{
+						"new_users":       map[string]interface{}{"term": map[string]interface{}{"action.keyword": "register"}},
+						"returning_users": map[string]interface{}{"term": map[string]interface{}{"action.keyword": "login"}},
+					},
+				},
+				"aggs": map[string]interface{}{
+					"unique_count": map[string]interface{}{
+						"cardinality": map[string]interface{}{"field": "client_info.visitor_id.keyword"},
+					},
+				},
+			},
+		},
+		"size": 0,
+	}
+
+	if req.GetAccountId() != "" {
+		must := query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{})
+		must = append(must, map[string]interface{}{"term": map[string]interface{}{"account_id": req.GetAccountId()}})
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = must
+	}
+
+	res, err := db.performSearch(ctx, ActivityEventIndex+"*", query)
+	if err != nil {
+		return nil, err
+	}
+
+	var searchRes struct {
+		Aggregations struct {
+			GeoHotspots struct {
+				Buckets []struct {
+					Key      string `json:"key"`
+					DocCount int64  `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"geo_hotspots"`
+			Platforms struct {
+				Buckets []struct {
+					Key      string `json:"key"`
+					DocCount int64  `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"platforms"`
+			PeakTimes struct {
+				Buckets []struct {
+					Key      string `json:"key_as_string"`
+					DocCount int64  `json:"doc_count"`
+				} `json:"buckets"`
+			} `json:"peak_times"`
+			Retention struct {
+				Buckets map[string]struct {
+					UniqueCount struct {
+						Value int64 `json:"value"`
+					} `json:"unique_count"`
+				} `json:"buckets"`
+			} `json:"retention"`
+		} `json:"aggregations"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&searchRes); err != nil {
+		return nil, err
+	}
+
+	analytics := &pb.AdvancedAnalytics{
+		GeographicHotspots: make(map[string]int64),
+		PlatformBias:       make(map[string]int64),
+		PeakReadingTimes:   make(map[string]int64),
+	}
+
+	for _, b := range searchRes.Aggregations.GeoHotspots.Buckets {
+		analytics.GeographicHotspots[b.Key] = b.DocCount
+	}
+	for _, b := range searchRes.Aggregations.Platforms.Buckets {
+		analytics.PlatformBias[b.Key] = b.DocCount
+	}
+	for _, b := range searchRes.Aggregations.PeakTimes.Buckets {
+		analytics.PeakReadingTimes[b.Key] = b.DocCount
+	}
+
+	newUsers := searchRes.Aggregations.Retention.Buckets["new_users"].UniqueCount.Value
+	returningUsers := searchRes.Aggregations.Retention.Buckets["returning_users"].UniqueCount.Value
+	analytics.NewUsers = newUsers
+	analytics.ReturningUsers = returningUsers
+	if (newUsers + returningUsers) > 0 {
+		analytics.RetentionRate = float64(returningUsers) / float64(newUsers+returningUsers)
+	}
+
+	return analytics, nil
+}
+
+// performSearch is a helper to run ES queries
+func (db *ActivityDB) performSearch(ctx context.Context, index string, query map[string]interface{}) (*esapi.Response, error) {
+	queryBytes, _ := json.Marshal(query)
+	searchReq := esapi.SearchRequest{
+		Index: []string{index},
+		Body:  bytes.NewReader(queryBytes),
+	}
+	res, err := searchReq.Do(ctx, db.client)
+	if err != nil {
+		return nil, err
+	}
+	if res.IsError() {
+		return nil, fmt.Errorf("search error: %s", res.String())
+	}
+	return res, nil
+}
+
+// parseActivityEvents is a helper to parse search hits into pb.ActivityEvent
+func (db *ActivityDB) parseActivityEvents(res *esapi.Response) ([]*pb.ActivityEvent, int64, error) {
+	var searchResponse struct {
+		Hits struct {
+			Total struct {
+				Value int64 `json:"total"`
+			} `json:"total"`
+			Hits []struct {
+				Source interface{} `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&searchResponse); err != nil {
+		return nil, 0, err
+	}
+
+	activities := make([]*pb.ActivityEvent, 0, len(searchResponse.Hits.Hits))
+	for _, hit := range searchResponse.Hits.Hits {
+		doc := hit.Source.(map[string]interface{})
+
+		// Map ES fields back to pb.ActivityEvent
+		event := &pb.ActivityEvent{
+			Id:         fmt.Sprintf("%v", doc["id"]),
+			UserId:     fmt.Sprintf("%v", doc["user_id"]),
+			AccountId:  fmt.Sprintf("%v", doc["account_id"]),
+			SessionId:  fmt.Sprintf("%v", doc["session_id"]),
+			Action:     fmt.Sprintf("%v", doc["action"]),
+			Resource:   fmt.Sprintf("%v", doc["resource"]),
+			ResourceId: fmt.Sprintf("%v", doc["resource_id"]),
+			Success:    doc["success"].(bool),
+			DurationMs: int64(doc["duration_ms"].(float64)),
+		}
+
+		// Handle @timestamp
+		if ts, ok := doc["@timestamp"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, ts); err == nil {
+				event.Timestamp = timestamppb.New(t)
+			}
+		}
+
+		// Handle Category
+		if cat, ok := doc["category"].(string); ok {
+			if val, exists := pb.ActivityCategory_value[cat]; exists {
+				event.Category = pb.ActivityCategory(val)
+			}
+		}
+
+		activities = append(activities, event)
+	}
+
+	return activities, searchResponse.Hits.Total.Value, nil
 }

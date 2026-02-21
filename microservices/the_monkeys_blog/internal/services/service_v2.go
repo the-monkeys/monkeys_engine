@@ -42,42 +42,48 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		// Convert the struct to a map for further processing
 		req := reqStruct.AsMap()
 
-		blog.logger.Debugw("draft blog v2", "blog_id", req["blog_id"], "owner", req["owner_account_id"])
-		req["is_draft"] = true
-
 		blogId, _ := req["blog_id"].(string)
 		ownerAccountId, _ := req["owner_account_id"].(string)
+
+		req["is_draft"] = true
+
 		var ip, client string
-		if v, ok := req["Ip"]; ok && v != nil {
+		// Check both "Ip" and "ip" for backward/forward compatibility
+		if v, ok := req["ip"]; ok && v != nil {
 			ip, _ = v.(string)
-		} else {
-			ip = ""
+		} else if v, ok := req["Ip"]; ok && v != nil {
+			ip, _ = v.(string)
 		}
-		if v, ok := req["Client"]; ok && v != nil {
+
+		if v, ok := req["client"]; ok && v != nil {
 			client, _ = v.(string)
-		} else {
-			client = ""
+		} else if v, ok := req["Client"]; ok && v != nil {
+			client, _ = v.(string)
 		}
+
 		tagsInterface, ok := req["tags"].([]interface{})
 		if !ok {
-			blog.logger.Errorf("Tags field is not of type []interface{}")
+			blog.logger.Debugf("Tags field is missing or not of type []interface{}, using default")
 			tagsInterface = []interface{}{"untagged"}
 		}
 		tags := make([]string, len(tagsInterface))
 		for i, v := range tagsInterface {
 			tags[i], ok = v.(string)
 			if !ok {
-				blog.logger.Errorf("Tag value is not of type string")
+				blog.logger.Errorf("Tag value at index %d is not of type string: %v", i, v)
 				return status.Errorf(codes.InvalidArgument, "Tag value is not of type string")
 			}
 		}
 
-		exists, _, _ := blog.osClient.DoesBlogExist(stream.Context(), req["blog_id"].(string))
+		exists, _, err := blog.osClient.DoesBlogExist(stream.Context(), blogId)
+		if err != nil {
+			blog.logger.Errorf("Error checking blog existence for %s: %v", blogId, err)
+		}
+
 		if exists {
-			blog.logger.Debugw("update blog v2", "blog_id", blogId)
-			// Additional logic for existing blog handling
+			blog.logger.Debugw("DraftBlogV2: updating existing blog", "blog_id", blogId)
 		} else {
-			blog.logger.Debugw("create blog v2", "blog_id", blogId, "owner", ownerAccountId)
+			blog.logger.Infow("DraftBlogV2: creating new blog", "blog_id", blogId, "owner", ownerAccountId)
 			bx, err := json.Marshal(models.InterServiceMessage{
 				AccountId:  ownerAccountId,
 				BlogId:     blogId,
@@ -91,22 +97,26 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 				return status.Errorf(codes.Internal, "Something went wrong while drafting a blog")
 			}
 			if len(tags) == 0 {
-				req["Tags"] = []string{"untagged"}
+				req["tags"] = []string{"untagged"}
 			}
 			go func() {
 				err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
 				if err != nil {
-					blog.logger.Errorf("failed to publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+					blog.logger.Errorf("failed to publish blog create message to RabbitMQ: error=%v", err)
 				}
 			}()
 
 			go blog.trackBlogActivity(ownerAccountId, constants.BLOG_CREATE, "blog", blogId, req)
 		}
 
-		_, err = blog.osClient.SaveBlog(stream.Context(), req)
+		saveResp, err := blog.osClient.SaveBlog(stream.Context(), req)
 		if err != nil {
-			blog.logger.Errorf("Cannot store draft into opensearch: %v", err)
+			blog.logger.Errorf("DraftBlogV2: Cannot store draft into opensearch for blog %s: %v", blogId, err)
 			return status.Errorf(codes.Internal, "Failed to store draft: %v", err)
+		}
+
+		if saveResp.IsError() {
+			blog.logger.Errorf("DraftBlogV2: OpenSearch save error for blog %s: %v", blogId, saveResp.String())
 		}
 
 		// // Respond back to the client
@@ -134,7 +144,7 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 }
 
 func (blog *BlogService) BlogsOfFollowingAccounts(req *pb.FollowingAccounts, stream pb.BlogService_BlogsOfFollowingAccountsServer) error {
-	blog.logger.Debugf("Received request for blogs of following accounts: %v", req.AccountIds)
+	blog.logger.Debugf("BlogsOfFollowingAccounts: Received request for following accounts: %v", req.AccountIds)
 
 	if len(req.AccountIds) == 0 {
 		return status.Errorf(codes.InvalidArgument, "No account ids provided")
@@ -310,20 +320,26 @@ func (blog *BlogService) GetBlogsBySlice(req *pb.GetBlogsBySliceReq, stream pb.B
 }
 
 func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.Any, error) {
-	blog.logger.Debugf("Received request for blog: %v", req)
+	blogId := req.GetBlogId()
+	accountId := req.GetAccountId()
+	isDraft := req.GetIsDraft()
 
 	// Track blog reading activity
 	action := constants.READ_BLOG
-	if req.IsDraft {
+	if isDraft {
 		action = constants.READ_DRAFT
 	}
+	go blog.trackBlogActivity(accountId, action, "blog", blogId, req)
 
-	go blog.trackBlogActivity(req.AccountId, action, "blog", req.BlogId, req)
-
-	blogData, err := blog.osClient.GetBlogByBlogId(ctx, req.BlogId, req.IsDraft)
+	blogData, err := blog.osClient.GetBlogByBlogId(ctx, blogId, isDraft)
 	if err != nil {
-		blog.logger.Errorf("Error fetching blog: %v", err)
+		blog.logger.Errorf("GetBlog: Error fetching blog %s from OpenSearch: %v", blogId, err)
 		return nil, status.Errorf(codes.Internal, "Error fetching blog: %v", err)
+	}
+
+	if blogData == nil {
+		blog.logger.Warnf("GetBlog: Blog %s not found in OpenSearch", blogId)
+		return nil, status.Errorf(codes.NotFound, "Blog not found")
 	}
 
 	delete(blogData, "action")
@@ -333,11 +349,10 @@ func (blog *BlogService) GetBlog(ctx context.Context, req *pb.BlogReq) (*anypb.A
 
 	blogBytes, err := json.Marshal(blogData)
 	if err != nil {
-		blog.logger.Errorf("Error marshalling blogs: %v", err)
-		return nil, status.Errorf(codes.Internal, "Error marshalling blogs: %v", err)
+		blog.logger.Errorf("GetBlog: Error marshalling blog %s: %v", blogId, err)
+		return nil, status.Errorf(codes.Internal, "Error marshalling blog: %v", err)
 	}
 
-	// Pack the message into an Any message
 	return &anypb.Any{
 		TypeUrl: "the-monkeys/the-monkeys/apis/serviceconn/gateway_blog/pb.BlogResponse",
 		Value:   blogBytes,

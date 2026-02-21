@@ -389,47 +389,47 @@ services:
       retries: 3
       start_period: 15s
 
-  the_monkeys_notification:
-    container_name: "the_monkeys_notification"
-    build:
-      context: .
-      dockerfile: microservices/the_monkeys_notification/Dockerfile
-      args:
-        NOTIFICATION_SERVICE_PORT: ${MICROSERVICES_NOTIFICATION_PORT}
-    # For production, you can switch to:
-    # dockerfile: microservices/the_monkeys_notification/Dockerfile.distroless
-    networks:
-      - monkeys-network
-    depends_on:
-      - rabbitmq
-      - db-migrations
-      - the_monkeys_db
-      - elasticsearch-node1
-      - the_monkeys_blog
-      - the_monkeys_user
-    ports:
-      - "${MICROSERVICES_NOTIFICATION_PORT}:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"
-    restart: unless-stopped
-    env_file:
-      - .env
-    # Security: Run as non-root user
-    user: "1001:1001"
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.7'
-        reservations:
-          memory: 128M
-          cpus: '0.2'
-    # Health check
-    healthcheck:
-      test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
+  # the_monkeys_notification:
+  #   container_name: "the_monkeys_notification"
+  #   build:
+  #     context: .
+  #     dockerfile: microservices/the_monkeys_notification/Dockerfile
+  #     args:
+  #       NOTIFICATION_SERVICE_PORT: ${MICROSERVICES_NOTIFICATION_PORT}
+  #   # For production, you can switch to:
+  #   # dockerfile: microservices/the_monkeys_notification/Dockerfile.distroless
+  #   networks:
+  #     - monkeys-network
+  #   depends_on:
+  #     - rabbitmq
+  #     - db-migrations
+  #     - the_monkeys_db
+  #     - elasticsearch-node1
+  #     - the_monkeys_blog
+  #     - the_monkeys_user
+  #   ports:
+  #     - "${MICROSERVICES_NOTIFICATION_PORT}:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}"
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   # Security: Run as non-root user
+  #   user: "1001:1001"
+  #   # Resource limits for production
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #         cpus: '0.7'
+  #       reservations:
+  #         memory: 128M
+  #         cpus: '0.2'
+  #   # Health check
+  #   healthcheck:
+  #     test: [ "CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:${MICROSERVICES_NOTIFICATION_INTERNAL_PORT}" ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 15s
 
   # the_monkeys_ai_engine:
   #   container_name: "the_monkeys_ai_engine"

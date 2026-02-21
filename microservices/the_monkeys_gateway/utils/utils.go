@@ -164,6 +164,20 @@ func SetMonkeysAuthCookie(ctx *gin.Context, token string) {
 	http.SetCookie(ctx.Writer, authCookie)
 }
 
+func SetMonkeysRefreshCookie(ctx *gin.Context, token string) {
+	refreshCookie := &http.Cookie{
+		Name:     "mrt",
+		Value:    token,
+		HttpOnly: true,
+		Path:     "/",
+		MaxAge:   int(time.Duration(24*72)*time.Hour) / int(time.Second),
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
+	}
+
+	http.SetCookie(ctx.Writer, refreshCookie)
+}
+
 // GetClientIP extracts the real client IP address from various headers
 // Priority: X-Forwarded-For > X-Real-IP > ClientIP() fallback
 func GetClientIP(ctx *gin.Context) string {

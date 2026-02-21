@@ -33,6 +33,7 @@ const (
 	AuthService_UpdateEmailId_FullMethodName               = "/auth_svc.AuthService/UpdateEmailId"
 	AuthService_GoogleLogin_FullMethodName                 = "/auth_svc.AuthService/GoogleLogin"
 	AuthService_DecodeSignedJWT_FullMethodName             = "/auth_svc.AuthService/DecodeSignedJWT"
+	AuthService_RefreshToken_FullMethodName                = "/auth_svc.AuthService/RefreshToken"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -53,6 +54,7 @@ type AuthServiceClient interface {
 	UpdateEmailId(ctx context.Context, in *UpdateEmailIdReq, opts ...grpc.CallOption) (*UpdateEmailIdRes, error)
 	GoogleLogin(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
 	DecodeSignedJWT(ctx context.Context, in *DecodeSignedJWTRequest, opts ...grpc.CallOption) (*DecodeSignedJWTResponse, error)
+	RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenRes, error)
 }
 
 type authServiceClient struct {
@@ -203,6 +205,16 @@ func (c *authServiceClient) DecodeSignedJWT(ctx context.Context, in *DecodeSigne
 	return out, nil
 }
 
+func (c *authServiceClient) RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshTokenRes)
+	err := c.cc.Invoke(ctx, AuthService_RefreshToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -221,6 +233,7 @@ type AuthServiceServer interface {
 	UpdateEmailId(context.Context, *UpdateEmailIdReq) (*UpdateEmailIdRes, error)
 	GoogleLogin(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
 	DecodeSignedJWT(context.Context, *DecodeSignedJWTRequest) (*DecodeSignedJWTResponse, error)
+	RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -272,6 +285,9 @@ func (UnimplementedAuthServiceServer) GoogleLogin(context.Context, *RegisterUser
 }
 func (UnimplementedAuthServiceServer) DecodeSignedJWT(context.Context, *DecodeSignedJWTRequest) (*DecodeSignedJWTResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DecodeSignedJWT not implemented")
+}
+func (UnimplementedAuthServiceServer) RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshToken not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -546,6 +562,24 @@ func _AuthService_DecodeSignedJWT_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_RefreshToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshTokenReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RefreshToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RefreshToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RefreshToken(ctx, req.(*RefreshTokenReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -608,6 +642,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DecodeSignedJWT",
 			Handler:    _AuthService_DecodeSignedJWT_Handler,
+		},
+		{
+			MethodName: "RefreshToken",
+			Handler:    _AuthService_RefreshToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

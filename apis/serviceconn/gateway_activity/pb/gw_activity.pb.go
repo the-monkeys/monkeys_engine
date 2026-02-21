@@ -8362,6 +8362,739 @@ func (x *GetPerformanceAnalyticsResponse) GetError() *Error {
 	return nil
 }
 
+// Get Trending Blogs
+type GetTrendingBlogsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TimeRange     string                 `protobuf:"bytes,2,opt,name=time_range,json=timeRange,proto3" json:"time_range,omitempty"` // "24h", "7d", etc.
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTrendingBlogsRequest) Reset() {
+	*x = GetTrendingBlogsRequest{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTrendingBlogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTrendingBlogsRequest) ProtoMessage() {}
+
+func (x *GetTrendingBlogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTrendingBlogsRequest.ProtoReflect.Descriptor instead.
+func (*GetTrendingBlogsRequest) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *GetTrendingBlogsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetTrendingBlogsRequest) GetTimeRange() string {
+	if x != nil {
+		return x.TimeRange
+	}
+	return ""
+}
+
+func (x *GetTrendingBlogsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type TrendingBlog struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlogId        string                 `protobuf:"bytes,1,opt,name=blog_id,json=blogId,proto3" json:"blog_id,omitempty"`
+	Views         int64                  `protobuf:"varint,2,opt,name=views,proto3" json:"views,omitempty"`
+	Likes         int64                  `protobuf:"varint,3,opt,name=likes,proto3" json:"likes,omitempty"`
+	Score         float64                `protobuf:"fixed64,4,opt,name=score,proto3" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TrendingBlog) Reset() {
+	*x = TrendingBlog{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrendingBlog) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrendingBlog) ProtoMessage() {}
+
+func (x *TrendingBlog) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrendingBlog.ProtoReflect.Descriptor instead.
+func (*TrendingBlog) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *TrendingBlog) GetBlogId() string {
+	if x != nil {
+		return x.BlogId
+	}
+	return ""
+}
+
+func (x *TrendingBlog) GetViews() int64 {
+	if x != nil {
+		return x.Views
+	}
+	return 0
+}
+
+func (x *TrendingBlog) GetLikes() int64 {
+	if x != nil {
+		return x.Likes
+	}
+	return 0
+}
+
+func (x *TrendingBlog) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+type GetTrendingBlogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StatusCode    int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	Blogs         []*TrendingBlog        `protobuf:"bytes,2,rep,name=blogs,proto3" json:"blogs,omitempty"`
+	Error         *Error                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTrendingBlogsResponse) Reset() {
+	*x = GetTrendingBlogsResponse{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTrendingBlogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTrendingBlogsResponse) ProtoMessage() {}
+
+func (x *GetTrendingBlogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTrendingBlogsResponse.ProtoReflect.Descriptor instead.
+func (*GetTrendingBlogsResponse) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *GetTrendingBlogsResponse) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *GetTrendingBlogsResponse) GetBlogs() []*TrendingBlog {
+	if x != nil {
+		return x.Blogs
+	}
+	return nil
+}
+
+func (x *GetTrendingBlogsResponse) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+// Get Active Users
+type GetActiveUsersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TimeRange     string                 `protobuf:"bytes,2,opt,name=time_range,json=timeRange,proto3" json:"time_range,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActiveUsersRequest) Reset() {
+	*x = GetActiveUsersRequest{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActiveUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActiveUsersRequest) ProtoMessage() {}
+
+func (x *GetActiveUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActiveUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetActiveUsersRequest) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *GetActiveUsersRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetActiveUsersRequest) GetTimeRange() string {
+	if x != nil {
+		return x.TimeRange
+	}
+	return ""
+}
+
+type ActiveUser struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	LastActive    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=last_active,json=lastActive,proto3" json:"last_active,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActiveUser) Reset() {
+	*x = ActiveUser{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActiveUser) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActiveUser) ProtoMessage() {}
+
+func (x *ActiveUser) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActiveUser.ProtoReflect.Descriptor instead.
+func (*ActiveUser) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *ActiveUser) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ActiveUser) GetLastActive() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastActive
+	}
+	return nil
+}
+
+type GetActiveUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StatusCode    int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	ActiveUsers   int64                  `protobuf:"varint,2,opt,name=active_users,json=activeUsers,proto3" json:"active_users,omitempty"`
+	Error         *Error                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	UserList      []*ActiveUser          `protobuf:"bytes,4,rep,name=user_list,json=userList,proto3" json:"user_list,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActiveUsersResponse) Reset() {
+	*x = GetActiveUsersResponse{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActiveUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActiveUsersResponse) ProtoMessage() {}
+
+func (x *GetActiveUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActiveUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetActiveUsersResponse) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *GetActiveUsersResponse) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *GetActiveUsersResponse) GetActiveUsers() int64 {
+	if x != nil {
+		return x.ActiveUsers
+	}
+	return 0
+}
+
+func (x *GetActiveUsersResponse) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *GetActiveUsersResponse) GetUserList() []*ActiveUser {
+	if x != nil {
+		return x.UserList
+	}
+	return nil
+}
+
+// Get Account Activities
+type GetAccountActivitiesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Category      ActivityCategory       `protobuf:"varint,2,opt,name=category,proto3,enum=activity_svc.ActivityCategory" json:"category,omitempty"`
+	Action        string                 `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	StartTime     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccountActivitiesRequest) Reset() {
+	*x = GetAccountActivitiesRequest{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountActivitiesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountActivitiesRequest) ProtoMessage() {}
+
+func (x *GetAccountActivitiesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountActivitiesRequest.ProtoReflect.Descriptor instead.
+func (*GetAccountActivitiesRequest) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *GetAccountActivitiesRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetAccountActivitiesRequest) GetCategory() ActivityCategory {
+	if x != nil {
+		return x.Category
+	}
+	return ActivityCategory_CATEGORY_UNSPECIFIED
+}
+
+func (x *GetAccountActivitiesRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *GetAccountActivitiesRequest) GetStartTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartTime
+	}
+	return nil
+}
+
+func (x *GetAccountActivitiesRequest) GetEndTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndTime
+	}
+	return nil
+}
+
+func (x *GetAccountActivitiesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetAccountActivitiesRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type GetAccountActivitiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StatusCode    int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	Activities    []*ActivityEvent       `protobuf:"bytes,2,rep,name=activities,proto3" json:"activities,omitempty"`
+	TotalCount    int64                  `protobuf:"varint,3,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	Error         *Error                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccountActivitiesResponse) Reset() {
+	*x = GetAccountActivitiesResponse{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountActivitiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountActivitiesResponse) ProtoMessage() {}
+
+func (x *GetAccountActivitiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountActivitiesResponse.ProtoReflect.Descriptor instead.
+func (*GetAccountActivitiesResponse) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *GetAccountActivitiesResponse) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *GetAccountActivitiesResponse) GetActivities() []*ActivityEvent {
+	if x != nil {
+		return x.Activities
+	}
+	return nil
+}
+
+func (x *GetAccountActivitiesResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *GetAccountActivitiesResponse) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+// Advanced Analytics (The 5-point suite)
+type GetAdvancedAnalyticsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TimeRange     string                 `protobuf:"bytes,2,opt,name=time_range,json=timeRange,proto3" json:"time_range,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAdvancedAnalyticsRequest) Reset() {
+	*x = GetAdvancedAnalyticsRequest{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAdvancedAnalyticsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAdvancedAnalyticsRequest) ProtoMessage() {}
+
+func (x *GetAdvancedAnalyticsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAdvancedAnalyticsRequest.ProtoReflect.Descriptor instead.
+func (*GetAdvancedAnalyticsRequest) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *GetAdvancedAnalyticsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetAdvancedAnalyticsRequest) GetTimeRange() string {
+	if x != nil {
+		return x.TimeRange
+	}
+	return ""
+}
+
+type AdvancedAnalytics struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1. User Retention
+	RetentionRate  float64 `protobuf:"fixed64,1,opt,name=retention_rate,json=retentionRate,proto3" json:"retention_rate,omitempty"`
+	NewUsers       int64   `protobuf:"varint,2,opt,name=new_users,json=newUsers,proto3" json:"new_users,omitempty"`
+	ReturningUsers int64   `protobuf:"varint,3,opt,name=returning_users,json=returningUsers,proto3" json:"returning_users,omitempty"`
+	// 2. Conversion Funnel
+	ConversionFunnel *structpb.Struct `protobuf:"bytes,4,opt,name=conversion_funnel,json=conversionFunnel,proto3" json:"conversion_funnel,omitempty"`
+	// 3. Geographic Hotspots
+	GeographicHotspots map[string]int64 `protobuf:"bytes,5,rep,name=geographic_hotspots,json=geographicHotspots,proto3" json:"geographic_hotspots,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// 4. Peak Reading Times
+	PeakReadingTimes map[string]int64 `protobuf:"bytes,6,rep,name=peak_reading_times,json=peakReadingTimes,proto3" json:"peak_reading_times,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	// 5. Platform Bias
+	PlatformBias  map[string]int64 `protobuf:"bytes,7,rep,name=platform_bias,json=platformBias,proto3" json:"platform_bias,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvancedAnalytics) Reset() {
+	*x = AdvancedAnalytics{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvancedAnalytics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvancedAnalytics) ProtoMessage() {}
+
+func (x *AdvancedAnalytics) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvancedAnalytics.ProtoReflect.Descriptor instead.
+func (*AdvancedAnalytics) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *AdvancedAnalytics) GetRetentionRate() float64 {
+	if x != nil {
+		return x.RetentionRate
+	}
+	return 0
+}
+
+func (x *AdvancedAnalytics) GetNewUsers() int64 {
+	if x != nil {
+		return x.NewUsers
+	}
+	return 0
+}
+
+func (x *AdvancedAnalytics) GetReturningUsers() int64 {
+	if x != nil {
+		return x.ReturningUsers
+	}
+	return 0
+}
+
+func (x *AdvancedAnalytics) GetConversionFunnel() *structpb.Struct {
+	if x != nil {
+		return x.ConversionFunnel
+	}
+	return nil
+}
+
+func (x *AdvancedAnalytics) GetGeographicHotspots() map[string]int64 {
+	if x != nil {
+		return x.GeographicHotspots
+	}
+	return nil
+}
+
+func (x *AdvancedAnalytics) GetPeakReadingTimes() map[string]int64 {
+	if x != nil {
+		return x.PeakReadingTimes
+	}
+	return nil
+}
+
+func (x *AdvancedAnalytics) GetPlatformBias() map[string]int64 {
+	if x != nil {
+		return x.PlatformBias
+	}
+	return nil
+}
+
+type GetAdvancedAnalyticsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StatusCode    int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	Analytics     *AdvancedAnalytics     `protobuf:"bytes,2,opt,name=analytics,proto3" json:"analytics,omitempty"`
+	Error         *Error                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAdvancedAnalyticsResponse) Reset() {
+	*x = GetAdvancedAnalyticsResponse{}
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAdvancedAnalyticsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAdvancedAnalyticsResponse) ProtoMessage() {}
+
+func (x *GetAdvancedAnalyticsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAdvancedAnalyticsResponse.ProtoReflect.Descriptor instead.
+func (*GetAdvancedAnalyticsResponse) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *GetAdvancedAnalyticsResponse) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *GetAdvancedAnalyticsResponse) GetAnalytics() *AdvancedAnalytics {
+	if x != nil {
+		return x.Analytics
+	}
+	return nil
+}
+
+func (x *GetAdvancedAnalyticsResponse) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 // Health Check
 type HealthCheckRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -8371,7 +9104,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[72]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8383,7 +9116,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[72]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8396,7 +9129,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{72}
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{83}
 }
 
 type HealthCheckResponse struct {
@@ -8412,7 +9145,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[73]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8424,7 +9157,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[73]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8437,7 +9170,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{73}
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *HealthCheckResponse) GetStatusCode() int32 {
@@ -8487,7 +9220,7 @@ type Error struct {
 
 func (x *Error) Reset() {
 	*x = Error{}
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[74]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8499,7 +9232,7 @@ func (x *Error) String() string {
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[74]
+	mi := &file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8512,7 +9245,7 @@ func (x *Error) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Error.ProtoReflect.Descriptor instead.
 func (*Error) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{74}
+	return file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *Error) GetStatus() int32 {
@@ -9505,7 +10238,85 @@ const file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc = "" +
 	"\vtotal_count\x18\x03 \x01(\x03R\n" +
 	"totalCount\x12H\n" +
 	"\x13performance_summary\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x12performanceSummary\x12)\n" +
-	"\x05error\x18\x05 \x01(\v2\x13.activity_svc.ErrorR\x05error\"\x14\n" +
+	"\x05error\x18\x05 \x01(\v2\x13.activity_svc.ErrorR\x05error\"m\n" +
+	"\x17GetTrendingBlogsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"time_range\x18\x02 \x01(\tR\ttimeRange\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"i\n" +
+	"\fTrendingBlog\x12\x17\n" +
+	"\ablog_id\x18\x01 \x01(\tR\x06blogId\x12\x14\n" +
+	"\x05views\x18\x02 \x01(\x03R\x05views\x12\x14\n" +
+	"\x05likes\x18\x03 \x01(\x03R\x05likes\x12\x14\n" +
+	"\x05score\x18\x04 \x01(\x01R\x05score\"\x98\x01\n" +
+	"\x18GetTrendingBlogsResponse\x12\x1f\n" +
+	"\vstatus_code\x18\x01 \x01(\x05R\n" +
+	"statusCode\x120\n" +
+	"\x05blogs\x18\x02 \x03(\v2\x1a.activity_svc.TrendingBlogR\x05blogs\x12)\n" +
+	"\x05error\x18\x03 \x01(\v2\x13.activity_svc.ErrorR\x05error\"U\n" +
+	"\x15GetActiveUsersRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"time_range\x18\x02 \x01(\tR\ttimeRange\"b\n" +
+	"\n" +
+	"ActiveUser\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12;\n" +
+	"\vlast_active\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastActive\"\xbe\x01\n" +
+	"\x16GetActiveUsersResponse\x12\x1f\n" +
+	"\vstatus_code\x18\x01 \x01(\x05R\n" +
+	"statusCode\x12!\n" +
+	"\factive_users\x18\x02 \x01(\x03R\vactiveUsers\x12)\n" +
+	"\x05error\x18\x03 \x01(\v2\x13.activity_svc.ErrorR\x05error\x125\n" +
+	"\tuser_list\x18\x04 \x03(\v2\x18.activity_svc.ActiveUserR\buserList\"\xb0\x02\n" +
+	"\x1bGetAccountActivitiesRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12:\n" +
+	"\bcategory\x18\x02 \x01(\x0e2\x1e.activity_svc.ActivityCategoryR\bcategory\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action\x129\n" +
+	"\n" +
+	"start_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
+	"\bend_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\a \x01(\x05R\x06offset\"\xc8\x01\n" +
+	"\x1cGetAccountActivitiesResponse\x12\x1f\n" +
+	"\vstatus_code\x18\x01 \x01(\x05R\n" +
+	"statusCode\x12;\n" +
+	"\n" +
+	"activities\x18\x02 \x03(\v2\x1b.activity_svc.ActivityEventR\n" +
+	"activities\x12\x1f\n" +
+	"\vtotal_count\x18\x03 \x01(\x03R\n" +
+	"totalCount\x12)\n" +
+	"\x05error\x18\x04 \x01(\v2\x13.activity_svc.ErrorR\x05error\"[\n" +
+	"\x1bGetAdvancedAnalyticsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"time_range\x18\x02 \x01(\tR\ttimeRange\"\xba\x05\n" +
+	"\x11AdvancedAnalytics\x12%\n" +
+	"\x0eretention_rate\x18\x01 \x01(\x01R\rretentionRate\x12\x1b\n" +
+	"\tnew_users\x18\x02 \x01(\x03R\bnewUsers\x12'\n" +
+	"\x0freturning_users\x18\x03 \x01(\x03R\x0ereturningUsers\x12D\n" +
+	"\x11conversion_funnel\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x10conversionFunnel\x12h\n" +
+	"\x13geographic_hotspots\x18\x05 \x03(\v27.activity_svc.AdvancedAnalytics.GeographicHotspotsEntryR\x12geographicHotspots\x12c\n" +
+	"\x12peak_reading_times\x18\x06 \x03(\v25.activity_svc.AdvancedAnalytics.PeakReadingTimesEntryR\x10peakReadingTimes\x12V\n" +
+	"\rplatform_bias\x18\a \x03(\v21.activity_svc.AdvancedAnalytics.PlatformBiasEntryR\fplatformBias\x1aE\n" +
+	"\x17GeographicHotspotsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\x1aC\n" +
+	"\x15PeakReadingTimesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\x1a?\n" +
+	"\x11PlatformBiasEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xa9\x01\n" +
+	"\x1cGetAdvancedAnalyticsResponse\x12\x1f\n" +
+	"\vstatus_code\x18\x01 \x01(\x05R\n" +
+	"statusCode\x12=\n" +
+	"\tanalytics\x18\x02 \x01(\v2\x1f.activity_svc.AdvancedAnalyticsR\tanalytics\x12)\n" +
+	"\x05error\x18\x03 \x01(\v2\x13.activity_svc.ErrorR\x05error\"\x14\n" +
 	"\x12HealthCheckRequest\"\xc5\x01\n" +
 	"\x13HealthCheckResponse\x12\x1f\n" +
 	"\vstatus_code\x18\x01 \x01(\x05R\n" +
@@ -9578,7 +10389,7 @@ const file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc = "" +
 	"\x1fNOTIFICATION_TYPE_TRANSACTIONAL\x10\x02\x12\x1c\n" +
 	"\x18NOTIFICATION_TYPE_SYSTEM\x10\x03\x12\x1b\n" +
 	"\x17NOTIFICATION_TYPE_ALERT\x10\x04\x12\x1e\n" +
-	"\x1aNOTIFICATION_TYPE_SECURITY\x10\x052\xa4\x18\n" +
+	"\x1aNOTIFICATION_TYPE_SECURITY\x10\x052\xc2\x1b\n" +
 	"\x0fActivityService\x12X\n" +
 	"\rTrackActivity\x12\".activity_svc.TrackActivityRequest\x1a#.activity_svc.TrackActivityResponse\x12d\n" +
 	"\x11GetUserActivities\x12&.activity_svc.GetUserActivitiesRequest\x1a'.activity_svc.GetUserActivitiesResponse\x12m\n" +
@@ -9606,7 +10417,11 @@ const file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc = "" +
 	"\x13TrackSearchActivity\x12(.activity_svc.TrackSearchActivityRequest\x1a).activity_svc.TrackSearchActivityResponse\x12g\n" +
 	"\x12GetSearchAnalytics\x12'.activity_svc.GetSearchAnalyticsRequest\x1a(.activity_svc.GetSearchAnalyticsResponse\x12p\n" +
 	"\x15TrackPerformanceEvent\x12*.activity_svc.TrackPerformanceEventRequest\x1a+.activity_svc.TrackPerformanceEventResponse\x12v\n" +
-	"\x17GetPerformanceAnalytics\x12,.activity_svc.GetPerformanceAnalyticsRequest\x1a-.activity_svc.GetPerformanceAnalyticsResponse\x12R\n" +
+	"\x17GetPerformanceAnalytics\x12,.activity_svc.GetPerformanceAnalyticsRequest\x1a-.activity_svc.GetPerformanceAnalyticsResponse\x12a\n" +
+	"\x10GetTrendingBlogs\x12%.activity_svc.GetTrendingBlogsRequest\x1a&.activity_svc.GetTrendingBlogsResponse\x12[\n" +
+	"\x0eGetActiveUsers\x12#.activity_svc.GetActiveUsersRequest\x1a$.activity_svc.GetActiveUsersResponse\x12m\n" +
+	"\x14GetAccountActivities\x12).activity_svc.GetAccountActivitiesRequest\x1a*.activity_svc.GetAccountActivitiesResponse\x12m\n" +
+	"\x14GetAdvancedAnalytics\x12).activity_svc.GetAdvancedAnalyticsRequest\x1a*.activity_svc.GetAdvancedAnalyticsResponse\x12R\n" +
 	"\vHealthCheck\x12 .activity_svc.HealthCheckRequest\x1a!.activity_svc.HealthCheckResponseB(Z&./apis/serviceconn/gateway_activity/pbb\x06proto3"
 
 var (
@@ -9622,7 +10437,7 @@ func file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDescGZIP() [
 }
 
 var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes = make([]protoimpl.MessageInfo, 75)
+var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_msgTypes = make([]protoimpl.MessageInfo, 89)
 var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_goTypes = []any{
 	(ActivityCategory)(0),                          // 0: activity_svc.ActivityCategory
 	(Severity)(0),                                  // 1: activity_svc.Severity
@@ -9703,244 +10518,282 @@ var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_goTypes = []any{
 	(*TrackPerformanceEventResponse)(nil),          // 76: activity_svc.TrackPerformanceEventResponse
 	(*GetPerformanceAnalyticsRequest)(nil),         // 77: activity_svc.GetPerformanceAnalyticsRequest
 	(*GetPerformanceAnalyticsResponse)(nil),        // 78: activity_svc.GetPerformanceAnalyticsResponse
-	(*HealthCheckRequest)(nil),                     // 79: activity_svc.HealthCheckRequest
-	(*HealthCheckResponse)(nil),                    // 80: activity_svc.HealthCheckResponse
-	(*Error)(nil),                                  // 81: activity_svc.Error
-	(*structpb.Struct)(nil),                        // 82: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),                  // 83: google.protobuf.Timestamp
+	(*GetTrendingBlogsRequest)(nil),                // 79: activity_svc.GetTrendingBlogsRequest
+	(*TrendingBlog)(nil),                           // 80: activity_svc.TrendingBlog
+	(*GetTrendingBlogsResponse)(nil),               // 81: activity_svc.GetTrendingBlogsResponse
+	(*GetActiveUsersRequest)(nil),                  // 82: activity_svc.GetActiveUsersRequest
+	(*ActiveUser)(nil),                             // 83: activity_svc.ActiveUser
+	(*GetActiveUsersResponse)(nil),                 // 84: activity_svc.GetActiveUsersResponse
+	(*GetAccountActivitiesRequest)(nil),            // 85: activity_svc.GetAccountActivitiesRequest
+	(*GetAccountActivitiesResponse)(nil),           // 86: activity_svc.GetAccountActivitiesResponse
+	(*GetAdvancedAnalyticsRequest)(nil),            // 87: activity_svc.GetAdvancedAnalyticsRequest
+	(*AdvancedAnalytics)(nil),                      // 88: activity_svc.AdvancedAnalytics
+	(*GetAdvancedAnalyticsResponse)(nil),           // 89: activity_svc.GetAdvancedAnalyticsResponse
+	(*HealthCheckRequest)(nil),                     // 90: activity_svc.HealthCheckRequest
+	(*HealthCheckResponse)(nil),                    // 91: activity_svc.HealthCheckResponse
+	(*Error)(nil),                                  // 92: activity_svc.Error
+	nil,                                            // 93: activity_svc.AdvancedAnalytics.GeographicHotspotsEntry
+	nil,                                            // 94: activity_svc.AdvancedAnalytics.PeakReadingTimesEntry
+	nil,                                            // 95: activity_svc.AdvancedAnalytics.PlatformBiasEntry
+	(*structpb.Struct)(nil),                        // 96: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),                  // 97: google.protobuf.Timestamp
 }
 var file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_depIdxs = []int32{
 	0,   // 0: activity_svc.ActivityEvent.category:type_name -> activity_svc.ActivityCategory
 	24,  // 1: activity_svc.ActivityEvent.client_info:type_name -> activity_svc.ClientInfo
-	82,  // 2: activity_svc.ActivityEvent.metadata:type_name -> google.protobuf.Struct
-	83,  // 3: activity_svc.ActivityEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 4: activity_svc.ActivityEvent.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 2: activity_svc.ActivityEvent.metadata:type_name -> google.protobuf.Struct
+	97,  // 3: activity_svc.ActivityEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 4: activity_svc.ActivityEvent.created_at:type_name -> google.protobuf.Timestamp
 	1,   // 5: activity_svc.SecurityEvent.severity:type_name -> activity_svc.Severity
 	9,   // 6: activity_svc.SecurityEvent.context:type_name -> activity_svc.SecurityContext
-	83,  // 7: activity_svc.SecurityEvent.resolved_at:type_name -> google.protobuf.Timestamp
-	83,  // 8: activity_svc.SecurityEvent.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 9: activity_svc.SecurityEvent.updated_at:type_name -> google.protobuf.Timestamp
-	83,  // 10: activity_svc.SecurityContext.last_success:type_name -> google.protobuf.Timestamp
-	82,  // 11: activity_svc.SecurityContext.patterns:type_name -> google.protobuf.Struct
-	82,  // 12: activity_svc.UserBehaviorAnalytics.category_breakdown:type_name -> google.protobuf.Struct
-	82,  // 13: activity_svc.UserBehaviorAnalytics.action_frequency:type_name -> google.protobuf.Struct
+	97,  // 7: activity_svc.SecurityEvent.resolved_at:type_name -> google.protobuf.Timestamp
+	97,  // 8: activity_svc.SecurityEvent.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 9: activity_svc.SecurityEvent.updated_at:type_name -> google.protobuf.Timestamp
+	97,  // 10: activity_svc.SecurityContext.last_success:type_name -> google.protobuf.Timestamp
+	96,  // 11: activity_svc.SecurityContext.patterns:type_name -> google.protobuf.Struct
+	96,  // 12: activity_svc.UserBehaviorAnalytics.category_breakdown:type_name -> google.protobuf.Struct
+	96,  // 13: activity_svc.UserBehaviorAnalytics.action_frequency:type_name -> google.protobuf.Struct
 	11,  // 14: activity_svc.UserBehaviorAnalytics.hourly_pattern:type_name -> activity_svc.HourlyActivity
-	82,  // 15: activity_svc.UserBehaviorAnalytics.device_usage:type_name -> google.protobuf.Struct
+	96,  // 15: activity_svc.UserBehaviorAnalytics.device_usage:type_name -> google.protobuf.Struct
 	12,  // 16: activity_svc.UserBehaviorAnalytics.location_pattern:type_name -> activity_svc.LocationActivity
-	83,  // 17: activity_svc.UserBehaviorAnalytics.last_activity:type_name -> google.protobuf.Timestamp
-	83,  // 18: activity_svc.UserBehaviorAnalytics.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 19: activity_svc.UserBehaviorAnalytics.updated_at:type_name -> google.protobuf.Timestamp
+	97,  // 17: activity_svc.UserBehaviorAnalytics.last_activity:type_name -> google.protobuf.Timestamp
+	97,  // 18: activity_svc.UserBehaviorAnalytics.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 19: activity_svc.UserBehaviorAnalytics.updated_at:type_name -> google.protobuf.Timestamp
 	4,   // 20: activity_svc.ReadingBehaviorAnalytics.device_type:type_name -> activity_svc.DeviceType
-	83,  // 21: activity_svc.ReadingBehaviorAnalytics.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 22: activity_svc.ReadingBehaviorAnalytics.created_at:type_name -> google.protobuf.Timestamp
-	82,  // 23: activity_svc.RecommendationInteraction.context:type_name -> google.protobuf.Struct
-	83,  // 24: activity_svc.RecommendationInteraction.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 25: activity_svc.RecommendationInteraction.created_at:type_name -> google.protobuf.Timestamp
-	82,  // 26: activity_svc.ContentInteraction.context:type_name -> google.protobuf.Struct
-	83,  // 27: activity_svc.ContentInteraction.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 28: activity_svc.ContentInteraction.created_at:type_name -> google.protobuf.Timestamp
-	82,  // 29: activity_svc.SearchActivity.filters:type_name -> google.protobuf.Struct
-	82,  // 30: activity_svc.SearchActivity.context:type_name -> google.protobuf.Struct
-	83,  // 31: activity_svc.SearchActivity.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 32: activity_svc.SearchActivity.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 21: activity_svc.ReadingBehaviorAnalytics.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 22: activity_svc.ReadingBehaviorAnalytics.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 23: activity_svc.RecommendationInteraction.context:type_name -> google.protobuf.Struct
+	97,  // 24: activity_svc.RecommendationInteraction.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 25: activity_svc.RecommendationInteraction.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 26: activity_svc.ContentInteraction.context:type_name -> google.protobuf.Struct
+	97,  // 27: activity_svc.ContentInteraction.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 28: activity_svc.ContentInteraction.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 29: activity_svc.SearchActivity.filters:type_name -> google.protobuf.Struct
+	96,  // 30: activity_svc.SearchActivity.context:type_name -> google.protobuf.Struct
+	97,  // 31: activity_svc.SearchActivity.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 32: activity_svc.SearchActivity.created_at:type_name -> google.protobuf.Timestamp
 	6,   // 33: activity_svc.NotificationEvent.type:type_name -> activity_svc.NotificationType
 	5,   // 34: activity_svc.NotificationEvent.channel:type_name -> activity_svc.NotificationChannel
-	83,  // 35: activity_svc.NotificationEvent.open_time:type_name -> google.protobuf.Timestamp
-	83,  // 36: activity_svc.NotificationEvent.click_time:type_name -> google.protobuf.Timestamp
-	82,  // 37: activity_svc.NotificationEvent.device_info:type_name -> google.protobuf.Struct
-	82,  // 38: activity_svc.NotificationEvent.location_info:type_name -> google.protobuf.Struct
-	83,  // 39: activity_svc.NotificationEvent.unsubscribe_time:type_name -> google.protobuf.Timestamp
-	82,  // 40: activity_svc.NotificationEvent.context:type_name -> google.protobuf.Struct
-	83,  // 41: activity_svc.NotificationEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 42: activity_svc.NotificationEvent.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 43: activity_svc.NotificationEvent.updated_at:type_name -> google.protobuf.Timestamp
-	82,  // 44: activity_svc.FinancialEvent.context:type_name -> google.protobuf.Struct
-	83,  // 45: activity_svc.FinancialEvent.processed_at:type_name -> google.protobuf.Timestamp
-	83,  // 46: activity_svc.FinancialEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 47: activity_svc.FinancialEvent.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 48: activity_svc.FinancialEvent.updated_at:type_name -> google.protobuf.Timestamp
+	97,  // 35: activity_svc.NotificationEvent.open_time:type_name -> google.protobuf.Timestamp
+	97,  // 36: activity_svc.NotificationEvent.click_time:type_name -> google.protobuf.Timestamp
+	96,  // 37: activity_svc.NotificationEvent.device_info:type_name -> google.protobuf.Struct
+	96,  // 38: activity_svc.NotificationEvent.location_info:type_name -> google.protobuf.Struct
+	97,  // 39: activity_svc.NotificationEvent.unsubscribe_time:type_name -> google.protobuf.Timestamp
+	96,  // 40: activity_svc.NotificationEvent.context:type_name -> google.protobuf.Struct
+	97,  // 41: activity_svc.NotificationEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 42: activity_svc.NotificationEvent.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 43: activity_svc.NotificationEvent.updated_at:type_name -> google.protobuf.Timestamp
+	96,  // 44: activity_svc.FinancialEvent.context:type_name -> google.protobuf.Struct
+	97,  // 45: activity_svc.FinancialEvent.processed_at:type_name -> google.protobuf.Timestamp
+	97,  // 46: activity_svc.FinancialEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 47: activity_svc.FinancialEvent.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 48: activity_svc.FinancialEvent.updated_at:type_name -> google.protobuf.Timestamp
 	2,   // 49: activity_svc.UserJourneyEvent.journey_stage:type_name -> activity_svc.JourneyStage
-	82,  // 50: activity_svc.UserJourneyEvent.context:type_name -> google.protobuf.Struct
-	83,  // 51: activity_svc.UserJourneyEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 52: activity_svc.UserJourneyEvent.created_at:type_name -> google.protobuf.Timestamp
-	82,  // 53: activity_svc.IntegrationEvent.context:type_name -> google.protobuf.Struct
-	83,  // 54: activity_svc.IntegrationEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 55: activity_svc.IntegrationEvent.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 50: activity_svc.UserJourneyEvent.context:type_name -> google.protobuf.Struct
+	97,  // 51: activity_svc.UserJourneyEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 52: activity_svc.UserJourneyEvent.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 53: activity_svc.IntegrationEvent.context:type_name -> google.protobuf.Struct
+	97,  // 54: activity_svc.IntegrationEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 55: activity_svc.IntegrationEvent.created_at:type_name -> google.protobuf.Timestamp
 	1,   // 56: activity_svc.IncidentEvent.severity:type_name -> activity_svc.Severity
-	82,  // 57: activity_svc.IncidentEvent.forensic_data:type_name -> google.protobuf.Struct
-	82,  // 58: activity_svc.IncidentEvent.context:type_name -> google.protobuf.Struct
-	83,  // 59: activity_svc.IncidentEvent.detected_at:type_name -> google.protobuf.Timestamp
-	83,  // 60: activity_svc.IncidentEvent.resolved_at:type_name -> google.protobuf.Timestamp
-	83,  // 61: activity_svc.IncidentEvent.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 62: activity_svc.IncidentEvent.updated_at:type_name -> google.protobuf.Timestamp
-	82,  // 63: activity_svc.ComplianceEvent.request_data:type_name -> google.protobuf.Struct
-	82,  // 64: activity_svc.ComplianceEvent.response_data:type_name -> google.protobuf.Struct
-	83,  // 65: activity_svc.ComplianceEvent.completed_at:type_name -> google.protobuf.Timestamp
-	83,  // 66: activity_svc.ComplianceEvent.created_at:type_name -> google.protobuf.Timestamp
-	83,  // 67: activity_svc.ComplianceEvent.updated_at:type_name -> google.protobuf.Timestamp
-	82,  // 68: activity_svc.PerformanceEvent.context:type_name -> google.protobuf.Struct
-	83,  // 69: activity_svc.PerformanceEvent.timestamp:type_name -> google.protobuf.Timestamp
-	83,  // 70: activity_svc.PerformanceEvent.created_at:type_name -> google.protobuf.Timestamp
+	96,  // 57: activity_svc.IncidentEvent.forensic_data:type_name -> google.protobuf.Struct
+	96,  // 58: activity_svc.IncidentEvent.context:type_name -> google.protobuf.Struct
+	97,  // 59: activity_svc.IncidentEvent.detected_at:type_name -> google.protobuf.Timestamp
+	97,  // 60: activity_svc.IncidentEvent.resolved_at:type_name -> google.protobuf.Timestamp
+	97,  // 61: activity_svc.IncidentEvent.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 62: activity_svc.IncidentEvent.updated_at:type_name -> google.protobuf.Timestamp
+	96,  // 63: activity_svc.ComplianceEvent.request_data:type_name -> google.protobuf.Struct
+	96,  // 64: activity_svc.ComplianceEvent.response_data:type_name -> google.protobuf.Struct
+	97,  // 65: activity_svc.ComplianceEvent.completed_at:type_name -> google.protobuf.Timestamp
+	97,  // 66: activity_svc.ComplianceEvent.created_at:type_name -> google.protobuf.Timestamp
+	97,  // 67: activity_svc.ComplianceEvent.updated_at:type_name -> google.protobuf.Timestamp
+	96,  // 68: activity_svc.PerformanceEvent.context:type_name -> google.protobuf.Struct
+	97,  // 69: activity_svc.PerformanceEvent.timestamp:type_name -> google.protobuf.Timestamp
+	97,  // 70: activity_svc.PerformanceEvent.created_at:type_name -> google.protobuf.Timestamp
 	3,   // 71: activity_svc.ClientInfo.platform:type_name -> activity_svc.Platform
 	4,   // 72: activity_svc.ClientInfo.device_type:type_name -> activity_svc.DeviceType
 	0,   // 73: activity_svc.TrackActivityRequest.category:type_name -> activity_svc.ActivityCategory
 	24,  // 74: activity_svc.TrackActivityRequest.client_info:type_name -> activity_svc.ClientInfo
-	82,  // 75: activity_svc.TrackActivityRequest.metadata:type_name -> google.protobuf.Struct
-	81,  // 76: activity_svc.TrackActivityResponse.error:type_name -> activity_svc.Error
+	96,  // 75: activity_svc.TrackActivityRequest.metadata:type_name -> google.protobuf.Struct
+	92,  // 76: activity_svc.TrackActivityResponse.error:type_name -> activity_svc.Error
 	0,   // 77: activity_svc.GetUserActivitiesRequest.category:type_name -> activity_svc.ActivityCategory
-	83,  // 78: activity_svc.GetUserActivitiesRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 79: activity_svc.GetUserActivitiesRequest.end_time:type_name -> google.protobuf.Timestamp
+	97,  // 78: activity_svc.GetUserActivitiesRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 79: activity_svc.GetUserActivitiesRequest.end_time:type_name -> google.protobuf.Timestamp
 	7,   // 80: activity_svc.GetUserActivitiesResponse.activities:type_name -> activity_svc.ActivityEvent
-	81,  // 81: activity_svc.GetUserActivitiesResponse.error:type_name -> activity_svc.Error
+	92,  // 81: activity_svc.GetUserActivitiesResponse.error:type_name -> activity_svc.Error
 	0,   // 82: activity_svc.GetActivityAnalyticsRequest.categories:type_name -> activity_svc.ActivityCategory
 	10,  // 83: activity_svc.GetActivityAnalyticsResponse.analytics:type_name -> activity_svc.UserBehaviorAnalytics
-	81,  // 84: activity_svc.GetActivityAnalyticsResponse.error:type_name -> activity_svc.Error
+	92,  // 84: activity_svc.GetActivityAnalyticsResponse.error:type_name -> activity_svc.Error
 	1,   // 85: activity_svc.TrackSecurityEventRequest.severity:type_name -> activity_svc.Severity
 	9,   // 86: activity_svc.TrackSecurityEventRequest.context:type_name -> activity_svc.SecurityContext
-	81,  // 87: activity_svc.TrackSecurityEventResponse.error:type_name -> activity_svc.Error
+	92,  // 87: activity_svc.TrackSecurityEventResponse.error:type_name -> activity_svc.Error
 	1,   // 88: activity_svc.GetSecurityEventsRequest.min_severity:type_name -> activity_svc.Severity
-	83,  // 89: activity_svc.GetSecurityEventsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 90: activity_svc.GetSecurityEventsRequest.end_time:type_name -> google.protobuf.Timestamp
+	97,  // 89: activity_svc.GetSecurityEventsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 90: activity_svc.GetSecurityEventsRequest.end_time:type_name -> google.protobuf.Timestamp
 	8,   // 91: activity_svc.GetSecurityEventsResponse.events:type_name -> activity_svc.SecurityEvent
-	81,  // 92: activity_svc.GetSecurityEventsResponse.error:type_name -> activity_svc.Error
+	92,  // 92: activity_svc.GetSecurityEventsResponse.error:type_name -> activity_svc.Error
 	10,  // 93: activity_svc.GetUserBehaviorAnalyticsResponse.analytics:type_name -> activity_svc.UserBehaviorAnalytics
-	81,  // 94: activity_svc.GetUserBehaviorAnalyticsResponse.error:type_name -> activity_svc.Error
+	92,  // 94: activity_svc.GetUserBehaviorAnalyticsResponse.error:type_name -> activity_svc.Error
 	13,  // 95: activity_svc.GetReadingBehaviorResponse.behavior:type_name -> activity_svc.ReadingBehaviorAnalytics
-	81,  // 96: activity_svc.GetReadingBehaviorResponse.error:type_name -> activity_svc.Error
-	82,  // 97: activity_svc.TrackRecommendationInteractionRequest.context:type_name -> google.protobuf.Struct
-	81,  // 98: activity_svc.TrackRecommendationInteractionResponse.error:type_name -> activity_svc.Error
+	92,  // 96: activity_svc.GetReadingBehaviorResponse.error:type_name -> activity_svc.Error
+	96,  // 97: activity_svc.TrackRecommendationInteractionRequest.context:type_name -> google.protobuf.Struct
+	92,  // 98: activity_svc.TrackRecommendationInteractionResponse.error:type_name -> activity_svc.Error
 	14,  // 99: activity_svc.GetRecommendationAnalyticsResponse.interactions:type_name -> activity_svc.RecommendationInteraction
-	82,  // 100: activity_svc.GetRecommendationAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
-	81,  // 101: activity_svc.GetRecommendationAnalyticsResponse.error:type_name -> activity_svc.Error
+	96,  // 100: activity_svc.GetRecommendationAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
+	92,  // 101: activity_svc.GetRecommendationAnalyticsResponse.error:type_name -> activity_svc.Error
 	15,  // 102: activity_svc.GetContentAnalyticsResponse.interactions:type_name -> activity_svc.ContentInteraction
-	82,  // 103: activity_svc.GetContentAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
-	81,  // 104: activity_svc.GetContentAnalyticsResponse.error:type_name -> activity_svc.Error
-	82,  // 105: activity_svc.TrackContentInteractionRequest.context:type_name -> google.protobuf.Struct
-	81,  // 106: activity_svc.TrackContentInteractionResponse.error:type_name -> activity_svc.Error
+	96,  // 103: activity_svc.GetContentAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
+	92,  // 104: activity_svc.GetContentAnalyticsResponse.error:type_name -> activity_svc.Error
+	96,  // 105: activity_svc.TrackContentInteractionRequest.context:type_name -> google.protobuf.Struct
+	92,  // 106: activity_svc.TrackContentInteractionResponse.error:type_name -> activity_svc.Error
 	2,   // 107: activity_svc.TrackUserJourneyRequest.journey_stage:type_name -> activity_svc.JourneyStage
-	82,  // 108: activity_svc.TrackUserJourneyRequest.context:type_name -> google.protobuf.Struct
-	81,  // 109: activity_svc.TrackUserJourneyResponse.error:type_name -> activity_svc.Error
+	96,  // 108: activity_svc.TrackUserJourneyRequest.context:type_name -> google.protobuf.Struct
+	92,  // 109: activity_svc.TrackUserJourneyResponse.error:type_name -> activity_svc.Error
 	2,   // 110: activity_svc.GetUserJourneyAnalyticsRequest.stage:type_name -> activity_svc.JourneyStage
 	19,  // 111: activity_svc.GetUserJourneyAnalyticsResponse.journeys:type_name -> activity_svc.UserJourneyEvent
-	82,  // 112: activity_svc.GetUserJourneyAnalyticsResponse.funnel_analytics:type_name -> google.protobuf.Struct
-	81,  // 113: activity_svc.GetUserJourneyAnalyticsResponse.error:type_name -> activity_svc.Error
+	96,  // 112: activity_svc.GetUserJourneyAnalyticsResponse.funnel_analytics:type_name -> google.protobuf.Struct
+	92,  // 113: activity_svc.GetUserJourneyAnalyticsResponse.error:type_name -> activity_svc.Error
 	6,   // 114: activity_svc.TrackNotificationEventRequest.type:type_name -> activity_svc.NotificationType
 	5,   // 115: activity_svc.TrackNotificationEventRequest.channel:type_name -> activity_svc.NotificationChannel
-	82,  // 116: activity_svc.TrackNotificationEventRequest.device_info:type_name -> google.protobuf.Struct
-	82,  // 117: activity_svc.TrackNotificationEventRequest.location_info:type_name -> google.protobuf.Struct
-	82,  // 118: activity_svc.TrackNotificationEventRequest.context:type_name -> google.protobuf.Struct
-	81,  // 119: activity_svc.TrackNotificationEventResponse.error:type_name -> activity_svc.Error
+	96,  // 116: activity_svc.TrackNotificationEventRequest.device_info:type_name -> google.protobuf.Struct
+	96,  // 117: activity_svc.TrackNotificationEventRequest.location_info:type_name -> google.protobuf.Struct
+	96,  // 118: activity_svc.TrackNotificationEventRequest.context:type_name -> google.protobuf.Struct
+	92,  // 119: activity_svc.TrackNotificationEventResponse.error:type_name -> activity_svc.Error
 	6,   // 120: activity_svc.GetNotificationAnalyticsRequest.type:type_name -> activity_svc.NotificationType
 	5,   // 121: activity_svc.GetNotificationAnalyticsRequest.channel:type_name -> activity_svc.NotificationChannel
 	17,  // 122: activity_svc.GetNotificationAnalyticsResponse.notifications:type_name -> activity_svc.NotificationEvent
-	82,  // 123: activity_svc.GetNotificationAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
-	81,  // 124: activity_svc.GetNotificationAnalyticsResponse.error:type_name -> activity_svc.Error
-	82,  // 125: activity_svc.TrackFinancialEventRequest.context:type_name -> google.protobuf.Struct
-	81,  // 126: activity_svc.TrackFinancialEventResponse.error:type_name -> activity_svc.Error
-	83,  // 127: activity_svc.GetFinancialEventsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 128: activity_svc.GetFinancialEventsRequest.end_time:type_name -> google.protobuf.Timestamp
+	96,  // 123: activity_svc.GetNotificationAnalyticsResponse.analytics_summary:type_name -> google.protobuf.Struct
+	92,  // 124: activity_svc.GetNotificationAnalyticsResponse.error:type_name -> activity_svc.Error
+	96,  // 125: activity_svc.TrackFinancialEventRequest.context:type_name -> google.protobuf.Struct
+	92,  // 126: activity_svc.TrackFinancialEventResponse.error:type_name -> activity_svc.Error
+	97,  // 127: activity_svc.GetFinancialEventsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 128: activity_svc.GetFinancialEventsRequest.end_time:type_name -> google.protobuf.Timestamp
 	18,  // 129: activity_svc.GetFinancialEventsResponse.events:type_name -> activity_svc.FinancialEvent
-	82,  // 130: activity_svc.GetFinancialEventsResponse.financial_summary:type_name -> google.protobuf.Struct
-	81,  // 131: activity_svc.GetFinancialEventsResponse.error:type_name -> activity_svc.Error
-	82,  // 132: activity_svc.TrackIntegrationEventRequest.context:type_name -> google.protobuf.Struct
-	81,  // 133: activity_svc.TrackIntegrationEventResponse.error:type_name -> activity_svc.Error
-	83,  // 134: activity_svc.GetIntegrationEventsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 135: activity_svc.GetIntegrationEventsRequest.end_time:type_name -> google.protobuf.Timestamp
+	96,  // 130: activity_svc.GetFinancialEventsResponse.financial_summary:type_name -> google.protobuf.Struct
+	92,  // 131: activity_svc.GetFinancialEventsResponse.error:type_name -> activity_svc.Error
+	96,  // 132: activity_svc.TrackIntegrationEventRequest.context:type_name -> google.protobuf.Struct
+	92,  // 133: activity_svc.TrackIntegrationEventResponse.error:type_name -> activity_svc.Error
+	97,  // 134: activity_svc.GetIntegrationEventsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 135: activity_svc.GetIntegrationEventsRequest.end_time:type_name -> google.protobuf.Timestamp
 	20,  // 136: activity_svc.GetIntegrationEventsResponse.events:type_name -> activity_svc.IntegrationEvent
-	82,  // 137: activity_svc.GetIntegrationEventsResponse.integration_summary:type_name -> google.protobuf.Struct
-	81,  // 138: activity_svc.GetIntegrationEventsResponse.error:type_name -> activity_svc.Error
+	96,  // 137: activity_svc.GetIntegrationEventsResponse.integration_summary:type_name -> google.protobuf.Struct
+	92,  // 138: activity_svc.GetIntegrationEventsResponse.error:type_name -> activity_svc.Error
 	1,   // 139: activity_svc.TrackIncidentEventRequest.severity:type_name -> activity_svc.Severity
-	82,  // 140: activity_svc.TrackIncidentEventRequest.forensic_data:type_name -> google.protobuf.Struct
-	82,  // 141: activity_svc.TrackIncidentEventRequest.context:type_name -> google.protobuf.Struct
-	81,  // 142: activity_svc.TrackIncidentEventResponse.error:type_name -> activity_svc.Error
+	96,  // 140: activity_svc.TrackIncidentEventRequest.forensic_data:type_name -> google.protobuf.Struct
+	96,  // 141: activity_svc.TrackIncidentEventRequest.context:type_name -> google.protobuf.Struct
+	92,  // 142: activity_svc.TrackIncidentEventResponse.error:type_name -> activity_svc.Error
 	1,   // 143: activity_svc.GetIncidentEventsRequest.min_severity:type_name -> activity_svc.Severity
-	83,  // 144: activity_svc.GetIncidentEventsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 145: activity_svc.GetIncidentEventsRequest.end_time:type_name -> google.protobuf.Timestamp
+	97,  // 144: activity_svc.GetIncidentEventsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 145: activity_svc.GetIncidentEventsRequest.end_time:type_name -> google.protobuf.Timestamp
 	21,  // 146: activity_svc.GetIncidentEventsResponse.events:type_name -> activity_svc.IncidentEvent
-	82,  // 147: activity_svc.GetIncidentEventsResponse.incident_summary:type_name -> google.protobuf.Struct
-	81,  // 148: activity_svc.GetIncidentEventsResponse.error:type_name -> activity_svc.Error
-	82,  // 149: activity_svc.TrackComplianceEventRequest.request_data:type_name -> google.protobuf.Struct
-	82,  // 150: activity_svc.TrackComplianceEventRequest.response_data:type_name -> google.protobuf.Struct
-	81,  // 151: activity_svc.TrackComplianceEventResponse.error:type_name -> activity_svc.Error
-	83,  // 152: activity_svc.GetComplianceEventsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 153: activity_svc.GetComplianceEventsRequest.end_time:type_name -> google.protobuf.Timestamp
+	96,  // 147: activity_svc.GetIncidentEventsResponse.incident_summary:type_name -> google.protobuf.Struct
+	92,  // 148: activity_svc.GetIncidentEventsResponse.error:type_name -> activity_svc.Error
+	96,  // 149: activity_svc.TrackComplianceEventRequest.request_data:type_name -> google.protobuf.Struct
+	96,  // 150: activity_svc.TrackComplianceEventRequest.response_data:type_name -> google.protobuf.Struct
+	92,  // 151: activity_svc.TrackComplianceEventResponse.error:type_name -> activity_svc.Error
+	97,  // 152: activity_svc.GetComplianceEventsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 153: activity_svc.GetComplianceEventsRequest.end_time:type_name -> google.protobuf.Timestamp
 	22,  // 154: activity_svc.GetComplianceEventsResponse.events:type_name -> activity_svc.ComplianceEvent
-	81,  // 155: activity_svc.GetComplianceEventsResponse.error:type_name -> activity_svc.Error
-	82,  // 156: activity_svc.TrackSearchActivityRequest.filters:type_name -> google.protobuf.Struct
-	82,  // 157: activity_svc.TrackSearchActivityRequest.context:type_name -> google.protobuf.Struct
-	81,  // 158: activity_svc.TrackSearchActivityResponse.error:type_name -> activity_svc.Error
+	92,  // 155: activity_svc.GetComplianceEventsResponse.error:type_name -> activity_svc.Error
+	96,  // 156: activity_svc.TrackSearchActivityRequest.filters:type_name -> google.protobuf.Struct
+	96,  // 157: activity_svc.TrackSearchActivityRequest.context:type_name -> google.protobuf.Struct
+	92,  // 158: activity_svc.TrackSearchActivityResponse.error:type_name -> activity_svc.Error
 	16,  // 159: activity_svc.GetSearchAnalyticsResponse.searches:type_name -> activity_svc.SearchActivity
-	82,  // 160: activity_svc.GetSearchAnalyticsResponse.search_summary:type_name -> google.protobuf.Struct
-	81,  // 161: activity_svc.GetSearchAnalyticsResponse.error:type_name -> activity_svc.Error
-	82,  // 162: activity_svc.TrackPerformanceEventRequest.context:type_name -> google.protobuf.Struct
-	81,  // 163: activity_svc.TrackPerformanceEventResponse.error:type_name -> activity_svc.Error
-	83,  // 164: activity_svc.GetPerformanceAnalyticsRequest.start_time:type_name -> google.protobuf.Timestamp
-	83,  // 165: activity_svc.GetPerformanceAnalyticsRequest.end_time:type_name -> google.protobuf.Timestamp
+	96,  // 160: activity_svc.GetSearchAnalyticsResponse.search_summary:type_name -> google.protobuf.Struct
+	92,  // 161: activity_svc.GetSearchAnalyticsResponse.error:type_name -> activity_svc.Error
+	96,  // 162: activity_svc.TrackPerformanceEventRequest.context:type_name -> google.protobuf.Struct
+	92,  // 163: activity_svc.TrackPerformanceEventResponse.error:type_name -> activity_svc.Error
+	97,  // 164: activity_svc.GetPerformanceAnalyticsRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 165: activity_svc.GetPerformanceAnalyticsRequest.end_time:type_name -> google.protobuf.Timestamp
 	23,  // 166: activity_svc.GetPerformanceAnalyticsResponse.events:type_name -> activity_svc.PerformanceEvent
-	82,  // 167: activity_svc.GetPerformanceAnalyticsResponse.performance_summary:type_name -> google.protobuf.Struct
-	81,  // 168: activity_svc.GetPerformanceAnalyticsResponse.error:type_name -> activity_svc.Error
-	83,  // 169: activity_svc.HealthCheckResponse.timestamp:type_name -> google.protobuf.Timestamp
-	25,  // 170: activity_svc.ActivityService.TrackActivity:input_type -> activity_svc.TrackActivityRequest
-	27,  // 171: activity_svc.ActivityService.GetUserActivities:input_type -> activity_svc.GetUserActivitiesRequest
-	29,  // 172: activity_svc.ActivityService.GetActivityAnalytics:input_type -> activity_svc.GetActivityAnalyticsRequest
-	31,  // 173: activity_svc.ActivityService.TrackSecurityEvent:input_type -> activity_svc.TrackSecurityEventRequest
-	33,  // 174: activity_svc.ActivityService.GetSecurityEvents:input_type -> activity_svc.GetSecurityEventsRequest
-	35,  // 175: activity_svc.ActivityService.GetUserBehaviorAnalytics:input_type -> activity_svc.GetUserBehaviorAnalyticsRequest
-	37,  // 176: activity_svc.ActivityService.GetReadingBehavior:input_type -> activity_svc.GetReadingBehaviorRequest
-	39,  // 177: activity_svc.ActivityService.TrackRecommendationInteraction:input_type -> activity_svc.TrackRecommendationInteractionRequest
-	41,  // 178: activity_svc.ActivityService.GetRecommendationAnalytics:input_type -> activity_svc.GetRecommendationAnalyticsRequest
-	43,  // 179: activity_svc.ActivityService.GetContentAnalytics:input_type -> activity_svc.GetContentAnalyticsRequest
-	45,  // 180: activity_svc.ActivityService.TrackContentInteraction:input_type -> activity_svc.TrackContentInteractionRequest
-	47,  // 181: activity_svc.ActivityService.TrackUserJourney:input_type -> activity_svc.TrackUserJourneyRequest
-	49,  // 182: activity_svc.ActivityService.GetUserJourneyAnalytics:input_type -> activity_svc.GetUserJourneyAnalyticsRequest
-	51,  // 183: activity_svc.ActivityService.TrackNotificationEvent:input_type -> activity_svc.TrackNotificationEventRequest
-	53,  // 184: activity_svc.ActivityService.GetNotificationAnalytics:input_type -> activity_svc.GetNotificationAnalyticsRequest
-	55,  // 185: activity_svc.ActivityService.TrackFinancialEvent:input_type -> activity_svc.TrackFinancialEventRequest
-	57,  // 186: activity_svc.ActivityService.GetFinancialEvents:input_type -> activity_svc.GetFinancialEventsRequest
-	59,  // 187: activity_svc.ActivityService.TrackIntegrationEvent:input_type -> activity_svc.TrackIntegrationEventRequest
-	61,  // 188: activity_svc.ActivityService.GetIntegrationEvents:input_type -> activity_svc.GetIntegrationEventsRequest
-	63,  // 189: activity_svc.ActivityService.TrackIncidentEvent:input_type -> activity_svc.TrackIncidentEventRequest
-	65,  // 190: activity_svc.ActivityService.GetIncidentEvents:input_type -> activity_svc.GetIncidentEventsRequest
-	67,  // 191: activity_svc.ActivityService.TrackComplianceEvent:input_type -> activity_svc.TrackComplianceEventRequest
-	69,  // 192: activity_svc.ActivityService.GetComplianceEvents:input_type -> activity_svc.GetComplianceEventsRequest
-	71,  // 193: activity_svc.ActivityService.TrackSearchActivity:input_type -> activity_svc.TrackSearchActivityRequest
-	73,  // 194: activity_svc.ActivityService.GetSearchAnalytics:input_type -> activity_svc.GetSearchAnalyticsRequest
-	75,  // 195: activity_svc.ActivityService.TrackPerformanceEvent:input_type -> activity_svc.TrackPerformanceEventRequest
-	77,  // 196: activity_svc.ActivityService.GetPerformanceAnalytics:input_type -> activity_svc.GetPerformanceAnalyticsRequest
-	79,  // 197: activity_svc.ActivityService.HealthCheck:input_type -> activity_svc.HealthCheckRequest
-	26,  // 198: activity_svc.ActivityService.TrackActivity:output_type -> activity_svc.TrackActivityResponse
-	28,  // 199: activity_svc.ActivityService.GetUserActivities:output_type -> activity_svc.GetUserActivitiesResponse
-	30,  // 200: activity_svc.ActivityService.GetActivityAnalytics:output_type -> activity_svc.GetActivityAnalyticsResponse
-	32,  // 201: activity_svc.ActivityService.TrackSecurityEvent:output_type -> activity_svc.TrackSecurityEventResponse
-	34,  // 202: activity_svc.ActivityService.GetSecurityEvents:output_type -> activity_svc.GetSecurityEventsResponse
-	36,  // 203: activity_svc.ActivityService.GetUserBehaviorAnalytics:output_type -> activity_svc.GetUserBehaviorAnalyticsResponse
-	38,  // 204: activity_svc.ActivityService.GetReadingBehavior:output_type -> activity_svc.GetReadingBehaviorResponse
-	40,  // 205: activity_svc.ActivityService.TrackRecommendationInteraction:output_type -> activity_svc.TrackRecommendationInteractionResponse
-	42,  // 206: activity_svc.ActivityService.GetRecommendationAnalytics:output_type -> activity_svc.GetRecommendationAnalyticsResponse
-	44,  // 207: activity_svc.ActivityService.GetContentAnalytics:output_type -> activity_svc.GetContentAnalyticsResponse
-	46,  // 208: activity_svc.ActivityService.TrackContentInteraction:output_type -> activity_svc.TrackContentInteractionResponse
-	48,  // 209: activity_svc.ActivityService.TrackUserJourney:output_type -> activity_svc.TrackUserJourneyResponse
-	50,  // 210: activity_svc.ActivityService.GetUserJourneyAnalytics:output_type -> activity_svc.GetUserJourneyAnalyticsResponse
-	52,  // 211: activity_svc.ActivityService.TrackNotificationEvent:output_type -> activity_svc.TrackNotificationEventResponse
-	54,  // 212: activity_svc.ActivityService.GetNotificationAnalytics:output_type -> activity_svc.GetNotificationAnalyticsResponse
-	56,  // 213: activity_svc.ActivityService.TrackFinancialEvent:output_type -> activity_svc.TrackFinancialEventResponse
-	58,  // 214: activity_svc.ActivityService.GetFinancialEvents:output_type -> activity_svc.GetFinancialEventsResponse
-	60,  // 215: activity_svc.ActivityService.TrackIntegrationEvent:output_type -> activity_svc.TrackIntegrationEventResponse
-	62,  // 216: activity_svc.ActivityService.GetIntegrationEvents:output_type -> activity_svc.GetIntegrationEventsResponse
-	64,  // 217: activity_svc.ActivityService.TrackIncidentEvent:output_type -> activity_svc.TrackIncidentEventResponse
-	66,  // 218: activity_svc.ActivityService.GetIncidentEvents:output_type -> activity_svc.GetIncidentEventsResponse
-	68,  // 219: activity_svc.ActivityService.TrackComplianceEvent:output_type -> activity_svc.TrackComplianceEventResponse
-	70,  // 220: activity_svc.ActivityService.GetComplianceEvents:output_type -> activity_svc.GetComplianceEventsResponse
-	72,  // 221: activity_svc.ActivityService.TrackSearchActivity:output_type -> activity_svc.TrackSearchActivityResponse
-	74,  // 222: activity_svc.ActivityService.GetSearchAnalytics:output_type -> activity_svc.GetSearchAnalyticsResponse
-	76,  // 223: activity_svc.ActivityService.TrackPerformanceEvent:output_type -> activity_svc.TrackPerformanceEventResponse
-	78,  // 224: activity_svc.ActivityService.GetPerformanceAnalytics:output_type -> activity_svc.GetPerformanceAnalyticsResponse
-	80,  // 225: activity_svc.ActivityService.HealthCheck:output_type -> activity_svc.HealthCheckResponse
-	198, // [198:226] is the sub-list for method output_type
-	170, // [170:198] is the sub-list for method input_type
-	170, // [170:170] is the sub-list for extension type_name
-	170, // [170:170] is the sub-list for extension extendee
-	0,   // [0:170] is the sub-list for field type_name
+	96,  // 167: activity_svc.GetPerformanceAnalyticsResponse.performance_summary:type_name -> google.protobuf.Struct
+	92,  // 168: activity_svc.GetPerformanceAnalyticsResponse.error:type_name -> activity_svc.Error
+	80,  // 169: activity_svc.GetTrendingBlogsResponse.blogs:type_name -> activity_svc.TrendingBlog
+	92,  // 170: activity_svc.GetTrendingBlogsResponse.error:type_name -> activity_svc.Error
+	97,  // 171: activity_svc.ActiveUser.last_active:type_name -> google.protobuf.Timestamp
+	92,  // 172: activity_svc.GetActiveUsersResponse.error:type_name -> activity_svc.Error
+	83,  // 173: activity_svc.GetActiveUsersResponse.user_list:type_name -> activity_svc.ActiveUser
+	0,   // 174: activity_svc.GetAccountActivitiesRequest.category:type_name -> activity_svc.ActivityCategory
+	97,  // 175: activity_svc.GetAccountActivitiesRequest.start_time:type_name -> google.protobuf.Timestamp
+	97,  // 176: activity_svc.GetAccountActivitiesRequest.end_time:type_name -> google.protobuf.Timestamp
+	7,   // 177: activity_svc.GetAccountActivitiesResponse.activities:type_name -> activity_svc.ActivityEvent
+	92,  // 178: activity_svc.GetAccountActivitiesResponse.error:type_name -> activity_svc.Error
+	96,  // 179: activity_svc.AdvancedAnalytics.conversion_funnel:type_name -> google.protobuf.Struct
+	93,  // 180: activity_svc.AdvancedAnalytics.geographic_hotspots:type_name -> activity_svc.AdvancedAnalytics.GeographicHotspotsEntry
+	94,  // 181: activity_svc.AdvancedAnalytics.peak_reading_times:type_name -> activity_svc.AdvancedAnalytics.PeakReadingTimesEntry
+	95,  // 182: activity_svc.AdvancedAnalytics.platform_bias:type_name -> activity_svc.AdvancedAnalytics.PlatformBiasEntry
+	88,  // 183: activity_svc.GetAdvancedAnalyticsResponse.analytics:type_name -> activity_svc.AdvancedAnalytics
+	92,  // 184: activity_svc.GetAdvancedAnalyticsResponse.error:type_name -> activity_svc.Error
+	97,  // 185: activity_svc.HealthCheckResponse.timestamp:type_name -> google.protobuf.Timestamp
+	25,  // 186: activity_svc.ActivityService.TrackActivity:input_type -> activity_svc.TrackActivityRequest
+	27,  // 187: activity_svc.ActivityService.GetUserActivities:input_type -> activity_svc.GetUserActivitiesRequest
+	29,  // 188: activity_svc.ActivityService.GetActivityAnalytics:input_type -> activity_svc.GetActivityAnalyticsRequest
+	31,  // 189: activity_svc.ActivityService.TrackSecurityEvent:input_type -> activity_svc.TrackSecurityEventRequest
+	33,  // 190: activity_svc.ActivityService.GetSecurityEvents:input_type -> activity_svc.GetSecurityEventsRequest
+	35,  // 191: activity_svc.ActivityService.GetUserBehaviorAnalytics:input_type -> activity_svc.GetUserBehaviorAnalyticsRequest
+	37,  // 192: activity_svc.ActivityService.GetReadingBehavior:input_type -> activity_svc.GetReadingBehaviorRequest
+	39,  // 193: activity_svc.ActivityService.TrackRecommendationInteraction:input_type -> activity_svc.TrackRecommendationInteractionRequest
+	41,  // 194: activity_svc.ActivityService.GetRecommendationAnalytics:input_type -> activity_svc.GetRecommendationAnalyticsRequest
+	43,  // 195: activity_svc.ActivityService.GetContentAnalytics:input_type -> activity_svc.GetContentAnalyticsRequest
+	45,  // 196: activity_svc.ActivityService.TrackContentInteraction:input_type -> activity_svc.TrackContentInteractionRequest
+	47,  // 197: activity_svc.ActivityService.TrackUserJourney:input_type -> activity_svc.TrackUserJourneyRequest
+	49,  // 198: activity_svc.ActivityService.GetUserJourneyAnalytics:input_type -> activity_svc.GetUserJourneyAnalyticsRequest
+	51,  // 199: activity_svc.ActivityService.TrackNotificationEvent:input_type -> activity_svc.TrackNotificationEventRequest
+	53,  // 200: activity_svc.ActivityService.GetNotificationAnalytics:input_type -> activity_svc.GetNotificationAnalyticsRequest
+	55,  // 201: activity_svc.ActivityService.TrackFinancialEvent:input_type -> activity_svc.TrackFinancialEventRequest
+	57,  // 202: activity_svc.ActivityService.GetFinancialEvents:input_type -> activity_svc.GetFinancialEventsRequest
+	59,  // 203: activity_svc.ActivityService.TrackIntegrationEvent:input_type -> activity_svc.TrackIntegrationEventRequest
+	61,  // 204: activity_svc.ActivityService.GetIntegrationEvents:input_type -> activity_svc.GetIntegrationEventsRequest
+	63,  // 205: activity_svc.ActivityService.TrackIncidentEvent:input_type -> activity_svc.TrackIncidentEventRequest
+	65,  // 206: activity_svc.ActivityService.GetIncidentEvents:input_type -> activity_svc.GetIncidentEventsRequest
+	67,  // 207: activity_svc.ActivityService.TrackComplianceEvent:input_type -> activity_svc.TrackComplianceEventRequest
+	69,  // 208: activity_svc.ActivityService.GetComplianceEvents:input_type -> activity_svc.GetComplianceEventsRequest
+	71,  // 209: activity_svc.ActivityService.TrackSearchActivity:input_type -> activity_svc.TrackSearchActivityRequest
+	73,  // 210: activity_svc.ActivityService.GetSearchAnalytics:input_type -> activity_svc.GetSearchAnalyticsRequest
+	75,  // 211: activity_svc.ActivityService.TrackPerformanceEvent:input_type -> activity_svc.TrackPerformanceEventRequest
+	77,  // 212: activity_svc.ActivityService.GetPerformanceAnalytics:input_type -> activity_svc.GetPerformanceAnalyticsRequest
+	79,  // 213: activity_svc.ActivityService.GetTrendingBlogs:input_type -> activity_svc.GetTrendingBlogsRequest
+	82,  // 214: activity_svc.ActivityService.GetActiveUsers:input_type -> activity_svc.GetActiveUsersRequest
+	85,  // 215: activity_svc.ActivityService.GetAccountActivities:input_type -> activity_svc.GetAccountActivitiesRequest
+	87,  // 216: activity_svc.ActivityService.GetAdvancedAnalytics:input_type -> activity_svc.GetAdvancedAnalyticsRequest
+	90,  // 217: activity_svc.ActivityService.HealthCheck:input_type -> activity_svc.HealthCheckRequest
+	26,  // 218: activity_svc.ActivityService.TrackActivity:output_type -> activity_svc.TrackActivityResponse
+	28,  // 219: activity_svc.ActivityService.GetUserActivities:output_type -> activity_svc.GetUserActivitiesResponse
+	30,  // 220: activity_svc.ActivityService.GetActivityAnalytics:output_type -> activity_svc.GetActivityAnalyticsResponse
+	32,  // 221: activity_svc.ActivityService.TrackSecurityEvent:output_type -> activity_svc.TrackSecurityEventResponse
+	34,  // 222: activity_svc.ActivityService.GetSecurityEvents:output_type -> activity_svc.GetSecurityEventsResponse
+	36,  // 223: activity_svc.ActivityService.GetUserBehaviorAnalytics:output_type -> activity_svc.GetUserBehaviorAnalyticsResponse
+	38,  // 224: activity_svc.ActivityService.GetReadingBehavior:output_type -> activity_svc.GetReadingBehaviorResponse
+	40,  // 225: activity_svc.ActivityService.TrackRecommendationInteraction:output_type -> activity_svc.TrackRecommendationInteractionResponse
+	42,  // 226: activity_svc.ActivityService.GetRecommendationAnalytics:output_type -> activity_svc.GetRecommendationAnalyticsResponse
+	44,  // 227: activity_svc.ActivityService.GetContentAnalytics:output_type -> activity_svc.GetContentAnalyticsResponse
+	46,  // 228: activity_svc.ActivityService.TrackContentInteraction:output_type -> activity_svc.TrackContentInteractionResponse
+	48,  // 229: activity_svc.ActivityService.TrackUserJourney:output_type -> activity_svc.TrackUserJourneyResponse
+	50,  // 230: activity_svc.ActivityService.GetUserJourneyAnalytics:output_type -> activity_svc.GetUserJourneyAnalyticsResponse
+	52,  // 231: activity_svc.ActivityService.TrackNotificationEvent:output_type -> activity_svc.TrackNotificationEventResponse
+	54,  // 232: activity_svc.ActivityService.GetNotificationAnalytics:output_type -> activity_svc.GetNotificationAnalyticsResponse
+	56,  // 233: activity_svc.ActivityService.TrackFinancialEvent:output_type -> activity_svc.TrackFinancialEventResponse
+	58,  // 234: activity_svc.ActivityService.GetFinancialEvents:output_type -> activity_svc.GetFinancialEventsResponse
+	60,  // 235: activity_svc.ActivityService.TrackIntegrationEvent:output_type -> activity_svc.TrackIntegrationEventResponse
+	62,  // 236: activity_svc.ActivityService.GetIntegrationEvents:output_type -> activity_svc.GetIntegrationEventsResponse
+	64,  // 237: activity_svc.ActivityService.TrackIncidentEvent:output_type -> activity_svc.TrackIncidentEventResponse
+	66,  // 238: activity_svc.ActivityService.GetIncidentEvents:output_type -> activity_svc.GetIncidentEventsResponse
+	68,  // 239: activity_svc.ActivityService.TrackComplianceEvent:output_type -> activity_svc.TrackComplianceEventResponse
+	70,  // 240: activity_svc.ActivityService.GetComplianceEvents:output_type -> activity_svc.GetComplianceEventsResponse
+	72,  // 241: activity_svc.ActivityService.TrackSearchActivity:output_type -> activity_svc.TrackSearchActivityResponse
+	74,  // 242: activity_svc.ActivityService.GetSearchAnalytics:output_type -> activity_svc.GetSearchAnalyticsResponse
+	76,  // 243: activity_svc.ActivityService.TrackPerformanceEvent:output_type -> activity_svc.TrackPerformanceEventResponse
+	78,  // 244: activity_svc.ActivityService.GetPerformanceAnalytics:output_type -> activity_svc.GetPerformanceAnalyticsResponse
+	81,  // 245: activity_svc.ActivityService.GetTrendingBlogs:output_type -> activity_svc.GetTrendingBlogsResponse
+	84,  // 246: activity_svc.ActivityService.GetActiveUsers:output_type -> activity_svc.GetActiveUsersResponse
+	86,  // 247: activity_svc.ActivityService.GetAccountActivities:output_type -> activity_svc.GetAccountActivitiesResponse
+	89,  // 248: activity_svc.ActivityService.GetAdvancedAnalytics:output_type -> activity_svc.GetAdvancedAnalyticsResponse
+	91,  // 249: activity_svc.ActivityService.HealthCheck:output_type -> activity_svc.HealthCheckResponse
+	218, // [218:250] is the sub-list for method output_type
+	186, // [186:218] is the sub-list for method input_type
+	186, // [186:186] is the sub-list for extension type_name
+	186, // [186:186] is the sub-list for extension extendee
+	0,   // [0:186] is the sub-list for field type_name
 }
 
 func init() { file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_init() }
@@ -9954,7 +10807,7 @@ func file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc), len(file_apis_serviceconn_gateway_activity_pb_gw_activity_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   75,
+			NumMessages:   89,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

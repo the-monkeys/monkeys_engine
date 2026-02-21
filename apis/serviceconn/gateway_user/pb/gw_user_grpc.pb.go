@@ -48,6 +48,7 @@ const (
 	UserService_RevokeCoAuthorAccess_FullMethodName        = "/auth_svc.UserService/RevokeCoAuthorAccess"
 	UserService_GetBlogsByUserIds_FullMethodName           = "/auth_svc.UserService/GetBlogsByUserIds"
 	UserService_CreateNewTopics_FullMethodName             = "/auth_svc.UserService/CreateNewTopics"
+	UserService_GetBatchUserDetails_FullMethodName         = "/auth_svc.UserService/GetBatchUserDetails"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -89,6 +90,7 @@ type UserServiceClient interface {
 	RevokeCoAuthorAccess(ctx context.Context, in *CoAuthorAccessReq, opts ...grpc.CallOption) (*CoAuthorAccessRes, error)
 	GetBlogsByUserIds(ctx context.Context, in *BlogsByUserIdsReq, opts ...grpc.CallOption) (*BlogsByUserNameRes, error)
 	CreateNewTopics(ctx context.Context, in *CreateTopicsReq, opts ...grpc.CallOption) (*CreateTopicsRes, error)
+	GetBatchUserDetails(ctx context.Context, in *GetBatchUserDetailsReq, opts ...grpc.CallOption) (*GetBatchUserDetailsRes, error)
 }
 
 type userServiceClient struct {
@@ -392,6 +394,16 @@ func (c *userServiceClient) CreateNewTopics(ctx context.Context, in *CreateTopic
 	return out, nil
 }
 
+func (c *userServiceClient) GetBatchUserDetails(ctx context.Context, in *GetBatchUserDetailsReq, opts ...grpc.CallOption) (*GetBatchUserDetailsRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBatchUserDetailsRes)
+	err := c.cc.Invoke(ctx, UserService_GetBatchUserDetails_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -431,6 +443,7 @@ type UserServiceServer interface {
 	RevokeCoAuthorAccess(context.Context, *CoAuthorAccessReq) (*CoAuthorAccessRes, error)
 	GetBlogsByUserIds(context.Context, *BlogsByUserIdsReq) (*BlogsByUserNameRes, error)
 	CreateNewTopics(context.Context, *CreateTopicsReq) (*CreateTopicsRes, error)
+	GetBatchUserDetails(context.Context, *GetBatchUserDetailsReq) (*GetBatchUserDetailsRes, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -527,6 +540,9 @@ func (UnimplementedUserServiceServer) GetBlogsByUserIds(context.Context, *BlogsB
 }
 func (UnimplementedUserServiceServer) CreateNewTopics(context.Context, *CreateTopicsReq) (*CreateTopicsRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateNewTopics not implemented")
+}
+func (UnimplementedUserServiceServer) GetBatchUserDetails(context.Context, *GetBatchUserDetailsReq) (*GetBatchUserDetailsRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBatchUserDetails not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -1060,6 +1076,24 @@ func _UserService_CreateNewTopics_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_GetBatchUserDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBatchUserDetailsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetBatchUserDetails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetBatchUserDetails_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetBatchUserDetails(ctx, req.(*GetBatchUserDetailsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1178,6 +1212,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateNewTopics",
 			Handler:    _UserService_CreateNewTopics_Handler,
+		},
+		{
+			MethodName: "GetBatchUserDetails",
+			Handler:    _UserService_GetBatchUserDetails_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

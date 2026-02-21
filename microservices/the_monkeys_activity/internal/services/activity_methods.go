@@ -326,3 +326,99 @@ func (s *ActivityServiceServer) TrackPerformanceEvent(ctx context.Context, req *
 func (s *ActivityServiceServer) GetPerformanceAnalytics(ctx context.Context, req *pb.GetPerformanceAnalyticsRequest) (*pb.GetPerformanceAnalyticsResponse, error) {
 	return &pb.GetPerformanceAnalyticsResponse{StatusCode: 200, Events: []*pb.PerformanceEvent{}, TotalCount: 0}, nil
 }
+func (s *ActivityServiceServer) GetTrendingBlogs(ctx context.Context, req *pb.GetTrendingBlogsRequest) (*pb.GetTrendingBlogsResponse, error) {
+	// If it's a global request and we have a cache, use it
+	if req.GetAccountId() == "" && req.GetTimeRange() == "24h" {
+		s.cacheMutex.RLock()
+		cached := s.trendingCache
+		s.cacheMutex.RUnlock()
+		if cached != nil {
+			return &pb.GetTrendingBlogsResponse{StatusCode: 200, Blogs: cached}, nil
+		}
+	}
+
+	// Otherwise, query the DB
+	trending, err := s.db.GetTrendingBlogs(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to get trending blogs", "error", err)
+		return &pb.GetTrendingBlogsResponse{
+			StatusCode: 500,
+			Error:      &pb.Error{Status: 500, Error: "database_error", Message: err.Error()},
+		}, nil
+	}
+
+	return &pb.GetTrendingBlogsResponse{StatusCode: 200, Blogs: trending}, nil
+}
+
+func (s *ActivityServiceServer) GetActiveUsers(ctx context.Context, req *pb.GetActiveUsersRequest) (*pb.GetActiveUsersResponse, error) {
+	// If it's a global request and we have a cache, use it
+	// Cache logic disabled to support listing active users
+	// if req.GetAccountId() == "" && req.GetTimeRange() == "3h" {
+	// 	s.cacheMutex.RLock()
+	// 	count := s.activeUsersCache
+	// 	s.cacheMutex.RUnlock()
+	// 	return &pb.GetActiveUsersResponse{StatusCode: 200, ActiveUsers: count}, nil
+	// }
+
+	count, userList, err := s.db.GetActiveUsers(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to get active users", "error", err)
+		return &pb.GetActiveUsersResponse{
+			StatusCode: 500,
+			Error:      &pb.Error{Status: 500, Error: "database_error", Message: err.Error()},
+		}, nil
+	}
+	s.logger.Infow("GetActiveUsers DB Result", "count", count, "userListSize", len(userList))
+	if len(userList) > 0 {
+		s.logger.Infow("First user in list", "user_id", userList[0].UserId, "last_active", userList[0].LastActive)
+	}
+
+	return &pb.GetActiveUsersResponse{StatusCode: 200, ActiveUsers: count, UserList: userList}, nil
+}
+
+func (s *ActivityServiceServer) GetAccountActivities(ctx context.Context, req *pb.GetAccountActivitiesRequest) (*pb.GetAccountActivitiesResponse, error) {
+	if req.GetAccountId() == "" {
+		return &pb.GetAccountActivitiesResponse{
+			StatusCode: 400,
+			Error:      &pb.Error{Status: 400, Error: "validation_error", Message: "account_id is required"},
+		}, nil
+	}
+
+	activities, total, err := s.db.GetAccountActivities(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to get account activities", "error", err)
+		return &pb.GetAccountActivitiesResponse{
+			StatusCode: 500,
+			Error:      &pb.Error{Status: 500, Error: "database_error", Message: err.Error()},
+		}, nil
+	}
+
+	return &pb.GetAccountActivitiesResponse{
+		StatusCode: 200,
+		Activities: activities,
+		TotalCount: total,
+	}, nil
+}
+
+func (s *ActivityServiceServer) GetAdvancedAnalytics(ctx context.Context, req *pb.GetAdvancedAnalyticsRequest) (*pb.GetAdvancedAnalyticsResponse, error) {
+	// If it's a global request and we have a cache, use it
+	if req.GetAccountId() == "" && req.GetTimeRange() == "7d" {
+		s.cacheMutex.RLock()
+		cached := s.advancedCache
+		s.cacheMutex.RUnlock()
+		if cached != nil {
+			return &pb.GetAdvancedAnalyticsResponse{StatusCode: 200, Analytics: cached}, nil
+		}
+	}
+
+	analytics, err := s.db.GetAdvancedAnalytics(ctx, req)
+	if err != nil {
+		s.logger.Errorw("failed to get advanced analytics", "error", err)
+		return &pb.GetAdvancedAnalyticsResponse{
+			StatusCode: 500,
+			Error:      &pb.Error{Status: 500, Error: "database_error", Message: err.Error()},
+		}, nil
+	}
+
+	return &pb.GetAdvancedAnalyticsResponse{StatusCode: 200, Analytics: analytics}, nil
+}

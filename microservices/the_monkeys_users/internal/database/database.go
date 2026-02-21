@@ -57,6 +57,7 @@ type UserDb interface {
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
 	GetFollowersAndFollowingsCounts(username string) (int, int, error)
 	GetBlogByBlogId(blogId string) (*models.Blog, error)
+	GetUsersByAccountIds(accIds []string) ([]models.UserProfileRes, error)
 	// Update queries
 	UpdateUserProfile(username string, dbUserInfo *models.UserProfileRes) error
 	UpdateBlogStatusToPublish(blogId string, status string) error
@@ -1022,5 +1023,36 @@ func (uh *uDBHandler) GetFollowers(username string) ([]models.TheMonkeysUser, er
 	}
 
 	uh.log.Debugf("Successfully fetched users who follow user: %s", username)
+	return users, nil
+}
+
+func (uh *uDBHandler) GetUsersByAccountIds(accIds []string) ([]models.UserProfileRes, error) {
+	var users []models.UserProfileRes
+	query := `
+		SELECT ua.username, ua.first_name, ua.last_name, 
+		ua.bio, ua.avatar_url, ua.address
+		FROM user_account ua
+		WHERE ua.account_id = ANY($1);
+	`
+	rows, err := uh.db.Query(query, accIds)
+	if err != nil {
+		uh.log.Errorf("Error fetching batch users: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u models.UserProfileRes
+		if err := rows.Scan(&u.Username, &u.FirstName, &u.LastName,
+			&u.Bio, &u.AvatarUrl, &u.Address); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return users, nil
 }

@@ -7,12 +7,13 @@
 package pb
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -2534,6 +2535,188 @@ func (x *FollowerFollowingCountsResp) GetStatus() int32 {
 	return 0
 }
 
+type GetBatchUserDetailsReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AccountIds []string `protobuf:"bytes,1,rep,name=account_ids,json=accountIds,proto3" json:"account_ids,omitempty"`
+}
+
+func (x *GetBatchUserDetailsReq) Reset() {
+	*x = GetBatchUserDetailsReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetBatchUserDetailsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBatchUserDetailsReq) ProtoMessage() {}
+
+func (x *GetBatchUserDetailsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBatchUserDetailsReq.ProtoReflect.Descriptor instead.
+func (*GetBatchUserDetailsReq) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetBatchUserDetailsReq) GetAccountIds() []string {
+	if x != nil {
+		return x.AccountIds
+	}
+	return nil
+}
+
+type GetBatchUserDetailsRes struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Users []*UserDetailsResp `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+}
+
+func (x *GetBatchUserDetailsRes) Reset() {
+	*x = GetBatchUserDetailsRes{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetBatchUserDetailsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBatchUserDetailsRes) ProtoMessage() {}
+
+func (x *GetBatchUserDetailsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBatchUserDetailsRes.ProtoReflect.Descriptor instead.
+func (*GetBatchUserDetailsRes) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetBatchUserDetailsRes) GetUsers() []*UserDetailsResp {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type GetBatchUserDetailsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountIds    []string               `protobuf:"bytes,1,rep,name=account_ids,json=accountIds,proto3" json:"account_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBatchUserDetailsReq) Reset() {
+	*x = GetBatchUserDetailsReq{}
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBatchUserDetailsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBatchUserDetailsReq) ProtoMessage() {}
+
+func (x *GetBatchUserDetailsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBatchUserDetailsReq.ProtoReflect.Descriptor instead.
+func (*GetBatchUserDetailsReq) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetBatchUserDetailsReq) GetAccountIds() []string {
+	if x != nil {
+		return x.AccountIds
+	}
+	return nil
+}
+
+type GetBatchUserDetailsRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*UserDetailsResp     `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBatchUserDetailsRes) Reset() {
+	*x = GetBatchUserDetailsRes{}
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBatchUserDetailsRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBatchUserDetailsRes) ProtoMessage() {}
+
+func (x *GetBatchUserDetailsRes) ProtoReflect() protoreflect.Message {
+	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBatchUserDetailsRes.ProtoReflect.Descriptor instead.
+func (*GetBatchUserDetailsRes) Descriptor() ([]byte, []int) {
+	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetBatchUserDetailsRes) GetUsers() []*UserDetailsResp {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
 var File_apis_serviceconn_gateway_user_pb_gw_user_proto protoreflect.FileDescriptor
 
 const file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc = "" +
@@ -2769,7 +2952,12 @@ const file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc = "" +
 	"\tfollowing\x18\x02 \x01(\x03R\tfollowing\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12\x18\n" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x12\x16\n" +
-	"\x06status\x18\x05 \x01(\x05R\x06status2\xe4\x10\n" +
+	"\x06status\x18\x05 \x01(\x05R\x06status\"9\n" +
+	"\x16GetBatchUserDetailsReq\x12\x1f\n" +
+	"\vaccount_ids\x18\x01 \x03(\tR\n" +
+	"accountIds\"I\n" +
+	"\x16GetBatchUserDetailsRes\x12/\n" +
+	"\x05users\x18\x01 \x03(\v2\x19.auth_svc.UserDetailsRespR\x05users2\xc1\x11\n" +
 	"\vUserService\x12L\n" +
 	"\x11GetUserActivities\x12\x19.auth_svc.UserActivityReq\x1a\x1a.auth_svc.UserActivityResp\"\x00\x12F\n" +
 	"\x0eGetUserProfile\x12\x18.auth_svc.UserProfileReq\x1a\x18.auth_svc.UserProfileRes\"\x00\x12U\n" +
@@ -2802,7 +2990,8 @@ const file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc = "" +
 	"\x0eInviteCoAuthor\x12\x1b.auth_svc.CoAuthorAccessReq\x1a\x1b.auth_svc.CoAuthorAccessRes\"\x00\x12R\n" +
 	"\x14RevokeCoAuthorAccess\x12\x1b.auth_svc.CoAuthorAccessReq\x1a\x1b.auth_svc.CoAuthorAccessRes\"\x00\x12P\n" +
 	"\x11GetBlogsByUserIds\x12\x1b.auth_svc.BlogsByUserIdsReq\x1a\x1c.auth_svc.BlogsByUserNameRes\"\x00\x12I\n" +
-	"\x0fCreateNewTopics\x12\x19.auth_svc.CreateTopicsReq\x1a\x19.auth_svc.CreateTopicsRes\"\x00B$Z\"./apis/serviceconn/gateway_user/pbb\x06proto3"
+	"\x0fCreateNewTopics\x12\x19.auth_svc.CreateTopicsReq\x1a\x19.auth_svc.CreateTopicsRes\"\x00\x12[\n" +
+	"\x13GetBatchUserDetails\x12 .auth_svc.GetBatchUserDetailsReq\x1a .auth_svc.GetBatchUserDetailsRes\"\x00B$Z\"./apis/serviceconn/gateway_user/pbb\x06proto3"
 
 var (
 	file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescOnce sync.Once
@@ -2816,7 +3005,7 @@ func file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP() []byte {
 	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescData
 }
 
-var file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_apis_serviceconn_gateway_user_pb_gw_user_proto_goTypes = []any{
 	(*UserProfileReq)(nil),              // 0: auth_svc.UserProfileReq
 	(*UserProfileRes)(nil),              // 1: auth_svc.UserProfileRes
@@ -2852,81 +3041,86 @@ var file_apis_serviceconn_gateway_user_pb_gw_user_proto_goTypes = []any{
 	(*FollowerFollowingResp)(nil),       // 31: auth_svc.FollowerFollowingResp
 	(*CountResp)(nil),                   // 32: auth_svc.CountResp
 	(*FollowerFollowingCountsResp)(nil), // 33: auth_svc.FollowerFollowingCountsResp
-	nil,                                 // 34: auth_svc.GetAllCategoriesRes.CategoryEntry
-	(*timestamppb.Timestamp)(nil),       // 35: google.protobuf.Timestamp
+	(*GetBatchUserDetailsReq)(nil),      // 34: auth_svc.GetBatchUserDetailsReq
+	(*GetBatchUserDetailsRes)(nil),      // 35: auth_svc.GetBatchUserDetailsRes
+	nil,                                 // 36: auth_svc.GetAllCategoriesRes.CategoryEntry
+	(*timestamppb.Timestamp)(nil),       // 37: google.protobuf.Timestamp
 }
 var file_apis_serviceconn_gateway_user_pb_gw_user_proto_depIdxs = []int32{
-	35, // 0: auth_svc.UserProfileRes.created_at:type_name -> google.protobuf.Timestamp
-	35, // 1: auth_svc.UserProfileRes.updated_at:type_name -> google.protobuf.Timestamp
+	37, // 0: auth_svc.UserProfileRes.created_at:type_name -> google.protobuf.Timestamp
+	37, // 1: auth_svc.UserProfileRes.updated_at:type_name -> google.protobuf.Timestamp
 	4,  // 2: auth_svc.UserActivityResp.response:type_name -> auth_svc.UserActivity
 	10, // 3: auth_svc.GetTopicsResponse.topics:type_name -> auth_svc.Topics
-	34, // 4: auth_svc.GetAllCategoriesRes.category:type_name -> auth_svc.GetAllCategoriesRes.CategoryEntry
+	36, // 4: auth_svc.GetAllCategoriesRes.category:type_name -> auth_svc.GetAllCategoriesRes.CategoryEntry
 	22, // 5: auth_svc.BlogsByUserNameRes.blogs:type_name -> auth_svc.Blog
 	30, // 6: auth_svc.FollowerFollowingResp.users:type_name -> auth_svc.User
-	12, // 7: auth_svc.GetAllCategoriesRes.CategoryEntry.value:type_name -> auth_svc.Category
-	2,  // 8: auth_svc.UserService.GetUserActivities:input_type -> auth_svc.UserActivityReq
-	0,  // 9: auth_svc.UserService.GetUserProfile:input_type -> auth_svc.UserProfileReq
-	5,  // 10: auth_svc.UserService.UpdateUserProfile:input_type -> auth_svc.UpdateUserProfileReq
-	7,  // 11: auth_svc.UserService.DeleteUserAccount:input_type -> auth_svc.DeleteUserProfileReq
-	9,  // 12: auth_svc.UserService.GetAllTopics:input_type -> auth_svc.GetTopicsRequests
-	13, // 13: auth_svc.UserService.GetAllCategories:input_type -> auth_svc.GetAllCategoriesReq
-	15, // 14: auth_svc.UserService.GetUserDetails:input_type -> auth_svc.UserDetailReq
-	17, // 15: auth_svc.UserService.FollowTopics:input_type -> auth_svc.TopicActionReq
-	17, // 16: auth_svc.UserService.UnFollowTopics:input_type -> auth_svc.TopicActionReq
-	28, // 17: auth_svc.UserService.FollowUser:input_type -> auth_svc.UserFollowReq
-	28, // 18: auth_svc.UserService.UnFollowUser:input_type -> auth_svc.UserFollowReq
-	15, // 19: auth_svc.UserService.GetFollowers:input_type -> auth_svc.UserDetailReq
-	15, // 20: auth_svc.UserService.GetFollowing:input_type -> auth_svc.UserDetailReq
-	28, // 21: auth_svc.UserService.GetIfIFollowedUser:input_type -> auth_svc.UserFollowReq
-	15, // 22: auth_svc.UserService.GetFollowersFollowingCounts:input_type -> auth_svc.UserDetailReq
-	15, // 23: auth_svc.UserService.SearchUser:input_type -> auth_svc.UserDetailReq
-	26, // 24: auth_svc.UserService.BookMarkBlog:input_type -> auth_svc.BookMarkReq
-	26, // 25: auth_svc.UserService.GetBookMarks:input_type -> auth_svc.BookMarkReq
-	26, // 26: auth_svc.UserService.RemoveBookMark:input_type -> auth_svc.BookMarkReq
-	26, // 27: auth_svc.UserService.LikeBlog:input_type -> auth_svc.BookMarkReq
-	26, // 28: auth_svc.UserService.UnlikeBlog:input_type -> auth_svc.BookMarkReq
-	26, // 29: auth_svc.UserService.GetIfBlogLiked:input_type -> auth_svc.BookMarkReq
-	26, // 30: auth_svc.UserService.GetIfBlogBookMarked:input_type -> auth_svc.BookMarkReq
-	26, // 31: auth_svc.UserService.GetBookMarkCounts:input_type -> auth_svc.BookMarkReq
-	26, // 32: auth_svc.UserService.GetLikeCounts:input_type -> auth_svc.BookMarkReq
-	19, // 33: auth_svc.UserService.InviteCoAuthor:input_type -> auth_svc.CoAuthorAccessReq
-	19, // 34: auth_svc.UserService.RevokeCoAuthorAccess:input_type -> auth_svc.CoAuthorAccessReq
-	21, // 35: auth_svc.UserService.GetBlogsByUserIds:input_type -> auth_svc.BlogsByUserIdsReq
-	24, // 36: auth_svc.UserService.CreateNewTopics:input_type -> auth_svc.CreateTopicsReq
-	3,  // 37: auth_svc.UserService.GetUserActivities:output_type -> auth_svc.UserActivityResp
-	1,  // 38: auth_svc.UserService.GetUserProfile:output_type -> auth_svc.UserProfileRes
-	6,  // 39: auth_svc.UserService.UpdateUserProfile:output_type -> auth_svc.UpdateUserProfileRes
-	8,  // 40: auth_svc.UserService.DeleteUserAccount:output_type -> auth_svc.DeleteUserProfileRes
-	11, // 41: auth_svc.UserService.GetAllTopics:output_type -> auth_svc.GetTopicsResponse
-	14, // 42: auth_svc.UserService.GetAllCategories:output_type -> auth_svc.GetAllCategoriesRes
-	16, // 43: auth_svc.UserService.GetUserDetails:output_type -> auth_svc.UserDetailsResp
-	18, // 44: auth_svc.UserService.FollowTopics:output_type -> auth_svc.TopicActionRes
-	18, // 45: auth_svc.UserService.UnFollowTopics:output_type -> auth_svc.TopicActionRes
-	29, // 46: auth_svc.UserService.FollowUser:output_type -> auth_svc.UserFollowRes
-	29, // 47: auth_svc.UserService.UnFollowUser:output_type -> auth_svc.UserFollowRes
-	31, // 48: auth_svc.UserService.GetFollowers:output_type -> auth_svc.FollowerFollowingResp
-	31, // 49: auth_svc.UserService.GetFollowing:output_type -> auth_svc.FollowerFollowingResp
-	29, // 50: auth_svc.UserService.GetIfIFollowedUser:output_type -> auth_svc.UserFollowRes
-	33, // 51: auth_svc.UserService.GetFollowersFollowingCounts:output_type -> auth_svc.FollowerFollowingCountsResp
-	31, // 52: auth_svc.UserService.SearchUser:output_type -> auth_svc.FollowerFollowingResp
-	27, // 53: auth_svc.UserService.BookMarkBlog:output_type -> auth_svc.BookMarkRes
-	27, // 54: auth_svc.UserService.GetBookMarks:output_type -> auth_svc.BookMarkRes
-	27, // 55: auth_svc.UserService.RemoveBookMark:output_type -> auth_svc.BookMarkRes
-	27, // 56: auth_svc.UserService.LikeBlog:output_type -> auth_svc.BookMarkRes
-	27, // 57: auth_svc.UserService.UnlikeBlog:output_type -> auth_svc.BookMarkRes
-	27, // 58: auth_svc.UserService.GetIfBlogLiked:output_type -> auth_svc.BookMarkRes
-	27, // 59: auth_svc.UserService.GetIfBlogBookMarked:output_type -> auth_svc.BookMarkRes
-	32, // 60: auth_svc.UserService.GetBookMarkCounts:output_type -> auth_svc.CountResp
-	32, // 61: auth_svc.UserService.GetLikeCounts:output_type -> auth_svc.CountResp
-	20, // 62: auth_svc.UserService.InviteCoAuthor:output_type -> auth_svc.CoAuthorAccessRes
-	20, // 63: auth_svc.UserService.RevokeCoAuthorAccess:output_type -> auth_svc.CoAuthorAccessRes
-	23, // 64: auth_svc.UserService.GetBlogsByUserIds:output_type -> auth_svc.BlogsByUserNameRes
-	25, // 65: auth_svc.UserService.CreateNewTopics:output_type -> auth_svc.CreateTopicsRes
-	37, // [37:66] is the sub-list for method output_type
-	8,  // [8:37] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	16, // 7: auth_svc.GetBatchUserDetailsRes.users:type_name -> auth_svc.UserDetailsResp
+	12, // 8: auth_svc.GetAllCategoriesRes.CategoryEntry.value:type_name -> auth_svc.Category
+	2,  // 9: auth_svc.UserService.GetUserActivities:input_type -> auth_svc.UserActivityReq
+	0,  // 10: auth_svc.UserService.GetUserProfile:input_type -> auth_svc.UserProfileReq
+	5,  // 11: auth_svc.UserService.UpdateUserProfile:input_type -> auth_svc.UpdateUserProfileReq
+	7,  // 12: auth_svc.UserService.DeleteUserAccount:input_type -> auth_svc.DeleteUserProfileReq
+	9,  // 13: auth_svc.UserService.GetAllTopics:input_type -> auth_svc.GetTopicsRequests
+	13, // 14: auth_svc.UserService.GetAllCategories:input_type -> auth_svc.GetAllCategoriesReq
+	15, // 15: auth_svc.UserService.GetUserDetails:input_type -> auth_svc.UserDetailReq
+	17, // 16: auth_svc.UserService.FollowTopics:input_type -> auth_svc.TopicActionReq
+	17, // 17: auth_svc.UserService.UnFollowTopics:input_type -> auth_svc.TopicActionReq
+	28, // 18: auth_svc.UserService.FollowUser:input_type -> auth_svc.UserFollowReq
+	28, // 19: auth_svc.UserService.UnFollowUser:input_type -> auth_svc.UserFollowReq
+	15, // 20: auth_svc.UserService.GetFollowers:input_type -> auth_svc.UserDetailReq
+	15, // 21: auth_svc.UserService.GetFollowing:input_type -> auth_svc.UserDetailReq
+	28, // 22: auth_svc.UserService.GetIfIFollowedUser:input_type -> auth_svc.UserFollowReq
+	15, // 23: auth_svc.UserService.GetFollowersFollowingCounts:input_type -> auth_svc.UserDetailReq
+	15, // 24: auth_svc.UserService.SearchUser:input_type -> auth_svc.UserDetailReq
+	26, // 25: auth_svc.UserService.BookMarkBlog:input_type -> auth_svc.BookMarkReq
+	26, // 26: auth_svc.UserService.GetBookMarks:input_type -> auth_svc.BookMarkReq
+	26, // 27: auth_svc.UserService.RemoveBookMark:input_type -> auth_svc.BookMarkReq
+	26, // 28: auth_svc.UserService.LikeBlog:input_type -> auth_svc.BookMarkReq
+	26, // 29: auth_svc.UserService.UnlikeBlog:input_type -> auth_svc.BookMarkReq
+	26, // 30: auth_svc.UserService.GetIfBlogLiked:input_type -> auth_svc.BookMarkReq
+	26, // 31: auth_svc.UserService.GetIfBlogBookMarked:input_type -> auth_svc.BookMarkReq
+	26, // 32: auth_svc.UserService.GetBookMarkCounts:input_type -> auth_svc.BookMarkReq
+	26, // 33: auth_svc.UserService.GetLikeCounts:input_type -> auth_svc.BookMarkReq
+	19, // 34: auth_svc.UserService.InviteCoAuthor:input_type -> auth_svc.CoAuthorAccessReq
+	19, // 35: auth_svc.UserService.RevokeCoAuthorAccess:input_type -> auth_svc.CoAuthorAccessReq
+	21, // 36: auth_svc.UserService.GetBlogsByUserIds:input_type -> auth_svc.BlogsByUserIdsReq
+	24, // 37: auth_svc.UserService.CreateNewTopics:input_type -> auth_svc.CreateTopicsReq
+	34, // 38: auth_svc.UserService.GetBatchUserDetails:input_type -> auth_svc.GetBatchUserDetailsReq
+	3,  // 39: auth_svc.UserService.GetUserActivities:output_type -> auth_svc.UserActivityResp
+	1,  // 40: auth_svc.UserService.GetUserProfile:output_type -> auth_svc.UserProfileRes
+	6,  // 41: auth_svc.UserService.UpdateUserProfile:output_type -> auth_svc.UpdateUserProfileRes
+	8,  // 42: auth_svc.UserService.DeleteUserAccount:output_type -> auth_svc.DeleteUserProfileRes
+	11, // 43: auth_svc.UserService.GetAllTopics:output_type -> auth_svc.GetTopicsResponse
+	14, // 44: auth_svc.UserService.GetAllCategories:output_type -> auth_svc.GetAllCategoriesRes
+	16, // 45: auth_svc.UserService.GetUserDetails:output_type -> auth_svc.UserDetailsResp
+	18, // 46: auth_svc.UserService.FollowTopics:output_type -> auth_svc.TopicActionRes
+	18, // 47: auth_svc.UserService.UnFollowTopics:output_type -> auth_svc.TopicActionRes
+	29, // 48: auth_svc.UserService.FollowUser:output_type -> auth_svc.UserFollowRes
+	29, // 49: auth_svc.UserService.UnFollowUser:output_type -> auth_svc.UserFollowRes
+	31, // 50: auth_svc.UserService.GetFollowers:output_type -> auth_svc.FollowerFollowingResp
+	31, // 51: auth_svc.UserService.GetFollowing:output_type -> auth_svc.FollowerFollowingResp
+	29, // 52: auth_svc.UserService.GetIfIFollowedUser:output_type -> auth_svc.UserFollowRes
+	33, // 53: auth_svc.UserService.GetFollowersFollowingCounts:output_type -> auth_svc.FollowerFollowingCountsResp
+	31, // 54: auth_svc.UserService.SearchUser:output_type -> auth_svc.FollowerFollowingResp
+	27, // 55: auth_svc.UserService.BookMarkBlog:output_type -> auth_svc.BookMarkRes
+	27, // 56: auth_svc.UserService.GetBookMarks:output_type -> auth_svc.BookMarkRes
+	27, // 57: auth_svc.UserService.RemoveBookMark:output_type -> auth_svc.BookMarkRes
+	27, // 58: auth_svc.UserService.LikeBlog:output_type -> auth_svc.BookMarkRes
+	27, // 59: auth_svc.UserService.UnlikeBlog:output_type -> auth_svc.BookMarkRes
+	27, // 60: auth_svc.UserService.GetIfBlogLiked:output_type -> auth_svc.BookMarkRes
+	27, // 61: auth_svc.UserService.GetIfBlogBookMarked:output_type -> auth_svc.BookMarkRes
+	32, // 62: auth_svc.UserService.GetBookMarkCounts:output_type -> auth_svc.CountResp
+	32, // 63: auth_svc.UserService.GetLikeCounts:output_type -> auth_svc.CountResp
+	20, // 64: auth_svc.UserService.InviteCoAuthor:output_type -> auth_svc.CoAuthorAccessRes
+	20, // 65: auth_svc.UserService.RevokeCoAuthorAccess:output_type -> auth_svc.CoAuthorAccessRes
+	23, // 66: auth_svc.UserService.GetBlogsByUserIds:output_type -> auth_svc.BlogsByUserNameRes
+	25, // 67: auth_svc.UserService.CreateNewTopics:output_type -> auth_svc.CreateTopicsRes
+	35, // 68: auth_svc.UserService.GetBatchUserDetails:output_type -> auth_svc.GetBatchUserDetailsRes
+	39, // [39:69] is the sub-list for method output_type
+	9,  // [9:39] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_apis_serviceconn_gateway_user_pb_gw_user_proto_init() }
@@ -2940,7 +3134,7 @@ func file_apis_serviceconn_gateway_user_pb_gw_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc), len(file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
