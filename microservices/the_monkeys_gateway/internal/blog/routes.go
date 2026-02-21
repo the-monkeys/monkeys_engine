@@ -799,7 +799,7 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	}
 
 	// Set connection timeouts and limits
-	conn.SetReadLimit(1024 * 1024)                         // 1MB max message size
+	conn.SetReadLimit(int64(constants.MaxMsgSize))         // Support up to 20MB messages
 	conn.SetReadDeadline(time.Now().Add(70 * time.Second)) // Slightly longer than client heartbeat
 	conn.SetPongHandler(func(string) error {
 		asc.log.Debug("Received pong from client")

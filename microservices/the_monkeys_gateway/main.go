@@ -64,11 +64,11 @@ func main() {
 	server.router.Use(gin.Recovery())
 	// retain default gin logger? use custom zap middleware later
 	// server.router.Use(gin.Logger())
-	server.router.MaxMultipartMemory = 8 << 20
+	server.router.MaxMultipartMemory = 100 << 20
 
 	// Apply security middleware
 	server.router.Use(secure.New(secure.Config{
-		FrameDeny:             true,
+		FrameDeny:             false,
 		ContentTypeNosniff:    true,
 		BrowserXssFilter:      true,
 		ContentSecurityPolicy: "default-src 'self';", // Customize as needed
@@ -147,9 +147,9 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	httpSrv := &http.Server{
 		Addr:           httpAddr,
 		Handler:        s.router,
-		MaxHeaderBytes: 1 << 20,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 5 << 20,
+		ReadTimeout:    1 * time.Hour,
+		WriteTimeout:   1 * time.Hour,
 	}
 
 	// HTTPS server (with TLS)
@@ -160,9 +160,9 @@ func (s *Server) launchServer(ctx context.Context, cfg *config.Config, tlsCert, 
 	httpsSrv := &http.Server{
 		Addr:           httpsAddr,
 		Handler:        s.router,
-		MaxHeaderBytes: 1 << 20,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 5 << 20,
+		ReadTimeout:    1 * time.Hour,
+		WriteTimeout:   1 * time.Hour,
 	}
 
 	// Start the HTTP server in a background goroutine
