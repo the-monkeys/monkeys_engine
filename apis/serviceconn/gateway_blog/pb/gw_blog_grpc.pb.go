@@ -33,9 +33,7 @@ const (
 	BlogService_GetPublishedBlogsByAccID_FullMethodName       = "/blog_svc.BlogService/GetPublishedBlogsByAccID"
 	BlogService_GetLatest100Blogs_FullMethodName              = "/blog_svc.BlogService/GetLatest100Blogs"
 	BlogService_GetPublishedBlogByIdAndOwnerId_FullMethodName = "/blog_svc.BlogService/GetPublishedBlogByIdAndOwnerId"
-	BlogService_GetAllScheduleBlogs_FullMethodName            = "/blog_svc.BlogService/GetAllScheduleBlogs"
 	BlogService_DeleteScheduleBlog_FullMethodName             = "/blog_svc.BlogService/DeleteScheduleBlog"
-	BlogService_MoveScheduleBlogToDraft_FullMethodName        = "/blog_svc.BlogService/MoveScheduleBlogToDraft"
 	BlogService_GetAllBlogsByBlogIds_FullMethodName           = "/blog_svc.BlogService/GetAllBlogsByBlogIds"
 	BlogService_CheckIfBlogsExist_FullMethodName              = "/blog_svc.BlogService/CheckIfBlogsExist"
 	BlogService_DeleteABlogByBlogId_FullMethodName            = "/blog_svc.BlogService/DeleteABlogByBlogId"
@@ -74,9 +72,7 @@ type BlogServiceClient interface {
 	GetPublishedBlogsByAccID(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(ctx context.Context, in *GetBlogsByTagsNameReq, opts ...grpc.CallOption) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error)
-	GetAllScheduleBlogs(ctx context.Context, in *GetAllScheduleBlogsReq, opts ...grpc.CallOption) (*GetPublishedBlogsRes, error)
 	DeleteScheduleBlog(ctx context.Context, in *DeleteScheduleBlogReq, opts ...grpc.CallOption) (*DeleteScheduleBlogResp, error)
-	MoveScheduleBlogToDraft(ctx context.Context, in *MoveScheduleBlogToDraftReq, opts ...grpc.CallOption) (*MoveScheduleBlogToDraftResp, error)
 	GetAllBlogsByBlogIds(ctx context.Context, in *GetBlogsByBlogIds, opts ...grpc.CallOption) (*GetBlogsRes, error)
 	CheckIfBlogsExist(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(ctx context.Context, in *DeleteBlogReq, opts ...grpc.CallOption) (*DeleteBlogResp, error)
@@ -253,30 +249,10 @@ func (c *blogServiceClient) GetPublishedBlogByIdAndOwnerId(ctx context.Context, 
 	return out, nil
 }
 
-func (c *blogServiceClient) GetAllScheduleBlogs(ctx context.Context, in *GetAllScheduleBlogsReq, opts ...grpc.CallOption) (*GetPublishedBlogsRes, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetPublishedBlogsRes)
-	err := c.cc.Invoke(ctx, BlogService_GetAllScheduleBlogs_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *blogServiceClient) DeleteScheduleBlog(ctx context.Context, in *DeleteScheduleBlogReq, opts ...grpc.CallOption) (*DeleteScheduleBlogResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteScheduleBlogResp)
 	err := c.cc.Invoke(ctx, BlogService_DeleteScheduleBlog_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *blogServiceClient) MoveScheduleBlogToDraft(ctx context.Context, in *MoveScheduleBlogToDraftReq, opts ...grpc.CallOption) (*MoveScheduleBlogToDraftResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MoveScheduleBlogToDraftResp)
-	err := c.cc.Invoke(ctx, BlogService_MoveScheduleBlogToDraft_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -511,9 +487,7 @@ type BlogServiceServer interface {
 	GetPublishedBlogsByAccID(context.Context, *BlogByIdReq) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(context.Context, *GetBlogsByTagsNameReq) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(context.Context, *BlogByIdReq) (*BlogByIdRes, error)
-	GetAllScheduleBlogs(context.Context, *GetAllScheduleBlogsReq) (*GetPublishedBlogsRes, error)
 	DeleteScheduleBlog(context.Context, *DeleteScheduleBlogReq) (*DeleteScheduleBlogResp, error)
-	MoveScheduleBlogToDraft(context.Context, *MoveScheduleBlogToDraftReq) (*MoveScheduleBlogToDraftResp, error)
 	GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error)
 	CheckIfBlogsExist(context.Context, *BlogByIdReq) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error)
@@ -581,14 +555,8 @@ func (UnimplementedBlogServiceServer) GetLatest100Blogs(context.Context, *GetBlo
 func (UnimplementedBlogServiceServer) GetPublishedBlogByIdAndOwnerId(context.Context, *BlogByIdReq) (*BlogByIdRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPublishedBlogByIdAndOwnerId not implemented")
 }
-func (UnimplementedBlogServiceServer) GetAllScheduleBlogs(context.Context, *GetAllScheduleBlogsReq) (*GetPublishedBlogsRes, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAllScheduleBlogs not implemented")
-}
 func (UnimplementedBlogServiceServer) DeleteScheduleBlog(context.Context, *DeleteScheduleBlogReq) (*DeleteScheduleBlogResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteScheduleBlog not implemented")
-}
-func (UnimplementedBlogServiceServer) MoveScheduleBlogToDraft(context.Context, *MoveScheduleBlogToDraftReq) (*MoveScheduleBlogToDraftResp, error) {
-	return nil, status.Error(codes.Unimplemented, "method MoveScheduleBlogToDraft not implemented")
 }
 func (UnimplementedBlogServiceServer) GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAllBlogsByBlogIds not implemented")
@@ -876,24 +844,6 @@ func _BlogService_GetPublishedBlogByIdAndOwnerId_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BlogService_GetAllScheduleBlogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetAllScheduleBlogsReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlogServiceServer).GetAllScheduleBlogs(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BlogService_GetAllScheduleBlogs_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServiceServer).GetAllScheduleBlogs(ctx, req.(*GetAllScheduleBlogsReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _BlogService_DeleteScheduleBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteScheduleBlogReq)
 	if err := dec(in); err != nil {
@@ -908,24 +858,6 @@ func _BlogService_DeleteScheduleBlog_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BlogServiceServer).DeleteScheduleBlog(ctx, req.(*DeleteScheduleBlogReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _BlogService_MoveScheduleBlogToDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(MoveScheduleBlogToDraftReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlogServiceServer).MoveScheduleBlogToDraft(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BlogService_MoveScheduleBlogToDraft_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServiceServer).MoveScheduleBlogToDraft(ctx, req.(*MoveScheduleBlogToDraftReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1199,16 +1131,8 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BlogService_GetPublishedBlogByIdAndOwnerId_Handler,
 		},
 		{
-			MethodName: "GetAllScheduleBlogs",
-			Handler:    _BlogService_GetAllScheduleBlogs_Handler,
-		},
-		{
 			MethodName: "DeleteScheduleBlog",
 			Handler:    _BlogService_DeleteScheduleBlog_Handler,
-		},
-		{
-			MethodName: "MoveScheduleBlogToDraft",
-			Handler:    _BlogService_MoveScheduleBlogToDraft_Handler,
 		},
 		{
 			MethodName: "GetAllBlogsByBlogIds",

@@ -469,6 +469,7 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 
 	// Execute the search request
 	res, err := req.Do(ctx, es.client)
+
 	if err != nil {
 		es.log.Errorf("GetBlogByBlogId: error executing search request, error: %+v", err)
 		return nil, err

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -22,6 +23,10 @@ const (
 	MaxRetries = 3
 	// RetryDelay between retries
 	RetryDelay = 5 * time.Second
+	// MaxFailedCycles is the maximum number of polling cycles a blog can fail
+	// before it is excluded from future scheduler queries.
+	// After this threshold, the blog requires manual intervention.
+	MaxFailedCycles = 5
 )
 
 // Scheduler handles the automatic publishing of scheduled blogs
@@ -119,8 +124,8 @@ func (s *Scheduler) processScheduledBlogs() {
 
 	s.logger.Debugf("Scheduler: checking for scheduled blogs due at %s", currentTime.Format(time.RFC3339))
 
-	// Fetch due scheduled blogs
-	dueBlogs, err := s.db.GetDueScheduledBlogs(ctx, currentTime)
+	// Fetch due scheduled blogs, excluding those that have exceeded max failed attempts
+	dueBlogs, err := s.db.GetDueScheduledBlogs(ctx, currentTime, MaxFailedCycles)
 	if err != nil {
 		s.logger.Errorf("Scheduler: failed to fetch due scheduled blogs: %v", err)
 		return
@@ -134,19 +139,28 @@ func (s *Scheduler) processScheduledBlogs() {
 	s.logger.Infof("Scheduler: found %d scheduled blogs ready to publish", len(dueBlogs))
 
 	// Process each blog
-	for _, blog := range dueBlogs {
-		blogId, _ := blog["blog_id"].(string)
-		accountId, _ := blog["owner_account_id"].(string)
+	for _, dueBlog := range dueBlogs {
+		blogId, _ := dueBlog.Source["blog_id"].(string)
+		accountId, _ := dueBlog.Source["owner_account_id"].(string)
 
 		if blogId == "" {
 			s.logger.Warn("Scheduler: skipping blog with empty blog_id")
 			continue
 		}
 
-		// Publish with retry logic
-		if err := s.publishBlogWithRetry(ctx, blogId, accountId, blog); err != nil {
+		// Publish with retry logic and optimistic concurrency control
+		if err := s.publishBlogWithRetry(ctx, blogId, accountId, dueBlog); err != nil {
+			if errors.Is(err, database.ErrVersionConflict) {
+				s.logger.Infof("Scheduler: blog %s already processed by another instance, skipping", blogId)
+				continue
+			}
+
 			s.logger.Errorf("Scheduler: failed to publish blog %s after %d retries: %v", blogId, MaxRetries, err)
-			// TODO: Consider moving to a dead-letter queue or sending alert
+
+			// Increment failed attempts counter to prevent infinite retry loop
+			if incErr := s.db.IncrementScheduleFailedAttempts(ctx, blogId, err.Error()); incErr != nil {
+				s.logger.Errorf("Scheduler: failed to increment failed attempts for blog %s: %v", blogId, incErr)
+			}
 			continue
 		}
 
@@ -154,14 +168,20 @@ func (s *Scheduler) processScheduledBlogs() {
 	}
 }
 
-// publishBlogWithRetry attempts to publish a blog with exponential backoff retry
-func (s *Scheduler) publishBlogWithRetry(ctx context.Context, blogId, accountId string, blog map[string]interface{}) error {
+// publishBlogWithRetry attempts to publish a blog with exponential backoff retry.
+// Version conflicts (from concurrent instance processing) are not retried.
+func (s *Scheduler) publishBlogWithRetry(ctx context.Context, blogId, accountId string, dueBlog database.DueScheduledBlog) error {
 	var lastErr error
 
 	for attempt := 1; attempt <= MaxRetries; attempt++ {
-		err := s.publishBlog(ctx, blogId, accountId, blog)
+		err := s.publishBlog(ctx, blogId, accountId, dueBlog)
 		if err == nil {
 			return nil
+		}
+
+		// Version conflict means another instance already published this blog — don't retry
+		if errors.Is(err, database.ErrVersionConflict) {
+			return err
 		}
 
 		lastErr = err
@@ -182,17 +202,22 @@ func (s *Scheduler) publishBlogWithRetry(ctx context.Context, blogId, accountId 
 	return lastErr
 }
 
-// publishBlog handles the actual publishing of a single blog
-func (s *Scheduler) publishBlog(ctx context.Context, blogId, accountId string, blog map[string]interface{}) error {
-	// Update blog status in Elasticsearch
-	_, err := s.db.PublishScheduledBlog(ctx, blogId)
+// publishBlog handles the actual publishing of a single blog.
+// Uses optimistic concurrency control to prevent duplicate publishes across instances.
+func (s *Scheduler) publishBlog(ctx context.Context, blogId, accountId string, dueBlog database.DueScheduledBlog) error {
+	// Use optimistic concurrency control to prevent duplicate publishes
+	seqNo := dueBlog.SeqNo
+	primaryTerm := dueBlog.PrimaryTerm
+
+	// Update blog status in Elasticsearch with version check
+	_, err := s.db.PublishScheduledBlog(ctx, blogId, &seqNo, &primaryTerm)
 	if err != nil {
 		return err
 	}
 
 	// Extract tags from blog
 	var tags []string
-	if tagsInterface, ok := blog["tags"].([]interface{}); ok {
+	if tagsInterface, ok := dueBlog.Source["tags"].([]interface{}); ok {
 		for _, t := range tagsInterface {
 			if tag, ok := t.(string); ok {
 				tags = append(tags, tag)
@@ -223,7 +248,7 @@ func (s *Scheduler) publishBlog(ctx context.Context, blogId, accountId string, b
 	// Handle SEO (async, non-blocking)
 	go func() {
 		slug := ""
-		if s, ok := blog["slug"].(string); ok {
+		if s, ok := dueBlog.Source["slug"].(string); ok {
 			slug = s
 		}
 		if slug == "" {

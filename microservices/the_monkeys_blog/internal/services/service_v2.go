@@ -575,10 +575,13 @@ func (blog *BlogService) MetaGetUsersBlogs(req *pb.BlogListReq, stream pb.BlogSe
 
 	if req.IsDraft {
 		blog.logger.Debug("Fetching draft blogs by account ID")
-		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, req.Limit, req.Offset)
+		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, false, req.Limit, req.Offset)
+	} else if req.IsSchedule {
+		blog.logger.Debug("Fetching schedule blogs by account ID")
+		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, true, req.Limit, req.Offset)
 	} else {
 		blog.logger.Debug("Fetching published blogs by account ID")
-		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, false, req.Limit, req.Offset)
+		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, false, false, req.Limit, req.Offset)
 	}
 
 	if err != nil {

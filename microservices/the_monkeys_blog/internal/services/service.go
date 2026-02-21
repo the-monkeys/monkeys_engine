@@ -628,6 +628,10 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 		// Try draft blogs if published blog not found
 		blogData, err = blog.osClient.GetBlogByBlogId(ctx, blogId, true)
 		if err != nil {
+			// Try draft blogs if published blog not found
+			blogData, err = blog.osClient.GetBlogByBlogId(ctx, blogId, true)
+		}
+		if err != nil {
 			blog.logger.Warnf("could not fetch blog metadata for activity tracking, blogId: %s, error: %v", blogId, err)
 			return nil
 		}
@@ -1000,28 +1004,8 @@ func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogR
 
 	}()
 
-	go func() {
-		// Get the blog slug and do the google search engine optimization
-		slug := req.Publish.Slug
-		if slug == "" {
-			blog.logger.Warnf("slug is empty for blog id: %s, generating a new slug", req.Publish.BlogId)
-			slug = fmt.Sprintf("blog-%s", req.Publish.BlogId)
-		}
-
-		// A slug looks like: proxmox-virtual-environment-the-practical-guide-for-smart-virtualization-78li3
-		// Add https://monkeys.com.co host and append /blog/ with host and then followed by slug
-		// The complete slug should look like: https://monkeys.com.co/blog/proxmox-virtual-environment-the-practical-guide-for-smart-virtualization-78li3
-
-		// Call a function to handle SEO asynchronously
-		err := blog.seoManager.HandleSEOForBlog(ctx, req.Publish.BlogId, slug)
-		if err != nil {
-			blog.logger.Errorf("failed to handle SEO for blog: user_id=%s, blog_id=%s, error=%v", req.Publish.AccountId, req.Publish.BlogId, err)
-		}
-
-	}()
-
-	// // Track blog activity
-	// blog.trackBlogActivity(req.Publish.AccountId, "publish_blog", "blog", req.Publish.BlogId, req)
+	// Track blog activity
+	blog.trackBlogActivity(req.Publish.AccountId, "schedule_blog", "blog", req.Publish.BlogId, req)
 
 	t := req.ScheduleTime.AsTime()
 
@@ -1033,156 +1017,6 @@ func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogR
 		),
 	}, nil
 
-}
-
-// GetAllScheduleBlogs returns scheduled blogs, filtered by account_id if provided
-func (blog *BlogService) GetAllScheduleBlogs(ctx context.Context, req *pb.GetAllScheduleBlogsReq) (*pb.GetPublishedBlogsRes, error) {
-	blog.logger.Infof("Getting scheduled blogs for account: %s", req.AccountId)
-
-	var res *pb.GetPublishedBlogsRes
-	var err error
-
-	// If account_id is provided, filter by it
-	if req.AccountId != "" {
-		res, err = blog.osClient.GetScheduleBlogsByAccountId(ctx, req.AccountId)
-	} else {
-		// Get all scheduled blogs (admin-only use case)
-		res, err = blog.osClient.GetAllScheduleBlogs(ctx)
-	}
-
-	if err != nil {
-		blog.logger.Errorf("Error fetching scheduled blogs: %v", err)
-		return nil, status.Errorf(codes.Internal, "couldn't fetch scheduled blogs")
-	}
-	return res, nil
-}
-
-// DeleteScheduleBlog deletes a scheduled blog
-func (blog *BlogService) DeleteScheduleBlog(ctx context.Context, req *pb.DeleteScheduleBlogReq) (*pb.DeleteScheduleBlogResp, error) {
-	blog.logger.Infof("User %s requested to delete scheduled blog: %s", req.AccountId, req.BlogId)
-
-	// Check if the blog exists
-	exists, blogInfo, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("Error checking blog existence: %v", err)
-		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.BlogId)
-	}
-
-	if !exists {
-		blog.logger.Errorf("The blog with ID: %s doesn't exist", req.BlogId)
-		return nil, status.Errorf(codes.NotFound, "cannot find the blog for id: %s", req.BlogId)
-	}
-
-	// Verify ownership
-	ownerAccountId, _ := blogInfo["owner_account_id"].(string)
-	if ownerAccountId != req.AccountId {
-		blog.logger.Errorf("User %s doesn't own the blog %s", req.AccountId, req.BlogId)
-		return nil, status.Errorf(codes.PermissionDenied, "you don't have permission to delete this blog")
-	}
-
-	// Verify blog is scheduled
-	isScheduled, _ := blogInfo["is_schedule"].(bool)
-	if !isScheduled {
-		blog.logger.Errorf("The blog %s is not scheduled", req.BlogId)
-		return nil, status.Errorf(codes.FailedPrecondition, "the blog is not scheduled")
-	}
-
-	// Delete the blog
-	_, err = blog.osClient.DeleteABlogById(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("Error deleting scheduled blog: %s, error: %v", req.BlogId, err)
-		return nil, status.Errorf(codes.Internal, "cannot delete the blog for id: %s", req.BlogId)
-	}
-
-	// Send RabbitMQ message
-	bx, err := json.Marshal(models.InterServiceMessage{
-		AccountId:  req.AccountId,
-		BlogId:     req.BlogId,
-		Action:     constants.BLOG_DELETE,
-		BlogStatus: "Deleted",
-	})
-
-	if err != nil {
-		blog.logger.Errorf("failed to marshal message for blog delete: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
-	} else {
-		go func() {
-			err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
-			if err != nil {
-				blog.logger.Errorf("failed to publish blog delete message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
-			}
-		}()
-	}
-
-	// Track blog activity
-	blog.trackBlogActivity(req.AccountId, "delete_scheduled_blog", "blog", req.BlogId, req)
-
-	return &pb.DeleteScheduleBlogResp{
-		Message: fmt.Sprintf("the scheduled blog %s has been deleted!", req.BlogId),
-	}, nil
-}
-
-// MoveScheduleBlogToDraft cancels a scheduled blog and moves it back to draft
-func (blog *BlogService) MoveScheduleBlogToDraft(ctx context.Context, req *pb.MoveScheduleBlogToDraftReq) (*pb.MoveScheduleBlogToDraftResp, error) {
-	blog.logger.Infof("User %s requested to move scheduled blog %s to draft", req.AccountId, req.BlogId)
-
-	// Check if the blog exists
-	exists, blogInfo, err := blog.osClient.DoesBlogExist(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("Error checking blog existence: %v", err)
-		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.BlogId)
-	}
-
-	if !exists {
-		blog.logger.Errorf("The blog with ID: %s doesn't exist", req.BlogId)
-		return nil, status.Errorf(codes.NotFound, "cannot find the blog for id: %s", req.BlogId)
-	}
-
-	// Verify ownership
-	ownerAccountId, _ := blogInfo["owner_account_id"].(string)
-	if ownerAccountId != req.AccountId {
-		blog.logger.Errorf("User %s doesn't own the blog %s", req.AccountId, req.BlogId)
-		return nil, status.Errorf(codes.PermissionDenied, "you don't have permission to modify this blog")
-	}
-
-	// Verify blog is scheduled
-	isScheduled, _ := blogInfo["is_schedule"].(bool)
-	if !isScheduled {
-		blog.logger.Errorf("The blog %s is not scheduled", req.BlogId)
-		return nil, status.Errorf(codes.FailedPrecondition, "the blog is not scheduled")
-	}
-
-	// Cancel the schedule and move to draft (MoveBlogToDraft handles both)
-	_, err = blog.osClient.MoveBlogToDraft(ctx, req.BlogId)
-	if err != nil {
-		blog.logger.Errorf("Error moving scheduled blog to draft: %s, error: %v", req.BlogId, err)
-		return nil, status.Errorf(codes.Internal, "cannot move the scheduled blog to draft for id: %s", req.BlogId)
-	}
-
-	// Send RabbitMQ message
-	bx, err := json.Marshal(models.InterServiceMessage{
-		AccountId:  req.AccountId,
-		BlogId:     req.BlogId,
-		Action:     constants.BLOG_UPDATE,
-		BlogStatus: constants.BlogStatusDraft,
-	})
-
-	if err != nil {
-		blog.logger.Errorf("failed to marshal message for schedule cancellation: user_id=%s, blog_id=%s, error=%v", req.AccountId, req.BlogId, err)
-	} else {
-		go func() {
-			err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
-			if err != nil {
-				blog.logger.Errorf("failed to publish schedule cancellation message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
-			}
-		}()
-	}
-
-	// Track blog activity
-	blog.trackBlogActivity(req.AccountId, "cancel_schedule_blog", "blog", req.BlogId, req)
-
-	return &pb.MoveScheduleBlogToDraftResp{
-		Message: fmt.Sprintf("the scheduled blog %s has been moved to draft!", req.BlogId),
-	}, nil
 }
 
 func (blog *BlogService) MoveBlogToDraftStatus(ctx context.Context, req *pb.BlogReq) (*pb.BlogResp, error) {

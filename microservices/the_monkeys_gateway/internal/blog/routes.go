@@ -203,8 +203,10 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routesV2.GET("/in-my-bookmark", rateLimiter, blogClient.MetaMyBookmarks) // Get my bookmark blog by id
 		// My feed blogs, contains blogs from people I follow + my own blogs + topics I follow
 		// routesV2.GET("/my-feed", blogClient.MyFeedBlogs) // Get my feed blogs
+		routesV2.GET("/my-scheduled_blog", rateLimiter, blogClient.MetaMyScheduleBlogs)
 	}
 
+	// Todo: removeing the unused code
 	// Authorization required APIs
 	{
 		// Write a blog, when the user have edit access
@@ -213,10 +215,8 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routesV2.POST("/to-draft/:blog_id", mware.AuthzRequired, blogClient.MoveBlogToDraft)
 		// Get my draft blog by id
 		routesV2.GET("/my-draft/:blog_id", mware.AuthzRequired, blogClient.GetDraftBlogByBlogIdV2)
+		// Schedule blog
 		routesV2.POST("/:blog_id/schedule_blog", mware.AuthzRequired, blogClient.ScheduleBlog)
-		routesV2.GET("/my-scheduled_blog", mware.AuthRequired, blogClient.GetAllScheduleBlogs)
-		routesV2.DELETE("/:blog_id/schedule", mware.AuthzRequired, blogClient.DeleteScheduleBlog)
-		routesV2.POST("/:blog_id/schedule/to-draft", mware.AuthzRequired, blogClient.MoveScheduleBlogToDraft)
 	}
 
 	// -------------------------------------------------- Section-based News APIs --------------------------------------------------
@@ -518,10 +518,6 @@ func (asc *BlogServiceClient) ScheduleBlog(ctx *gin.Context) {
 	}
 
 	id := ctx.Param("blog_id")
-
-	fmt.Printf("accId: %v\n", accId)
-	fmt.Printf("id: %v\n", id)
-	fmt.Printf("publishBody: %+v\n", scheduleBody)
 
 	resp, err := asc.Client.ScheduleBlog(
 		context.Background(),

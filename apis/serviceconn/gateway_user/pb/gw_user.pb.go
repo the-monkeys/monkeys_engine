@@ -7,13 +7,12 @@
 package pb
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -2533,100 +2532,6 @@ func (x *FollowerFollowingCountsResp) GetStatus() int32 {
 		return x.Status
 	}
 	return 0
-}
-
-type GetBatchUserDetailsReq struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	AccountIds []string `protobuf:"bytes,1,rep,name=account_ids,json=accountIds,proto3" json:"account_ids,omitempty"`
-}
-
-func (x *GetBatchUserDetailsReq) Reset() {
-	*x = GetBatchUserDetailsReq{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetBatchUserDetailsReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetBatchUserDetailsReq) ProtoMessage() {}
-
-func (x *GetBatchUserDetailsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[34]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetBatchUserDetailsReq.ProtoReflect.Descriptor instead.
-func (*GetBatchUserDetailsReq) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{34}
-}
-
-func (x *GetBatchUserDetailsReq) GetAccountIds() []string {
-	if x != nil {
-		return x.AccountIds
-	}
-	return nil
-}
-
-type GetBatchUserDetailsRes struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Users []*UserDetailsResp `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
-}
-
-func (x *GetBatchUserDetailsRes) Reset() {
-	*x = GetBatchUserDetailsRes{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetBatchUserDetailsRes) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetBatchUserDetailsRes) ProtoMessage() {}
-
-func (x *GetBatchUserDetailsRes) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_user_pb_gw_user_proto_msgTypes[35]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetBatchUserDetailsRes.ProtoReflect.Descriptor instead.
-func (*GetBatchUserDetailsRes) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_user_pb_gw_user_proto_rawDescGZIP(), []int{35}
-}
-
-func (x *GetBatchUserDetailsRes) GetUsers() []*UserDetailsResp {
-	if x != nil {
-		return x.Users
-	}
-	return nil
 }
 
 type GetBatchUserDetailsReq struct {
