@@ -435,17 +435,8 @@ message GetScheduleBlogsByAccountIdReq {
     ClientInfo client_info = 2;
 }
 
-// Delete a scheduled blog
-message DeleteScheduleBlogReq {
-    string blog_id = 1;
-    string account_id = 2;
-    ClientInfo client_info = 3;
-}
 
-message DeleteScheduleBlogResp {
-    string message = 1;
-    string error = 2;
-}
+
 
 message MoveScheduleBlogToDraftResp {
     string message = 1;
@@ -471,7 +462,6 @@ service BlogService {
     rpc GetPublishedBlogsByAccID(BlogByIdReq) returns (GetPublishedBlogsRes);
     rpc GetLatest100Blogs(GetBlogsByTagsNameReq) returns (GetBlogsByTagsNameRes);
     rpc GetPublishedBlogByIdAndOwnerId(BlogByIdReq) returns (BlogByIdRes);
-    rpc DeleteScheduleBlog(DeleteScheduleBlogReq) returns (DeleteScheduleBlogResp);
 
     rpc GetAllBlogsByBlogIds(GetBlogsByBlogIds) returns (GetBlogsRes) {};
 

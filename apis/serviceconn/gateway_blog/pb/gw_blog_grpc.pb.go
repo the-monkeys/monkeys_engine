@@ -33,7 +33,6 @@ const (
 	BlogService_GetPublishedBlogsByAccID_FullMethodName       = "/blog_svc.BlogService/GetPublishedBlogsByAccID"
 	BlogService_GetLatest100Blogs_FullMethodName              = "/blog_svc.BlogService/GetLatest100Blogs"
 	BlogService_GetPublishedBlogByIdAndOwnerId_FullMethodName = "/blog_svc.BlogService/GetPublishedBlogByIdAndOwnerId"
-	BlogService_DeleteScheduleBlog_FullMethodName             = "/blog_svc.BlogService/DeleteScheduleBlog"
 	BlogService_GetAllBlogsByBlogIds_FullMethodName           = "/blog_svc.BlogService/GetAllBlogsByBlogIds"
 	BlogService_CheckIfBlogsExist_FullMethodName              = "/blog_svc.BlogService/CheckIfBlogsExist"
 	BlogService_DeleteABlogByBlogId_FullMethodName            = "/blog_svc.BlogService/DeleteABlogByBlogId"
@@ -72,7 +71,6 @@ type BlogServiceClient interface {
 	GetPublishedBlogsByAccID(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(ctx context.Context, in *GetBlogsByTagsNameReq, opts ...grpc.CallOption) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogByIdRes, error)
-	DeleteScheduleBlog(ctx context.Context, in *DeleteScheduleBlogReq, opts ...grpc.CallOption) (*DeleteScheduleBlogResp, error)
 	GetAllBlogsByBlogIds(ctx context.Context, in *GetBlogsByBlogIds, opts ...grpc.CallOption) (*GetBlogsRes, error)
 	CheckIfBlogsExist(ctx context.Context, in *BlogByIdReq, opts ...grpc.CallOption) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(ctx context.Context, in *DeleteBlogReq, opts ...grpc.CallOption) (*DeleteBlogResp, error)
@@ -243,16 +241,6 @@ func (c *blogServiceClient) GetPublishedBlogByIdAndOwnerId(ctx context.Context, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BlogByIdRes)
 	err := c.cc.Invoke(ctx, BlogService_GetPublishedBlogByIdAndOwnerId_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *blogServiceClient) DeleteScheduleBlog(ctx context.Context, in *DeleteScheduleBlogReq, opts ...grpc.CallOption) (*DeleteScheduleBlogResp, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteScheduleBlogResp)
-	err := c.cc.Invoke(ctx, BlogService_DeleteScheduleBlog_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +475,6 @@ type BlogServiceServer interface {
 	GetPublishedBlogsByAccID(context.Context, *BlogByIdReq) (*GetPublishedBlogsRes, error)
 	GetLatest100Blogs(context.Context, *GetBlogsByTagsNameReq) (*GetBlogsByTagsNameRes, error)
 	GetPublishedBlogByIdAndOwnerId(context.Context, *BlogByIdReq) (*BlogByIdRes, error)
-	DeleteScheduleBlog(context.Context, *DeleteScheduleBlogReq) (*DeleteScheduleBlogResp, error)
 	GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error)
 	CheckIfBlogsExist(context.Context, *BlogByIdReq) (*BlogExistsRes, error)
 	DeleteABlogByBlogId(context.Context, *DeleteBlogReq) (*DeleteBlogResp, error)
@@ -554,9 +541,6 @@ func (UnimplementedBlogServiceServer) GetLatest100Blogs(context.Context, *GetBlo
 }
 func (UnimplementedBlogServiceServer) GetPublishedBlogByIdAndOwnerId(context.Context, *BlogByIdReq) (*BlogByIdRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPublishedBlogByIdAndOwnerId not implemented")
-}
-func (UnimplementedBlogServiceServer) DeleteScheduleBlog(context.Context, *DeleteScheduleBlogReq) (*DeleteScheduleBlogResp, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteScheduleBlog not implemented")
 }
 func (UnimplementedBlogServiceServer) GetAllBlogsByBlogIds(context.Context, *GetBlogsByBlogIds) (*GetBlogsRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAllBlogsByBlogIds not implemented")
@@ -844,24 +828,6 @@ func _BlogService_GetPublishedBlogByIdAndOwnerId_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BlogService_DeleteScheduleBlog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteScheduleBlogReq)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlogServiceServer).DeleteScheduleBlog(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BlogService_DeleteScheduleBlog_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServiceServer).DeleteScheduleBlog(ctx, req.(*DeleteScheduleBlogReq))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _BlogService_GetAllBlogsByBlogIds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetBlogsByBlogIds)
 	if err := dec(in); err != nil {
@@ -1129,10 +1095,6 @@ var BlogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPublishedBlogByIdAndOwnerId",
 			Handler:    _BlogService_GetPublishedBlogByIdAndOwnerId_Handler,
-		},
-		{
-			MethodName: "DeleteScheduleBlog",
-			Handler:    _BlogService_DeleteScheduleBlog_Handler,
 		},
 		{
 			MethodName: "GetAllBlogsByBlogIds",

@@ -947,8 +947,6 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	}, nil
 }
 
-// Todo: working of schedule blog feature
-
 func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogReq) (*pb.ScheduleBlogResp, error) {
 	blog.logger.Infof("The user has requested to publish the blog: %s", req.Publish.BlogId)
 
@@ -973,8 +971,6 @@ func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogR
 		blog.logger.Errorf("Error Publishing the blog: %s, error: %v", req.Publish.BlogId, err)
 		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.Publish.BlogId)
 	}
-
-	// TODO: Add Tags to the db if not already added
 
 	bx, err := json.Marshal(models.InterServiceMessage{
 		AccountId:    req.Publish.AccountId,
@@ -1004,7 +1000,6 @@ func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogR
 
 	}()
 
-	// Track blog activity
 	blog.trackBlogActivity(req.Publish.AccountId, "schedule_blog", "blog", req.Publish.BlogId, req)
 
 	t := req.ScheduleTime.AsTime()

@@ -3489,119 +3489,6 @@ func (x *GetScheduleBlogsByAccountIdReq) GetClientInfo() *ClientInfo {
 	return nil
 }
 
-// Delete a scheduled blog
-type DeleteScheduleBlogReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BlogId        string                 `protobuf:"bytes,1,opt,name=blog_id,json=blogId,proto3" json:"blog_id,omitempty"`
-	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ClientInfo    *ClientInfo            `protobuf:"bytes,3,opt,name=client_info,json=clientInfo,proto3" json:"client_info,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteScheduleBlogReq) Reset() {
-	*x = DeleteScheduleBlogReq{}
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[39]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteScheduleBlogReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteScheduleBlogReq) ProtoMessage() {}
-
-func (x *DeleteScheduleBlogReq) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[39]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteScheduleBlogReq.ProtoReflect.Descriptor instead.
-func (*DeleteScheduleBlogReq) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{39}
-}
-
-func (x *DeleteScheduleBlogReq) GetBlogId() string {
-	if x != nil {
-		return x.BlogId
-	}
-	return ""
-}
-
-func (x *DeleteScheduleBlogReq) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
-}
-
-func (x *DeleteScheduleBlogReq) GetClientInfo() *ClientInfo {
-	if x != nil {
-		return x.ClientInfo
-	}
-	return nil
-}
-
-type DeleteScheduleBlogResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteScheduleBlogResp) Reset() {
-	*x = DeleteScheduleBlogResp{}
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[40]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteScheduleBlogResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteScheduleBlogResp) ProtoMessage() {}
-
-func (x *DeleteScheduleBlogResp) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[40]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteScheduleBlogResp.ProtoReflect.Descriptor instead.
-func (*DeleteScheduleBlogResp) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{40}
-}
-
-func (x *DeleteScheduleBlogResp) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *DeleteScheduleBlogResp) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
 type MoveScheduleBlogToDraftResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
@@ -3612,7 +3499,7 @@ type MoveScheduleBlogToDraftResp struct {
 
 func (x *MoveScheduleBlogToDraftResp) Reset() {
 	*x = MoveScheduleBlogToDraftResp{}
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[41]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3624,7 +3511,7 @@ func (x *MoveScheduleBlogToDraftResp) String() string {
 func (*MoveScheduleBlogToDraftResp) ProtoMessage() {}
 
 func (x *MoveScheduleBlogToDraftResp) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[41]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3637,7 +3524,7 @@ func (x *MoveScheduleBlogToDraftResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveScheduleBlogToDraftResp.ProtoReflect.Descriptor instead.
 func (*MoveScheduleBlogToDraftResp) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{41}
+	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *MoveScheduleBlogToDraftResp) GetMessage() string {
@@ -3668,7 +3555,7 @@ type TrackInteractionReq struct {
 
 func (x *TrackInteractionReq) Reset() {
 	*x = TrackInteractionReq{}
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[42]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3680,7 +3567,7 @@ func (x *TrackInteractionReq) String() string {
 func (*TrackInteractionReq) ProtoMessage() {}
 
 func (x *TrackInteractionReq) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[42]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3693,7 +3580,7 @@ func (x *TrackInteractionReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrackInteractionReq.ProtoReflect.Descriptor instead.
 func (*TrackInteractionReq) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{42}
+	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *TrackInteractionReq) GetBlogId() string {
@@ -3748,7 +3635,7 @@ type TrackInteractionResp struct {
 
 func (x *TrackInteractionResp) Reset() {
 	*x = TrackInteractionResp{}
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[43]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3760,7 +3647,7 @@ func (x *TrackInteractionResp) String() string {
 func (*TrackInteractionResp) ProtoMessage() {}
 
 func (x *TrackInteractionResp) ProtoReflect() protoreflect.Message {
-	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[43]
+	mi := &file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3773,7 +3660,7 @@ func (x *TrackInteractionResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrackInteractionResp.ProtoReflect.Descriptor instead.
 func (*TrackInteractionResp) Descriptor() ([]byte, []int) {
-	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{43}
+	return file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *TrackInteractionResp) GetSuccess() bool {
@@ -4152,16 +4039,7 @@ const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x125\n" +
 	"\vclient_info\x18\x02 \x01(\v2\x14.blog_svc.ClientInfoR\n" +
-	"clientInfo\"\x86\x01\n" +
-	"\x15DeleteScheduleBlogReq\x12\x17\n" +
-	"\ablog_id\x18\x01 \x01(\tR\x06blogId\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x02 \x01(\tR\taccountId\x125\n" +
-	"\vclient_info\x18\x03 \x01(\v2\x14.blog_svc.ClientInfoR\n" +
-	"clientInfo\"H\n" +
-	"\x16DeleteScheduleBlogResp\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"M\n" +
+	"clientInfo\"M\n" +
 	"\x1bMoveScheduleBlogToDraftResp\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\x85\x02\n" +
@@ -4184,7 +4062,7 @@ const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\x0fPLATFORM_MOBILE\x10\x02\x12\x13\n" +
 	"\x0fPLATFORM_TABLET\x10\x03\x12\x10\n" +
 	"\fPLATFORM_API\x10\x04\x12\x14\n" +
-	"\x10PLATFORM_DESKTOP\x10\x052\xb6\x10\n" +
+	"\x10PLATFORM_DESKTOP\x10\x052\xdd\x0f\n" +
 	"\vBlogService\x12A\n" +
 	"\x10GetBlogsMetadata\x12\x15.blog_svc.BlogListReq\x1a\x14.google.protobuf.Any0\x01\x12B\n" +
 	"\x13SearchBlogsMetadata\x12\x13.blog_svc.SearchReq\x1a\x14.google.protobuf.Any0\x01\x12B\n" +
@@ -4198,8 +4076,7 @@ const file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc = "" +
 	"\x14GetDraftBlogsByAccId\x12\x15.blog_svc.BlogByIdReq\x1a\x1a.blog_svc.GetDraftBlogsRes\x12Q\n" +
 	"\x18GetPublishedBlogsByAccID\x12\x15.blog_svc.BlogByIdReq\x1a\x1e.blog_svc.GetPublishedBlogsRes\x12U\n" +
 	"\x11GetLatest100Blogs\x12\x1f.blog_svc.GetBlogsByTagsNameReq\x1a\x1f.blog_svc.GetBlogsByTagsNameRes\x12N\n" +
-	"\x1eGetPublishedBlogByIdAndOwnerId\x12\x15.blog_svc.BlogByIdReq\x1a\x15.blog_svc.BlogByIdRes\x12W\n" +
-	"\x12DeleteScheduleBlog\x12\x1f.blog_svc.DeleteScheduleBlogReq\x1a .blog_svc.DeleteScheduleBlogResp\x12L\n" +
+	"\x1eGetPublishedBlogByIdAndOwnerId\x12\x15.blog_svc.BlogByIdReq\x1a\x15.blog_svc.BlogByIdRes\x12L\n" +
 	"\x14GetAllBlogsByBlogIds\x12\x1b.blog_svc.GetBlogsByBlogIds\x1a\x15.blog_svc.GetBlogsRes\"\x00\x12C\n" +
 	"\x11CheckIfBlogsExist\x12\x15.blog_svc.BlogByIdReq\x1a\x17.blog_svc.BlogExistsRes\x12H\n" +
 	"\x13DeleteABlogByBlogId\x12\x17.blog_svc.DeleteBlogReq\x1a\x18.blog_svc.DeleteBlogResp\x12D\n" +
@@ -4229,7 +4106,7 @@ func file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDescGZIP() []byte {
 }
 
 var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_goTypes = []any{
 	(Platform)(0),                          // 0: blog_svc.Platform
 	(*ClientInfo)(nil),                     // 1: blog_svc.ClientInfo
@@ -4271,14 +4148,12 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_goTypes = []any{
 	(*BlogListReq)(nil),                    // 37: blog_svc.BlogListReq
 	(*SearchReq)(nil),                      // 38: blog_svc.SearchReq
 	(*GetScheduleBlogsByAccountIdReq)(nil), // 39: blog_svc.GetScheduleBlogsByAccountIdReq
-	(*DeleteScheduleBlogReq)(nil),          // 40: blog_svc.DeleteScheduleBlogReq
-	(*DeleteScheduleBlogResp)(nil),         // 41: blog_svc.DeleteScheduleBlogResp
-	(*MoveScheduleBlogToDraftResp)(nil),    // 42: blog_svc.MoveScheduleBlogToDraftResp
-	(*TrackInteractionReq)(nil),            // 43: blog_svc.TrackInteractionReq
-	(*TrackInteractionResp)(nil),           // 44: blog_svc.TrackInteractionResp
-	(*timestamppb.Timestamp)(nil),          // 45: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                // 46: google.protobuf.Struct
-	(*anypb.Any)(nil),                      // 47: google.protobuf.Any
+	(*MoveScheduleBlogToDraftResp)(nil),    // 40: blog_svc.MoveScheduleBlogToDraftResp
+	(*TrackInteractionReq)(nil),            // 41: blog_svc.TrackInteractionReq
+	(*TrackInteractionResp)(nil),           // 42: blog_svc.TrackInteractionResp
+	(*timestamppb.Timestamp)(nil),          // 43: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                // 44: google.protobuf.Struct
+	(*anypb.Any)(nil),                      // 45: google.protobuf.Any
 }
 var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_depIdxs = []int32{
 	0,  // 0: blog_svc.ClientInfo.platform:type_name -> blog_svc.Platform
@@ -4296,7 +4171,7 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_depIdxs = []int32{
 	0,  // 12: blog_svc.PublishBlogReq.platform:type_name -> blog_svc.Platform
 	1,  // 13: blog_svc.PublishBlogReq.client_info:type_name -> blog_svc.ClientInfo
 	12, // 14: blog_svc.ScheduleBlogReq.publish:type_name -> blog_svc.PublishBlogReq
-	45, // 15: blog_svc.ScheduleBlogReq.schedule_time:type_name -> google.protobuf.Timestamp
+	43, // 15: blog_svc.ScheduleBlogReq.schedule_time:type_name -> google.protobuf.Timestamp
 	1,  // 16: blog_svc.BlogByIdReq.client_info:type_name -> blog_svc.ClientInfo
 	4,  // 17: blog_svc.BlogByIdRes.blog:type_name -> blog_svc.Blog
 	1,  // 18: blog_svc.ArchiveBlogReq.client_info:type_name -> blog_svc.ClientInfo
@@ -4320,72 +4195,69 @@ var file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_depIdxs = []int32{
 	0,  // 36: blog_svc.SearchReq.platform:type_name -> blog_svc.Platform
 	1,  // 37: blog_svc.SearchReq.client_info:type_name -> blog_svc.ClientInfo
 	1,  // 38: blog_svc.GetScheduleBlogsByAccountIdReq.client_info:type_name -> blog_svc.ClientInfo
-	1,  // 39: blog_svc.DeleteScheduleBlogReq.client_info:type_name -> blog_svc.ClientInfo
-	1,  // 40: blog_svc.TrackInteractionReq.client_info:type_name -> blog_svc.ClientInfo
-	46, // 41: blog_svc.TrackInteractionReq.metadata:type_name -> google.protobuf.Struct
-	37, // 42: blog_svc.BlogService.GetBlogsMetadata:input_type -> blog_svc.BlogListReq
-	38, // 43: blog_svc.BlogService.SearchBlogsMetadata:input_type -> blog_svc.SearchReq
-	12, // 44: blog_svc.BlogService.PublishBlog:input_type -> blog_svc.PublishBlogReq
-	13, // 45: blog_svc.BlogService.ScheduleBlog:input_type -> blog_svc.ScheduleBlogReq
-	2,  // 46: blog_svc.BlogService.DraftBlog:input_type -> blog_svc.DraftBlogRequest
-	16, // 47: blog_svc.BlogService.GetPublishedBlogById:input_type -> blog_svc.BlogByIdReq
-	16, // 48: blog_svc.BlogService.GetDraftBlogById:input_type -> blog_svc.BlogByIdReq
-	18, // 49: blog_svc.BlogService.ArchiveBlogById:input_type -> blog_svc.ArchiveBlogReq
-	20, // 50: blog_svc.BlogService.GetPublishedBlogsByTagsName:input_type -> blog_svc.GetBlogsByTagsNameReq
-	16, // 51: blog_svc.BlogService.GetDraftBlogsByAccId:input_type -> blog_svc.BlogByIdReq
-	16, // 52: blog_svc.BlogService.GetPublishedBlogsByAccID:input_type -> blog_svc.BlogByIdReq
-	20, // 53: blog_svc.BlogService.GetLatest100Blogs:input_type -> blog_svc.GetBlogsByTagsNameReq
-	16, // 54: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:input_type -> blog_svc.BlogByIdReq
-	40, // 55: blog_svc.BlogService.DeleteScheduleBlog:input_type -> blog_svc.DeleteScheduleBlogReq
-	30, // 56: blog_svc.BlogService.GetAllBlogsByBlogIds:input_type -> blog_svc.GetBlogsByBlogIds
-	16, // 57: blog_svc.BlogService.CheckIfBlogsExist:input_type -> blog_svc.BlogByIdReq
-	28, // 58: blog_svc.BlogService.DeleteABlogByBlogId:input_type -> blog_svc.DeleteBlogReq
-	16, // 59: blog_svc.BlogService.GetDraftBlogByBlogId:input_type -> blog_svc.BlogByIdReq
-	47, // 60: blog_svc.BlogService.DraftBlogV2:input_type -> google.protobuf.Any
-	32, // 61: blog_svc.BlogService.BlogsOfFollowingAccounts:input_type -> blog_svc.FollowingAccounts
-	33, // 62: blog_svc.BlogService.GetBlogs:input_type -> blog_svc.GetBlogsReq
-	35, // 63: blog_svc.BlogService.GetBlog:input_type -> blog_svc.BlogReq
-	35, // 64: blog_svc.BlogService.MoveBlogToDraftStatus:input_type -> blog_svc.BlogReq
-	34, // 65: blog_svc.BlogService.GetBlogsBySlice:input_type -> blog_svc.GetBlogsBySliceReq
-	37, // 66: blog_svc.BlogService.MetaGetFeedBlogs:input_type -> blog_svc.BlogListReq
-	37, // 67: blog_svc.BlogService.MetaGetUsersBlogs:input_type -> blog_svc.BlogListReq
-	37, // 68: blog_svc.BlogService.MetaGetBlogsByBlogIds:input_type -> blog_svc.BlogListReq
-	35, // 69: blog_svc.BlogService.UsersBlogData:input_type -> blog_svc.BlogReq
-	43, // 70: blog_svc.BlogService.TrackInteraction:input_type -> blog_svc.TrackInteractionReq
-	47, // 71: blog_svc.BlogService.GetBlogsMetadata:output_type -> google.protobuf.Any
-	47, // 72: blog_svc.BlogService.SearchBlogsMetadata:output_type -> google.protobuf.Any
-	14, // 73: blog_svc.BlogService.PublishBlog:output_type -> blog_svc.PublishBlogResp
-	15, // 74: blog_svc.BlogService.ScheduleBlog:output_type -> blog_svc.ScheduleBlogResp
-	3,  // 75: blog_svc.BlogService.DraftBlog:output_type -> blog_svc.BlogResponse
-	17, // 76: blog_svc.BlogService.GetPublishedBlogById:output_type -> blog_svc.BlogByIdRes
-	17, // 77: blog_svc.BlogService.GetDraftBlogById:output_type -> blog_svc.BlogByIdRes
-	19, // 78: blog_svc.BlogService.ArchiveBlogById:output_type -> blog_svc.ArchiveBlogResp
-	22, // 79: blog_svc.BlogService.GetPublishedBlogsByTagsName:output_type -> blog_svc.GetBlogsByTagsNameRes
-	24, // 80: blog_svc.BlogService.GetDraftBlogsByAccId:output_type -> blog_svc.GetDraftBlogsRes
-	25, // 81: blog_svc.BlogService.GetPublishedBlogsByAccID:output_type -> blog_svc.GetPublishedBlogsRes
-	22, // 82: blog_svc.BlogService.GetLatest100Blogs:output_type -> blog_svc.GetBlogsByTagsNameRes
-	17, // 83: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:output_type -> blog_svc.BlogByIdRes
-	41, // 84: blog_svc.BlogService.DeleteScheduleBlog:output_type -> blog_svc.DeleteScheduleBlogResp
-	31, // 85: blog_svc.BlogService.GetAllBlogsByBlogIds:output_type -> blog_svc.GetBlogsRes
-	27, // 86: blog_svc.BlogService.CheckIfBlogsExist:output_type -> blog_svc.BlogExistsRes
-	29, // 87: blog_svc.BlogService.DeleteABlogByBlogId:output_type -> blog_svc.DeleteBlogResp
-	17, // 88: blog_svc.BlogService.GetDraftBlogByBlogId:output_type -> blog_svc.BlogByIdRes
-	47, // 89: blog_svc.BlogService.DraftBlogV2:output_type -> google.protobuf.Any
-	47, // 90: blog_svc.BlogService.BlogsOfFollowingAccounts:output_type -> google.protobuf.Any
-	47, // 91: blog_svc.BlogService.GetBlogs:output_type -> google.protobuf.Any
-	47, // 92: blog_svc.BlogService.GetBlog:output_type -> google.protobuf.Any
-	36, // 93: blog_svc.BlogService.MoveBlogToDraftStatus:output_type -> blog_svc.BlogResp
-	47, // 94: blog_svc.BlogService.GetBlogsBySlice:output_type -> google.protobuf.Any
-	47, // 95: blog_svc.BlogService.MetaGetFeedBlogs:output_type -> google.protobuf.Any
-	47, // 96: blog_svc.BlogService.MetaGetUsersBlogs:output_type -> google.protobuf.Any
-	47, // 97: blog_svc.BlogService.MetaGetBlogsByBlogIds:output_type -> google.protobuf.Any
-	47, // 98: blog_svc.BlogService.UsersBlogData:output_type -> google.protobuf.Any
-	44, // 99: blog_svc.BlogService.TrackInteraction:output_type -> blog_svc.TrackInteractionResp
-	71, // [71:100] is the sub-list for method output_type
-	42, // [42:71] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	1,  // 39: blog_svc.TrackInteractionReq.client_info:type_name -> blog_svc.ClientInfo
+	44, // 40: blog_svc.TrackInteractionReq.metadata:type_name -> google.protobuf.Struct
+	37, // 41: blog_svc.BlogService.GetBlogsMetadata:input_type -> blog_svc.BlogListReq
+	38, // 42: blog_svc.BlogService.SearchBlogsMetadata:input_type -> blog_svc.SearchReq
+	12, // 43: blog_svc.BlogService.PublishBlog:input_type -> blog_svc.PublishBlogReq
+	13, // 44: blog_svc.BlogService.ScheduleBlog:input_type -> blog_svc.ScheduleBlogReq
+	2,  // 45: blog_svc.BlogService.DraftBlog:input_type -> blog_svc.DraftBlogRequest
+	16, // 46: blog_svc.BlogService.GetPublishedBlogById:input_type -> blog_svc.BlogByIdReq
+	16, // 47: blog_svc.BlogService.GetDraftBlogById:input_type -> blog_svc.BlogByIdReq
+	18, // 48: blog_svc.BlogService.ArchiveBlogById:input_type -> blog_svc.ArchiveBlogReq
+	20, // 49: blog_svc.BlogService.GetPublishedBlogsByTagsName:input_type -> blog_svc.GetBlogsByTagsNameReq
+	16, // 50: blog_svc.BlogService.GetDraftBlogsByAccId:input_type -> blog_svc.BlogByIdReq
+	16, // 51: blog_svc.BlogService.GetPublishedBlogsByAccID:input_type -> blog_svc.BlogByIdReq
+	20, // 52: blog_svc.BlogService.GetLatest100Blogs:input_type -> blog_svc.GetBlogsByTagsNameReq
+	16, // 53: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:input_type -> blog_svc.BlogByIdReq
+	30, // 54: blog_svc.BlogService.GetAllBlogsByBlogIds:input_type -> blog_svc.GetBlogsByBlogIds
+	16, // 55: blog_svc.BlogService.CheckIfBlogsExist:input_type -> blog_svc.BlogByIdReq
+	28, // 56: blog_svc.BlogService.DeleteABlogByBlogId:input_type -> blog_svc.DeleteBlogReq
+	16, // 57: blog_svc.BlogService.GetDraftBlogByBlogId:input_type -> blog_svc.BlogByIdReq
+	45, // 58: blog_svc.BlogService.DraftBlogV2:input_type -> google.protobuf.Any
+	32, // 59: blog_svc.BlogService.BlogsOfFollowingAccounts:input_type -> blog_svc.FollowingAccounts
+	33, // 60: blog_svc.BlogService.GetBlogs:input_type -> blog_svc.GetBlogsReq
+	35, // 61: blog_svc.BlogService.GetBlog:input_type -> blog_svc.BlogReq
+	35, // 62: blog_svc.BlogService.MoveBlogToDraftStatus:input_type -> blog_svc.BlogReq
+	34, // 63: blog_svc.BlogService.GetBlogsBySlice:input_type -> blog_svc.GetBlogsBySliceReq
+	37, // 64: blog_svc.BlogService.MetaGetFeedBlogs:input_type -> blog_svc.BlogListReq
+	37, // 65: blog_svc.BlogService.MetaGetUsersBlogs:input_type -> blog_svc.BlogListReq
+	37, // 66: blog_svc.BlogService.MetaGetBlogsByBlogIds:input_type -> blog_svc.BlogListReq
+	35, // 67: blog_svc.BlogService.UsersBlogData:input_type -> blog_svc.BlogReq
+	41, // 68: blog_svc.BlogService.TrackInteraction:input_type -> blog_svc.TrackInteractionReq
+	45, // 69: blog_svc.BlogService.GetBlogsMetadata:output_type -> google.protobuf.Any
+	45, // 70: blog_svc.BlogService.SearchBlogsMetadata:output_type -> google.protobuf.Any
+	14, // 71: blog_svc.BlogService.PublishBlog:output_type -> blog_svc.PublishBlogResp
+	15, // 72: blog_svc.BlogService.ScheduleBlog:output_type -> blog_svc.ScheduleBlogResp
+	3,  // 73: blog_svc.BlogService.DraftBlog:output_type -> blog_svc.BlogResponse
+	17, // 74: blog_svc.BlogService.GetPublishedBlogById:output_type -> blog_svc.BlogByIdRes
+	17, // 75: blog_svc.BlogService.GetDraftBlogById:output_type -> blog_svc.BlogByIdRes
+	19, // 76: blog_svc.BlogService.ArchiveBlogById:output_type -> blog_svc.ArchiveBlogResp
+	22, // 77: blog_svc.BlogService.GetPublishedBlogsByTagsName:output_type -> blog_svc.GetBlogsByTagsNameRes
+	24, // 78: blog_svc.BlogService.GetDraftBlogsByAccId:output_type -> blog_svc.GetDraftBlogsRes
+	25, // 79: blog_svc.BlogService.GetPublishedBlogsByAccID:output_type -> blog_svc.GetPublishedBlogsRes
+	22, // 80: blog_svc.BlogService.GetLatest100Blogs:output_type -> blog_svc.GetBlogsByTagsNameRes
+	17, // 81: blog_svc.BlogService.GetPublishedBlogByIdAndOwnerId:output_type -> blog_svc.BlogByIdRes
+	31, // 82: blog_svc.BlogService.GetAllBlogsByBlogIds:output_type -> blog_svc.GetBlogsRes
+	27, // 83: blog_svc.BlogService.CheckIfBlogsExist:output_type -> blog_svc.BlogExistsRes
+	29, // 84: blog_svc.BlogService.DeleteABlogByBlogId:output_type -> blog_svc.DeleteBlogResp
+	17, // 85: blog_svc.BlogService.GetDraftBlogByBlogId:output_type -> blog_svc.BlogByIdRes
+	45, // 86: blog_svc.BlogService.DraftBlogV2:output_type -> google.protobuf.Any
+	45, // 87: blog_svc.BlogService.BlogsOfFollowingAccounts:output_type -> google.protobuf.Any
+	45, // 88: blog_svc.BlogService.GetBlogs:output_type -> google.protobuf.Any
+	45, // 89: blog_svc.BlogService.GetBlog:output_type -> google.protobuf.Any
+	36, // 90: blog_svc.BlogService.MoveBlogToDraftStatus:output_type -> blog_svc.BlogResp
+	45, // 91: blog_svc.BlogService.GetBlogsBySlice:output_type -> google.protobuf.Any
+	45, // 92: blog_svc.BlogService.MetaGetFeedBlogs:output_type -> google.protobuf.Any
+	45, // 93: blog_svc.BlogService.MetaGetUsersBlogs:output_type -> google.protobuf.Any
+	45, // 94: blog_svc.BlogService.MetaGetBlogsByBlogIds:output_type -> google.protobuf.Any
+	45, // 95: blog_svc.BlogService.UsersBlogData:output_type -> google.protobuf.Any
+	42, // 96: blog_svc.BlogService.TrackInteraction:output_type -> blog_svc.TrackInteractionResp
+	69, // [69:97] is the sub-list for method output_type
+	41, // [41:69] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_init() }
@@ -4399,7 +4271,7 @@ func file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc), len(file_apis_serviceconn_gateway_blog_pb_gw_blog_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   44,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
