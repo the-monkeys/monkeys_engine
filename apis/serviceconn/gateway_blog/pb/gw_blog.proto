@@ -4,6 +4,7 @@ package blog_svc;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "./apis/serviceconn/gateway_blog/pb";
 
@@ -193,9 +194,20 @@ message PublishBlogReq {
     ClientInfo client_info = 11;
 }
 
+message ScheduleBlogReq {
+    PublishBlogReq publish = 1;
+    google.protobuf.Timestamp schedule_time = 2;
+    string timezone = 3;
+}
+
 message PublishBlogResp {
     string message = 1;
     string error = 2;
+}
+
+message ScheduleBlogResp {
+     string message = 1;
+     string error = 2;
 }
 
 message BlogByIdReq {
@@ -251,6 +263,12 @@ message GetBlogs {
     repeated string tags = 4;
     string content_type = 5;
     repeated string author_list = 6;
+
+      // Scheduling metadata
+    bool is_schedule = 7;
+    bool is_draft = 8;
+    string schedule_time = 9;  // RFC3339 UTC
+    string timezone = 10;
 }
 
 message GetDraftBlogsRes {
@@ -259,6 +277,11 @@ message GetDraftBlogsRes {
 }
 
 message GetPublishedBlogsRes {
+    repeated GetBlogs blogs = 1;
+    string error = 2;
+}
+
+message GetScheduledBlogRes {
     repeated GetBlogs blogs = 1;
     string error = 2;
 }
@@ -375,6 +398,7 @@ message BlogListReq {
     int32 offset = 3;
     string accountId = 4; // Optional: filter by account ID
     bool isDraft = 5; // Optional: filter by draft status
+
     repeated string blog_ids = 6; // Optional: filter by specific blog IDs
     
     // Enhanced client tracking fields (backward compatible)
@@ -385,6 +409,7 @@ message BlogListReq {
     string referrer = 11;
     Platform platform = 12;
     ClientInfo client_info = 13;
+    bool isSchedule = 14;
 }
 
 message SearchReq {
@@ -403,12 +428,28 @@ message SearchReq {
     ClientInfo client_info = 11;
 }
 
+message GetScheduleBlogsByAccountIdReq {
+    // Account ID to filter blogs (if empty, returns all - only for admin)
+    string account_id = 1;
+    // Enhanced client tracking fields
+    ClientInfo client_info = 2;
+}
+
+
+
+
+message MoveScheduleBlogToDraftResp {
+    string message = 1;
+    string error = 2;
+}
+
 service BlogService {
     // Metadata may contain the blog id, owner account id, title, first paragraph, 
     // tags, first image, publish time, author name, etc.
     rpc GetBlogsMetadata(BlogListReq) returns (stream google.protobuf.Any);
     rpc SearchBlogsMetadata(SearchReq) returns (stream google.protobuf.Any);
     rpc PublishBlog(PublishBlogReq) returns (PublishBlogResp); // By blog id\
+    rpc ScheduleBlog(ScheduleBlogReq) returns (ScheduleBlogResp); 
     
     // --------------------------------------------------------------------- Deprecated APIs ---------------------------------------------------------------------
     // TODO: Remove the deprecated APIs

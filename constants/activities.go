@@ -34,6 +34,7 @@ const (
 	UpdateBlog               = "Updated the Blog"
 	DeleteBlog               = "Deleted the Blog %s"
 	PublishBlog              = "Published the Blog %s"
+	ScheduleBlog             = "Scheduled the Blog %s"
 	ArchiveBlog              = "Archived the Blog"
 	LikeBlog                 = "Liked a Blog %s"
 	UnlikeBlog               = "Unliked a Blog %s"

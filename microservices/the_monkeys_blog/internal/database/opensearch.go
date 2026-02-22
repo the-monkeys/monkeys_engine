@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,12 +17,43 @@ import (
 	"go.uber.org/zap"
 )
 
+// ScheduleBlogOptions contains all options for scheduling a blog
+type ScheduleBlogOptions struct {
+	BlogID       string    // Required: Blog ID to schedule
+	ScheduleTime time.Time // Required: When to publish the blog (in UTC)
+	Timezone     string    // Optional: User's timezone for display purposes
+}
+
+// Validate checks if the required fields are present
+func (o *ScheduleBlogOptions) Validate() error {
+	if o.BlogID == "" {
+		return fmt.Errorf("blogId cannot be empty")
+	}
+	if o.ScheduleTime.IsZero() {
+		return fmt.Errorf("scheduleTime cannot be empty")
+	}
+	return nil
+}
+
+// DueScheduledBlog represents a scheduled blog ready for publishing,
+// along with Elasticsearch version control fields for optimistic concurrency.
+type DueScheduledBlog struct {
+	Source      map[string]interface{}
+	SeqNo       int
+	PrimaryTerm int
+}
+
+// ErrVersionConflict is returned when an Elasticsearch update fails due to a
+// version conflict, indicating another scheduler instance already processed the document.
+var ErrVersionConflict = errors.New("elasticsearch version conflict: document was modified by another process")
+
 type ElasticsearchStorage interface {
 	DraftABlog(ctx context.Context, blog *pb.DraftBlogRequest) (*esapi.Response, error)
 	GetDraftBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetDraftBlogsRes, error)
 	GetDraftBlogByBlogId(ctx context.Context, blogId string) (*pb.BlogByIdRes, error)
 	DoesBlogExist(ctx context.Context, blogID string) (bool, map[string]interface{}, error)
 	PublishBlogById(ctx context.Context, blogId string) (*esapi.Response, error)
+	ScheduleBlogById(ctx context.Context, opts ScheduleBlogOptions) (*esapi.Response, error)
 	MoveBlogToDraft(ctx context.Context, blogId string) (*esapi.Response, error)
 	GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error)
 	GetPublishedBlogById(ctx context.Context, id string) (*pb.BlogByIdRes, error)
@@ -33,6 +65,10 @@ type ElasticsearchStorage interface {
 	GetPublishedBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetPublishedBlogsRes, error)
 	GetBlogsByBlogIds(ctx context.Context, blogIds []string) (*pb.GetBlogsRes, error)
 	DeleteBlogsByOwnerAccountID(ctx context.Context, ownerAccountId string) (*esapi.Response, error)
+	GetScheduledBlogsByOwnerAccountID(ctx context.Context, ownerAccountId string) (*pb.GetPublishedBlogsRes, error)
+	GetDueScheduledBlogs(ctx context.Context, currentTime time.Time, maxFailedAttempts int) ([]DueScheduledBlog, error)
+	PublishScheduledBlog(ctx context.Context, blogId string, seqNo *int, primaryTerm *int) (*esapi.Response, error)
+	IncrementScheduleFailedAttempts(ctx context.Context, blogId string, reason string) error
 
 	// -------------------------------------------------------------------------------- V2 --------------------------------------------------------------------------------
 	SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error)
@@ -50,7 +86,7 @@ type ElasticsearchStorage interface {
 	GetBlogsMetadataByTags(ctx context.Context, tags []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 	GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, int, error)
 	GetBlogsMetadataByQuery(ctx context.Context, queryTexts []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
-	GetBlogsMetaByAccountId(ctx context.Context, accountId string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
+	GetBlogsMetaByAccountId(ctx context.Context, accountId string, isDraft bool, isSchedule bool, limit, offset int32) ([]map[string]interface{}, int, error)
 	GetBlogsMetaByBlogIdsV2(ctx context.Context, blogIds []string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error)
 }
 
@@ -346,6 +382,142 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 	return blogs, nil
 }
 
+// Todo: get all the schedule blog and try to think about make this function also flexable for getting schedule blog with accountid
+func (es *elasticsearchStorage) GetScheduledBlogsByOwnerAccountID(ctx context.Context, ownerAccountID string) (*pb.GetPublishedBlogsRes, error) {
+
+	// Write and query to get schedule blog from elastic search
+	query := map[string]interface{}{
+		"sort": []map[string]interface{}{
+			{
+				"blog.time": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"owner_account_id.keyword": ownerAccountID,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_schedule": true,
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"is_draft": true,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+				"should": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": false,
+						},
+					},
+					{
+						"bool": map[string]interface{}{
+							"must_not": map[string]interface{}{
+								"exists": map[string]interface{}{
+									"field": "is_archived",
+								},
+							},
+						},
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		},
+	}
+
+	bs, err := json.Marshal(query)
+
+	// Todo: if changing the function name change the below name as well (match function name and below error message)
+	if err != nil {
+		es.log.Errorf("GetAllScheduleBlog: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	// Create a new search request with the query
+	req := esapi.SearchRequest{
+		Index: []string{constants.ElasticsearchBlogIndex},
+		Body:  strings.NewReader(string(bs)),
+	}
+
+	// Execute the search request
+	res, err := req.Do(ctx, es.client)
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetAllScheduleBlogs: error closing response body, error: %v", err)
+		}
+	}()
+
+	// Check if the response indicates an error
+	if res.IsError() {
+		err = fmt.Errorf("GetAllScheduleBlogs: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Read the response body
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetAllScheduleBlogs: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	// Parse the response body
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetAllScheduleBlogs: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	// Extract the hits from the response
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		err := fmt.Errorf("GetAllScheduleBlogs: failed to parse hits from response")
+		es.log.Error(err)
+		return nil, err
+	}
+
+	// Convert the hits to a slice of GetDraftBlogsRes
+	var blogs = &pb.GetPublishedBlogsRes{
+		Blogs: make([]*pb.GetBlogs, 0, len(hits)),
+	}
+	for _, hit := range hits {
+		hitSource := hit.(map[string]interface{})["_source"]
+		hitBytes, err := json.Marshal(hitSource)
+		if err != nil {
+			es.log.Errorf("GetAllScheduleBlogs: error marshaling hit source, error: %v", err)
+			continue
+		}
+
+		var blog pb.GetBlogs
+		if err := json.Unmarshal(hitBytes, &blog); err != nil {
+			es.log.Errorf("GetAllScheduleBlogs: error unmarshaling hit to GetBlogs, error: %v", err)
+			continue
+		}
+		blogs.Blogs = append(blogs.Blogs, &blog)
+	}
+
+	es.log.Infof("GetAllScheduleBlogs: successfully fetched %d published blogs for owner_account_id: %s", len(blogs.Blogs))
+	return blogs, nil
+
+}
+
 func (es *elasticsearchStorage) DoesBlogExist(ctx context.Context, blogID string) (bool, map[string]interface{}, error) {
 	// Ensure blogID is not empty
 	if blogID == "" {
@@ -462,6 +634,62 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 	return updateResponse, nil
 }
 
+// ScheduleBlogById schedules a blog for future publication
+func (es *elasticsearchStorage) ScheduleBlogById(ctx context.Context, opts ScheduleBlogOptions) (*esapi.Response, error) {
+	// Validate options
+	if err := opts.Validate(); err != nil {
+		es.log.Errorf("ScheduleBlogById: validation failed: %v", err)
+		return nil, err
+	}
+
+	// Build the update script - sets is_schedule=true, is_draft=true, and stores schedule_time + timezone
+	updateScript := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": `ctx._source.is_schedule = true; 
+			            ctx._source.is_draft = true; 
+			            ctx._source.schedule_time = params.schedule_time; 
+			            ctx._source.timezone = params.timezone;`,
+			"params": map[string]interface{}{
+				"schedule_time": opts.ScheduleTime.UTC().Format(time.RFC3339), // Store in UTC
+				"timezone":      opts.Timezone,
+			},
+		},
+	}
+
+	bs, err := json.Marshal(updateScript)
+	if err != nil {
+		es.log.Errorf("ScheduleBlogById: cannot marshal update script: %v", err)
+		return nil, err
+	}
+
+	req := esapi.UpdateRequest{
+		Index:      constants.ElasticsearchBlogIndex,
+		DocumentID: opts.BlogID,
+		Body:       strings.NewReader(string(bs)),
+	}
+
+	updateResponse, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("ScheduleBlogById: update request failed: %v", err)
+		return updateResponse, err
+	}
+	defer func() {
+		if err := updateResponse.Body.Close(); err != nil {
+			es.log.Errorf("ScheduleBlogById: error closing response body: %v", err)
+		}
+	}()
+
+	if updateResponse.IsError() {
+		err = fmt.Errorf("ScheduleBlogById: update failed for blog %s: %s", opts.BlogID, updateResponse.String())
+		es.log.Error(err)
+		return updateResponse, err
+	}
+
+	es.log.Infof("ScheduleBlogById: successfully scheduled blog %s for %s (%s)",
+		opts.BlogID, opts.ScheduleTime.Format(time.RFC3339), opts.Timezone)
+	return updateResponse, nil
+}
+
 func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId string) (*esapi.Response, error) {
 	// Ensure blogId is not empty
 	if blogId == "" {
@@ -469,10 +697,10 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 		return nil, fmt.Errorf("blogId cannot be empty")
 	}
 
-	// Build the update query to set is_draft to false and add published_time
+	// Build the update query to set is_draft to true and clear scheduling/publishing flags
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": "ctx._source.is_draft = true; ctx._source.published_time = params.published_time;",
+			"source": "ctx._source.is_draft = true; ctx._source.is_schedule = false; ctx._source.schedule_time = null; ctx._source.published_time = params.published_time; ctx._source.timezone = null",
 			"params": map[string]interface{}{
 				"published_time": time.Now().Format(time.RFC3339),
 			},
@@ -513,6 +741,276 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 
 	es.log.Infof("MoveBlogToDraft: successfully published blog with id: %s", blogId)
 	return updateResponse, nil
+}
+
+// GetDueScheduledBlogs returns all scheduled blogs that are due for publishing (schedule_time <= currentTime).
+// Blogs that have exceeded maxFailedAttempts are excluded to prevent infinite retry loops.
+// Returns blog data along with Elasticsearch version control fields for optimistic concurrency.
+func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, currentTime time.Time, maxFailedAttempts int) ([]DueScheduledBlog, error) {
+	// Query for scheduled blogs where:
+	// - is_schedule = true
+	// - schedule_time <= currentTime
+	// - is_archived != true
+	// - failed_attempts < maxFailedAttempts (or field doesn't exist)
+	query := map[string]interface{}{
+		"size": 100, // Process up to 100 blogs per batch
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_schedule": true,
+						},
+					},
+					{
+						"range": map[string]interface{}{
+							"schedule_time": map[string]interface{}{
+								"lte": currentTime.Format(time.RFC3339),
+							},
+						},
+					},
+					{
+						// Exclude blogs that have exceeded max failed attempts.
+						// Match if: failed_attempts < max OR the field doesn't exist yet.
+						"bool": map[string]interface{}{
+							"should": []map[string]interface{}{
+								{
+									"range": map[string]interface{}{
+										"failed_attempts": map[string]interface{}{
+											"lt": maxFailedAttempts,
+										},
+									},
+								},
+								{
+									"bool": map[string]interface{}{
+										"must_not": []map[string]interface{}{
+											{
+												"exists": map[string]interface{}{
+													"field": "failed_attempts",
+												},
+											},
+										},
+									},
+								},
+							},
+							"minimum_should_match": 1,
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"is_archived": true,
+						},
+					},
+				},
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"schedule_time": map[string]string{
+					"order": "asc",
+				},
+			},
+		},
+	}
+
+	bs, err := json.Marshal(query)
+	if err != nil {
+		es.log.Errorf("GetDueScheduledBlogs: cannot marshal the query, error: %v", err)
+		return nil, err
+	}
+
+	// Request seq_no and primary_term for optimistic concurrency control
+	seqNoPrimaryTerm := true
+	req := esapi.SearchRequest{
+		Index:            []string{constants.ElasticsearchBlogIndex},
+		Body:             strings.NewReader(string(bs)),
+		SeqNoPrimaryTerm: &seqNoPrimaryTerm,
+	}
+
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("GetDueScheduledBlogs: error executing search request, error: %+v", err)
+		return nil, err
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("GetDueScheduledBlogs: error closing response body, error: %v", err)
+		}
+	}()
+
+	if res.IsError() {
+		err = fmt.Errorf("GetDueScheduledBlogs: search query failed, response: %+v", res)
+		es.log.Error(err)
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		es.log.Errorf("GetDueScheduledBlogs: error reading response body, error: %v", err)
+		return nil, err
+	}
+
+	var esResponse map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &esResponse); err != nil {
+		es.log.Errorf("GetDueScheduledBlogs: error decoding response body, error: %v", err)
+		return nil, err
+	}
+
+	hits, ok := esResponse["hits"].(map[string]interface{})["hits"].([]interface{})
+	if !ok {
+		es.log.Debug("GetDueScheduledBlogs: no scheduled blogs due")
+		return []DueScheduledBlog{}, nil
+	}
+
+	var blogs []DueScheduledBlog
+	for _, hit := range hits {
+		hitMap := hit.(map[string]interface{})
+		source, _ := hitMap["_source"].(map[string]interface{})
+
+		seqNo := 0
+		if v, ok := hitMap["_seq_no"].(float64); ok {
+			seqNo = int(v)
+		}
+		primaryTerm := 0
+		if v, ok := hitMap["_primary_term"].(float64); ok {
+			primaryTerm = int(v)
+		}
+
+		blogs = append(blogs, DueScheduledBlog{
+			Source:      source,
+			SeqNo:       seqNo,
+			PrimaryTerm: primaryTerm,
+		})
+	}
+
+	es.log.Infof("GetDueScheduledBlogs: found %d scheduled blogs ready to be published", len(blogs))
+	return blogs, nil
+}
+
+// PublishScheduledBlog publishes a scheduled blog by setting is_draft=false, is_schedule=false, and published_time.
+// Uses optimistic concurrency control (seqNo/primaryTerm) to prevent duplicate publishes across multiple instances.
+// Returns ErrVersionConflict if the document was already modified by another instance.
+func (es *elasticsearchStorage) PublishScheduledBlog(ctx context.Context, blogId string, seqNo *int, primaryTerm *int) (*esapi.Response, error) {
+	if blogId == "" {
+		es.log.Error("PublishScheduledBlog: blogId is empty")
+		return nil, fmt.Errorf("blogId cannot be empty")
+	}
+
+	// Build the update query to publish the scheduled blog.
+	// Also cleans up scheduling metadata (schedule_time, failed_attempts, etc.)
+	updateScript := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": `ctx._source.is_draft = false;
+			            ctx._source.is_schedule = false;
+			            ctx._source.published_time = params.published_time;
+			            ctx._source.schedule_time = null;
+			            ctx._source.failed_attempts = null;
+			            ctx._source.last_failure_reason = null;
+			            ctx._source.last_failure_time = null;`,
+			"params": map[string]interface{}{
+				"published_time": time.Now().Format(time.RFC3339),
+			},
+		},
+	}
+
+	bs, err := json.Marshal(updateScript)
+	if err != nil {
+		es.log.Errorf("PublishScheduledBlog: cannot marshal the update script, error: %v", err)
+		return nil, err
+	}
+
+	req := esapi.UpdateRequest{
+		Index:         constants.ElasticsearchBlogIndex,
+		DocumentID:    blogId,
+		Body:          strings.NewReader(string(bs)),
+		IfSeqNo:       seqNo,
+		IfPrimaryTerm: primaryTerm,
+	}
+
+	updateResponse, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("PublishScheduledBlog: error executing update request, error: %+v", err)
+		return updateResponse, err
+	}
+	defer func() {
+		if err := updateResponse.Body.Close(); err != nil {
+			es.log.Errorf("PublishScheduledBlog: error closing response body, error: %v", err)
+		}
+	}()
+
+	// Check for version conflict — another instance already processed this blog
+	if updateResponse.StatusCode == http.StatusConflict {
+		es.log.Infof("PublishScheduledBlog: version conflict for blog %s - already processed by another instance", blogId)
+		return nil, ErrVersionConflict
+	}
+
+	if updateResponse.IsError() {
+		err = fmt.Errorf("PublishScheduledBlog: update query failed, response: %+v", updateResponse)
+		es.log.Error(err)
+		return updateResponse, err
+	}
+
+	es.log.Infof("PublishScheduledBlog: successfully published scheduled blog with id: %s", blogId)
+	return updateResponse, nil
+}
+
+// IncrementScheduleFailedAttempts increments the failed_attempts counter for a scheduled blog
+// and records the failure reason and time. This prevents blogs with persistent errors from
+// being retried indefinitely by the scheduler.
+func (es *elasticsearchStorage) IncrementScheduleFailedAttempts(ctx context.Context, blogId string, reason string) error {
+	if blogId == "" {
+		return fmt.Errorf("blogId cannot be empty")
+	}
+
+	updateScript := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": `if (ctx._source.failed_attempts == null) {
+			              ctx._source.failed_attempts = 1;
+			            } else {
+			              ctx._source.failed_attempts += 1;
+			            }
+			            ctx._source.last_failure_reason = params.reason;
+			            ctx._source.last_failure_time = params.failure_time;`,
+			"params": map[string]interface{}{
+				"reason":       reason,
+				"failure_time": time.Now().UTC().Format(time.RFC3339),
+			},
+		},
+	}
+
+	bs, err := json.Marshal(updateScript)
+	if err != nil {
+		es.log.Errorf("IncrementScheduleFailedAttempts: cannot marshal update script: %v", err)
+		return err
+	}
+
+	req := esapi.UpdateRequest{
+		Index:      constants.ElasticsearchBlogIndex,
+		DocumentID: blogId,
+		Body:       strings.NewReader(string(bs)),
+	}
+
+	res, err := req.Do(ctx, es.client)
+	if err != nil {
+		es.log.Errorf("IncrementScheduleFailedAttempts: update failed for blog %s: %v", blogId, err)
+		return err
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			es.log.Errorf("IncrementScheduleFailedAttempts: error closing response body: %v", err)
+		}
+	}()
+
+	if res.IsError() {
+		err = fmt.Errorf("IncrementScheduleFailedAttempts: update failed for blog %s: %s", blogId, res.String())
+		es.log.Error(err)
+		return err
+	}
+
+	es.log.Warnf("IncrementScheduleFailedAttempts: incremented failed attempts for blog %s, reason: %s", blogId, reason)
+	return nil
 }
 
 func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, tags ...string) (*pb.GetBlogsByTagsNameRes, error) {

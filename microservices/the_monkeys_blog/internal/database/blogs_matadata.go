@@ -580,59 +580,133 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 	return blogsMetadata, totalCount, nil
 }
 
-func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, accountId string, isDraft bool, limit, offset int32) ([]map[string]interface{}, int, error) {
+func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, accountId string, isDraft bool, isSchedule bool, limit, offset int32) ([]map[string]interface{}, int, error) {
 	// Validate input
 	if accountId == "" {
 		es.log.Error("GetBlogsMetaByAccountId: accountId cannot be empty")
 		return nil, 0, fmt.Errorf("accountId cannot be empty")
 	}
 
-	// Build the query to get blogs by account ID with sorting by latest first
-	query := map[string]interface{}{
-		"sort": []map[string]interface{}{
-			{
-				"published_time": map[string]interface{}{
-					"order":         "desc",
-					"unmapped_type": "date", // Handle cases where published_time is missing
+	// -----------------------------
+	// Build MUST conditions
+	// -----------------------------
+	must := []map[string]interface{}{
+		{
+			"term": map[string]interface{}{
+				"owner_account_id.keyword": accountId,
+			},
+		},
+	}
+
+	// -----------------------------
+	// MUST NOT conditions
+	// -----------------------------
+	mustNot := []map[string]interface{}{
+		{
+			"term": map[string]interface{}{
+				"is_archived": true,
+			},
+		},
+	}
+
+	if isSchedule {
+		// Scheduled blogs
+		must = append(must,
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_schedule": true,
 				},
 			},
-			{
+		)
+	} else if isDraft {
+		// Draft blogs
+		must = append(must,
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_draft": true,
+				},
+			},
+		)
+
+		mustNot = append(mustNot,
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_schedule": true,
+				},
+			},
+		)
+	} else {
+		// Published blogs
+		must = append(must,
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_draft": false,
+				},
+			},
+			map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_schedule": false,
+				},
+			},
+		)
+	}
+
+	// -----------------------------
+	// SORT logic
+	// -----------------------------
+	sort := []map[string]interface{}{}
+
+	if isSchedule {
+		sort = append(sort, map[string]interface{}{
+			"schedule_time": map[string]string{
+				"order": "asc",
+			},
+		})
+	} else if isDraft {
+		sort = append(sort, map[string]interface{}{
+			"blog.time": map[string]string{
+				"order": "desc",
+			},
+		})
+	} else {
+		sort = append(sort,
+			map[string]interface{}{
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
+				},
+			},
+			map[string]interface{}{
 				"blog.time": map[string]string{
 					"order": "desc",
 				},
 			},
-		},
+		)
+	}
+
+	// -----------------------------
+	// FINAL QUERY
+	// -----------------------------
+	query := map[string]interface{}{
 		"from": offset,
 		"size": limit,
+		"sort": sort,
 		"_source": []string{
 			"blog_id",
 			"owner_account_id",
-			"blog.blocks", // To extract title, first paragraph, and first image
+			"blog.blocks",
 			"tags",
 			"content_type",
 			"published_time",
+			"schedule_time",
+			"timezone",
+			"is_schedule",
+			"is_draft",
 		},
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"term": map[string]interface{}{
-							"owner_account_id.keyword": accountId,
-						},
-					},
-					{
-						"term": map[string]interface{}{
-							"is_draft": isDraft,
-						},
-					},
-				},
-				"must_not": []map[string]interface{}{
-					{
-						"term": map[string]interface{}{
-							"is_archived": true,
-						},
-					},
-				},
+				"must":     must,
+				"must_not": mustNot,
 			},
 		},
 	}
@@ -652,6 +726,7 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 
 	// Execute the search request
 	res, err := req.Do(ctx, es.client)
+
 	if err != nil {
 		es.log.Errorf("GetBlogsMetaByAccountId: error executing search request, error: %+v", err)
 		return nil, 0, err
@@ -711,6 +786,16 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 			"published_time":   hitSource["published_time"],
 		}
 
+		// Appending response needed for schedule blogs
+		if isSchedule {
+			if v, ok := hitSource["schedule_time"]; ok {
+				blogMetadata["schedule_time"] = v
+			}
+			if v, ok := hitSource["timezone"]; ok {
+				blogMetadata["timezone"] = v
+			}
+		}
+
 		// Initialize metadata fields
 		blogMetadata["title"] = ""
 		blogMetadata["first_paragraph"] = ""
@@ -756,6 +841,8 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 
 		blogsMetadata = append(blogsMetadata, blogMetadata)
 	}
+
+	fmt.Printf("blogsMetadata: %v\n", blogsMetadata)
 
 	es.log.Debugf("GetBlogsMetaByAccountId: successfully fetched %d blogs metadata out of %d total for account %s", len(blogsMetadata), totalCount, accountId)
 	return blogsMetadata, totalCount, nil
