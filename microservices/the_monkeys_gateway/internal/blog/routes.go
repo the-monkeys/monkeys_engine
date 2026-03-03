@@ -739,47 +739,23 @@ func (asc *BlogServiceClient) WriteBlog(ctx *gin.Context) {
 	// Get client information using utility function
 	clientInfo := utils.GetClientInfo(ctx)
 
-	// Check if the blog exists
-	resp, err := asc.Client.CheckIfBlogsExist(context.Background(), &pb.BlogByIdReq{
-		BlogId:     id,
-		ClientInfo: asc.createClientInfo(ctx),
-	})
-	if err != nil {
-		if status, ok := status.FromError(err); ok {
-			switch status.Code() {
-			case codes.InvalidArgument:
-				ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Incomplete request, please provide correct input parameters"})
-				return
-			case codes.Internal:
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Cannot fetch the draft blogs"})
-				return
-			default:
-
-			}
-		}
-	}
-
-	// Check if the user has already 5 blogs in draft then do not allow to create more
-	// if resp.DraftCount >= 5 {
-	// 	ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "You cannot create more than 5 draft blogs"})
-	// 	return
-	// }
-
+	// Determine action from the permission set already loaded by AuthzRequired
+	// middleware. This avoids an extra gRPC round-trip to CheckIfBlogsExist:
+	//   - AuthzRequired → CheckAccessLevel hits Postgres blog_permissions.
+	//   - No row → Access: ["Create"]  (new blog)
+	//   - Row found → Access: ["Edit", ...] (existing blog)
+	// The blog service's DraftBlogV2 stream validates IsDraft on the first
+	// message, so the gateway doesn't need to query Elasticsearch at all.
 	var action string
 	var initialLogDone bool
 
-	if resp.BlogExists {
-		if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
-			return
-		}
+	switch {
+	case utils.CheckUserAccessInContext(ctx, constants.PermissionEdit):
 		action = constants.BLOG_UPDATE
-	} else {
+	case utils.CheckUserAccessInContext(ctx, constants.PermissionCreate):
 		action = constants.BLOG_CREATE
-	}
-
-	if !resp.IsDraft {
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "you need to move the blog to draft to edit it"})
+	default:
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 		return
 	}
 

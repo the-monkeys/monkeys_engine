@@ -269,6 +269,12 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context
 							"is_archived": true,
 						},
 					},
+					{
+						// Exclude scheduled blogs; docs without is_scheduled are treated as non-scheduled
+						"term": map[string]interface{}{
+							"is_scheduled": true,
+						},
+					},
 				},
 			},
 		},
@@ -610,11 +616,11 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 	}
 
 	if isSchedule {
-		// Scheduled blogs
+		// Scheduled blogs: explicitly require is_scheduled=true
 		must = append(must,
 			map[string]interface{}{
 				"term": map[string]interface{}{
-					"is_schedule": true,
+					"is_scheduled": true,
 				},
 			},
 		)
@@ -628,24 +634,29 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 			},
 		)
 
+		// Exclude scheduled drafts. Use must_not so docs without the field still match.
 		mustNot = append(mustNot,
 			map[string]interface{}{
 				"term": map[string]interface{}{
-					"is_schedule": true,
+					"is_scheduled": true,
 				},
 			},
 		)
 	} else {
-		// Published blogs
+		// Published blogs: is_draft must be false.
+		// Use must_not for is_scheduled so documents missing the field are still matched.
 		must = append(must,
 			map[string]interface{}{
 				"term": map[string]interface{}{
 					"is_draft": false,
 				},
 			},
+		)
+
+		mustNot = append(mustNot,
 			map[string]interface{}{
 				"term": map[string]interface{}{
-					"is_schedule": false,
+					"is_scheduled": true,
 				},
 			},
 		)
@@ -658,8 +669,9 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 
 	if isSchedule {
 		sort = append(sort, map[string]interface{}{
-			"schedule_time": map[string]string{
-				"order": "asc",
+			"schedule_time": map[string]interface{}{
+				"order":         "asc",
+				"unmapped_type": "date",
 			},
 		})
 	} else if isDraft {
@@ -700,7 +712,7 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 			"published_time",
 			"schedule_time",
 			"timezone",
-			"is_schedule",
+			"is_scheduled",
 			"is_draft",
 		},
 		"query": map[string]interface{}{

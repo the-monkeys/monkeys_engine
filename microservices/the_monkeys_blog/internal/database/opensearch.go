@@ -282,6 +282,12 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 							"is_archived": true,
 						},
 					},
+					{
+						// Exclude scheduled blogs; docs without is_scheduled are treated as non-scheduled
+						"term": map[string]interface{}{
+							"is_scheduled": true,
+						},
+					},
 				},
 				"should": []map[string]interface{}{
 					{
@@ -404,7 +410,7 @@ func (es *elasticsearchStorage) GetScheduledBlogsByOwnerAccountID(ctx context.Co
 					},
 					{
 						"term": map[string]interface{}{
-							"is_schedule": true,
+							"is_scheduled": true,
 						},
 					},
 					{
@@ -587,10 +593,11 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 		return nil, fmt.Errorf("blogId cannot be empty")
 	}
 
-	// Build the update query to set is_draft to false and add published_time
+	// Build the update query to set is_draft to false, is_scheduled to false, and add published_time.
+	// Always set is_scheduled=false so future queries work correctly for old docs that lacked is_scheduled.
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": "ctx._source.is_draft = false; ctx._source.published_time = params.published_time;",
+			"source": "ctx._source.is_draft = false; ctx._source.is_scheduled = false; ctx._source.published_time = params.published_time;",
 			"params": map[string]interface{}{
 				"published_time": time.Now().Format(time.RFC3339),
 			},
@@ -604,11 +611,14 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 		return nil, err
 	}
 
-	// Create an update request
+	// Create an update request with retry_on_conflict to handle concurrent writes
+	// from DraftBlogV2 streaming auto-save that can bump the doc's _seq_no mid-update.
+	retries := 3
 	req := esapi.UpdateRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blogId,
-		Body:       strings.NewReader(string(bs)),
+		Index:          constants.ElasticsearchBlogIndex,
+		DocumentID:     blogId,
+		Body:           strings.NewReader(string(bs)),
+		RetryOnConflict: &retries,
 	}
 
 	// Execute the update request
@@ -642,10 +652,10 @@ func (es *elasticsearchStorage) ScheduleBlogById(ctx context.Context, opts Sched
 		return nil, err
 	}
 
-	// Build the update script - sets is_schedule=true, is_draft=true, and stores schedule_time + timezone
+	// Build the update script - sets is_scheduled=true, is_draft=true, and stores schedule_time + timezone
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": `ctx._source.is_schedule = true; 
+			"source": `ctx._source.is_scheduled = true; 
 			            ctx._source.is_draft = true; 
 			            ctx._source.schedule_time = params.schedule_time; 
 			            ctx._source.timezone = params.timezone;`,
@@ -662,10 +672,12 @@ func (es *elasticsearchStorage) ScheduleBlogById(ctx context.Context, opts Sched
 		return nil, err
 	}
 
+	retries := 3
 	req := esapi.UpdateRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: opts.BlogID,
-		Body:       strings.NewReader(string(bs)),
+		Index:           constants.ElasticsearchBlogIndex,
+		DocumentID:      opts.BlogID,
+		Body:            strings.NewReader(string(bs)),
+		RetryOnConflict: &retries,
 	}
 
 	updateResponse, err := req.Do(ctx, es.client)
@@ -700,7 +712,7 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 	// Build the update query to set is_draft to true and clear scheduling/publishing flags
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
-			"source": "ctx._source.is_draft = true; ctx._source.is_schedule = false; ctx._source.schedule_time = null; ctx._source.published_time = params.published_time; ctx._source.timezone = null",
+			"source": "ctx._source.is_draft = true; ctx._source.is_scheduled = false; ctx._source.schedule_time = null; ctx._source.published_time = params.published_time; ctx._source.timezone = null",
 			"params": map[string]interface{}{
 				"published_time": time.Now().Format(time.RFC3339),
 			},
@@ -714,11 +726,13 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 		return nil, err
 	}
 
-	// Create an update request
+	// Create an update request with retry_on_conflict for concurrent write safety
+	retries := 3
 	req := esapi.UpdateRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blogId,
-		Body:       strings.NewReader(string(bs)),
+		Index:           constants.ElasticsearchBlogIndex,
+		DocumentID:      blogId,
+		Body:            strings.NewReader(string(bs)),
+		RetryOnConflict: &retries,
 	}
 
 	// Execute the update request
@@ -748,7 +762,7 @@ func (es *elasticsearchStorage) MoveBlogToDraft(ctx context.Context, blogId stri
 // Returns blog data along with Elasticsearch version control fields for optimistic concurrency.
 func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, currentTime time.Time, maxFailedAttempts int) ([]DueScheduledBlog, error) {
 	// Query for scheduled blogs where:
-	// - is_schedule = true
+	// - is_scheduled = true
 	// - schedule_time <= currentTime
 	// - is_archived != true
 	// - failed_attempts < maxFailedAttempts (or field doesn't exist)
@@ -759,7 +773,7 @@ func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, curren
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"is_schedule": true,
+							"is_scheduled": true,
 						},
 					},
 					{
@@ -808,8 +822,9 @@ func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, curren
 		},
 		"sort": []map[string]interface{}{
 			{
-				"schedule_time": map[string]string{
-					"order": "asc",
+				"schedule_time": map[string]interface{}{
+					"order":         "asc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -889,7 +904,7 @@ func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, curren
 	return blogs, nil
 }
 
-// PublishScheduledBlog publishes a scheduled blog by setting is_draft=false, is_schedule=false, and published_time.
+// PublishScheduledBlog publishes a scheduled blog by setting is_draft=false, is_scheduled=false, and published_time.
 // Uses optimistic concurrency control (seqNo/primaryTerm) to prevent duplicate publishes across multiple instances.
 // Returns ErrVersionConflict if the document was already modified by another instance.
 func (es *elasticsearchStorage) PublishScheduledBlog(ctx context.Context, blogId string, seqNo *int, primaryTerm *int) (*esapi.Response, error) {
@@ -903,7 +918,7 @@ func (es *elasticsearchStorage) PublishScheduledBlog(ctx context.Context, blogId
 	updateScript := map[string]interface{}{
 		"script": map[string]interface{}{
 			"source": `ctx._source.is_draft = false;
-			            ctx._source.is_schedule = false;
+			            ctx._source.is_scheduled = false;
 			            ctx._source.published_time = params.published_time;
 			            ctx._source.schedule_time = null;
 			            ctx._source.failed_attempts = null;
@@ -986,10 +1001,12 @@ func (es *elasticsearchStorage) IncrementScheduleFailedAttempts(ctx context.Cont
 		return err
 	}
 
+	retries := 3
 	req := esapi.UpdateRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blogId,
-		Body:       strings.NewReader(string(bs)),
+		Index:           constants.ElasticsearchBlogIndex,
+		DocumentID:      blogId,
+		Body:            strings.NewReader(string(bs)),
+		RetryOnConflict: &retries,
 	}
 
 	res, err := req.Do(ctx, es.client)
@@ -1295,11 +1312,13 @@ func (es *elasticsearchStorage) AchieveAPublishedBlogById(ctx context.Context, b
 		return nil, err
 	}
 
-	// Create an update request
+	// Create an update request with retry_on_conflict for concurrent write safety
+	retries := 3
 	req := esapi.UpdateRequest{
-		Index:      constants.ElasticsearchBlogIndex,
-		DocumentID: blogId,
-		Body:       strings.NewReader(string(bs)),
+		Index:           constants.ElasticsearchBlogIndex,
+		DocumentID:      blogId,
+		Body:            strings.NewReader(string(bs)),
+		RetryOnConflict: &retries,
 	}
 
 	// Execute the update request

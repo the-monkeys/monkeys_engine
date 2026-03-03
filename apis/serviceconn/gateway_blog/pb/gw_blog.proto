@@ -125,14 +125,14 @@ message Block {
 
 message Data {
     string text = 1;
-    int32 level = 2;  // For headers
-    File file = 3;    // For files in attaches and images
+    int32 level = 2; // For headers
+    File file = 3; // For files in attaches and images
     repeated string items = 4; // For lists and checklist items
     string list_type = 5; // For list type (unordered, ordered)
-    bool withBorder = 6;  // For images
+    bool withBorder = 6; // For images
     bool withBackground = 7; // For images
-    bool stretched = 8;  // For images
-    string caption = 9;  // For images
+    bool stretched = 8; // For images
+    string caption = 9; // For images
 
     // For tables
     bool withHeadings = 10; // For tables
@@ -150,7 +150,7 @@ message Data {
 }
 
 message TableRow {
-    repeated string cells = 1;  // List of cell contents in the row
+    repeated string cells = 1; // List of cell contents in the row
 }
 
 message ChecklistItem {
@@ -162,7 +162,7 @@ message URLData {
     string url = 1;
     string title = 2;
     string description = 3;
-    string image_url = 4;  // Optional: Image URL for link previews
+    string image_url = 4; // Optional: Image URL for link previews
 }
 
 message File {
@@ -265,9 +265,9 @@ message GetBlogs {
     repeated string author_list = 6;
 
       // Scheduling metadata
-    bool is_schedule = 7;
+    bool is_scheduled = 7;
     bool is_draft = 8;
-    string schedule_time = 9;  // RFC3339 UTC
+    string schedule_time = 9; // RFC3339 UTC
     string timezone = 10;
 }
 
@@ -409,7 +409,7 @@ message BlogListReq {
     string referrer = 11;
     Platform platform = 12;
     ClientInfo client_info = 13;
-    bool isSchedule = 14;
+    bool is_scheduled = 14;
 }
 
 message SearchReq {

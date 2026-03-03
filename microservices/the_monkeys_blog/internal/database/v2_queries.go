@@ -902,6 +902,12 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Cont
 							"is_archived": true,
 						},
 					},
+					{
+						// Exclude scheduled blogs; docs without is_scheduled are treated as non-scheduled
+						"term": map[string]interface{}{
+							"is_scheduled": true,
+						},
+					},
 				},
 			},
 		},

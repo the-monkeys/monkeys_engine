@@ -876,18 +876,18 @@ func (asc *BlogServiceClient) MetaMyDraftBlogs(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
-		AccountId:  userInfo.AccountId,
-		IsDraft:    true, // Only draft blogs
-		IsSchedule: false,
-		Limit:      int32(limitInt),
-		Offset:     int32(offsetInt),
-		Ip:         clientInfo.IPAddress,
-		Client:     clientInfo.ClientType,
-		SessionId:  clientInfo.SessionID,
-		UserAgent:  clientInfo.UserAgent,
-		Referrer:   clientInfo.Referrer,
-		Platform:   utils.GetBlogPlatform(ctx),
-		ClientInfo: createClientInfo(clientInfo),
+		AccountId:   userInfo.AccountId,
+		IsDraft:     true, // Only draft blogs
+		IsScheduled: false,
+		Limit:       int32(limitInt),
+		Offset:      int32(offsetInt),
+		Ip:          clientInfo.IPAddress,
+		Client:      clientInfo.ClientType,
+		SessionId:   clientInfo.SessionID,
+		UserAgent:   clientInfo.UserAgent,
+		Referrer:    clientInfo.Referrer,
+		Platform:    utils.GetBlogPlatform(ctx),
+		ClientInfo:  createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -1032,18 +1032,18 @@ func (asc *BlogServiceClient) MetaMyScheduleBlogs(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetUsersBlogs(context.Background(), &pb.BlogListReq{
-		AccountId:  userInfo.AccountId,
-		IsDraft:    false,
-		IsSchedule: true,
-		Limit:      int32(limitInt),
-		Offset:     int32(offsetInt),
-		Ip:         clientInfo.IPAddress,
-		Client:     clientInfo.ClientType,
-		SessionId:  clientInfo.SessionID,
-		UserAgent:  clientInfo.UserAgent,
-		Referrer:   clientInfo.Referrer,
-		Platform:   utils.GetBlogPlatform(ctx),
-		ClientInfo: createClientInfo(clientInfo),
+		AccountId:   userInfo.AccountId,
+		IsDraft:     false,
+		IsScheduled: true,
+		Limit:       int32(limitInt),
+		Offset:      int32(offsetInt),
+		Ip:          clientInfo.IPAddress,
+		Client:      clientInfo.ClientType,
+		SessionId:   clientInfo.SessionID,
+		UserAgent:   clientInfo.UserAgent,
+		Referrer:    clientInfo.Referrer,
+		Platform:    utils.GetBlogPlatform(ctx),
+		ClientInfo:  createClientInfo(clientInfo),
 	})
 
 	if err != nil {
@@ -1182,18 +1182,18 @@ func (asc *BlogServiceClient) MetaMyBookmarks(ctx *gin.Context) {
 
 	// Call gRPC to get blog metadata with client tracking
 	stream, err := asc.Client.MetaGetBlogsByBlogIds(context.Background(), &pb.BlogListReq{
-		BlogIds:    blogResp,
-		IsDraft:    false, // Only published blogs
-		IsSchedule: false,
-		Limit:      int32(limitInt),
-		Offset:     int32(offsetInt),
-		Ip:         clientInfo.IPAddress,
-		Client:     clientInfo.ClientType,
-		SessionId:  clientInfo.SessionID,
-		UserAgent:  clientInfo.UserAgent,
-		Referrer:   clientInfo.Referrer,
-		Platform:   utils.GetBlogPlatform(ctx),
-		ClientInfo: createClientInfo(clientInfo),
+		BlogIds:     blogResp,
+		IsDraft:     false, // Only published blogs
+		IsScheduled: false,
+		Limit:       int32(limitInt),
+		Offset:      int32(offsetInt),
+		Ip:          clientInfo.IPAddress,
+		Client:      clientInfo.ClientType,
+		SessionId:   clientInfo.SessionID,
+		UserAgent:   clientInfo.UserAgent,
+		Referrer:    clientInfo.Referrer,
+		Platform:    utils.GetBlogPlatform(ctx),
+		ClientInfo:  createClientInfo(clientInfo),
 	})
 
 	if err != nil {

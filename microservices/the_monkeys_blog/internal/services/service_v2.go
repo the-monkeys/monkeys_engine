@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"strings"
@@ -17,7 +18,49 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// computeContentFingerprint creates a deterministic hash of blog content,
+// excluding volatile fields (timestamps) that change on every auto-save tick
+// even when the actual content hasn't changed. This prevents unnecessary
+// Elasticsearch writes from the streaming auto-save loop.
+func computeContentFingerprint(req map[string]interface{}) [32]byte {
+	content := make(map[string]interface{}, 4)
+	for _, key := range []string{"blog", "tags", "slug", "owner_account_id"} {
+		if v, ok := req[key]; ok {
+			content[key] = v
+		}
+	}
+	stripTimeFields(content)
+	bs, _ := json.Marshal(content)
+	return sha256.Sum256(bs)
+}
+
+// stripTimeFields recursively removes "time" keys from maps/slices
+// so that auto-save tick timestamps don't affect the content fingerprint.
+func stripTimeFields(v interface{}) {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		delete(val, "time")
+		for _, child := range val {
+			stripTimeFields(child)
+		}
+	case []interface{}:
+		for _, item := range val {
+			stripTimeFields(item)
+		}
+	}
+}
+
 func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, anypb.Any]) error {
+	// Track the last content fingerprint to skip redundant ES writes
+	// when the auto-save loop fires with unchanged content.
+	var lastFingerprint [32]byte
+
+	// Track blog existence across the stream lifetime. We only query ES
+	// once on the first message — after that, the existence state is
+	// known (either it already existed or we just created it).
+	var blogExists bool
+	var existenceChecked bool
+
 	for {
 		// Receive a message from the client
 		reqAny, err := stream.Recv()
@@ -75,12 +118,61 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			}
 		}
 
-		exists, _, err := blog.osClient.DoesBlogExist(stream.Context(), blogId)
-		if err != nil {
-			blog.logger.Errorf("Error checking blog existence for %s: %v", blogId, err)
+		// Compute a content fingerprint to detect whether the blog content
+		// actually changed. The client auto-save loop sends updates every ~15s
+		// even when the user hasn't typed anything — the only difference is the
+		// per-block "time" field. Skipping unchanged saves reduces ES writes
+		// and eliminates version bumps that cause 409 conflicts on publish.
+		fingerprint := computeContentFingerprint(req)
+
+		// Check blog existence and draft status only once per stream.
+		// After the first message we know whether the blog exists and
+		// whether it's editable, so subsequent auto-save ticks skip
+		// the ES GET entirely — one fewer round-trip per message.
+		if !existenceChecked {
+			exists, blogInfo, err := blog.osClient.DoesBlogExist(stream.Context(), blogId)
+			if err != nil {
+				blog.logger.Errorf("Error checking blog existence for %s: %v", blogId, err)
+			}
+			blogExists = exists
+			existenceChecked = true
+
+			// If blog exists, validate it is still a draft. Published or
+			// archived blogs must be moved back to draft before editing.
+			if exists && blogInfo != nil {
+				isDraft := true
+				switch v := blogInfo["is_draft"].(type) {
+				case bool:
+					isDraft = v
+				case string:
+					isDraft = v != "false" && v != "False"
+				}
+				if !isDraft {
+					blog.logger.Warnw("DraftBlogV2: blog is not a draft, rejecting edit",
+						"blog_id", blogId)
+					return status.Errorf(codes.FailedPrecondition,
+						"blog must be moved to draft before editing")
+				}
+			}
 		}
 
-		if exists {
+		// If blog already exists and content hasn't changed, skip the ES write
+		// but still respond to the client so the WebSocket doesn't stall.
+		if blogExists && fingerprint == lastFingerprint {
+			blog.logger.Debugw("DraftBlogV2: content unchanged, skipping save", "blog_id", blogId)
+			anyMsg, err := anypb.New(reqStruct)
+			if err != nil {
+				blog.logger.Errorf("Error wrapping structpb.Struct in anypb.Any: %v", err)
+				return status.Errorf(codes.Internal, "Failed to wrap struct in Any: %v", err)
+			}
+			if err := stream.Send(anyMsg); err != nil {
+				blog.logger.Errorf("Error sending response: %v", err)
+				return status.Errorf(codes.Internal, "Failed to send response: %v", err)
+			}
+			continue
+		}
+
+		if blogExists {
 			blog.logger.Debugw("DraftBlogV2: updating existing blog", "blog_id", blogId)
 		} else {
 			blog.logger.Infow("DraftBlogV2: creating new blog", "blog_id", blogId, "owner", ownerAccountId)
@@ -100,13 +192,16 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 				req["tags"] = []string{"untagged"}
 			}
 			go func() {
-				err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+				err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 				if err != nil {
-					blog.logger.Errorf("failed to publish blog create message to RabbitMQ: error=%v", err)
+					blog.logger.Errorf("failed to reliably publish blog create message to RabbitMQ: error=%v", err)
 				}
 			}()
 
 			go blog.trackBlogActivity(ownerAccountId, constants.BLOG_CREATE, "blog", blogId, req)
+
+			// Mark as existing so subsequent messages use the update path.
+			blogExists = true
 		}
 
 		saveResp, err := blog.osClient.SaveBlog(stream.Context(), req)
@@ -118,6 +213,9 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 		if saveResp.IsError() {
 			blog.logger.Errorf("DraftBlogV2: OpenSearch save error for blog %s: %v", blogId, saveResp.String())
 		}
+
+		// Update fingerprint after successful write
+		lastFingerprint = fingerprint
 
 		// // Respond back to the client
 		// resp := &pb.BlogResponse{
@@ -576,7 +674,7 @@ func (blog *BlogService) MetaGetUsersBlogs(req *pb.BlogListReq, stream pb.BlogSe
 	if req.IsDraft {
 		blog.logger.Debug("Fetching draft blogs by account ID")
 		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, false, req.Limit, req.Offset)
-	} else if req.IsSchedule {
+	} else if req.IsScheduled {
 		blog.logger.Debug("Fetching schedule blogs by account ID")
 		blogs, count, err = blog.osClient.GetBlogsMetaByAccountId(stream.Context(), req.AccountId, true, true, req.Limit, req.Offset)
 	} else {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -14,10 +15,12 @@ import (
 
 var log = logger.ZapForService("rabbitmq")
 
-// / Conn represents a RabbitMQ connection with a channel.
+// Conn represents a RabbitMQ connection with a channel.
 type Conn struct {
 	Connection *amqp.Connection
 	Channel    *amqp.Channel
+	confirmCh  chan amqp.Confirmation // single shared confirm listener
+	pubMu      *sync.Mutex            // serialize publish+confirm to avoid confirmation mismatch
 }
 
 // GetConn establishes a connection to RabbitMQ and returns a Conn struct.
@@ -55,12 +58,34 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 		return Conn{}, fmt.Errorf("failed to declare exchange: %w", err)
 	}
 
+	// Set up Dead Letter Exchange and Queue if configured.
+	// The DLX captures messages that are rejected (nacked without requeue) by consumers,
+	// giving operators visibility into processing failures.
+	if conf.DLXExchange != "" {
+		if err := setupDeadLetterInfrastructure(connection.Channel, conf); err != nil {
+			connection.Close()
+			return Conn{}, fmt.Errorf("failed to set up dead letter infrastructure: %w", err)
+		}
+	}
+
 	for i, queue := range conf.Queues {
 		log.Debugf("Creating a queue: %s", queue)
-		_, err = connection.Channel.QueueDeclare(queue, true, false, false, false, nil)
+
+		// If this is the user-service queue (queue2) and DLX is configured,
+		// declare it with dead-letter routing so rejected messages go to the DLQ.
+		args := amqp.Table(nil)
+		if conf.DLXExchange != "" && conf.DLQKey != "" && queue == conf.Queues[1] {
+			args = amqp.Table{
+				"x-dead-letter-exchange":    conf.DLXExchange,
+				"x-dead-letter-routing-key": conf.DLQKey,
+			}
+			log.Debugf("Queue %s configured with DLX: exchange=%s, routing_key=%s", queue, conf.DLXExchange, conf.DLQKey)
+		}
+
+		_, err = connection.Channel.QueueDeclare(queue, true, false, false, false, args)
 		if err != nil {
 			connection.Close()
-			return Conn{}, fmt.Errorf("failed to declare queue: %w", err)
+			return Conn{}, fmt.Errorf("failed to declare queue %s: %w", queue, err)
 		}
 
 		log.Debugf("Binding the queue %s with exchange %s using routing key %s", queue, conf.Exchange, conf.RoutingKeys[i])
@@ -71,7 +96,49 @@ func GetConn(conf config.RabbitMQ) (Conn, error) {
 		}
 	}
 
+	// Enable publisher confirms so PublishReliable can verify broker receipt.
+	// Register a single shared confirm listener — calling NotifyPublish multiple
+	// times leaks listeners and causes confirmations to be delivered to the wrong one.
+	if err := connection.Channel.Confirm(false); err != nil {
+		log.Warnf("Failed to enable publisher confirms (non-fatal): %v", err)
+	} else {
+		connection.confirmCh = make(chan amqp.Confirmation, 256)
+		connection.pubMu = &sync.Mutex{}
+		connection.Channel.NotifyPublish(connection.confirmCh)
+		log.Debug("Publisher confirms enabled with shared confirm listener")
+	}
+
 	return connection, nil
+}
+
+// setupDeadLetterInfrastructure creates the DLX exchange and DLQ queue with binding.
+func setupDeadLetterInfrastructure(ch *amqp.Channel, conf config.RabbitMQ) error {
+	log.Debugf("Creating dead letter exchange: %s", conf.DLXExchange)
+	if err := ch.ExchangeDeclare(conf.DLXExchange, "direct", true, false, false, false, nil); err != nil {
+		return fmt.Errorf("failed to declare DLX exchange %s: %w", conf.DLXExchange, err)
+	}
+
+	dlqQueue := conf.DLQQueue
+	if dlqQueue == "" {
+		dlqQueue = "dead_letter_queue"
+	}
+
+	log.Debugf("Creating dead letter queue: %s", dlqQueue)
+	if _, err := ch.QueueDeclare(dlqQueue, true, false, false, false, nil); err != nil {
+		return fmt.Errorf("failed to declare DLQ queue %s: %w", dlqQueue, err)
+	}
+
+	dlqKey := conf.DLQKey
+	if dlqKey == "" {
+		dlqKey = "dlq"
+	}
+
+	log.Debugf("Binding DLQ %s to DLX %s with routing key %s", dlqQueue, conf.DLXExchange, dlqKey)
+	if err := ch.QueueBind(dlqQueue, dlqKey, conf.DLXExchange, false, nil); err != nil {
+		return fmt.Errorf("failed to bind DLQ: %w", err)
+	}
+
+	return nil
 }
 
 // Reconnect attempts to re-establish the RabbitMQ connection
@@ -92,16 +159,92 @@ func Reconnect(conf config.RabbitMQ) Conn {
 }
 
 // PublishMessage sends a message to the specified exchange with the given routing key.
+// Messages use persistent delivery mode to survive broker restarts.
 func (c Conn) PublishMessage(exchangeName, routingKey string, message []byte) error {
 	err := c.Channel.Publish(exchangeName, routingKey, false, false, amqp.Publishing{
-		ContentType: "application/octet-stream",
-		Body:        message,
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent, // Survive broker restarts
+		Body:         message,
 	})
 	if err != nil {
 		return fmt.Errorf("error publishing message: %w", err)
 	}
 	log.Debug("Message published")
 	return nil
+}
+
+// PublishReliable publishes a message with publisher confirms.
+// It waits for the broker to acknowledge receipt, retrying up to maxRetries times
+// with exponential backoff. If the broker nacks or all retries fail, returns an error.
+func (c Conn) PublishReliable(exchangeName, routingKey string, message []byte, maxRetries int) error {
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+
+	backoff := 500 * time.Millisecond
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		confirm, err := c.publishAndWaitConfirm(exchangeName, routingKey, message)
+		if err != nil {
+			log.Errorf("PublishReliable: attempt %d/%d failed to publish: %v", attempt, maxRetries, err)
+		} else if confirm.Ack {
+			log.Debugf("PublishReliable: message confirmed by broker (attempt %d)", attempt)
+			return nil
+		} else {
+			log.Warnf("PublishReliable: broker nacked message (attempt %d/%d)", attempt, maxRetries)
+		}
+
+		if attempt < maxRetries {
+			log.Debugf("PublishReliable: retrying in %v", backoff)
+			time.Sleep(backoff)
+			backoff *= 2
+			if backoff > 10*time.Second {
+				backoff = 10 * time.Second
+			}
+		}
+	}
+
+	return fmt.Errorf("PublishReliable: exhausted %d retries, message not confirmed", maxRetries)
+}
+
+// publishAndWaitConfirm publishes one message and blocks until the broker confirms or 5s timeout.
+// Uses the shared confirmCh registered once during GetConn, serialized by pubMu
+// to avoid confirmation delivery mismatch across concurrent publishers.
+func (c Conn) publishAndWaitConfirm(exchangeName, routingKey string, message []byte) (amqp.Confirmation, error) {
+	if c.confirmCh == nil {
+		return amqp.Confirmation{}, fmt.Errorf("publisher confirms not enabled")
+	}
+
+	// Serialize publish + confirm-wait so each publish gets its own confirmation.
+	c.pubMu.Lock()
+	defer c.pubMu.Unlock()
+
+	// Drain any stale confirmations from previous PublishMessage calls or
+	// other non-reliable publishes that generated confirms we never consumed.
+	for {
+		select {
+		case <-c.confirmCh:
+		default:
+			goto drained
+		}
+	}
+drained:
+
+	err := c.Channel.Publish(exchangeName, routingKey, false, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		Body:         message,
+	})
+	if err != nil {
+		return amqp.Confirmation{}, fmt.Errorf("error publishing message: %w", err)
+	}
+
+	select {
+	case confirm := <-c.confirmCh:
+		return confirm, nil
+	case <-time.After(5 * time.Second):
+		return amqp.Confirmation{}, fmt.Errorf("timed out waiting for broker confirmation")
+	}
 }
 
 // ReceiveData consumes messages from the specified queue.

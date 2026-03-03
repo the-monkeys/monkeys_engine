@@ -239,7 +239,7 @@ func (s *Scheduler) publishBlog(ctx context.Context, blogId, accountId string, d
 		s.logger.Errorf("Scheduler: failed to marshal RabbitMQ message for blog %s: %v", blogId, err)
 		// Don't fail the publish - blog is already published in ES
 	} else {
-		if err := s.qConn.PublishMessage(s.config.RabbitMQ.Exchange, s.config.RabbitMQ.RoutingKeys[1], msgBytes); err != nil {
+		if err := s.qConn.PublishReliable(s.config.RabbitMQ.Exchange, s.config.RabbitMQ.RoutingKeys[1], msgBytes, s.config.RabbitMQ.MaxRetries); err != nil {
 			s.logger.Errorf("Scheduler: failed to publish RabbitMQ message for blog %s: %v", blogId, err)
 			// Don't fail the publish - blog is already published in ES
 		}

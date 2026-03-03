@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -28,6 +29,11 @@ func NewUserDb(dbConn database.UserDb, log *zap.SugaredLogger, config *config.Co
 	return &UserDbConn{dbConn: dbConn, log: log, config: config}
 }
 
+// ConsumeFromQueue connects to RabbitMQ queue2 and processes messages.
+// It automatically reconnects if the channel/connection drops, using
+// exponential backoff (1s → 2s → 4s … 30s cap).
+// Messages are manually acked on success; on processing failure they are
+// nacked without requeue so RabbitMQ routes them to the dead letter queue.
 func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredLogger, dbConn database.UserDb) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -42,81 +48,139 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 		os.Exit(0)
 	}()
 
-	msgs, err := conn.Channel.Consume(
-		conf.RabbitMQ.Queues[1], // queue
-		"",                      // consumer
-		true,                    // auto-ack
-		false,                   // exclusive
-		false,                   // no-local
-		false,                   // no-wait
-		nil,                     // args
-	)
-	if err != nil {
-		log.Errorf("Failed to register a consumer: %v", err)
-		return
-	}
-
 	userCon := NewUserDb(dbConn, log, conf)
-	for d := range msgs {
-		user := models.TheMonkeysMessage{}
-		if err = json.Unmarshal(d.Body, &user); err != nil {
-			log.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
-			return
+	backoff := time.Second
+
+	for {
+		msgs, err := conn.Channel.Consume(
+			conf.RabbitMQ.Queues[1], // queue
+			"",                      // consumer
+			false,                   // auto-ack OFF — we ack/nack manually
+			false,                   // exclusive
+			false,                   // no-local
+			false,                   // no-wait
+			nil,                     // args
+		)
+		if err != nil {
+			log.Errorf("Failed to register a consumer, reconnecting in %v: %v", backoff, err)
+			time.Sleep(backoff)
+			backoff = nextBackoff(backoff)
+			conn = rabbitmq.Reconnect(conf.RabbitMQ)
+			continue
 		}
-		log.Debugf("user: %+v", user)
-		userLog := &models.UserLogs{AccountId: user.AccountId, IpAddress: user.IpAddress, Client: user.Client}
-		log.Debugf("userLog: %+v", userLog)
-		userLog.IpAddress, userLog.Client = utils.IpClientConvert(userLog.IpAddress, userLog.Client)
 
-		switch user.Action {
-		case constants.BLOG_CREATE:
-			log.Debugf("Creating blog: %+v", user)
-			if err := userCon.dbConn.AddBlogWithId(user); err != nil {
-				userCon.log.Errorf("Error creating blog: %v", err)
-			}
-			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
-		case constants.BLOG_UPDATE:
-			usr, err := userCon.dbConn.GetBlogByBlogId(user.BlogId)
-			if err != nil {
-				log.Errorf("Error getting blog: %v", err)
-			}
-			if usr.BlogStatus != user.BlogStatus {
-				if err := userCon.dbConn.UpdateBlogStatusToDraft(user.BlogId, user.BlogStatus); err != nil {
-					log.Errorf("Can't update blog status to draft: %v", err)
+		// Reset backoff on successful consume registration
+		backoff = time.Second
+		log.Info("Consumer registered on queue: ", conf.RabbitMQ.Queues[1])
+
+		// Process messages until the channel closes
+		for d := range msgs {
+			if err := processMessage(userCon, log, d.Body); err != nil {
+				// Processing failed — nack without requeue so the message goes to the DLQ
+				log.Errorf("Message processing failed, sending to DLQ: %v", err)
+				if nackErr := d.Nack(false, false); nackErr != nil {
+					log.Errorf("Failed to nack message: %v", nackErr)
 				}
-				go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.MovedBlogToDraft, user.BlogId), constants.ServiceBlog, constants.EventDraftedBlog, userCon.log)
-			}
-		case constants.BLOG_PUBLISH:
-			fmt.Printf("User published a blog: %+v", user)
-			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
-				log.Errorf("Can't update blog status to publish: %v", err)
-			}
-			for _, tag := range user.Tags {
-				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
-					log.Errorf("Can't update blog status to publish: %v", err)
+			} else {
+				// Processing succeeded — ack the message
+				if ackErr := d.Ack(false); ackErr != nil {
+					log.Errorf("Failed to ack message: %v", ackErr)
 				}
 			}
-			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
-		case constants.BLOG_DELETE:
-			if err := userCon.dbConn.DeleteBlogAndReferences(user.BlogId); err != nil {
-				log.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
-			}
-			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
-
-		case constants.BLOG_SCHEDULE:
-			fmt.Printf("User schedule a blog: %+v", user)
-			if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
-				log.Errorf("Can't update blog status to schedule: %v", err)
-			}
-			for _, tag := range user.Tags {
-				if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
-					log.Errorf("Can't update blog status to schedule: %v", err)
-				}
-			}
-			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.ScheduleBlog, user.BlogId), constants.ServiceBlog, constants.EventScheduledBlog, userCon.log)
-
-		default:
-			log.Errorf("Unknown action: %s", user.Action)
 		}
+
+		// If we reach here, the channel was closed — reconnect
+		log.Warn("RabbitMQ channel closed, reconnecting in ", backoff)
+		time.Sleep(backoff)
+		backoff = nextBackoff(backoff)
+		conn = rabbitmq.Reconnect(conf.RabbitMQ)
 	}
+}
+
+// nextBackoff doubles the backoff duration, capping at 30 seconds.
+func nextBackoff(current time.Duration) time.Duration {
+	next := current * 2
+	if next > 30*time.Second {
+		return 30 * time.Second
+	}
+	return next
+}
+
+// processMessage unmarshals and handles a single RabbitMQ delivery.
+// Returns nil on success; returns an error if processing fails so the
+// caller can nack the message to the dead letter queue.
+func processMessage(userCon *UserDbConn, log *zap.SugaredLogger, body []byte) error {
+	user := models.TheMonkeysMessage{}
+	if err := json.Unmarshal(body, &user); err != nil {
+		log.Errorf("Failed to unmarshal message from RabbitMQ, sending to DLQ: %v", err)
+		return fmt.Errorf("unmarshal failed: %w", err)
+	}
+
+	log.Debugf("consumer received message: %+v", user)
+	userLog := &models.UserLogs{AccountId: user.AccountId, IpAddress: user.IpAddress, Client: user.Client}
+	userLog.IpAddress, userLog.Client = utils.IpClientConvert(userLog.IpAddress, userLog.Client)
+
+	switch user.Action {
+	case constants.BLOG_CREATE:
+		log.Debugf("Creating blog: %+v", user)
+		if err := userCon.dbConn.AddBlogWithId(user); err != nil {
+			log.Errorf("Error creating blog: %v", err)
+			return fmt.Errorf("AddBlogWithId failed for %s: %w", user.BlogId, err)
+		}
+		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
+
+	case constants.BLOG_UPDATE:
+		usr, err := userCon.dbConn.GetBlogByBlogId(user.BlogId)
+		if err != nil {
+			log.Errorf("Error getting blog: %v", err)
+			return fmt.Errorf("GetBlogByBlogId failed for %s: %w", user.BlogId, err)
+		}
+		if usr.BlogStatus != user.BlogStatus {
+			if err := userCon.dbConn.UpdateBlogStatusToDraft(user.BlogId, user.BlogStatus); err != nil {
+				log.Errorf("Can't update blog status to draft: %v", err)
+				return fmt.Errorf("UpdateBlogStatusToDraft failed for %s: %w", user.BlogId, err)
+			}
+			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.MovedBlogToDraft, user.BlogId), constants.ServiceBlog, constants.EventDraftedBlog, userCon.log)
+		}
+
+	case constants.BLOG_PUBLISH:
+		log.Infof("User published a blog: blogId=%s, accountId=%s", user.BlogId, user.AccountId)
+		if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
+			log.Errorf("Can't update blog status to publish: %v", err)
+			return fmt.Errorf("UpdateBlogStatusToPublish failed for %s: %w", user.BlogId, err)
+		}
+		for _, tag := range user.Tags {
+			if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
+				log.Errorf("Can't insert topic for publish: %v", err)
+				// Non-critical: don't send to DLQ for tag insertion failures
+			}
+		}
+		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
+
+	case constants.BLOG_DELETE:
+		if err := userCon.dbConn.DeleteBlogAndReferences(user.BlogId); err != nil {
+			log.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
+			return fmt.Errorf("DeleteBlogAndReferences failed for %s: %w", user.BlogId, err)
+		}
+		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
+
+	case constants.BLOG_SCHEDULE:
+		log.Infof("User scheduled a blog: blogId=%s, accountId=%s", user.BlogId, user.AccountId)
+		if err := userCon.dbConn.UpdateBlogStatusToPublish(user.BlogId, user.BlogStatus); err != nil {
+			log.Errorf("Can't update blog status to schedule: %v", err)
+			return fmt.Errorf("UpdateBlogStatusToPublish (schedule) failed for %s: %w", user.BlogId, err)
+		}
+		for _, tag := range user.Tags {
+			if err := userCon.dbConn.InsertTopicWithCategory(context.Background(), tag, "General"); err != nil {
+				log.Errorf("Can't insert topic for schedule: %v", err)
+			}
+		}
+		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.ScheduleBlog, user.BlogId), constants.ServiceBlog, constants.EventScheduledBlog, userCon.log)
+
+	default:
+		log.Errorf("Unknown action: %s", user.Action)
+		return fmt.Errorf("unknown action: %s", user.Action)
+	}
+
+	return nil
 }
