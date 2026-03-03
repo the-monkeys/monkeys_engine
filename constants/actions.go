@@ -7,6 +7,7 @@ const (
 	BLOG_CREATE         = "blog_create"
 	BLOG_UPDATE         = "blog_update"
 	BLOG_PUBLISH        = "published"
+	BLOG_SCHEDULE       = "scheduled"
 	BLOG_DELETE         = "delete"
 	BLOG_LIKE           = "blog_like"
 	USER_FOLLOWED       = "user_followed"

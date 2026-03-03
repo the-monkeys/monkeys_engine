@@ -100,6 +100,13 @@ type RabbitMQ struct {
 	Exchange               string   `mapstructure:"exchange"`
 	Queues                 []string `yaml:"queues"`
 	RoutingKeys            []string `yaml:"routingKeys"`
+
+	// Dead Letter Queue configuration for reliable message delivery.
+	// Messages that are nacked or exceed retry limits are routed here.
+	DLXExchange string `mapstructure:"dlx_exchange"`
+	DLQQueue    string `mapstructure:"dlq_queue"`
+	DLQKey      string `mapstructure:"dlq_key"`
+	MaxRetries  int    `mapstructure:"max_retries"`
 }
 
 type Keys struct {
@@ -314,6 +321,10 @@ func bindEnvVars() {
 	viper.BindEnv("rabbitMQ.password", "RABBITMQ_PASSWORD")
 	viper.BindEnv("rabbitMQ.virtual_host", "RABBITMQ_VIRTUAL_HOST")
 	viper.BindEnv("rabbitMQ.exchange", "RABBITMQ_EXCHANGE")
+	viper.BindEnv("rabbitMQ.dlx_exchange", "RABBITMQ_DLX_EXCHANGE")
+	viper.BindEnv("rabbitMQ.dlq_queue", "RABBITMQ_DLQ_QUEUE")
+	viper.BindEnv("rabbitMQ.dlq_key", "RABBITMQ_DLQ_KEY")
+	viper.BindEnv("rabbitMQ.max_retries", "RABBITMQ_MAX_RETRIES")
 
 	// Keys
 	viper.BindEnv("keys.mediastack", "KEYS_MEDIASTACK")

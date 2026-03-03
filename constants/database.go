@@ -54,6 +54,7 @@ const (
 const (
 	BlogStatusDraft     = "Draft"
 	BlogStatusPublished = "Published"
+	BlogStatusScheduled = "Scheduled"
 	BlogStatusArchived  = "Archived"
 	BlogDeleted         = "Deleted"
 )

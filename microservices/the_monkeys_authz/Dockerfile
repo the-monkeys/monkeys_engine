@@ -8,14 +8,22 @@ WORKDIR /app
 
 # Copy go mod files first (for better caching)
 COPY go.mod go.sum ./
-RUN go mod download
+
+# Download dependencies with a persistent cache mount so modules
+# are shared across all service builds and survive layer invalidation.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy source code
 COPY . .
 
-# Build the binary with optimizations for production
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -a -installsuffix cgo \
+# Build the binary with optimizations for production.
+# Cache mounts persist the Go build cache across builds — shared
+# packages (gRPC, protobuf, zap, etc.) are compiled once and reused
+# by all service Dockerfiles.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOMAXPROCS=4 go build \
     -ldflags='-w -s -extldflags "-static"' \
     -o authz-service ./microservices/the_monkeys_authz/main.go
 

@@ -628,6 +628,10 @@ func (blog *BlogService) fetchBlogMetadataForActivity(ctx context.Context, blogI
 		// Try draft blogs if published blog not found
 		blogData, err = blog.osClient.GetBlogByBlogId(ctx, blogId, true)
 		if err != nil {
+			// Try draft blogs if published blog not found
+			blogData, err = blog.osClient.GetBlogByBlogId(ctx, blogId, true)
+		}
+		if err != nil {
 			blog.logger.Warnf("could not fetch blog metadata for activity tracking, blogId: %s, error: %v", blogId, err)
 			return nil
 		}
@@ -741,9 +745,9 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		}
 		// fmt.Printf("bx: %v\n", string(bx))
 		go func() {
-			err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+			err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 			if err != nil {
-				blog.logger.Errorf("failed to publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+				blog.logger.Errorf("failed to reliably publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
 			}
 		}()
 	}
@@ -773,14 +777,32 @@ func (blog *BlogService) CheckIfBlogsExist(ctx context.Context, req *pb.BlogById
 		return nil, status.Errorf(codes.NotFound, "cannot find the blog with id")
 	}
 
-	isDraft, ok := blogInfo["is_draft"].(bool)
-	if !ok {
-		blog.logger.Errorf("unexpected type for is_draft field")
-		isDraft = true
+	// If the blog doesn't exist, blogInfo is nil — return early to avoid
+	// a nil map access on is_draft.
+	if !exists {
+		return &pb.BlogExistsRes{
+			BlogExists: false,
+			IsDraft:    true,
+		}, nil
 	}
 
-	// Track blog activity
-	// blog.trackBlogActivity(req.OwnerAccountId, "check_blog_existence", "blog", req.BlogId, req)
+	// Handle is_draft being bool, string, or missing (old docs may have
+	// inconsistent types depending on which code path created them).
+	isDraft := true
+	if blogInfo != nil {
+		switch v := blogInfo["is_draft"].(type) {
+		case bool:
+			isDraft = v
+		case string:
+			isDraft = v != "false" && v != "False"
+		default:
+			// Field missing or unexpected type — default to draft
+			blog.logger.Warnw("is_draft field missing or unexpected type, defaulting to draft",
+				"blog_id", req.BlogId,
+				"type", fmt.Sprintf("%T", blogInfo["is_draft"]),
+				"value", blogInfo["is_draft"])
+		}
+	}
 
 	return &pb.BlogExistsRes{
 		BlogExists: exists,
@@ -905,10 +927,10 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	}
 
 	go func() {
-		// Enqueue publish message to user service asynchronously
-		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		// Enqueue publish message to user service asynchronously with publisher confirms
+		err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 		if err != nil {
-			blog.logger.Errorf(`failed to publish blog publish message to RabbitMQ: 
+			blog.logger.Errorf(`failed to reliably publish blog publish message to RabbitMQ: 
 			 exchange=%s, routing_key=%s, error=%v`, blog.config.RabbitMQ.Exchange,
 				blog.config.RabbitMQ.RoutingKeys[1], err)
 		}
@@ -941,6 +963,73 @@ func (blog *BlogService) PublishBlog(ctx context.Context, req *pb.PublishBlogReq
 	return &pb.PublishBlogResp{
 		Message: fmt.Sprintf("the blog %s has been published!", req.BlogId),
 	}, nil
+}
+
+func (blog *BlogService) ScheduleBlog(ctx context.Context, req *pb.ScheduleBlogReq) (*pb.ScheduleBlogResp, error) {
+	blog.logger.Infof("The user has requested to publish the blog: %s", req.Publish.BlogId)
+
+	// Check if the blog exists
+	exists, _, err := blog.osClient.DoesBlogExist(ctx, req.Publish.BlogId)
+	if err != nil {
+		blog.logger.Errorf("Error checking blog existence: %v", err)
+		return nil, status.Errorf(codes.Internal, "cannot get the blog for id: %s", req.Publish.BlogId)
+	}
+
+	if !exists {
+		blog.logger.Errorf("The blog with ID: %s doesn't exist", req.Publish.BlogId)
+		return nil, status.Errorf(codes.NotFound, "cannot find the blog for id: %s", req.Publish.BlogId)
+	}
+
+	_, err = blog.osClient.ScheduleBlogById(ctx, database.ScheduleBlogOptions{
+		BlogID:       req.Publish.BlogId,
+		ScheduleTime: req.ScheduleTime.AsTime(),
+		Timezone:     req.Timezone,
+	})
+	if err != nil {
+		blog.logger.Errorf("Error Publishing the blog: %s, error: %v", req.Publish.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "cannot find the blog for id: %s", req.Publish.BlogId)
+	}
+
+	bx, err := json.Marshal(models.InterServiceMessage{
+		AccountId:    req.Publish.AccountId,
+		BlogId:       req.Publish.BlogId,
+		Action:       constants.BLOG_SCHEDULE,
+		BlogStatus:   constants.BlogStatusScheduled,
+		IpAddress:    req.Publish.Ip,
+		Client:       req.Publish.Client,
+		Tags:         req.Publish.Tags,
+		ScheduleTime: req.ScheduleTime.AsTime(),
+		Timezone:     req.Timezone,
+	})
+
+	if err != nil {
+		blog.logger.Errorf("failed to marshal message for blog publish: user_id=%s, blog_id=%s, error=%v", req.Publish.AccountId, req.Publish.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.Publish.BlogId)
+	}
+
+	go func() {
+		// Enqueue publish message to user service asynchronously with publisher confirms
+		err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
+		if err != nil {
+			blog.logger.Errorf(`failed to reliably publish blog publish message to RabbitMQ:
+			 exchange=%s, routing_key=%s, error=%v`, blog.config.RabbitMQ.Exchange,
+				blog.config.RabbitMQ.RoutingKeys[1], err)
+		}
+
+	}()
+
+	blog.trackBlogActivity(req.Publish.AccountId, "schedule_blog", "blog", req.Publish.BlogId, req)
+
+	t := req.ScheduleTime.AsTime()
+
+	return &pb.ScheduleBlogResp{
+		Message: fmt.Sprintf(
+			"the blog %s has been scheduled for %s!",
+			req.Publish.BlogId,
+			t.Format(time.RFC3339), // or any format you like
+		),
+	}, nil
+
 }
 
 func (blog *BlogService) MoveBlogToDraftStatus(ctx context.Context, req *pb.BlogReq) (*pb.BlogResp, error) {
@@ -978,11 +1067,11 @@ func (blog *BlogService) MoveBlogToDraftStatus(ctx context.Context, req *pb.Blog
 		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
 	}
 
-	// Enqueue publish message to user service asynchronously
+	// Enqueue publish message to user service asynchronously with publisher confirms
 	go func() {
-		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 		if err != nil {
-			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+			blog.logger.Errorf("failed to reliably publish blog draft message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
 		}
 	}()
 
@@ -1091,11 +1180,11 @@ func (blog *BlogService) DeleteABlogByBlogId(ctx context.Context, req *pb.Delete
 		return nil, status.Errorf(codes.Internal, "published the blog with some error: %s", req.BlogId)
 	}
 
-	// Enqueue delete message to user service asynchronously
+	// Enqueue delete message to user service asynchronously with publisher confirms
 	go func() {
-		err := blog.qConn.PublishMessage(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx)
+		err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 		if err != nil {
-			blog.logger.Errorf("failed to publish blog publish message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+			blog.logger.Errorf("failed to reliably publish blog delete message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
 		}
 	}()
 

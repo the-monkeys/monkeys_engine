@@ -469,6 +469,7 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 
 	// Execute the search request
 	res, err := req.Do(ctx, es.client)
+
 	if err != nil {
 		es.log.Errorf("GetBlogByBlogId: error executing search request, error: %+v", err)
 		return nil, err
@@ -899,6 +900,12 @@ func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Cont
 					{
 						"term": map[string]interface{}{
 							"is_archived": true,
+						},
+					},
+					{
+						// Exclude scheduled blogs; docs without is_scheduled are treated as non-scheduled
+						"term": map[string]interface{}{
+							"is_scheduled": true,
 						},
 					},
 				},

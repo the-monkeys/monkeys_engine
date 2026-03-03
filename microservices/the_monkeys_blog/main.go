@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_blog/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -11,6 +14,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/database"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/scheduler"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/seo"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/services"
 
@@ -27,6 +31,7 @@ func printBanner(host, env string) {
 		fmt.Sprintf("│   Host     : %-44s│\n", host) +
 		fmt.Sprintf("│   Env      : %-44s│\n", env) +
 		"│   Logs     : zap (structured)                             │\n" +
+		"│   Scheduler: ACTIVE (30s interval)                        │\n" +
 		"│   Tip      : Set LOG_LEVEL=debug for verbose output       │\n" +
 		"└──────────────────────────────────────────────────────────┘\n"
 	fmt.Print(banner)
@@ -62,6 +67,19 @@ func main() {
 
 	seoManager := seo.NewSEOManager(logg, cfg)
 	blogService := services.NewBlogService(osClient, seoManager, logg, cfg, qConn)
+
+	// Start the blog scheduler for automatic publishing
+	blogScheduler := scheduler.NewScheduler(osClient, seoManager, qConn, cfg, logg)
+	blogScheduler.Start()
+
+	// Handle graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		logg.Info("Received shutdown signal, stopping scheduler...")
+		blogScheduler.Stop()
+	}()
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterBlogServiceServer(grpcServer, blogService)
