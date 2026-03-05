@@ -149,6 +149,12 @@ type Minio struct {
 	RemoteAccessKey  string `mapstructure:"remote_access_key"`
 	RemoteSecretKey  string `mapstructure:"remote_secret_key"`
 	RemoteBucketName string `mapstructure:"remote_bucket_name"`
+	// Bidirectional sync toggles.
+	// Set to false to disable the corresponding periodic sync loop.
+	// Both default to true (Viper zero-value for bool is false,
+	// so the env var must be explicitly set to "false" to disable).
+	EnableFSToMinioSync bool `mapstructure:"enable_fs_to_minio_sync"`
+	EnableMinioToFSSync bool `mapstructure:"enable_minio_to_fs_sync"`
 }
 
 type Cors struct {
@@ -358,6 +364,8 @@ func bindEnvVars() {
 	viper.BindEnv("minio.remote_access_key", "MINIO_REMOTE_ACCESS_KEY")
 	viper.BindEnv("minio.remote_secret_key", "MINIO_REMOTE_SECRET_KEY")
 	viper.BindEnv("minio.remote_bucket_name", "MINIO_REMOTE_BUCKET_NAME")
+	viper.BindEnv("minio.enable_fs_to_minio_sync", "MINIO_ENABLE_FS_TO_MINIO_SYNC")
+	viper.BindEnv("minio.enable_minio_to_fs_sync", "MINIO_ENABLE_MINIO_TO_FS_SYNC")
 
 	// SEO
 	viper.BindEnv("seo.enabled", "SEO_ENABLED")

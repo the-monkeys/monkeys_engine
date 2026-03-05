@@ -1075,7 +1075,7 @@ func (asc *BlogServiceClient) FollowingBlogsFeed(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1171,7 +1171,7 @@ func (asc *BlogServiceClient) GetLatestBlogs(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1271,7 +1271,7 @@ func (asc *BlogServiceClient) GetBlogsByTags(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1352,7 +1352,7 @@ func (asc *BlogServiceClient) MyDraftBlogs(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1446,7 +1446,7 @@ func (asc *BlogServiceClient) MyPublishedBlogs(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1558,7 +1558,7 @@ func (asc *BlogServiceClient) UsersBlogs(ctx *gin.Context) {
 		}
 
 		var blogMaps []map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return
@@ -1703,7 +1703,7 @@ func (asc *BlogServiceClient) MoveBlogToDraft(ctx *gin.Context) {
 // 		}
 
 // 		var blogMaps []map[string]interface{}
-// 		if err := json.Unmarshal(blog.Value, &blogMaps); err != nil {
+// 		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMaps); err != nil {
 // 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 // 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 // 			return
@@ -1780,7 +1780,7 @@ func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 	}
 
 	var blogMap map[string]interface{}
-	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
+	if err := json.Unmarshal(rewriteV1StorageURLs(resp.Value), &blogMap); err != nil {
 		asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 		return
@@ -1841,7 +1841,7 @@ func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
 	}
 
 	var blogMap map[string]interface{}
-	if err := json.Unmarshal(resp.Value, &blogMap); err != nil {
+	if err := json.Unmarshal(rewriteV1StorageURLs(resp.Value), &blogMap); err != nil {
 		asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 		return
@@ -1920,7 +1920,7 @@ func (asc *BlogServiceClient) GetLatestNews(ctx *gin.Context) {
 		}
 
 		var newsMap map[string]interface{}
-		if err := json.Unmarshal(news.Value, &newsMap); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(news.Value), &newsMap); err != nil {
 			asc.log.Errorf("cannot unmarshal the news, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the news"})
 			return
@@ -1993,7 +1993,7 @@ func (asc *BlogServiceClient) GetTrendingNews(ctx *gin.Context) {
 		}
 
 		var newsMap map[string]interface{}
-		if err := json.Unmarshal(news.Value, &newsMap); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(news.Value), &newsMap); err != nil {
 			asc.log.Errorf("cannot unmarshal the news, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the news"})
 			return
@@ -2055,7 +2055,7 @@ func (asc *BlogServiceClient) GetNewsBySections(ctx *gin.Context) {
 			}
 
 			var newsMap map[string]interface{}
-			if err := json.Unmarshal(news.Value, &newsMap); err != nil {
+			if err := json.Unmarshal(rewriteV1StorageURLs(news.Value), &newsMap); err != nil {
 				asc.log.Errorf("cannot unmarshal news for section %s, error: %v", section, err)
 				continue
 			}
@@ -2234,7 +2234,7 @@ func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
 
 		// Unmarshal into a map since response structure has changed
 		var blogMap map[string]interface{}
-		if err := json.Unmarshal(blog.Value, &blogMap); err != nil {
+		if err := json.Unmarshal(rewriteV1StorageURLs(blog.Value), &blogMap); err != nil {
 			asc.log.Errorf("cannot unmarshal the blog, error: %v", err)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "cannot unmarshal the blog"})
 			return

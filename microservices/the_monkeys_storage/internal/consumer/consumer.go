@@ -60,10 +60,22 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.Sugared
 	go consumeQueue(conn, conf.Queues[0], log, cfg, mc)
 	go consumeQueue(conn, conf.Queues[2], log, cfg, mc)
 
-	// Start periodic sync for filesystem to MinIO migration
+	// Start periodic sync goroutines only if enabled in config.
+	// Defaults: both syncs are disabled (bool zero value) unless explicitly
+	// set via MINIO_ENABLE_FS_TO_MINIO_SYNC / MINIO_ENABLE_MINIO_TO_FS_SYNC.
 	if mc != nil && cfg != nil {
-		go startPeriodicSync(cfg, mc, log)
-		go startMinioToFileSystemSync(cfg, mc, log)
+		if cfg.Minio.EnableFSToMinioSync {
+			log.Info("FS→MinIO periodic sync: ENABLED")
+			go startPeriodicSync(cfg, mc, log)
+		} else {
+			log.Info("FS→MinIO periodic sync: DISABLED (set MINIO_ENABLE_FS_TO_MINIO_SYNC=true to enable)")
+		}
+		if cfg.Minio.EnableMinioToFSSync {
+			log.Info("MinIO→FS periodic sync: ENABLED")
+			go startMinioToFileSystemSync(cfg, mc, log)
+		} else {
+			log.Info("MinIO→FS periodic sync: DISABLED (set MINIO_ENABLE_MINIO_TO_FS_SYNC=true to enable)")
+		}
 	}
 
 	// Keep the main function running to allow goroutines to process messages

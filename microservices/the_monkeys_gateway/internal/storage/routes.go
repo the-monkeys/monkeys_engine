@@ -6,8 +6,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.uber.org/zap"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
@@ -23,6 +27,10 @@ import (
 type FileServiceClient struct {
 	Client pb.UploadBlogFileClient
 	log    *zap.SugaredLogger
+	// MinIO fallback: serve files from object storage when the gRPC
+	// file-store service is unreachable or the file was uploaded via v2.
+	mc     *minio.Client
+	bucket string
 }
 
 func NewFileServiceClient(cfg *config.Config, log *zap.SugaredLogger) pb.UploadBlogFileClient {
@@ -50,23 +58,40 @@ func RegisterFileStorageRouter(router *gin.Engine, cfg *config.Config, authClien
 		Client: NewFileServiceClient(cfg, log),
 		log:    log,
 	}
+
+	// Initialise MinIO client for fallback reads.
+	// If MinIO is unreachable the v1 handler degrades to gRPC-only.
+	if cfg.Minio.Endpoint != "" {
+		mc, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.Minio.AccessKey, cfg.Minio.SecretKey, ""),
+			Secure: cfg.Minio.UseSSL,
+		})
+		if err != nil {
+			log.Warnf("v1 storage: MinIO fallback unavailable: %v", err)
+		} else {
+			usc.mc = mc
+			usc.bucket = cfg.Minio.Bucket
+			log.Info("v1 storage: MinIO fallback enabled")
+		}
+	}
+
 	routes := router.Group("/api/v1/files")
 
-	routes.GET("/post/:id/:fileName", usc.GetBlogFile)
+	// routes.GET("/post/:id/:fileName", usc.GetBlogFile)
 
-	// route defined to get profile pic
-	routes.GET("/profile/:user_id/profile", usc.GetProfilePic)
+	// // route defined to get profile pic
+	// routes.GET("/profile/:user_id/profile", usc.GetProfilePic)
 
 	routes.Use(mware.AuthRequired)
-	routes.POST("/post/:id", usc.UploadBlogFile)
-	routes.DELETE("/post/:id/:fileName", usc.DeleteBlogFile)
+	// routes.POST("/post/:id", usc.UploadBlogFile)
+	// routes.DELETE("/post/:id/:fileName", usc.DeleteBlogFile)
 
-	// route defined to access profile
-	routes.POST("/profile/:user_id/profile", usc.UploadProfilePic)
-	routes.DELETE("/profile/:user_id/profile", usc.DeleteProfilePic)
+	// // route defined to access profile
+	// routes.POST("/profile/:user_id/profile", usc.UploadProfilePic)
+	// routes.DELETE("/profile/:user_id/profile", usc.DeleteProfilePic)
 
-	rotuesV11 := router.Group("/api/v1.1/files")
-	rotuesV11.GET("/profile/:user_id/profile", usc.GetProfilePicStream)
+	// rotuesV11 := router.Group("/api/v1.1/files")
+	// rotuesV11.GET("/profile/:user_id/profile", usc.GetProfilePicStream)
 
 	return usc
 }
@@ -123,6 +148,34 @@ func (asc *FileServiceClient) GetBlogFile(ctx *gin.Context) {
 	blogId := ctx.Param("id")
 	fileName := ctx.Param("fileName")
 
+	// --- MinIO fast path ---
+	// If MinIO is configured, try to serve the object directly.
+	// This covers files uploaded via v2 and files already synced to MinIO.
+	if asc.mc != nil {
+		objectKey := "posts/" + blogId + "/" + fileName
+		obj, err := asc.mc.GetObject(context.Background(), asc.bucket, objectKey, minio.GetObjectOptions{})
+		if err == nil {
+			info, statErr := obj.Stat()
+			if statErr == nil {
+				ct := info.ContentType
+				if ct == "" {
+					ct = contentTypeFromExt(fileName)
+				}
+				ctx.Header("Content-Type", ct)
+				ctx.Header("Cache-Control", "public, max-age=31536000, immutable")
+				ctx.Status(http.StatusOK)
+				if _, err := io.Copy(ctx.Writer, obj); err != nil {
+					asc.log.Errorf("MinIO stream error for %s: %v", objectKey, err)
+				}
+				_ = obj.Close()
+				return
+			}
+			_ = obj.Close()
+			// Object not found in MinIO — fall through to gRPC.
+		}
+	}
+
+	// --- gRPC fallback ---
 	stream, err := asc.Client.GetBlogFile(context.Background(), &pb.GetBlogFileReq{
 		BlogId:   blogId,
 		FileName: fileName,
@@ -229,6 +282,31 @@ func (asc *FileServiceClient) UploadProfilePic(ctx *gin.Context) {
 func (asc *FileServiceClient) GetProfilePic(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 
+	// --- MinIO fast path ---
+	if asc.mc != nil {
+		objectKey := "profiles/" + userID + "/profile"
+		obj, err := asc.mc.GetObject(context.Background(), asc.bucket, objectKey, minio.GetObjectOptions{})
+		if err == nil {
+			info, statErr := obj.Stat()
+			if statErr == nil {
+				ct := info.ContentType
+				if ct == "" {
+					ct = "image/png"
+				}
+				ctx.Header("Content-Type", ct)
+				ctx.Header("Cache-Control", "public, max-age=3600")
+				ctx.Status(http.StatusOK)
+				if _, err := io.Copy(ctx.Writer, obj); err != nil {
+					asc.log.Errorf("MinIO stream error for profile %s: %v", objectKey, err)
+				}
+				_ = obj.Close()
+				return
+			}
+			_ = obj.Close()
+		}
+	}
+
+	// --- gRPC fallback ---
 	stream, err := asc.Client.GetProfilePic(context.Background(), &pb.GetProfilePicReq{
 		UserId:   userID,
 		FileName: "profile.png",
@@ -320,4 +398,25 @@ func (asc *FileServiceClient) DeleteProfilePic(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusAccepted, res)
+}
+
+// contentTypeFromExt returns a MIME type for common image/file extensions.
+// Used when MinIO object metadata lacks Content-Type.
+func contentTypeFromExt(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".avif":
+		return "image/avif"
+	case ".svg":
+		return "image/svg+xml"
+	default:
+		return "application/octet-stream"
+	}
 }

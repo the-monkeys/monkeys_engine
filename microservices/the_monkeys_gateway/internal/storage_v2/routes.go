@@ -147,6 +147,36 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 		v2.DELETE("/profiles/:user_id/profile", svc.DeleteProfileImage)
 
 	}
+
+	// ---- Version-free aliases (/api/storage/...) ----
+	// These are version-agnostic routes that forward to the same v2 handlers.
+	// Frontend code should migrate to these so a future v3 backend change
+	// only needs a gateway config update, not a client-side rollout.
+	vf := router.Group("/api/storage")
+	{
+		// Public reads (posts + profiles)
+		vf.GET("/profiles/:user_id/profile", svc.GetProfileImage)
+		vf.GET("/profiles/:user_id/profile/meta", svc.GetProfileMeta)
+		vf.GET("/profiles/:user_id/profile/url", svc.GetProfileURL)
+		vf.GET("/posts/:id/:fileName", svc.GetPostFile)
+		vf.GET("/posts/:id/:fileName/meta", svc.GetPostFileMeta)
+		vf.GET("/posts/:id/:fileName/url", svc.GetPostFileURL)
+	}
+	vf.Use(mw.AuthRequired)
+	{
+		// Auth-required writes/deletes (posts)
+		vf.POST("/posts/:id", mw.AuthorizationByID, svc.UploadPostFile)
+		vf.GET("/posts/:id", svc.ListPostFiles)
+		vf.HEAD("/posts/:id/:fileName", svc.HeadPostFile)
+		vf.PUT("/posts/:id/:fileName", mw.AuthorizationByID, svc.UpdatePostFile)
+		vf.DELETE("/posts/:id/:fileName", mw.AuthorizationByID, svc.DeletePostFile)
+		// Auth-required writes/deletes (profiles)
+		vf.POST("/profiles/:user_id/profile", svc.UploadProfileImage)
+		vf.HEAD("/profiles/:user_id/profile", svc.HeadProfileImage)
+		vf.PUT("/profiles/:user_id/profile", svc.UpdateProfileImage)
+		vf.DELETE("/profiles/:user_id/profile", svc.DeleteProfileImage)
+	}
+
 	return svc
 }
 
@@ -217,28 +247,34 @@ func (s *Service) enrichResponse(ctx context.Context, resp gin.H, objectName str
 	}
 }
 
-// presignedOrCDNURL returns a CDN URL if MINIO_CDN_URL is set; otherwise a presigned GET URL
-// with the provided expiry. Note: we DO NOT rewrite the host of the presigned URL because
-// AWS SigV4 includes the host in the signature. Rewriting would break the signature.
+// presignedOrCDNURL returns a domain-free relative path for the object.
+// Returning a relative path (e.g. "/api/v2/storage/posts/abc/img.png") makes
+// stored URLs environment-agnostic: the browser resolves against its current
+// origin, so the same data works on localhost, staging, and production with
+// zero migration on domain change.
+//
+// Fallback: if MINIO_CDN_URL is explicitly set, it is used as the prefix
+// (backward compat / CDN edge-cache scenario). If neither CDN nor public
+// signer is configured, presigned URLs are used as a last resort.
 func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expiry time.Duration) (string, error) {
 	if s.cdnURL != "" {
-		// Treat as public CDN origin; return deterministic URL
-		return strings.TrimRight(s.cdnURL, "/") + "/" + objectName, nil
-	}
-	// Prefer a signer bound to a public base URL if provided, so the signature uses the public host
-	if s.publicSigner != nil {
-		u, err := s.publicSigner.PresignedGetObject(ctx, s.bucket, objectName, expiry, nil)
-		if err == nil {
-			return u.String(), nil
+		trimmed := strings.TrimRight(s.cdnURL, "/")
+		// If cdnURL is already a relative path (starts with /), return as-is.
+		// If it's an absolute URL, extract just the path portion to stay domain-free.
+		if strings.HasPrefix(trimmed, "/") {
+			return trimmed + "/" + objectName, nil
 		}
-		// fall back to default client on error
-		s.log.Warnf("public presign failed, falling back to internal presign: %v", err)
+		// Absolute cdnURL configured — but we deliberately return only the path.
+		// e.g. "https://monkeys.support/api/v2/storage" → "/api/v2/storage"
+		// This keeps stored URLs domain-free.
+		if idx := strings.Index(trimmed, "/api/"); idx >= 0 {
+			return trimmed[idx:] + "/" + objectName, nil
+		}
+		// Fallback: return the relative storage path directly
+		return "/api/v2/storage/" + objectName, nil
 	}
-	u, err := s.mc.PresignedGetObject(ctx, s.bucket, objectName, expiry, nil)
-	if err != nil {
-		return "", err
-	}
-	return u.String(), nil
+	// No CDN configured — return relative path by default
+	return "/api/v2/storage/" + objectName, nil
 }
 
 // Handlers (Create/Read/Update/Delete)
