@@ -189,6 +189,29 @@ func uniqueName(original string) string {
 	return uuid.NewString() + ext
 }
 
+// extFromContentType returns the canonical file extension (with leading dot)
+// for the given Content-Type. Returns "" for unsupported/unknown types.
+// This keeps MinIO object keys self-documenting: "profile.png" instead of "profile".
+func extFromContentType(ct string) string {
+	ct = strings.ToLower(ct)
+	switch {
+	case strings.Contains(ct, "image/png"):
+		return ".png"
+	case strings.Contains(ct, "image/jpeg"):
+		return ".jpg"
+	case strings.Contains(ct, "image/webp"):
+		return ".webp"
+	case strings.Contains(ct, "image/avif"):
+		return ".avif"
+	case strings.Contains(ct, "image/gif"):
+		return ".gif"
+	case strings.Contains(ct, "image/svg+xml"):
+		return ".svg"
+	default:
+		return ""
+	}
+}
+
 // metaValue fetches a header-like key from a case-insensitive map provided by MinIO/S3 user metadata.
 func metaValue(m map[string]string, key string) string {
 	for k, v := range m {
@@ -595,10 +618,66 @@ func (s *Service) DeletePostFile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "deleted", "object": objectName})
 }
 
+// resolveProfileKey finds the actual MinIO object key for a user's profile image.
+// Both v1 and v2 store with a real extension (e.g. "profiles/{user}/profile.png").
+// A brief transitional period may have stored extensionless "profiles/{user}/profile".
+// This helper tries common extensions first (the canonical form), then falls back
+// to the extensionless key. Returns the resolved key and true if found.
+func (s *Service) resolveProfileKey(ctx context.Context, userID string) (string, bool) {
+	base := "profiles/" + userID + "/profile"
+	// Try extension-bearing keys first — canonical for both v1 and v2.
+	for _, ext := range []string{".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"} {
+		key := base + ext
+		if _, err := s.mc.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{}); err == nil {
+			return key, true
+		}
+	}
+	// Fallback: extensionless key from brief v2 transitional period.
+	if _, err := s.mc.StatObject(ctx, s.bucket, base, minio.StatObjectOptions{}); err == nil {
+		return base, true
+	}
+	return "", false
+}
+
+// cleanupOtherProfileKeys removes any profile keys that differ from currentKey.
+// This covers: old extension variants (e.g. user re-uploads as .webp replacing .png)
+// and the extensionless key from the brief v2 transitional period.
+// Called after a successful upload/update so stale files don't waste space.
+func (s *Service) cleanupOtherProfileKeys(ctx context.Context, userID, currentKey string) {
+	base := "profiles/" + userID + "/profile"
+	// Remove extensionless key if it's not the current one.
+	if base != currentKey {
+		if _, err := s.mc.StatObject(ctx, s.bucket, base, minio.StatObjectOptions{}); err == nil {
+			if err := s.mc.RemoveObject(ctx, s.bucket, base, minio.RemoveObjectOptions{}); err != nil {
+				s.log.Warnf("failed to clean up profile key %s: %v", base, err)
+			} else {
+				s.log.Infof("cleaned up stale profile key: %s", base)
+			}
+		}
+	}
+	// Remove extension variants that differ from the current key.
+	for _, ext := range []string{".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"} {
+		key := base + ext
+		if key == currentKey {
+			continue
+		}
+		if _, err := s.mc.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{}); err == nil {
+			if err := s.mc.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{}); err != nil {
+				s.log.Warnf("failed to clean up profile key %s: %v", key, err)
+			} else {
+				s.log.Infof("cleaned up stale profile key: %s", key)
+			}
+		}
+	}
+}
+
 // UploadProfileImage
 // Method: POST /api/v2/storage/profiles/:user_id/profile (auth required)
 // Input: multipart form field `profile_pic`
-// Behavior: stores to canonical key profiles/{user_id}/profile, computes BlurHash/dimensions for images
+// Behavior: stores to profiles/{user_id}/profile.{ext} (extension from Content-Type),
+//
+//	computes BlurHash/dimensions for images, cleans up any prior key variants.
+//
 // Response: 201 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UploadProfileImage(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
@@ -616,8 +695,11 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 	}
 	defer file.Close()
 
-	objectName := "profiles/" + userID + "/profile" // single canonical key for profile image
 	contentType := fileHeader.Header.Get("Content-Type")
+	// Derive extension from uploaded Content-Type so MinIO key is self-documenting.
+	// e.g. image/png → profiles/{user}/profile.png
+	ext := extFromContentType(contentType)
+	objectName := "profiles/" + userID + "/profile" + ext
 
 	// Streaming upload
 	const metadataLimit = 5 * 1024 * 1024
@@ -655,6 +737,10 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 		return
 	}
 
+	// Clean up any prior profile keys that differ from the one just written.
+	// Handles: old extension variants (.png → .webp) and extensionless transitional keys.
+	s.cleanupOtherProfileKeys(ctx.Request.Context(), userID, objectName)
+
 	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
@@ -671,7 +757,12 @@ func (s *Service) UploadProfileImage(ctx *gin.Context) {
 // Behavior: returns metadata headers; includes X-Blurhash and dimensions if image
 func (s *Service) HeadProfileImage(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
-	objectName := "profiles/" + userID + "/profile"
+
+	objectName, found := s.resolveProfileKey(ctx.Request.Context(), userID)
+	if !found {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
+	}
 
 	info, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
 	if err != nil {
@@ -727,8 +818,9 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 	}
 	defer file.Close()
 
-	objectName := "profiles/" + userID + "/profile"
 	contentType := fileHeader.Header.Get("Content-Type")
+	ext := extFromContentType(contentType)
+	objectName := "profiles/" + userID + "/profile" + ext
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -757,6 +849,9 @@ func (s *Service) UpdateProfileImage(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
 		return
 	}
+
+	// Clean up any prior profile keys that differ from the one just written.
+	s.cleanupOtherProfileKeys(ctx.Request.Context(), userID, objectName)
 
 	resp := gin.H{
 		"bucket":      s.bucket,
@@ -822,7 +917,12 @@ func (s *Service) GetPostFileMeta(ctx *gin.Context) {
 // Behavior: JSON metadata for profile image including BlurHash, dimensions, and direct URL
 func (s *Service) GetProfileMeta(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
-	objectName := "profiles/" + userID + "/profile"
+
+	objectName, found := s.resolveProfileKey(ctx.Request.Context(), userID)
+	if !found {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
+	}
 
 	info, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
 	if err != nil {
@@ -905,7 +1005,12 @@ func (s *Service) GetPostFileURL(ctx *gin.Context) {
 // Behavior: returns CDN/presigned URL for profile image
 func (s *Service) GetProfileURL(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
-	objectName := "profiles/" + userID + "/profile"
+
+	objectName, found := s.resolveProfileKey(ctx.Request.Context(), userID)
+	if !found {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
+	}
 
 	expires := 600
 	if qs := ctx.Query("expires"); qs != "" {
@@ -919,12 +1024,6 @@ func (s *Service) GetProfileURL(ctx *gin.Context) {
 		}
 	}
 
-	// Check existence first
-	if _, err := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{}); err != nil {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
-		return
-	}
-
 	urlStr, err := s.presignedOrCDNURL(ctx.Request.Context(), objectName, time.Duration(expires)*time.Second)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "could not generate url"})
@@ -936,7 +1035,12 @@ func (s *Service) GetProfileURL(ctx *gin.Context) {
 func (s *Service) GetProfileImage(ctx *gin.Context) {
 	// Streams the user's profile image (public)
 	userID := ctx.Param("user_id")
-	objectName := "profiles/" + userID + "/profile"
+
+	objectName, found := s.resolveProfileKey(ctx.Request.Context(), userID)
+	if !found {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
+		return
+	}
 
 	obj, err := s.mc.GetObject(ctx.Request.Context(), s.bucket, objectName, minio.GetObjectOptions{})
 	if err != nil {
@@ -991,11 +1095,9 @@ func (s *Service) DeleteProfileImage(ctx *gin.Context) {
 		return
 	}
 
-	objectName := "profiles/" + userID + "/profile"
-
-	// Check existence first for clearer 404
-	_, statErr := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
-	if statErr != nil {
+	// Resolve actual key (extensionless v2 or legacy .png/.jpg from v1)
+	objectName, found := s.resolveProfileKey(ctx.Request.Context(), userID)
+	if !found {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "profile not found"})
 		return
 	}
