@@ -200,7 +200,7 @@ func (s *ActivityServiceServer) GetContentAnalytics(ctx context.Context, req *pb
 	)
 
 	if req.GetContentType() == "blog" && req.GetContentId() != "" {
-		analytics, err := s.db.GetBlogAnalytics(ctx, req.GetContentId())
+		analytics, err := s.db.GetBlogAnalytics(ctx, req.GetContentId(), req.GetTimeRange())
 		if err != nil {
 			s.logger.Errorw("failed to get blog analytics", "error", err)
 			return &pb.GetContentAnalyticsResponse{
@@ -232,6 +232,7 @@ func (s *ActivityServiceServer) GetContentAnalytics(ctx context.Context, req *pb
 			// "isps":                   convertMap(analytics.ISPs),
 			"daily_activity":         convertMap(analytics.DailyActivity),
 			"hourly_activity":        convertMap(analytics.HourlyActivity),
+			"monthly_activity":       convertMap(analytics.MonthlyActivity),
 			"read_time_distribution": convertMap(analytics.ReadTimeDistribution),
 			"realtime_views":         convertMap(analytics.RealtimeViews),
 		})
