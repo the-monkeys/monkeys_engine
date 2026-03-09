@@ -3,6 +3,7 @@ package storage_v2
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -89,10 +90,31 @@ func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
 	return svc, nil
 }
 
+func newServiceWithRetry(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
+	const maxRetries = 5
+	backoff := 2 * time.Second
+
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		svc, err := newService(cfg, log)
+		if err == nil {
+			if attempt > 1 {
+				log.Infof("MinIO connected on attempt %d", attempt)
+			}
+			return svc, nil
+		}
+		lastErr = err
+		log.Warnf("MinIO init attempt %d/%d failed: %v (retry in %v)", attempt, maxRetries, err, backoff)
+		time.Sleep(backoff)
+		backoff *= 2 // exponential backoff: 2s, 4s, 8s, 16s, 32s
+	}
+	return nil, fmt.Errorf("MinIO init failed after %d attempts: %w", maxRetries, lastErr)
+}
+
 func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *Service {
 	mw := auth.InitAuthMiddleware(authClient, log)
 
-	svc, err := newService(cfg, log)
+	svc, err := newServiceWithRetry(cfg, log)
 	if err != nil {
 		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
