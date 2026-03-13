@@ -1804,9 +1804,22 @@ func (asc *BlogServiceClient) GetPublishedBlogByBlogId(ctx *gin.Context) {
 
 func (asc *BlogServiceClient) GetDraftBlogByBlogIdV2(ctx *gin.Context) {
 	blogId := ctx.Param("blog_id")
+	accessLevel, _ := ctx.Get("user_access_level")
+	accountId, _ := ctx.Get("accountId")
+	asc.log.Debugw("GetDraftBlogByBlogIdV2: permission check",
+		"blog_id", blogId,
+		"account_id", accountId,
+		"access_level", accessLevel,
+	)
 
-	// Check permissions:
-	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+	// Check permissions: allow both Edit (existing blog) and Create (new blog)
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) &&
+		!utils.CheckUserAccessInContext(ctx, constants.PermissionCreate) {
+		asc.log.Warnw("GetDraftBlogByBlogIdV2: access denied",
+			"blog_id", blogId,
+			"account_id", accountId,
+			"access_level", accessLevel,
+		)
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "you are not allowed to perform this action"})
 		return
 	}
