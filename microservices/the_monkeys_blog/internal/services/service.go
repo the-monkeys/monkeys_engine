@@ -745,9 +745,22 @@ func (blog *BlogService) DraftBlog(ctx context.Context, req *pb.DraftBlogRequest
 		}
 		// fmt.Printf("bx: %v\n", string(bx))
 		go func() {
+			blog.logger.Debugw("DraftBlog: publishing blog_create to RabbitMQ",
+				"blog_id", req.BlogId,
+				"owner", req.OwnerAccountId,
+				"exchange", blog.config.RabbitMQ.Exchange,
+				"routing_key", blog.config.RabbitMQ.RoutingKeys[1],
+				"message_size", len(bx),
+			)
 			err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
 			if err != nil {
-				blog.logger.Errorf("failed to reliably publish blog create message to RabbitMQ: exchange=%s, routing_key=%s, error=%v", blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+				blog.logger.Errorf("failed to reliably publish blog create message to RabbitMQ: blog_id=%s, owner=%s, exchange=%s, routing_key=%s, error=%v",
+					req.BlogId, req.OwnerAccountId, blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
+			} else {
+				blog.logger.Infow("DraftBlog: blog_create message published to RabbitMQ",
+					"blog_id", req.BlogId,
+					"owner", req.OwnerAccountId,
+				)
 			}
 		}()
 	}

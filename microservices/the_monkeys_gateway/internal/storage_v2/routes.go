@@ -331,8 +331,21 @@ func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expi
 // Response: 201 JSON { bucket, object, fileName, etag, size, contentType }
 func (s *Service) UploadPostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+	accessLevel, _ := ctx.Get("user_access_level")
+	accountId, _ := ctx.Get("accountId")
+	s.log.Debugw("UploadPostFile: permission check",
+		"blog_id", blogID,
+		"account_id", accountId,
+		"access_level", accessLevel,
+	)
 
-	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) &&
+		!utils.CheckUserAccessInContext(ctx, constants.PermissionCreate) {
+		s.log.Warnw("UploadPostFile: access denied",
+			"blog_id", blogID,
+			"account_id", accountId,
+			"access_level", accessLevel,
+		)
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 		return
 	}
@@ -485,8 +498,20 @@ func (s *Service) HeadPostFile(ctx *gin.Context) {
 // Response: 200 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+	accessLevel, _ := ctx.Get("user_access_level")
+	accountId, _ := ctx.Get("accountId")
+	s.log.Debugw("UpdatePostFile: permission check",
+		"blog_id", blogID,
+		"account_id", accountId,
+		"access_level", accessLevel,
+	)
 
 	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		s.log.Warnw("UpdatePostFile: access denied",
+			"blog_id", blogID,
+			"account_id", accountId,
+			"access_level", accessLevel,
+		)
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 		return
 	}
@@ -614,8 +639,20 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 // Response: 200 JSON { message: "deleted", object }
 func (s *Service) DeletePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
+	accessLevel, _ := ctx.Get("user_access_level")
+	accountId, _ := ctx.Get("accountId")
+	s.log.Debugw("DeletePostFile: permission check",
+		"blog_id", blogID,
+		"account_id", accountId,
+		"access_level", accessLevel,
+	)
 
 	if !utils.CheckUserAccessInContext(ctx, constants.PermissionEdit) {
+		s.log.Warnw("DeletePostFile: access denied",
+			"blog_id", blogID,
+			"account_id", accountId,
+			"access_level", accessLevel,
+		)
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "You are not allowed to perform this action"})
 		return
 	}
