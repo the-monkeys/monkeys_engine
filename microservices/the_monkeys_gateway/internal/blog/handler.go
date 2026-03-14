@@ -1405,11 +1405,14 @@ func (asc *BlogServiceClient) GetBlogStats(ctx *gin.Context) {
 		return
 	}
 
-	// Call Activity Service to get read count
-	// We use GetContentAnalytics as implemented in Activity Service
-	resp, err := asc.ActivityCli.GetContentAnalytics(context.Background(), &activity_pb.GetContentAnalyticsRequest{
+	// Supported values: "24h", "48h", "7d", "30d", "90d", "1y"
+	// Default is empty string which the activity service treats as 30d daily + 48h hourly
+	timeRange := ctx.DefaultQuery("time_range", "")
+
+	resp, err := asc.ActivityCli.GetContentAnalytics(ctx.Request.Context(), &activity_pb.GetContentAnalyticsRequest{
 		ContentId:   blogID,
 		ContentType: "blog",
+		TimeRange:   timeRange,
 	})
 
 	if err != nil {

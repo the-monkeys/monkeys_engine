@@ -23,7 +23,7 @@ type ActivityDatabase interface {
 	SaveActivity(ctx context.Context, req *pb.TrackActivityRequest) (string, error)
 	GetUserActivities(ctx context.Context, req *pb.GetUserActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
 	SaveSecurityEvent(ctx context.Context, req *pb.TrackSecurityEventRequest) (string, error)
-	GetBlogAnalytics(ctx context.Context, blogID string) (*BlogAnalytics, error)
+	GetBlogAnalytics(ctx context.Context, blogID string, timeRange string) (*BlogAnalytics, error)
 	GetTrendingBlogs(ctx context.Context, req *pb.GetTrendingBlogsRequest) ([]*pb.TrendingBlog, error)
 	GetActiveUsers(ctx context.Context, req *pb.GetActiveUsersRequest) (int64, []*pb.ActiveUser, error)
 	GetAccountActivities(ctx context.Context, req *pb.GetAccountActivitiesRequest) ([]*pb.ActivityEvent, int64, error)
@@ -64,6 +64,7 @@ type BlogAnalytics struct {
 	ISPs                 map[string]int64
 	DailyActivity        map[string]int64
 	HourlyActivity       map[string]int64
+	MonthlyActivity      map[string]int64
 	ReadTimeDistribution map[string]int64
 	RealtimeViews        map[string]int64
 	ValidViews           int64
@@ -1324,7 +1325,42 @@ func (db *ActivityDB) GetIndexInfo(ctx context.Context) (map[string]interface{},
 }
 
 // GetBlogAnalytics calculates detailed analytics for a specific blog
-func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*BlogAnalytics, error) {
+// parseTimeRange converts a time_range string (e.g., "24h", "7d", "30d") into
+// Elasticsearch range expressions for tiered resolution:
+//   - hourly: bounded to min(requested, 48h) to cap at ~48 buckets
+//   - daily:  bounded to min(requested, 90d) to cap at ~90 buckets
+//   - monthly: unbounded (all-time) — safe since max ~120 buckets for 10-year-old content
+func parseTimeRange(timeRange string) (hourlyGte, dailyGte string) {
+	// Defaults: hourly=48h, daily=30d
+	hourlyGte = "now-48h"
+	dailyGte = "now-30d"
+
+	switch timeRange {
+	case "24h":
+		hourlyGte = "now-24h"
+		dailyGte = "now-24h"
+	case "48h":
+		hourlyGte = "now-48h"
+		dailyGte = "now-48h"
+	case "7d":
+		hourlyGte = "now-48h" // hourly capped at 48h regardless
+		dailyGte = "now-7d"
+	case "30d":
+		hourlyGte = "now-48h"
+		dailyGte = "now-30d"
+	case "90d":
+		hourlyGte = "now-48h"
+		dailyGte = "now-90d"
+	case "1y":
+		hourlyGte = "now-48h"
+		dailyGte = "now-365d"
+	}
+
+	return hourlyGte, dailyGte
+}
+
+func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string, timeRange string) (*BlogAnalytics, error) {
+	hourlyGte, dailyGte := parseTimeRange(timeRange)
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
@@ -1389,17 +1425,46 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 						},
 					},
 					"daily_activity": map[string]interface{}{
-						"date_histogram": map[string]interface{}{
-							"field":             "@timestamp",
-							"calendar_interval": "day",
-							"format":            "yyyy-MM-dd",
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"@timestamp": map[string]interface{}{
+									"gte": dailyGte,
+								},
+							},
+						},
+						"aggs": map[string]interface{}{
+							"histogram": map[string]interface{}{
+								"date_histogram": map[string]interface{}{
+									"field":             "@timestamp",
+									"calendar_interval": "day",
+									"format":            "yyyy-MM-dd",
+								},
+							},
 						},
 					},
 					"hourly_activity": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"range": map[string]interface{}{
+								"@timestamp": map[string]interface{}{
+									"gte": hourlyGte,
+								},
+							},
+						},
+						"aggs": map[string]interface{}{
+							"histogram": map[string]interface{}{
+								"date_histogram": map[string]interface{}{
+									"field":             "@timestamp",
+									"calendar_interval": "hour",
+									"format":            "yyyy-MM-dd HH:00",
+								},
+							},
+						},
+					},
+					"monthly_activity": map[string]interface{}{
 						"date_histogram": map[string]interface{}{
 							"field":             "@timestamp",
-							"calendar_interval": "hour",
-							"format":            "yyyy-MM-dd HH:00",
+							"calendar_interval": "month",
+							"format":            "yyyy-MM",
 						},
 					},
 					"realtime_views": map[string]interface{}{
@@ -1517,6 +1582,7 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 		ISPs:                 make(map[string]int64),
 		DailyActivity:        make(map[string]int64),
 		HourlyActivity:       make(map[string]int64),
+		MonthlyActivity:      make(map[string]int64),
 		ReadTimeDistribution: make(map[string]int64),
 		RealtimeViews:        make(map[string]int64),
 	}
@@ -1565,8 +1631,15 @@ func (db *ActivityDB) GetBlogAnalytics(ctx context.Context, blogID string) (*Blo
 		extractBuckets(viewsAgg, "platforms", analytics.Platforms)
 		extractBuckets(viewsAgg, "cities", analytics.Cities)
 		extractBuckets(viewsAgg, "isps", analytics.ISPs)
-		extractBuckets(viewsAgg, "daily_activity", analytics.DailyActivity)
-		extractBuckets(viewsAgg, "hourly_activity", analytics.HourlyActivity)
+		extractBuckets(viewsAgg, "monthly_activity", analytics.MonthlyActivity)
+
+		// daily_activity and hourly_activity are nested under filter aggs
+		if dailyAgg, ok := viewsAgg["daily_activity"].(map[string]interface{}); ok {
+			extractBuckets(dailyAgg, "histogram", analytics.DailyActivity)
+		}
+		if hourlyAgg, ok := viewsAgg["hourly_activity"].(map[string]interface{}); ok {
+			extractBuckets(hourlyAgg, "histogram", analytics.HourlyActivity)
+		}
 
 		// Realtime views is nested deeper
 		if realtime, ok := viewsAgg["realtime_views"].(map[string]interface{}); ok {
