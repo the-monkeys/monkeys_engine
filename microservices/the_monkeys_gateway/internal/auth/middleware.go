@@ -84,7 +84,7 @@ func (c *AuthMiddlewareConfig) AuthzRequired(ctx *gin.Context) {
 
 	blogID := ctx.Param("blog_id")
 	userName := res.UserName
-	email := ctx.Param("email")
+	email := res.Email // ✅ FIXED: Get email from JWT token, not URL params
 
 	accessResp, err := c.svc.Client.CheckAccessLevel(context.Background(), &pb.AccessCheckReq{
 		// Token:     res,
@@ -126,7 +126,7 @@ func (c *AuthMiddlewareConfig) AuthorizationByID(ctx *gin.Context) {
 
 	blogID := ctx.Param("id")
 	userName := res.UserName
-	email := ctx.Param("email")
+	email := res.Email // ✅ FIXED: Get email from JWT token, not URL params
 	accessResp, err := c.svc.Client.CheckAccessLevel(context.Background(), &pb.AccessCheckReq{
 		// Token:     res,
 		Email:     email,
