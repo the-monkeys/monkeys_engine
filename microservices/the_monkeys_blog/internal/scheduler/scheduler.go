@@ -33,7 +33,7 @@ const (
 type Scheduler struct {
 	db         database.ElasticsearchStorage
 	seoManager seo.SEOManager
-	qConn      rabbitmq.Conn
+	qConn      *rabbitmq.ConnManager
 	config     *config.Config
 	logger     *zap.SugaredLogger
 	stopCh     chan struct{}
@@ -46,7 +46,7 @@ type Scheduler struct {
 func NewScheduler(
 	db database.ElasticsearchStorage,
 	seoManager seo.SEOManager,
-	qConn rabbitmq.Conn,
+	qConn *rabbitmq.ConnManager,
 	cfg *config.Config,
 	logger *zap.SugaredLogger,
 ) *Scheduler {

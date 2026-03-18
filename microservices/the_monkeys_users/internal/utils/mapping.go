@@ -23,12 +23,14 @@ func MapUserUpdateDataPatch(req *pb.UpdateUserProfileReq, dbUserInfo *models.Use
 	if req.Bio != "" {
 		dbUserInfo.Bio.String = req.Bio
 	}
-	parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
-	if err != nil {
-		log.Errorf("couldn't parse date of birth to time.Time: %v", err)
-	} else {
-		log.Debugf("Parsed date of birth: %v", parsedTime)
-		dbUserInfo.DateOfBirth.Time = parsedTime
+	if req.DateOfBirth != "" {
+		parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
+		if err != nil {
+			log.Errorf("couldn't parse date of birth to time.Time: %v", err)
+		} else {
+			log.Debugf("Parsed date of birth: %v", parsedTime)
+			dbUserInfo.DateOfBirth.Time = parsedTime
+		}
 	}
 	if req.Address != "" {
 		dbUserInfo.Address.String = req.Address
@@ -58,12 +60,14 @@ func MapUserUpdateDataPut(req *pb.UpdateUserProfileReq, dbUserInfo *models.UserP
 	dbUserInfo.FirstName = req.FirstName
 	dbUserInfo.LastName = req.LastName
 	dbUserInfo.Bio.String = req.Bio
-	parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
-	if err != nil {
-		log.Errorf("couldn't parse date of birth to time.Time: %v", err)
-	} else {
-		log.Debugf("Parsed date of birth: %v", parsedTime)
-		dbUserInfo.DateOfBirth.Time = parsedTime
+	if req.DateOfBirth != "" {
+		parsedTime, err := time.Parse("2006-01-02", req.DateOfBirth)
+		if err != nil {
+			log.Errorf("couldn't parse date of birth to time.Time: %v", err)
+		} else {
+			log.Debugf("Parsed date of birth: %v", parsedTime)
+			dbUserInfo.DateOfBirth.Time = parsedTime
+		}
 	}
 	dbUserInfo.Address.String = req.Address
 	dbUserInfo.ContactNumber.String = req.ContactNumber

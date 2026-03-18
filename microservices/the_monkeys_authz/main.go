@@ -57,7 +57,7 @@ func main() {
 		log.Fatalw("auth service cannot listen", "address", listenAddr, "error", err)
 	}
 
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 
 	authServer := services.NewAuthzSvc(dbHandler, jwt, cfg, qConn, log)
 

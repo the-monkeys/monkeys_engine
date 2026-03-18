@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -15,52 +16,71 @@ import (
 	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
 
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		<-sigChan
-		log.Debug("Graceful shutdown initiated - closing RabbitMQ connections")
-		if err := conn.Channel.Close(); err != nil {
-			log.Errorf("RabbitMQ channel closure failed: %v", err)
-		}
+		log.Debug("Graceful shutdown initiated - blog consumer exiting")
 		os.Exit(0)
 	}()
 
-	// Consume from both queue[0] and queue[2] in separate goroutines
-	go consumeQueue(conn, conf.Queues[3], log, db)
+	// Consume from queue[3] with reconnect loop
+	go consumeQueue(mgr, conf.Queues[3], log, db)
 
-	// Keep the main function running to allow goroutines to process messages
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
-	msgs, err := conn.Channel.Consume(
-		queueName, // queue
-		"",        // consumer
-		true,      // auto-ack
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
-	)
-	if err != nil {
-		log.Errorf("Queue consumer registration failed for '%s': %v", queueName, err)
-		return
-	}
+// consumeQueue registers a consumer on the given queue and processes messages.
+// On channel close it reconnects via the shared ConnManager and re-registers,
+// so consumption never permanently stops due to a broker restart or blip.
+func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
+	backoff := time.Second
 
-	for d := range msgs {
-		user := models.InterServiceMessage{}
-		if err := json.Unmarshal(d.Body, &user); err != nil {
-			log.Errorf("Message deserialization failed: %v", err)
+	for {
+		msgs, err := mgr.Channel().Consume(
+			queueName,
+			"",    // consumer tag
+			true,  // auto-ack
+			false, // exclusive
+			false, // no-local
+			false, // no-wait
+			nil,
+		)
+		if err != nil {
+			log.Errorf("Blog consumer: failed to register on queue '%s', reconnecting in %v: %v", queueName, backoff, err)
+			time.Sleep(backoff)
+			backoff = nextBackoff(backoff)
+			mgr.Reconnect()
 			continue
 		}
 
-		handleUserAction(user, log, db)
+		backoff = time.Second
+		log.Infof("Blog consumer: registered on queue '%s'", queueName)
+
+		for d := range msgs {
+			user := models.InterServiceMessage{}
+			if err := json.Unmarshal(d.Body, &user); err != nil {
+				log.Errorf("Blog consumer: message deserialization failed: %v", err)
+				continue
+			}
+			handleUserAction(user, log, db)
+		}
+
+		// Channel closed — reconnect and loop
+		log.Warn("Blog consumer: channel closed, reconnecting...")
+		mgr.Reconnect()
 	}
+}
+
+// nextBackoff doubles the duration, capped at 30 seconds.
+func nextBackoff(d time.Duration) time.Duration {
+	if d *= 2; d > 30*time.Second {
+		return 30 * time.Second
+	}
+	return d
 }
 
 func handleUserAction(user models.InterServiceMessage, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
@@ -72,7 +92,6 @@ func handleUserAction(user models.InterServiceMessage, log *zap.SugaredLogger, d
 			log.Errorf("Blog deletion operation failed: %v", err)
 			return
 		}
-		// Check if response is nil (no blogs found to delete)
 		if resp == nil {
 			log.Info("User account deletion completed - no associated blogs found")
 		} else {

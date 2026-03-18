@@ -59,7 +59,7 @@ func main() {
 
 	// Initialize RabbitMQ connection using the standard reconnect method
 	log.Infow("connecting to RabbitMQ for activity tracking")
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 
 	// Start the activity consumer using the same pattern as users service
 	log.Infow("starting activity consumer")

@@ -26,17 +26,14 @@ import (
 	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger) {
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, log *zap.SugaredLogger) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
-		logger.ZapSugar().Debug("Received termination signal. Closing connection and exiting gracefully.")
-		if err := conn.Channel.Close(); err != nil {
-			logger.ZapSugar().Errorf("Error closing RabbitMQ channel: %v", err)
-		}
+		logger.ZapSugar().Debug("Storage consumer: received termination signal, exiting")
 		os.Exit(0)
 	}()
 
@@ -56,13 +53,9 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.Sugared
 		}
 	}
 
-	// Consume from both queue[0] and queue[2] in separate goroutines
-	go consumeQueue(conn, conf.Queues[0], log, cfg, mc)
-	go consumeQueue(conn, conf.Queues[2], log, cfg, mc)
+	go consumeQueue(mgr, conf.Queues[0], log, cfg, mc)
+	go consumeQueue(mgr, conf.Queues[2], log, cfg, mc)
 
-	// Start periodic sync goroutines only if enabled in config.
-	// Defaults: both syncs are disabled (bool zero value) unless explicitly
-	// set via MINIO_ENABLE_FS_TO_MINIO_SYNC / MINIO_ENABLE_MINIO_TO_FS_SYNC.
 	if mc != nil && cfg != nil {
 		if cfg.Minio.EnableFSToMinioSync {
 			log.Info("FS→MinIO periodic sync: ENABLED")
@@ -78,32 +71,47 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.Sugared
 		}
 	}
 
-	// Keep the main function running to allow goroutines to process messages
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
-	msgs, err := conn.Channel.Consume(
-		queueName,
-		"",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		logger.ZapSugar().Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
-		return
-	}
+func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
+	backoff := time.Second
 
-	for d := range msgs {
-		user := models.TheMonkeysMessage{}
-		if err := json.Unmarshal(d.Body, &user); err != nil {
-			logger.ZapSugar().Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+	for {
+		msgs, err := mgr.Channel().Consume(
+			queueName,
+			"",
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			logger.ZapSugar().Errorf("Storage consumer: failed to register on queue '%s', reconnecting in %v: %v", queueName, backoff, err)
+			time.Sleep(backoff)
+			if backoff *= 2; backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			mgr.Reconnect()
 			continue
 		}
-		handleUserAction(user, log, cfg, mc)
+
+		backoff = time.Second
+		logger.ZapSugar().Infof("Storage consumer: registered on queue '%s'", queueName)
+
+		for d := range msgs {
+			user := models.TheMonkeysMessage{}
+			if err := json.Unmarshal(d.Body, &user); err != nil {
+				logger.ZapSugar().Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+				continue
+			}
+			handleUserAction(user, log, cfg, mc)
+		}
+
+		// Channel closed — reconnect
+		logger.ZapSugar().Warn("Storage consumer: channel closed, reconnecting...")
+		mgr.Reconnect()
 	}
 }
 

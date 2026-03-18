@@ -24,19 +24,15 @@ const (
 	ActivityTrackingRoutingKey = "activity.track"
 )
 
-// ConsumeActivityMessages starts consuming activity tracking messages from RabbitMQ
-// Following the same pattern as the users service
-func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.SugaredLogger, db database.ActivityDatabase) {
+// ConsumeActivityMessages starts consuming activity tracking messages from RabbitMQ.
+// It reconnects automatically on channel close using the shared ConnManager.
+func ConsumeActivityMessages(mgr *rabbitmq.ConnManager, cfg *config.Config, log *zap.SugaredLogger, db database.ActivityDatabase) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		<-sigChan
-		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
-		if err := conn.Channel.Close(); err != nil {
-			log.Errorf("Error closing RabbitMQ channel: %v", err)
-		}
+		log.Debug("Activity consumer: received termination signal, exiting")
 		os.Exit(0)
 	}()
 
@@ -54,71 +50,75 @@ func ConsumeActivityMessages(conn rabbitmq.Conn, cfg *config.Config, log *zap.Su
 		return
 	}
 
-	log.Infow("starting to consume from activity tracking queue", "queue", ActivityTrackingQueue, "index", queueIndex)
+	queueName := cfg.RabbitMQ.Queues[queueIndex]
+	backoff := time.Second
 
-	msgs, err := conn.Channel.Consume(
-		cfg.RabbitMQ.Queues[queueIndex], // queue - activity_tracking_queue
-		"activity-consumer",             // consumer
-		false,                           // auto-ack (manual ack for reliability)
-		false,                           // exclusive
-		false,                           // no-local
-		false,                           // no-wait
-		nil,                             // args
-	)
-	if err != nil {
-		log.Errorf("Failed to register activity consumer: %v", err)
-		return
-	}
+	for {
+		log.Infow("activity consumer: registering on queue", "queue", queueName)
 
-	log.Infow("activity consumer started successfully, waiting for messages")
-
-	for msg := range msgs {
-
-		log.Debugw("received activity tracking message", "body", string(msg.Body))
-
-		var activityReq pb.TrackActivityRequest
-
-		if err := json.Unmarshal(msg.Body, &activityReq); err != nil {
-			log.Errorw("failed to unmarshal activity tracking message",
-				"error", err,
-				"message_body", string(msg.Body))
-			msg.Nack(false, false) // Don't requeue malformed messages
+		msgs, err := mgr.Channel().Consume(
+			queueName,
+			"activity-consumer",
+			false, // manual ack for reliability
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			log.Errorf("Activity consumer: failed to register on queue '%s', reconnecting in %v: %v", queueName, backoff, err)
+			time.Sleep(backoff)
+			if backoff *= 2; backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			mgr.Reconnect()
 			continue
 		}
 
-		log.Debugw("processing activity tracking message",
-			"user_id", activityReq.UserId,
-			"action", activityReq.Action,
-			"category", activityReq.Category.String())
+		backoff = time.Second
+		log.Infow("activity consumer started successfully, waiting for messages")
 
-		// Fix empty client_info.ip_address field to prevent Elasticsearch validation errors
-		if activityReq.ClientInfo == nil {
-			activityReq.ClientInfo = &pb.ClientInfo{
-				IpAddress: "127.0.0.1", // Default to localhost for empty IP
+		for msg := range msgs {
+			log.Debugw("received activity tracking message", "body", string(msg.Body))
+
+			var activityReq pb.TrackActivityRequest
+			if err := json.Unmarshal(msg.Body, &activityReq); err != nil {
+				log.Errorw("failed to unmarshal activity tracking message",
+					"error", err,
+					"message_body", string(msg.Body))
+				msg.Nack(false, false)
+				continue
 			}
-			log.Debugw("created missing client_info with default IP", "user_id", activityReq.UserId, "default_ip", "127.0.0.1")
-		} else if activityReq.ClientInfo.IpAddress == "" {
-			activityReq.ClientInfo.IpAddress = "127.0.0.1" // Default to localhost for empty IP
-			log.Debugw("fixed empty client_info.ip_address field", "user_id", activityReq.UserId, "default_ip", "127.0.0.1")
-		}
 
-		// Store the activity in Elasticsearch
-		if err := storeActivity(db, &activityReq, log); err != nil { //todo: storing activity data
-			log.Errorw("failed to store activity in database",
-				"error", err,
+			log.Debugw("processing activity tracking message",
+				"user_id", activityReq.UserId,
+				"action", activityReq.Action,
+				"category", activityReq.Category.String())
+
+			if activityReq.ClientInfo == nil {
+				activityReq.ClientInfo = &pb.ClientInfo{IpAddress: "127.0.0.1"}
+			} else if activityReq.ClientInfo.IpAddress == "" {
+				activityReq.ClientInfo.IpAddress = "127.0.0.1"
+			}
+
+			if err := storeActivity(db, &activityReq, log); err != nil {
+				log.Errorw("failed to store activity in database",
+					"error", err,
+					"user_id", activityReq.UserId,
+					"action", activityReq.Action)
+				msg.Nack(false, false)
+				continue
+			}
+
+			log.Debugw("successfully processed and stored activity",
 				"user_id", activityReq.UserId,
 				"action", activityReq.Action)
-			// Don't requeue for persistent validation errors, just discard
-			msg.Nack(false, false)
-			continue
+			msg.Ack(false)
 		}
 
-		log.Debugw("successfully processed and stored activity",
-			"user_id", activityReq.UserId,
-			"action", activityReq.Action)
-
-		// Acknowledge the message
-		msg.Ack(false)
+		// Channel closed — reconnect
+		log.Warn("Activity consumer: channel closed, reconnecting...")
+		mgr.Reconnect()
 	}
 }
 

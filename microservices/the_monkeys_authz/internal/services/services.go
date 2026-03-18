@@ -31,11 +31,11 @@ type AuthzSvc struct {
 	jwt    utils.JwtWrapper
 	config *config.Config
 	logger *zap.SugaredLogger
-	qConn  rabbitmq.Conn
+	qConn  *rabbitmq.ConnManager
 	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn rabbitmq.Conn, logger *zap.SugaredLogger) *AuthzSvc {
+func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn *rabbitmq.ConnManager, logger *zap.SugaredLogger) *AuthzSvc {
 	return &AuthzSvc{
 		dbConn: dbCli,
 		jwt:    jwt,

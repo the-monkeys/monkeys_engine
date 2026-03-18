@@ -68,7 +68,7 @@ func main() {
 	log := logger.ZapForService("tm_storage")
 
 	// Connect to rabbitmq server
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
 
 	// Bind to all interfaces for health checks to work

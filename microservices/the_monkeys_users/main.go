@@ -52,7 +52,7 @@ func main() {
 
 	printBanner(cfg)
 
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg, log, db)
 
 	userService := services.NewUserSvc(db, log, cfg, qConn)

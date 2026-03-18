@@ -62,7 +62,7 @@ func main() {
 		return
 	}
 
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, logg, osClient)
 
 	seoManager := seo.NewSEOManager(logg, cfg)

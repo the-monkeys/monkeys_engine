@@ -29,11 +29,11 @@ type BlogService struct {
 	seoManager seo.SEOManager
 	logger     *zap.SugaredLogger
 	config     *config.Config
-	qConn      rabbitmq.Conn
+	qConn      *rabbitmq.ConnManager
 	pb.UnimplementedBlogServiceServer
 }
 
-func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOManager, logger *zap.SugaredLogger, config *config.Config, qConn rabbitmq.Conn) *BlogService {
+func NewBlogService(client database.ElasticsearchStorage, seoManager seo.SEOManager, logger *zap.SugaredLogger, config *config.Config, qConn *rabbitmq.ConnManager) *BlogService {
 	return &BlogService{
 		osClient:   client,
 		seoManager: seoManager,

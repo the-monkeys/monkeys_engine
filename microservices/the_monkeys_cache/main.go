@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Connect to rabbitmq server
-	qConn := rabbitmq.Reconnect(cfg.RabbitMQ)
+	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg, log)
 
 	s := grpc.NewServer()

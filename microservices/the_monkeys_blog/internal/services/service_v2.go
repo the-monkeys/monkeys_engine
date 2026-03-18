@@ -199,25 +199,26 @@ func (blog *BlogService) DraftBlogV2(stream grpc.BidiStreamingServer[anypb.Any, 
 			if len(tags) == 0 {
 				req["tags"] = []string{"untagged"}
 			}
-			go func() {
-				blog.logger.Debugw("DraftBlogV2: publishing blog_create to RabbitMQ",
-					"blog_id", blogId,
-					"owner", ownerAccountId,
-					"exchange", blog.config.RabbitMQ.Exchange,
-					"routing_key", blog.config.RabbitMQ.RoutingKeys[1],
-					"message_size", len(bx),
-				)
-				err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries)
-				if err != nil {
-					blog.logger.Errorf("failed to reliably publish blog create message to RabbitMQ: blog_id=%s, owner=%s, exchange=%s, routing_key=%s, error=%v",
-						blogId, ownerAccountId, blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], err)
-				} else {
-					blog.logger.Infow("DraftBlogV2: blog_create message published to RabbitMQ",
-						"blog_id", blogId,
-						"owner", ownerAccountId,
-					)
-				}
-			}()
+
+			// Publish synchronously before writing to Elasticsearch.
+			// If the broker rejects the message after all retries, we return an
+			// error to the client and skip the ES write entirely, so the blog
+			// never ends up orphaned in ES without a matching Postgres row.
+			blog.logger.Debugw("DraftBlogV2: publishing blog_create to RabbitMQ",
+				"blog_id", blogId,
+				"owner", ownerAccountId,
+				"exchange", blog.config.RabbitMQ.Exchange,
+				"routing_key", blog.config.RabbitMQ.RoutingKeys[1],
+				"message_size", len(bx),
+			)
+			if err := blog.qConn.PublishReliable(blog.config.RabbitMQ.Exchange, blog.config.RabbitMQ.RoutingKeys[1], bx, blog.config.RabbitMQ.MaxRetries); err != nil {
+				blog.logger.Errorf("DraftBlogV2: failed to publish blog_create to RabbitMQ, aborting ES write: blog_id=%s, error=%v", blogId, err)
+				return status.Errorf(codes.Internal, "Failed to create blog, please try again")
+			}
+			blog.logger.Infow("DraftBlogV2: blog_create message published to RabbitMQ",
+				"blog_id", blogId,
+				"owner", ownerAccountId,
+			)
 
 			go blog.trackBlogActivity(ownerAccountId, constants.BLOG_CREATE, "blog", blogId, req)
 
