@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -14,51 +15,56 @@ import (
 	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf config.RabbitMQ, log *zap.SugaredLogger, db database.NotificationDB) {
-
-	// Set up signal handling for graceful shutdown
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, log *zap.SugaredLogger, db database.NotificationDB) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		<-sigChan
-		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
-		if err := conn.Channel.Close(); err != nil {
-			log.Errorf("Failed to close RabbitMQ channel: %v", err)
-		}
+		log.Debug("Notification consumer: received termination signal, exiting")
 		os.Exit(0)
 	}()
 
-	// Consume from both queue[0] and queue[2] in separate goroutines
-	go consumeQueue(conn, conf.Queues[4], log, db)
-
-	// Keep the main function running to allow goroutines to process messages
+	go consumeQueue(mgr, conf.Queues[4], log, db)
 	select {}
 }
 
-func consumeQueue(conn rabbitmq.Conn, queueName string, log *zap.SugaredLogger, db database.NotificationDB) {
-	msgs, err := conn.Channel.Consume(
-		queueName, // queue
-		"",        // consumer
-		true,      // auto-ack
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
-	)
-	if err != nil {
-		log.Errorf("Failed to register a consumer for queue %s: %v", queueName, err)
-		return
-	}
+func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredLogger, db database.NotificationDB) {
+	backoff := time.Second
 
-	for d := range msgs {
-		user := models.TheMonkeysMessage{}
-		if err := json.Unmarshal(d.Body, &user); err != nil {
-			log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+	for {
+		msgs, err := mgr.Channel().Consume(
+			queueName,
+			"",
+			true, // auto-ack
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			log.Errorf("Notification consumer: failed to register on queue '%s', reconnecting in %v: %v", queueName, backoff, err)
+			time.Sleep(backoff)
+			if backoff *= 2; backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			mgr.Reconnect()
 			continue
 		}
 
-		handleUserAction(user, log, db)
+		backoff = time.Second
+		log.Info("Notification consumer: registered on queue: ", queueName)
+
+		for d := range msgs {
+			user := models.TheMonkeysMessage{}
+			if err := json.Unmarshal(d.Body, &user); err != nil {
+				log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
+				continue
+			}
+			handleUserAction(user, log, db)
+		}
+
+		log.Warn("Notification consumer: channel closed, reconnecting...")
+		mgr.Reconnect()
 	}
 }
 

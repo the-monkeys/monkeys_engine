@@ -544,8 +544,8 @@ func (uh *uDBHandler) LikeBlog(username string, blogExtId string) error {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			uh.log.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			uh.log.Errorf("Failed to rollback LikeBlog transaction: %v", err)
 		}
 	}()
 
@@ -600,8 +600,8 @@ func (uh *uDBHandler) UnlikeBlog(username string, blogExtId string) error {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			uh.log.Errorf("Failed to rollback transaction after error: %+v, rollback error: %+v", err, err)
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			uh.log.Errorf("Failed to rollback UnlikeBlog transaction: %v", err)
 		}
 	}()
 
@@ -965,8 +965,8 @@ func (uh *uDBHandler) InsertTopicWithCategory(ctx context.Context, description, 
 		return fmt.Errorf("could not begin transaction: %v", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			uh.log.Errorf("Failed to rollback transaction after error: %v, rollback error: %v", err, err)
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			uh.log.Errorf("Failed to rollback InsertTopicWithCategory transaction: %v", err)
 		}
 	}()
 

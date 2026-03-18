@@ -28,11 +28,11 @@ type UserSvc struct {
 	dbConn database.UserDb
 	log    *zap.SugaredLogger
 	config *config.Config
-	qConn  rabbitmq.Conn
+	qConn  *rabbitmq.ConnManager
 	pb.UnimplementedUserServiceServer
 }
 
-func NewUserSvc(dbConn database.UserDb, log *zap.SugaredLogger, config *config.Config, qConn rabbitmq.Conn) *UserSvc {
+func NewUserSvc(dbConn database.UserDb, log *zap.SugaredLogger, config *config.Config, qConn *rabbitmq.ConnManager) *UserSvc {
 	return &UserSvc{dbConn: dbConn, log: log, config: config, qConn: qConn}
 }
 

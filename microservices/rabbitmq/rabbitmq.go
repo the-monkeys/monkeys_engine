@@ -280,6 +280,85 @@ func (c Conn) ReceiveData(queueName string) error {
 	return nil
 }
 
+// ConnManager wraps a Conn with a mutex so that reconnection in the consumer
+// goroutine is immediately visible to all other goroutines holding the *ConnManager.
+// Use *ConnManager everywhere instead of passing Conn by value.
+type ConnManager struct {
+	mu   sync.RWMutex
+	conn Conn
+	conf config.RabbitMQ
+}
+
+// NewConnManager dials RabbitMQ (with infinite retry) and returns a shared manager.
+func NewConnManager(conf config.RabbitMQ) *ConnManager {
+	m := &ConnManager{conf: conf}
+	m.conn = Reconnect(conf)
+	return m
+}
+
+// reconnectLocked MUST be called with m.mu held for writing.
+func (m *ConnManager) reconnectLocked() {
+	m.conn.Close()
+	m.conn = Reconnect(m.conf)
+}
+
+// Reconnect replaces the current connection. Safe for concurrent callers — only
+// one will actually reconnect; the rest will observe the updated conn.
+func (m *ConnManager) Reconnect() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reconnectLocked()
+}
+
+// Channel returns the current *amqp.Channel. Consumers call this to register
+// with Consume(); they must call Reconnect() and re-register when msgs closes.
+func (m *ConnManager) Channel() *amqp.Channel {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.conn.Channel
+}
+
+// PublishReliable publishes with broker confirmation. On any error it reconnects
+// once and retries so a transient connection blip doesn't lose the message.
+func (m *ConnManager) PublishReliable(exchange, routingKey string, message []byte, maxRetries int) error {
+	m.mu.RLock()
+	conn := m.conn
+	m.mu.RUnlock()
+
+	err := conn.PublishReliable(exchange, routingKey, message, maxRetries)
+	if err == nil {
+		return nil
+	}
+
+	log.Warnf("ConnManager.PublishReliable: failed, reconnecting and retrying once: %v", err)
+	m.mu.Lock()
+	m.reconnectLocked()
+	conn = m.conn
+	m.mu.Unlock()
+
+	return conn.PublishReliable(exchange, routingKey, message, maxRetries)
+}
+
+// PublishMessage sends without confirmation. On error it reconnects and retries once.
+func (m *ConnManager) PublishMessage(exchange, routingKey string, message []byte) error {
+	m.mu.RLock()
+	conn := m.conn
+	m.mu.RUnlock()
+
+	err := conn.PublishMessage(exchange, routingKey, message)
+	if err == nil {
+		return nil
+	}
+
+	log.Warnf("ConnManager.PublishMessage: failed, reconnecting and retrying once: %v", err)
+	m.mu.Lock()
+	m.reconnectLocked()
+	conn = m.conn
+	m.mu.Unlock()
+
+	return conn.PublishMessage(exchange, routingKey, message)
+}
+
 // Close closes the RabbitMQ connection and channel gracefully.
 func (c Conn) Close() {
 	if c.Channel != nil {

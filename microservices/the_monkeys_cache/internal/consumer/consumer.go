@@ -51,37 +51,18 @@ func NewUserDb(log *zap.SugaredLogger, config *config.Config) *UserDbConn {
 	}
 }
 
-func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredLogger) {
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf *config.Config, log *zap.SugaredLogger) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		<-sigChan
-		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
-		if err := conn.Channel.Close(); err != nil {
-			log.Errorf("Error closing RabbitMQ channel: %v", err)
-		}
+		log.Debug("Cache consumer: received termination signal, exiting")
 		os.Exit(0)
 	}()
 
-	msgs, err := conn.Channel.Consume(
-		conf.RabbitMQ.Queues[5], // queue
-		"",                      // consumer
-		true,                    // auto-ack
-		false,                   // exclusive
-		false,                   // no-local
-		false,                   // no-wait
-		nil,                     // args
-	)
-	if err != nil {
-		log.Errorf("Failed to register a consumer: %v", err)
-		return
-	}
-
 	cacheServer := service.NewCacheServer(log)
 	ctx := context.Background()
-
 	userCon := NewUserDb(log, conf)
 	redis, err := db.RedisConn(conf, log)
 	if err != nil {
@@ -89,52 +70,75 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 		return
 	}
 
-	for d := range msgs {
-		user := models.TheMonkeysMessage{}
-		if err = json.Unmarshal(d.Body, &user); err != nil {
-			log.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
-			return
+	backoff := time.Second
+
+	for {
+		msgs, err := mgr.Channel().Consume(
+			conf.RabbitMQ.Queues[5],
+			"",
+			true, // auto-ack
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			log.Errorf("Cache consumer: failed to register, reconnecting in %v: %v", backoff, err)
+			time.Sleep(backoff)
+			if backoff *= 2; backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			mgr.Reconnect()
+			continue
 		}
 
-		switch user.Action {
-		case constants.BLOG_CREATE:
+		backoff = time.Second
+		log.Info("Cache consumer: registered on queue: ", conf.RabbitMQ.Queues[5])
 
-		case constants.BLOG_UPDATE:
-
-		case constants.BLOG_PUBLISH:
-			userCon.log.Debugf("User published a blog: %+v", user)
-			// TODO: Update Users profile published and draft blogs
-
-			// Update feed
-			feed := userCon.Feed(500, 0)
-
-			// Redis cache
-			feedJSON, err := json.Marshal(feed)
-			if err != nil {
-				userCon.log.Errorf("Failed to marshal feed: %v", err)
-				return
+		for d := range msgs {
+			user := models.TheMonkeysMessage{}
+			if err = json.Unmarshal(d.Body, &user); err != nil {
+				log.Errorf("Failed to unmarshal user from rabbitMQ: %v", err)
+				continue
 			}
 
-			status := redis.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30).Err()
-			if status != nil {
-				userCon.log.Errorf("Failed to set feed in cache: %v", status)
-			} else {
-				fmt.Println("Feed successfully set in cache")
+			switch user.Action {
+			case constants.BLOG_CREATE:
+
+			case constants.BLOG_UPDATE:
+
+			case constants.BLOG_PUBLISH:
+				userCon.log.Debugf("User published a blog: %+v", user)
+				feed := userCon.Feed(500, 0)
+
+				feedJSON, err := json.Marshal(feed)
+				if err != nil {
+					userCon.log.Errorf("Failed to marshal feed: %v", err)
+					continue
+				}
+
+				status := redis.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30).Err()
+				if status != nil {
+					userCon.log.Errorf("Failed to set feed in cache: %v", status)
+				} else {
+					fmt.Println("Feed successfully set in cache")
+				}
+
+				if err := cacheServer.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30); err != nil {
+					userCon.log.Errorf("Failed to set feed in inbuilt cache: %v", err)
+				}
+
+			case constants.BLOG_DELETE:
+
+			case constants.PROFILE_UPDATE:
+
+			default:
+				log.Errorf("Unknown action: %s", user.Action)
 			}
-
-			// Inbuilt cache
-			if err := cacheServer.Set(ctx, fmt.Sprintf(constants.Feed, 500, 0), feedJSON, time.Hour*24*30); err != nil {
-				userCon.log.Errorf("Failed to set feed in inbuilt cache: %v", err)
-			}
-
-		case constants.BLOG_DELETE:
-
-		case constants.PROFILE_UPDATE:
-
-		default:
-			log.Errorf("Unknown action: %s", user.Action)
 		}
 
+		log.Warn("Cache consumer: channel closed, reconnecting...")
+		mgr.Reconnect()
 	}
 }
 

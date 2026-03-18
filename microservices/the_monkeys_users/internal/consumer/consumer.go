@@ -34,7 +34,7 @@ func NewUserDb(dbConn database.UserDb, log *zap.SugaredLogger, config *config.Co
 // exponential backoff (1s → 2s → 4s … 30s cap).
 // Messages are manually acked on success; on processing failure they are
 // nacked without requeue so RabbitMQ routes them to the dead letter queue.
-func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredLogger, dbConn database.UserDb) {
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf *config.Config, log *zap.SugaredLogger, dbConn database.UserDb) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -42,9 +42,6 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 	go func() {
 		<-sigChan
 		log.Debug("Received termination signal. Closing connection and exiting gracefully.")
-		if err := conn.Channel.Close(); err != nil {
-			log.Errorf("Error closing RabbitMQ channel: %v", err)
-		}
 		os.Exit(0)
 	}()
 
@@ -52,7 +49,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 	backoff := time.Second
 
 	for {
-		msgs, err := conn.Channel.Consume(
+		msgs, err := mgr.Channel().Consume(
 			conf.RabbitMQ.Queues[1], // queue
 			"",                      // consumer
 			false,                   // auto-ack OFF — we ack/nack manually
@@ -65,7 +62,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 			log.Errorf("Failed to register a consumer, reconnecting in %v: %v", backoff, err)
 			time.Sleep(backoff)
 			backoff = nextBackoff(backoff)
-			conn = rabbitmq.Reconnect(conf.RabbitMQ)
+			mgr.Reconnect()
 			continue
 		}
 
@@ -93,7 +90,7 @@ func ConsumeFromQueue(conn rabbitmq.Conn, conf *config.Config, log *zap.SugaredL
 		log.Warn("RabbitMQ channel closed, reconnecting in ", backoff)
 		time.Sleep(backoff)
 		backoff = nextBackoff(backoff)
-		conn = rabbitmq.Reconnect(conf.RabbitMQ)
+		mgr.Reconnect()
 	}
 }
 

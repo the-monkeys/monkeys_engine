@@ -535,13 +535,20 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && rbErr != sql.ErrTxDone {
+				uh.log.Errorf("rollback failed while adding blog %s: %v", msg.BlogId, rbErr)
+			}
+		}
+	}()
 
 	var userId int64
 	//From account_id find user_id
-	if err := tx.QueryRow(`
-			SELECT id FROM user_account WHERE account_id = $1;`, msg.AccountId).Scan(&userId); err != nil {
+	err = tx.QueryRow(`SELECT id FROM user_account WHERE account_id = $1;`, msg.AccountId).Scan(&userId)
+	if err != nil {
 		uh.log.Errorf("can't get id by using user_account %s, error: %+v", msg.AccountId, err)
-		return nil
+		return fmt.Errorf("cannot find user by account_id %s: %w", msg.AccountId, err)
 	}
 
 	stmt, err := tx.Prepare(`INSERT INTO blog (user_id, blog_id, status) VALUES ($1, $2, $3) RETURNING id;`)
@@ -567,11 +574,15 @@ func (uh *uDBHandler) AddBlogWithId(msg models.TheMonkeysMessage) error {
 		uh.log.Errorf("cannot prepare statement to add permission into the blog_permissions: %v", err)
 		return err
 	}
+	defer func() {
+		if closeErr := stmt2.Close(); closeErr != nil {
+			uh.log.Errorf("cannot close the permission prepared statement for user %s, error: %v", msg.AccountId, closeErr)
+		}
+	}()
 
-	row := stmt2.QueryRow(blogId, userId, constants.RoleOwner)
-	if row.Err() != nil {
-		uh.log.Errorf("cannot execute query to add permission into the blog_permissions: %v", row.Err())
-		return row.Err()
+	if _, err = stmt2.Exec(blogId, userId, constants.RoleOwner); err != nil {
+		uh.log.Errorf("cannot execute query to add permission into the blog_permissions: %v", err)
+		return err
 	}
 
 	err = tx.Commit()
