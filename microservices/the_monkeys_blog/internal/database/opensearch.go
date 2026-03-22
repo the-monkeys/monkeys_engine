@@ -615,9 +615,9 @@ func (es *elasticsearchStorage) PublishBlogById(ctx context.Context, blogId stri
 	// from DraftBlogV2 streaming auto-save that can bump the doc's _seq_no mid-update.
 	retries := 3
 	req := esapi.UpdateRequest{
-		Index:          constants.ElasticsearchBlogIndex,
-		DocumentID:     blogId,
-		Body:           strings.NewReader(string(bs)),
+		Index:           constants.ElasticsearchBlogIndex,
+		DocumentID:      blogId,
+		Body:            strings.NewReader(string(bs)),
 		RetryOnConflict: &retries,
 	}
 
@@ -900,7 +900,7 @@ func (es *elasticsearchStorage) GetDueScheduledBlogs(ctx context.Context, curren
 		})
 	}
 
-	es.log.Infof("GetDueScheduledBlogs: found %d scheduled blogs ready to be published", len(blogs))
+	es.log.Debug("GetDueScheduledBlogs: found %d scheduled blogs ready to be published", len(blogs))
 	return blogs, nil
 }
 
