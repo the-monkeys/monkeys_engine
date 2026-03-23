@@ -32,6 +32,7 @@ type TheMonkeysMessage struct {
 	Notification string `json:"notification"`
 	BlogId       string `json:"blog_id"`
 	BlogStatus   string `json:"blog_status"`
+	BlogTitle    string `json:"blog_title"`
 }
 
 type TheMonkeysUser struct {

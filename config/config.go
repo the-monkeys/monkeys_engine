@@ -162,6 +162,15 @@ type Cors struct {
 	UseTempCors      bool   `mapstructure:"use_temp_cors"`
 }
 
+type FreeRangeNotify struct {
+	BaseURL      string `mapstructure:"base_url"`
+	APIKey       string `mapstructure:"api_key"`
+	AppID        string `mapstructure:"app_id"`
+	EmailEnabled bool   `mapstructure:"email_enabled"`
+	SSEPublicURL string `mapstructure:"sse_public_url"`
+	DevEmail     string `mapstructure:"dev_email"` // Override all email recipients in dev
+}
+
 type Redis struct {
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
@@ -187,6 +196,7 @@ type Config struct {
 	Redis             Redis             `mapstructure:"redis"`
 	Minio             Minio             `mapstructure:"minio"`
 	SEO               SEO               `mapstructure:"seo"`
+	FreeRangeNotify   FreeRangeNotify   `mapstructure:"freerangenotify"`
 	AppEnv            string            `mapstructure:"app_env"`
 }
 
@@ -374,6 +384,14 @@ func bindEnvVars() {
 	viper.BindEnv("seo.search_console_sitemap_url", "SEO_SEARCH_CONSOLE_SITEMAP_URL")
 	viper.BindEnv("seo.base_url", "SEO_BASE_URL")
 	viper.BindEnv("seo.google_credentials_file", "SEO_GOOGLE_CREDENTIALS_FILE")
+
+	// FreeRangeNotify
+	viper.BindEnv("freerangenotify.base_url", "FRN_BASE_URL")
+	viper.BindEnv("freerangenotify.api_key", "FRN_API_KEY")
+	viper.BindEnv("freerangenotify.app_id", "FRN_APP_ID")
+	viper.BindEnv("freerangenotify.email_enabled", "FRN_EMAIL_ENABLED")
+	viper.BindEnv("freerangenotify.sse_public_url", "FRN_SSE_PUBLIC_URL")
+	viper.BindEnv("freerangenotify.dev_email", "FRN_DEV_EMAIL")
 }
 
 // handleArrayEnvVars manually handles array environment variables

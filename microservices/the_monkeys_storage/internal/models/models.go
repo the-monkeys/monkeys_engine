@@ -13,4 +13,5 @@ type TheMonkeysMessage struct {
 	Action      string `json:"action"`
 	BlogId      string `json:"blog_id"`
 	BlogStatus  string `json:"status"`
+	BlogTitle   string `json:"blog_title"`
 }
