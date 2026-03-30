@@ -106,15 +106,16 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		}
 
 	case constants.BLOG_LIKE:
-		log.Debugf("Received blog like: %s liked %s", user.Username, user.BlogId)
+		log.Debugf("Received blog like: %s liked %s", user.NewUsername, user.BlogId)
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplBlogLikedInApp,
+			SSETpl:   constants.FRNTplBlogLikedSSE,
 			Priority: "low",
 			Category: constants.FRNCategorySocial,
 			Data: map[string]interface{}{
-				"liker_name": user.Username,
-				"blog_title": user.BlogTitle,
+				"liker_name": user.NewUsername,
+				"blog_id":    user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN like notification failed", "user", user.Username, "err", err)
@@ -132,6 +133,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Data: map[string]interface{}{
 				"inviter_name": user.Username,
 				"blog_title":   user.BlogTitle,
+				"blog_id":      user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN co-author invite notification failed", "err", err)
@@ -148,6 +150,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Data: map[string]interface{}{
 				"coauthor_name": user.Username,
 				"blog_title":    user.BlogTitle,
+				"blog_id":       user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN co-author accept notification failed", "err", err)
@@ -163,6 +166,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Data: map[string]interface{}{
 				"coauthor_name": user.Username,
 				"blog_title":    user.BlogTitle,
+				"blog_id":       user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN co-author decline notification failed", "err", err)
@@ -179,6 +183,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Data: map[string]interface{}{
 				"remover_name": user.Username,
 				"blog_title":   user.BlogTitle,
+				"blog_id":      user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN co-author removed notification failed", "err", err)
@@ -194,7 +199,8 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Category: constants.FRNCategoryContent,
 			Data: map[string]interface{}{
 				"publisher_name": user.Username,
-				"blog_title":     user.BlogTitle,
+				// "blog_title":     user.BlogTitle,
+				"blog_id": user.BlogId,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN co-author blog published notification failed", "err", err)

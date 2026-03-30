@@ -743,6 +743,19 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
 
+	// Check if the user has already liked this blog
+	alreadyLiked, err := us.dbConn.IsBlogLikedByUser(req.Username, req.BlogId)
+	if err != nil {
+		us.log.Errorf("error checking like status for user %s on blog %s: %v", req.Username, req.BlogId, err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+	if alreadyLiked {
+		return &pb.BookMarkRes{
+			Status:  http.StatusOK,
+			Message: "you have already liked this blog",
+		}, nil
+	}
+
 	err = us.dbConn.LikeBlog(req.Username, req.BlogId)
 	if err != nil {
 		us.log.Errorf("error while liking the blog: %v", err)
@@ -755,7 +768,7 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.LikeBlog, req.BlogId), constants.ServiceUser, constants.EventBlogLike, us.log)
+	// go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.LikeBlog, req.BlogId), constants.ServiceUser, constants.EventBlogLike, us.log)
 
 	// Send a notification to the user
 	blog, err := us.dbConn.GetBlogsByBlogId(req.BlogId)
@@ -764,10 +777,14 @@ func (us *UserSvc) LikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.BookM
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
+	fmt.Printf("blog)): %v\n", blog)
+
 	if blog.AccountId != user.AccountId {
 		bx, err := json.Marshal(models.TheMonkeysMessage{
 			Username:     blog.Username,
 			AccountId:    blog.AccountId,
+			NewUsername:  user.Username,
+			BlogId:       blog.BlogId,
 			Action:       constants.BLOG_LIKE,
 			Notification: fmt.Sprintf("%s liked your blog: %s", user.Username, blog.BlogId),
 		})
