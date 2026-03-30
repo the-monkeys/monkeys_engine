@@ -10,6 +10,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/consumer"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/database"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/freerangenotify"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/services"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -44,6 +45,14 @@ func main() {
 		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
+	// Initialize FRN client for dispatching notifications
+	frn := freerangenotify.NewClient(
+		cfg.FreeRangeNotify.BaseURL,
+		cfg.FreeRangeNotify.APIKey,
+		cfg.FreeRangeNotify.DevEmail,
+		log,
+	)
+
 	// Bind to all interfaces for health checks to work
 	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.NotificationPort)
 	lis, err := net.Listen("tcp", listenAddr)
@@ -51,9 +60,9 @@ func main() {
 		log.Errorf("failed to listen at port %v, error: %+v", listenAddr, err)
 	}
 
-	// Connect to rabbitmq server
+	// Connect to rabbitmq server — consumer now calls FRN instead of PostgreSQL
 	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
-	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log, db)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log, frn)
 
 	notificationSvc := services.NewNotificationSvc(db, log, cfg)
 

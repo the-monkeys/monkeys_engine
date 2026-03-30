@@ -617,6 +617,24 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 	// Track authentication activity
 	as.trackAuthActivity(user, "login", req)
 
+	// Publish login notification
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.LOGIN_DETECTED,
+		IpAddress: clientInfo.IPAddress,
+		Client:    clientInfo.Client,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal login notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish login notification: %v", err)
+			}
+		}()
+	}
+
 	resp := &pb.LoginUserResponse{
 		StatusCode:              http.StatusOK,
 		Token:                   token,
@@ -707,6 +725,24 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 	// Track authentication activity
 	as.trackAuthActivity(user, "forgot_password", req)
 
+	// Publish password reset requested notification
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.PASSWORD_RESET_REQUESTED,
+		IpAddress: user.IpAddress,
+		Client:    user.Client,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal password reset requested notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish password reset requested notification: %v", err)
+			}
+		}()
+	}
+
 	return &pb.ForgotPasswordRes{
 		StatusCode: 200,
 		Message:    "Verification link has been sent to the email!",
@@ -760,6 +796,24 @@ func (as *AuthzSvc) ResetPassword(ctx context.Context, req *pb.ResetPasswordReq)
 	// Track authentication activity
 	as.trackAuthActivity(user, "reset_password", req)
 
+	// Publish password changed notification (reset via token)
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.PASSWORD_CHANGED,
+		IpAddress: user.IpAddress,
+		Client:    user.Client,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal password reset notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish password reset notification: %v", err)
+			}
+		}()
+	}
+
 	return &pb.ResetPasswordRes{
 		StatusCode: http.StatusOK,
 		Token:      token,
@@ -806,6 +860,23 @@ func (as *AuthzSvc) UpdatePassword(ctx context.Context, req *pb.UpdatePasswordRe
 
 	// Track authentication activity
 	as.trackAuthActivity(user, "update_password", req)
+
+	// Publish notification for password change
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:     user.Username,
+		AccountId:    user.AccountId,
+		Action:       constants.PASSWORD_CHANGED,
+		Notification: "Your password was changed",
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal password changed notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish password changed notification: %v", err)
+			}
+		}()
+	}
 
 	return &pb.UpdatePasswordRes{
 		StatusCode: http.StatusOK,
@@ -912,6 +983,24 @@ func (as *AuthzSvc) VerifyEmail(ctx context.Context, req *pb.VerifyEmailReq) (*p
 	// Track authentication activity
 	as.trackAuthActivity(user, "verify_email", req)
 
+	// Publish notification for email verification
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:     user.Username,
+		AccountId:    user.AccountId,
+		Email:        user.Email,
+		Action:       constants.EMAIL_VERIFIED,
+		Notification: "Your email has been verified",
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal email verified notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish email verified notification: %v", err)
+			}
+		}()
+	}
+
 	user.Email = req.Email
 	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
@@ -969,6 +1058,21 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 		if err != nil {
 			as.logger.Errorf("failed to publish message for user: %s for updating profile, error: %v", user.Username, err)
+		}
+
+		// Send a separate notification message with USERNAME_CHANGED action
+		notifBx, mErr := json.Marshal(models.TheMonkeysMessage{
+			Username:    user.Username,
+			NewUsername: req.NewUsername,
+			AccountId:   user.AccountId,
+			Action:      constants.USERNAME_CHANGED,
+		})
+		if mErr != nil {
+			as.logger.Errorf("failed to marshal username changed notification: %v", mErr)
+			return
+		}
+		if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifBx); err != nil {
+			as.logger.Errorf("failed to publish username change notification for user: %s, error: %v", user.Username, err)
 		}
 	}()
 
@@ -1035,6 +1139,22 @@ func (as *AuthzSvc) UpdatePasswordWithPassword(ctx context.Context, req *pb.Upda
 	// Track authentication activity
 	as.trackAuthActivity(user, "update_password_with_password", req)
 
+	// Publish password changed notification
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Action:    constants.PASSWORD_CHANGED,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal password changed notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				as.logger.Errorf("failed to publish password changed notification: %v", err)
+			}
+		}()
+	}
+
 	// Return
 	return &pb.UpdatePasswordWithPasswordRes{
 		StatusCode: http.StatusOK,
@@ -1096,6 +1216,23 @@ func (as *AuthzSvc) UpdateEmailId(ctx context.Context, req *pb.UpdateEmailIdReq)
 	// Track authentication activity
 	as.trackAuthActivity(user, "update_email", req)
 
+	// Publish email changed notification
+	emailNotifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:  user.Username,
+		AccountId: user.AccountId,
+		Email:     req.NewEmail,
+		Action:    constants.EMAIL_CHANGED,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal email changed notification: %v", err)
+	} else {
+		go func() {
+			if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], emailNotifMsg); err != nil {
+				as.logger.Errorf("failed to publish email changed notification: %v", err)
+			}
+		}()
+	}
+
 	user.Email = req.NewEmail
 	token, _, err := as.jwt.GenerateToken(user)
 	if err != nil {
@@ -1135,6 +1272,23 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 			if err != nil {
 				as.logger.Errorf("google login: failed to generate token for user %s: %v", user.Email, err)
 				return nil, status.Errorf(codes.Aborted, "user cannot login using google at this time")
+			}
+
+			// Publish login notification for existing Google user
+			gLoginMsg, marshalErr := json.Marshal(models.TheMonkeysMessage{
+				Username:    existingUser.Username,
+				AccountId:   existingUser.AccountId,
+				Action:      constants.LOGIN_DETECTED,
+				LoginMethod: constants.AuthGoogleOauth2,
+			})
+			if marshalErr != nil {
+				as.logger.Errorf("failed to marshal google login notification: %v", marshalErr)
+			} else {
+				go func() {
+					if pubErr := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], gLoginMsg); pubErr != nil {
+						as.logger.Errorf("failed to publish google login notification: %v", pubErr)
+					}
+				}()
 			}
 
 			return &pb.RegisterUserResponse{

@@ -1,8 +1,11 @@
 package notification
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"sync"
@@ -33,6 +36,7 @@ type Notification struct {
 
 type NotificationServiceClient struct {
 	Client      pb.NotificationServiceClient
+	cfg         *config.Config
 	mu          sync.Mutex
 	connections map[string][]*websocket.Conn // Map user ID to WebSocket connections
 	log         *zap.SugaredLogger
@@ -56,6 +60,7 @@ func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClien
 
 	nsc := &NotificationServiceClient{
 		Client:      NewNotificationServiceClient(cfg, lg),
+		cfg:         cfg,
 		connections: make(map[string][]*websocket.Conn), // Map of user ID to WebSocket connections
 		log:         lg,
 	}
@@ -67,6 +72,9 @@ func RegisterNotificationRoute(router *gin.Engine, cfg *config.Config, authClien
 	routes.GET("/notifications", nsc.GetNotifications)         // Get notifications
 	routes.GET("/ws-notification", nsc.GetNotificationsStream) // WebSocket endpoint
 	routes.PUT("/notifications", nsc.ViewNotification)         // Get notifications
+	routes.GET("/sse-token", nsc.GetSSEToken)                  // FRN SSE token
+	routes.GET("/frn", nsc.GetFRNNotifications)                // FRN notification list
+	routes.POST("/frn/read-all", nsc.MarkAllFRNRead)           // Mark all as read
 
 	return nsc
 }
@@ -246,4 +254,147 @@ func (nsc *NotificationServiceClient) GetNotificationsStream(ctx *gin.Context) {
 			return
 		}
 	}
+}
+
+// GetSSEToken returns a short-lived FRN SSE token for the authenticated user.
+func (nsc *NotificationServiceClient) GetSSEToken(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	if userName == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing user identity"})
+		return
+	}
+
+	frnCfg := nsc.cfg.FreeRangeNotify
+	if frnCfg.BaseURL == "" {
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification service not configured"})
+		return
+	}
+
+	payload, err := json.Marshal(map[string]string{
+		"user_id": userName,
+	})
+	if err != nil {
+		nsc.log.Errorw("failed to marshal sse-token request", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	url := frnCfg.BaseURL + "/sse/tokens"
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		nsc.log.Errorw("failed to build sse-token request", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+frnCfg.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		nsc.log.Errorw("failed to get sse token from FRN", "err", err, "user", userName)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "notification service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		nsc.log.Errorw("FRN returned non-200 for sse-token", "status", resp.StatusCode, "body", string(body), "user", userName)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "failed to obtain sse token"})
+		return
+	}
+
+	// Forward FRN's JSON response (contains token + sse_public_url) directly.
+	ctx.Data(http.StatusOK, "application/json", body)
+}
+
+// GetFRNNotifications proxies the FRN notification list for the authenticated user.
+func (nsc *NotificationServiceClient) GetFRNNotifications(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	if userName == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing user identity"})
+		return
+	}
+
+	frnCfg := nsc.cfg.FreeRangeNotify
+	if frnCfg.BaseURL == "" {
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification service not configured"})
+		return
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	pageSize := ctx.DefaultQuery("page_size", "20")
+	page := ctx.DefaultQuery("page", "1")
+	channel := ctx.DefaultQuery("channel", "in_app")
+
+	url := fmt.Sprintf("%s/notifications?user_id=%s&channel=%s&page_size=%s&page=%s",
+		frnCfg.BaseURL, userName, channel, pageSize, page)
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		nsc.log.Errorw("failed to build FRN list request", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	req.Header.Set("X-API-Key", frnCfg.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		nsc.log.Errorw("failed to get notifications from FRN", "err", err, "user", userName)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "notification service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	ctx.Data(resp.StatusCode, "application/json", body)
+}
+
+// MarkAllFRNRead marks all notifications as read for the authenticated user.
+func (nsc *NotificationServiceClient) MarkAllFRNRead(ctx *gin.Context) {
+	userName := ctx.GetString("userName")
+	if userName == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "missing user identity"})
+		return
+	}
+
+	frnCfg := nsc.cfg.FreeRangeNotify
+	if frnCfg.BaseURL == "" {
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification service not configured"})
+		return
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	payload, err := json.Marshal(map[string]string{"user_id": userName})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	url := frnCfg.BaseURL + "/notifications/read-all"
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", frnCfg.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		nsc.log.Errorw("failed to mark-all-read in FRN", "err", err, "user", userName)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "notification service unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	ctx.Data(resp.StatusCode, "application/json", body)
 }

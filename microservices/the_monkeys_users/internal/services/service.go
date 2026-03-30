@@ -406,6 +406,25 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.InvitedAsACoAuthor, req.Username, req.BlogId), constants.ServiceUser, constants.EventInviteCoAuthor, us.log)
 
+	// Publish notification event for co-author invite
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		AccountId:    resp.AccountId,
+		Username:     req.BlogOwnerUsername,
+		NewUsername:  req.Username,
+		Action:       constants.CO_AUTHOR_INVITE,
+		BlogId:       req.BlogId,
+		Notification: fmt.Sprintf("%s invited you as a co-author", req.BlogOwnerUsername),
+	})
+	if err != nil {
+		us.log.Errorf("failed to marshal co-author invite notification: %v", err)
+	} else {
+		go func() {
+			if err := us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				us.log.Errorf("failed to publish co-author invite notification: %v", err)
+			}
+		}()
+	}
+
 	return &pb.CoAuthorAccessRes{
 		Message: fmt.Sprintf("%s has been invited as a co-author", req.Username),
 	}, nil
@@ -439,6 +458,24 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 
 	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RevokedCoAuthorRequest, req.Username, req.BlogId), constants.ServiceUser, constants.EventRemoveCoAuthor, us.log)
+
+	// Publish notification event for co-author removal
+	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
+		Username:     req.BlogOwnerUsername,
+		NewUsername:  req.Username,
+		Action:       constants.CO_AUTHOR_REMOVED,
+		BlogId:       req.BlogId,
+		Notification: fmt.Sprintf("You have been removed as co-author from blog %s", req.BlogId),
+	})
+	if err != nil {
+		us.log.Errorf("failed to marshal co-author removed notification: %v", err)
+	} else {
+		go func() {
+			if err := us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], notifMsg); err != nil {
+				us.log.Errorf("failed to publish co-author removal notification: %v", err)
+			}
+		}()
+	}
 
 	return &pb.CoAuthorAccessRes{
 		Message: fmt.Sprintf("%s has been removed from co-author", req.Username),

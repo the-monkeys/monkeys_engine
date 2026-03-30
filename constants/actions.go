@@ -17,6 +17,20 @@ const (
 	DELETE_USERS_ALL_BLOGS = "delete_users_all_blogs"
 
 	PROFILE_UPDATE = "profile_update"
+
+	// Notification-specific actions (published to RoutingKeys[4])
+	CO_AUTHOR_INVITE         = "co_author_invite"
+	CO_AUTHOR_ACCEPT         = "co_author_accept"
+	CO_AUTHOR_DECLINE        = "co_author_decline"
+	CO_AUTHOR_REMOVED        = "co_author_removed"
+	CO_AUTHOR_BLOG_PUBLISHED = "co_author_blog_published"
+	PASSWORD_CHANGED         = "password_changed"
+	EMAIL_VERIFIED           = "email_verified"
+	BLOG_COMMENT             = "blog_comment"
+	LOGIN_DETECTED           = "login_detected"
+	PASSWORD_RESET_REQUESTED = "password_reset_requested"
+	EMAIL_CHANGED            = "email_changed"
+	USERNAME_CHANGED         = "username_changed"
 )
 
 // RestrictedUsernames contains usernames that are not allowed for user registration
