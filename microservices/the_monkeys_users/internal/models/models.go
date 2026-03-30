@@ -107,6 +107,7 @@ type TheMonkeysMessage struct {
 	BlogStatus   string   `json:"blog_status"`
 	Notification string   `json:"notification"`
 	Tags         []string `json:"tags"`
+	BlogTitle    string   `json:"blog_title"`
 }
 
 type Blog struct {

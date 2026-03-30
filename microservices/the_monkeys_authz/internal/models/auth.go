@@ -76,4 +76,7 @@ type TheMonkeysMessage struct {
 	IpAddress    string `json:"ip"`
 	Action       string `json:"action"`
 	Notification string `json:"notification"`
+	BlogId       string `json:"blog_id"`
+	BlogStatus   string `json:"blog_status"`
+	BlogTitle    string `json:"blog_title"`
 }
