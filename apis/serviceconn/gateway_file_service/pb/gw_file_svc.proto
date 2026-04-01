@@ -75,6 +75,94 @@ message DeleteProfilePicRes {
     string error = 3;
 }
 
+message CheckAssetReq {
+    string checksum = 1;
+}
+
+message CheckAssetRes {
+    bool exists = 1;
+    string object_key = 2;
+    int32 width = 3;
+    int32 height = 4;
+    string blurhash = 5;
+    string error = 6;
+}
+
+message RegisterAssetReq {
+    string checksum = 1;
+    string object_key = 2;
+    string content_type = 3;
+    int64 size = 4;
+    int32 width = 5;
+    int32 height = 6;
+    string blurhash = 7;
+}
+
+message RegisterAssetRes {
+    bool success = 1;
+    string error = 2;
+    string checksum = 3;
+    string object_key = 4;
+}
+
+message UpdateNSFWReq {
+    string checksum = 1;
+    bool is_nsfw = 2;
+    float nsfw_score = 3;
+}
+
+message UpdateNSFWRes {
+    bool success = 1;
+    string error = 2;
+}
+
+message CreateAssetRefReq {
+    string checksum = 1;
+    string owner_type = 2;
+    string owner_id = 3;
+    string purpose = 4;
+    string file_name = 5;
+}
+
+message CreateAssetRefRes {
+    bool success = 1;
+    string ref_id = 2;
+    string checksum = 3;
+    string object_key = 4;
+    string error = 5;
+}
+
+message DeleteAssetRefReq {
+    string ref_id = 1;
+    string owner_type = 2;
+    string owner_id = 3;
+    string purpose = 4;
+    string file_name = 5;
+}
+
+message DeleteAssetRefRes {
+    bool success = 1;
+    int32 deleted_count = 2;
+    string error = 3;
+}
+
+message ReplaceAssetRefReq {
+    string checksum = 1;
+    string owner_type = 2;
+    string owner_id = 3;
+    string purpose = 4;
+    string file_name = 5;
+}
+
+message ReplaceAssetRefRes {
+    bool success = 1;
+    string ref_id = 2;
+    string checksum = 3;
+    string object_key = 4;
+    int32 deleted_count = 5;
+    string error = 6;
+}
+
 service UploadBlogFile {
     // Lets an user upload profile pic into the file server
     rpc UploadProfilePic(stream UploadProfilePicReq) returns (UploadProfilePicRes) {};
@@ -88,4 +176,12 @@ service UploadBlogFile {
     rpc UploadBlogFile(stream UploadBlogFileReq) returns (UploadBlogFileRes) {};
 	rpc GetBlogFile(GetBlogFileReq) returns (stream GetBlogFileRes) {};
 	rpc DeleteBlogFile(DeleteBlogFileReq) returns (DeleteBlogFileRes) {};
+
+    // Deduplication Methods
+    rpc CheckAsset(CheckAssetReq) returns (CheckAssetRes) {};
+    rpc RegisterAsset(RegisterAssetReq) returns (RegisterAssetRes) {};
+    rpc UpdateNSFW(UpdateNSFWReq) returns (UpdateNSFWRes) {};
+    rpc CreateAssetRef(CreateAssetRefReq) returns (CreateAssetRefRes) {};
+    rpc DeleteAssetRef(DeleteAssetRefReq) returns (DeleteAssetRefRes) {};
+    rpc ReplaceAssetRef(ReplaceAssetRefReq) returns (ReplaceAssetRefRes) {};
 }

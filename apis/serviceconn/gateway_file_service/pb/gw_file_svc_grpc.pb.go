@@ -25,6 +25,12 @@ const (
 	UploadBlogFile_UploadBlogFile_FullMethodName   = "/auth_svc.UploadBlogFile/UploadBlogFile"
 	UploadBlogFile_GetBlogFile_FullMethodName      = "/auth_svc.UploadBlogFile/GetBlogFile"
 	UploadBlogFile_DeleteBlogFile_FullMethodName   = "/auth_svc.UploadBlogFile/DeleteBlogFile"
+	UploadBlogFile_CheckAsset_FullMethodName       = "/auth_svc.UploadBlogFile/CheckAsset"
+	UploadBlogFile_RegisterAsset_FullMethodName    = "/auth_svc.UploadBlogFile/RegisterAsset"
+	UploadBlogFile_UpdateNSFW_FullMethodName       = "/auth_svc.UploadBlogFile/UpdateNSFW"
+	UploadBlogFile_CreateAssetRef_FullMethodName   = "/auth_svc.UploadBlogFile/CreateAssetRef"
+	UploadBlogFile_DeleteAssetRef_FullMethodName   = "/auth_svc.UploadBlogFile/DeleteAssetRef"
+	UploadBlogFile_ReplaceAssetRef_FullMethodName  = "/auth_svc.UploadBlogFile/ReplaceAssetRef"
 )
 
 // UploadBlogFileClient is the client API for UploadBlogFile service.
@@ -40,6 +46,13 @@ type UploadBlogFileClient interface {
 	UploadBlogFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadBlogFileReq, UploadBlogFileRes], error)
 	GetBlogFile(ctx context.Context, in *GetBlogFileReq, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetBlogFileRes], error)
 	DeleteBlogFile(ctx context.Context, in *DeleteBlogFileReq, opts ...grpc.CallOption) (*DeleteBlogFileRes, error)
+	// Deduplication Methods
+	CheckAsset(ctx context.Context, in *CheckAssetReq, opts ...grpc.CallOption) (*CheckAssetRes, error)
+	RegisterAsset(ctx context.Context, in *RegisterAssetReq, opts ...grpc.CallOption) (*RegisterAssetRes, error)
+	UpdateNSFW(ctx context.Context, in *UpdateNSFWReq, opts ...grpc.CallOption) (*UpdateNSFWRes, error)
+	CreateAssetRef(ctx context.Context, in *CreateAssetRefReq, opts ...grpc.CallOption) (*CreateAssetRefRes, error)
+	DeleteAssetRef(ctx context.Context, in *DeleteAssetRefReq, opts ...grpc.CallOption) (*DeleteAssetRefRes, error)
+	ReplaceAssetRef(ctx context.Context, in *ReplaceAssetRefReq, opts ...grpc.CallOption) (*ReplaceAssetRefRes, error)
 }
 
 type uploadBlogFileClient struct {
@@ -134,6 +147,66 @@ func (c *uploadBlogFileClient) DeleteBlogFile(ctx context.Context, in *DeleteBlo
 	return out, nil
 }
 
+func (c *uploadBlogFileClient) CheckAsset(ctx context.Context, in *CheckAssetReq, opts ...grpc.CallOption) (*CheckAssetRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckAssetRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_CheckAsset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *uploadBlogFileClient) RegisterAsset(ctx context.Context, in *RegisterAssetReq, opts ...grpc.CallOption) (*RegisterAssetRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterAssetRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_RegisterAsset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *uploadBlogFileClient) UpdateNSFW(ctx context.Context, in *UpdateNSFWReq, opts ...grpc.CallOption) (*UpdateNSFWRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateNSFWRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_UpdateNSFW_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *uploadBlogFileClient) CreateAssetRef(ctx context.Context, in *CreateAssetRefReq, opts ...grpc.CallOption) (*CreateAssetRefRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateAssetRefRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_CreateAssetRef_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *uploadBlogFileClient) DeleteAssetRef(ctx context.Context, in *DeleteAssetRefReq, opts ...grpc.CallOption) (*DeleteAssetRefRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAssetRefRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_DeleteAssetRef_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *uploadBlogFileClient) ReplaceAssetRef(ctx context.Context, in *ReplaceAssetRefReq, opts ...grpc.CallOption) (*ReplaceAssetRefRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplaceAssetRefRes)
+	err := c.cc.Invoke(ctx, UploadBlogFile_ReplaceAssetRef_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UploadBlogFileServer is the server API for UploadBlogFile service.
 // All implementations must embed UnimplementedUploadBlogFileServer
 // for forward compatibility.
@@ -147,6 +220,13 @@ type UploadBlogFileServer interface {
 	UploadBlogFile(grpc.ClientStreamingServer[UploadBlogFileReq, UploadBlogFileRes]) error
 	GetBlogFile(*GetBlogFileReq, grpc.ServerStreamingServer[GetBlogFileRes]) error
 	DeleteBlogFile(context.Context, *DeleteBlogFileReq) (*DeleteBlogFileRes, error)
+	// Deduplication Methods
+	CheckAsset(context.Context, *CheckAssetReq) (*CheckAssetRes, error)
+	RegisterAsset(context.Context, *RegisterAssetReq) (*RegisterAssetRes, error)
+	UpdateNSFW(context.Context, *UpdateNSFWReq) (*UpdateNSFWRes, error)
+	CreateAssetRef(context.Context, *CreateAssetRefReq) (*CreateAssetRefRes, error)
+	DeleteAssetRef(context.Context, *DeleteAssetRefReq) (*DeleteAssetRefRes, error)
+	ReplaceAssetRef(context.Context, *ReplaceAssetRefReq) (*ReplaceAssetRefRes, error)
 	mustEmbedUnimplementedUploadBlogFileServer()
 }
 
@@ -174,6 +254,24 @@ func (UnimplementedUploadBlogFileServer) GetBlogFile(*GetBlogFileReq, grpc.Serve
 }
 func (UnimplementedUploadBlogFileServer) DeleteBlogFile(context.Context, *DeleteBlogFileReq) (*DeleteBlogFileRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteBlogFile not implemented")
+}
+func (UnimplementedUploadBlogFileServer) CheckAsset(context.Context, *CheckAssetReq) (*CheckAssetRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckAsset not implemented")
+}
+func (UnimplementedUploadBlogFileServer) RegisterAsset(context.Context, *RegisterAssetReq) (*RegisterAssetRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterAsset not implemented")
+}
+func (UnimplementedUploadBlogFileServer) UpdateNSFW(context.Context, *UpdateNSFWReq) (*UpdateNSFWRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateNSFW not implemented")
+}
+func (UnimplementedUploadBlogFileServer) CreateAssetRef(context.Context, *CreateAssetRefReq) (*CreateAssetRefRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAssetRef not implemented")
+}
+func (UnimplementedUploadBlogFileServer) DeleteAssetRef(context.Context, *DeleteAssetRefReq) (*DeleteAssetRefRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAssetRef not implemented")
+}
+func (UnimplementedUploadBlogFileServer) ReplaceAssetRef(context.Context, *ReplaceAssetRefReq) (*ReplaceAssetRefRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReplaceAssetRef not implemented")
 }
 func (UnimplementedUploadBlogFileServer) mustEmbedUnimplementedUploadBlogFileServer() {}
 func (UnimplementedUploadBlogFileServer) testEmbeddedByValue()                        {}
@@ -268,6 +366,114 @@ func _UploadBlogFile_DeleteBlogFile_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UploadBlogFile_CheckAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckAssetReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).CheckAsset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_CheckAsset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).CheckAsset(ctx, req.(*CheckAssetReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UploadBlogFile_RegisterAsset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterAssetReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).RegisterAsset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_RegisterAsset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).RegisterAsset(ctx, req.(*RegisterAssetReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UploadBlogFile_UpdateNSFW_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateNSFWReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).UpdateNSFW(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_UpdateNSFW_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).UpdateNSFW(ctx, req.(*UpdateNSFWReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UploadBlogFile_CreateAssetRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAssetRefReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).CreateAssetRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_CreateAssetRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).CreateAssetRef(ctx, req.(*CreateAssetRefReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UploadBlogFile_DeleteAssetRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAssetRefReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).DeleteAssetRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_DeleteAssetRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).DeleteAssetRef(ctx, req.(*DeleteAssetRefReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UploadBlogFile_ReplaceAssetRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplaceAssetRefReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UploadBlogFileServer).ReplaceAssetRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UploadBlogFile_ReplaceAssetRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UploadBlogFileServer).ReplaceAssetRef(ctx, req.(*ReplaceAssetRefReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UploadBlogFile_ServiceDesc is the grpc.ServiceDesc for UploadBlogFile service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,6 +488,30 @@ var UploadBlogFile_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteBlogFile",
 			Handler:    _UploadBlogFile_DeleteBlogFile_Handler,
+		},
+		{
+			MethodName: "CheckAsset",
+			Handler:    _UploadBlogFile_CheckAsset_Handler,
+		},
+		{
+			MethodName: "RegisterAsset",
+			Handler:    _UploadBlogFile_RegisterAsset_Handler,
+		},
+		{
+			MethodName: "UpdateNSFW",
+			Handler:    _UploadBlogFile_UpdateNSFW_Handler,
+		},
+		{
+			MethodName: "CreateAssetRef",
+			Handler:    _UploadBlogFile_CreateAssetRef_Handler,
+		},
+		{
+			MethodName: "DeleteAssetRef",
+			Handler:    _UploadBlogFile_DeleteAssetRef_Handler,
+		},
+		{
+			MethodName: "ReplaceAssetRef",
+			Handler:    _UploadBlogFile_ReplaceAssetRef_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

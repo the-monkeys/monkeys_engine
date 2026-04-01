@@ -3,19 +3,25 @@ package storage_v2
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 
 	"github.com/bbrks/go-blurhash"
 	"go.uber.org/zap"
@@ -38,6 +44,7 @@ import (
 
 type Service struct {
 	mc           *minio.Client
+	storageCli   pb.UploadBlogFileClient
 	bucket       string
 	cdnURL       string
 	publicBase   string // optional public base (scheme+host) to generate presigned URLs for
@@ -45,7 +52,25 @@ type Service struct {
 	log          *zap.SugaredLogger
 }
 
-func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
+const (
+	imageMetadataLimit = 5 * 1024 * 1024
+	memoryUploadLimit  = 32 * 1024 * 1024
+
+	postAssetOwnerType = "blog"
+	postAssetPurpose   = "editor_image"
+)
+
+type preparedAssetUpload struct {
+	checksum string
+	reader   io.Reader
+	size     int64
+	width    int32
+	height   int32
+	blurhash string
+	cleanup  func()
+}
+
+func newService(cfg *config.Config, storageCli pb.UploadBlogFileClient, log *zap.SugaredLogger) (*Service, error) {
 	cli, err := minio.New(cfg.Minio.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.Minio.AccessKey, cfg.Minio.SecretKey, ""),
 		Secure: cfg.Minio.UseSSL,
@@ -54,7 +79,7 @@ func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
 		return nil, err
 	}
 
-	svc := &Service{mc: cli, bucket: cfg.Minio.Bucket, cdnURL: cfg.Minio.CDNURL, log: log}
+	svc := &Service{mc: cli, storageCli: storageCli, bucket: cfg.Minio.Bucket, cdnURL: cfg.Minio.CDNURL, log: log}
 	// If a public base is provided (e.g., http://localhost:9000), create a signer bound to that host
 	if v := strings.TrimSpace(cfg.Minio.PublicBaseURL); v != "" {
 		svc.publicBase = strings.TrimRight(v, "/")
@@ -90,13 +115,13 @@ func newService(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
 	return svc, nil
 }
 
-func newServiceWithRetry(cfg *config.Config, log *zap.SugaredLogger) (*Service, error) {
+func newServiceWithRetry(cfg *config.Config, storageCli pb.UploadBlogFileClient, log *zap.SugaredLogger) (*Service, error) {
 	const maxRetries = 5
 	backoff := 2 * time.Second
 
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		svc, err := newService(cfg, log)
+		svc, err := newService(cfg, storageCli, log)
 		if err == nil {
 			if attempt > 1 {
 				log.Infof("MinIO connected on attempt %d", attempt)
@@ -111,10 +136,10 @@ func newServiceWithRetry(cfg *config.Config, log *zap.SugaredLogger) (*Service, 
 	return nil, fmt.Errorf("MinIO init failed after %d attempts: %w", maxRetries, lastErr)
 }
 
-func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *Service {
+func RegisterRoutes(router *gin.Engine, cfg *config.Config, storageCli pb.UploadBlogFileClient, authClient *auth.ServiceClient, log *zap.SugaredLogger) *Service {
 	mw := auth.InitAuthMiddleware(authClient, log)
 
-	svc, err := newServiceWithRetry(cfg, log)
+	svc, err := newServiceWithRetry(cfg, storageCli, log)
 	if err != nil {
 		log.Fatalf("failed to initialize MinIO client: %v", err)
 	}
@@ -131,8 +156,9 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 		v2.GET("/profiles/:user_id/profile/url", svc.GetProfileURL)
 	}
 	{
-		// Stream a blog file (public). Uses object key posts/{id}/{fileName}.
+		// Stream legacy blog files and checksum-addressed CAS assets.
 		v2.GET("/posts/:id/:fileName", svc.GetPostFile)
+		v2.GET("/assets/sha256/:p1/:p2/:fileName", svc.GetAssetFile)
 		// Fast-load helpers (public): metadata + presigned/CDN URL
 		// JSON with etag, size, contentType, lastModified, cacheControl, blurhash, width, height, url.
 		v2.GET("/posts/:id/:fileName/meta", svc.GetPostFileMeta)
@@ -145,7 +171,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 
 	// Blog content CRUD
 	{
-		// Upload multipart form field `file`. Stores under posts/{id}/<uuid+ext>. Returns JSON with object info.
+		// Upload multipart form field `file`. Stores/reuses a checksum-addressed asset and creates a blog reference.
 		v2.POST("/posts/:id", mw.AuthorizationByID, svc.UploadPostFile)
 		// List all objects under posts/{id}/ (auth required).
 		v2.GET("/posts/:id", svc.ListPostFiles)
@@ -153,7 +179,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 		v2.HEAD("/posts/:id/:fileName", svc.HeadPostFile)
 		// Replace an existing file with multipart field `file`. Updates metadata for images.
 		v2.PUT("/posts/:id/:fileName", mw.AuthorizationByID, svc.UpdatePostFile)
-		// Delete an object.
+		// Delete the blog file reference. Legacy path-based objects are removed as a fallback.
 		v2.DELETE("/posts/:id/:fileName", mw.AuthorizationByID, svc.DeletePostFile)
 	}
 
@@ -181,6 +207,7 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, authClient *auth.Ser
 		vf.GET("/profiles/:user_id/profile/meta", svc.GetProfileMeta)
 		vf.GET("/profiles/:user_id/profile/url", svc.GetProfileURL)
 		vf.GET("/posts/:id/:fileName", svc.GetPostFile)
+		vf.GET("/assets/sha256/:p1/:p2/:fileName", svc.GetAssetFile)
 		vf.GET("/posts/:id/:fileName/meta", svc.GetPostFileMeta)
 		vf.GET("/posts/:id/:fileName/url", svc.GetPostFileURL)
 	}
@@ -274,6 +301,136 @@ func (s *Service) computeImageMetadata(contentType string, data []byte) (hash st
 	return hash, b.Dx(), b.Dy(), true
 }
 
+func (s *Service) prepareAssetUpload(file multipart.File, fileHeader *multipart.FileHeader, contentType string) (*preparedAssetUpload, error) {
+	if fileHeader.Size <= memoryUploadLimit {
+		data, err := io.ReadAll(file)
+		if err != nil {
+			return nil, err
+		}
+		sum := sha256.Sum256(data)
+		prepared := &preparedAssetUpload{
+			checksum: hex.EncodeToString(sum[:]),
+			reader:   bytes.NewReader(data),
+			size:     int64(len(data)),
+		}
+		if strings.HasPrefix(strings.ToLower(contentType), "image/") && int64(len(data)) <= imageMetadataLimit {
+			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
+				prepared.blurhash = hash
+				prepared.width = int32(w)
+				prepared.height = int32(h)
+			}
+		}
+		return prepared, nil
+	}
+
+	tmp, err := os.CreateTemp("", "the-monkeys-upload-*")
+	if err != nil {
+		return nil, err
+	}
+	cleanup := func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+	}
+
+	hasher := sha256.New()
+	size, err := io.Copy(io.MultiWriter(tmp, hasher), file)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	return &preparedAssetUpload{
+		checksum: hex.EncodeToString(hasher.Sum(nil)),
+		reader:   tmp,
+		size:     size,
+		cleanup:  cleanup,
+	}, nil
+}
+
+func (s *Service) assetObjectName(checksum, contentType, originalName string) string {
+	ext := extFromContentType(contentType)
+	if ext == "" {
+		ext = strings.ToLower(filepath.Ext(originalName))
+	}
+	if len(checksum) < 4 {
+		return "assets/sha256/" + checksum + ext
+	}
+	return fmt.Sprintf("assets/sha256/%s/%s/%s%s", checksum[:2], checksum[2:4], checksum, ext)
+}
+
+func (s *Service) metadataFromPrepared(prepared *preparedAssetUpload) map[string]string {
+	if prepared.blurhash == "" && prepared.width == 0 && prepared.height == 0 {
+		return nil
+	}
+	return map[string]string{
+		"x-blurhash": prepared.blurhash,
+		"x-width":    strconv.Itoa(int(prepared.width)),
+		"x-height":   strconv.Itoa(int(prepared.height)),
+	}
+}
+
+func (s *Service) ensureAssetStored(ctx context.Context, prepared *preparedAssetUpload, originalName, contentType, cacheControl string) (objectName string, etag string, uploaded bool, err error) {
+	checkRes, checkErr := s.storageCli.CheckAsset(ctx, &pb.CheckAssetReq{Checksum: prepared.checksum})
+	if checkErr == nil && checkRes.Exists {
+		return checkRes.ObjectKey, "", false, nil
+	}
+	if checkErr != nil {
+		s.log.Warnw("asset check failed; proceeding with candidate upload", "checksum", prepared.checksum, "err", checkErr)
+	}
+
+	objectName = s.assetObjectName(prepared.checksum, contentType, originalName)
+	opts := minio.PutObjectOptions{
+		ContentType:  contentType,
+		CacheControl: cacheControl,
+		UserMetadata: s.metadataFromPrepared(prepared),
+	}
+	info, err := s.mc.PutObject(ctx, s.bucket, objectName, prepared.reader, prepared.size, opts)
+	if err != nil {
+		return "", "", false, err
+	}
+
+	registerRes, err := s.storageCli.RegisterAsset(ctx, &pb.RegisterAssetReq{
+		Checksum:    prepared.checksum,
+		ObjectKey:   objectName,
+		ContentType: contentType,
+		Size:        prepared.size,
+		Width:       prepared.width,
+		Height:      prepared.height,
+		Blurhash:    prepared.blurhash,
+	})
+	if err != nil {
+		return "", "", true, err
+	}
+	if !registerRes.Success {
+		return "", "", true, fmt.Errorf("register asset failed: %s", registerRes.Error)
+	}
+	if registerRes.ObjectKey != "" {
+		objectName = registerRes.ObjectKey
+	}
+
+	return objectName, info.ETag, true, nil
+}
+
+func (s *Service) enrichPreparedResponse(ctx context.Context, resp gin.H, objectName string, prepared *preparedAssetUpload, cacheControl string) {
+	resp["cacheControl"] = cacheControl
+	if prepared.blurhash != "" {
+		resp["blurhash"] = prepared.blurhash
+	}
+	if prepared.width > 0 {
+		resp["width"] = prepared.width
+	}
+	if prepared.height > 0 {
+		resp["height"] = prepared.height
+	}
+	if urlStr, err := s.presignedOrCDNURL(ctx, objectName, 10*time.Minute); err == nil {
+		resp["url"] = urlStr
+	}
+}
+
 // enrichResponse adds computed image metadata, cacheControl, and a direct URL
 // to an upload/update JSON response so the client gets everything in one round-trip.
 func (s *Service) enrichResponse(ctx context.Context, resp gin.H, objectName string, opts minio.PutObjectOptions) {
@@ -327,7 +484,7 @@ func (s *Service) presignedOrCDNURL(ctx context.Context, objectName string, expi
 // UploadPostFile
 // Method: POST /api/v2/storage/posts/:id (auth required)
 // Input: multipart form field `file`
-// Behavior: stores under posts/{id}/<uuid+ext>, computes BlurHash/dimensions for images, sets Cache-Control immutable
+// Behavior: stores/reuses a checksum-addressed asset, computes BlurHash/dimensions for images, and creates a blog reference.
 // Response: 201 JSON { bucket, object, fileName, etag, size, contentType }
 func (s *Service) UploadPostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
@@ -357,48 +514,41 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 	}
 	defer file.Close()
 
-	// Generate unique name within posts/{id}/ prefix (S3-style folder)
 	fname := uniqueName(fileHeader.Filename)
-	objectName := "posts/" + blogID + "/" + fname
 	contentType := fileHeader.Header.Get("Content-Type")
+	const cacheControl = "public, max-age=31536000"
 
-	opts := minio.PutObjectOptions{
-		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000",
-	}
-
-	// Read a small prefix for image metadata if it's an image
-	// 5MB limit for metadata processing to keep memory low
-	const metadataLimit = 5 * 1024 * 1024
-	var finalReader io.Reader = file
-	var objectSize int64 = fileHeader.Size
-
-	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
-		// Read into memory ONLY if small enough for metadata
-		data, err := io.ReadAll(file)
-		if err == nil {
-			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
-				opts.UserMetadata = map[string]string{
-					"x-blurhash": hash,
-					"x-width":    strconv.Itoa(w),
-					"x-height":   strconv.Itoa(h),
-				}
-			}
-			finalReader = bytes.NewReader(data)
-			objectSize = int64(len(data))
-		} else {
-			// Fallback to streaming if read fails
-			_, _ = file.Seek(0, io.SeekStart)
-		}
-	} else {
-		// For videos or large images, we MUST ensure we are at the start
-		_, _ = file.Seek(0, io.SeekStart)
-	}
-
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
+	prepared, err := s.prepareAssetUpload(file, fileHeader, contentType)
 	if err != nil {
-		s.log.Errorf("minio PutObject error: %v", err)
+		s.log.Errorf("prepare asset upload error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	if prepared.cleanup != nil {
+		defer prepared.cleanup()
+	}
+
+	objectName, etag, _, err := s.ensureAssetStored(ctx.Request.Context(), prepared, fileHeader.Filename, contentType, cacheControl)
+	if err != nil {
+		s.log.Errorf("asset store/register error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload failed"})
+		return
+	}
+
+	refRes, err := s.storageCli.CreateAssetRef(ctx.Request.Context(), &pb.CreateAssetRefReq{
+		Checksum:  prepared.checksum,
+		OwnerType: postAssetOwnerType,
+		OwnerId:   blogID,
+		Purpose:   postAssetPurpose,
+		FileName:  fname,
+	})
+	if err != nil || !refRes.Success {
+		msg := ""
+		if refRes != nil {
+			msg = refRes.Error
+		}
+		s.log.Errorf("create asset ref error: %v %s", err, msg)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "upload reference failed"})
 		return
 	}
 
@@ -408,11 +558,13 @@ func (s *Service) UploadPostFile(ctx *gin.Context) {
 		"bucket":      s.bucket,
 		"object":      objectName,
 		"fileName":    fname,
-		"etag":        info.ETag,
-		"size":        info.Size,
+		"refId":       refRes.RefId,
+		"checksum":    prepared.checksum,
+		"etag":        etag,
+		"size":        prepared.size,
 		"contentType": contentType,
 	}
-	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
+	s.enrichPreparedResponse(ctx.Request.Context(), resp, objectName, prepared, cacheControl)
 	ctx.JSON(http.StatusCreated, resp)
 }
 
@@ -494,7 +646,7 @@ func (s *Service) HeadPostFile(ctx *gin.Context) {
 // UpdatePostFile
 // Method: PUT /api/v2/storage/posts/:id/:fileName (auth required)
 // Input: multipart form field `file`
-// Behavior: replaces object and recomputes image metadata
+// Behavior: stores/reuses a checksum-addressed asset, then moves the blog reference to it.
 // Response: 200 JSON { bucket, object, etag, size, contentType }
 func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
@@ -517,7 +669,6 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	}
 
 	fileName := ctx.Param("fileName")
-	objectName := "posts/" + blogID + "/" + fileName
 
 	file, fileHeader, err := ctx.Request.FormFile("file")
 	if err != nil {
@@ -527,49 +678,53 @@ func (s *Service) UpdatePostFile(ctx *gin.Context) {
 	defer file.Close()
 
 	contentType := fileHeader.Header.Get("Content-Type")
-	opts := minio.PutObjectOptions{
-		ContentType:  contentType,
-		CacheControl: "public, max-age=31536000",
-	}
+	const cacheControl = "public, max-age=31536000"
 
-	const metadataLimit = 5 * 1024 * 1024
-	var finalReader io.Reader = file
-	var objectSize int64 = fileHeader.Size
-
-	if strings.HasPrefix(strings.ToLower(contentType), "image/") && fileHeader.Size <= metadataLimit {
-		data, err := io.ReadAll(file)
-		if err == nil {
-			if hash, w, h, ok := s.computeImageMetadata(contentType, data); ok {
-				opts.UserMetadata = map[string]string{
-					"x-blurhash": hash,
-					"x-width":    strconv.Itoa(w),
-					"x-height":   strconv.Itoa(h),
-				}
-			}
-			finalReader = bytes.NewReader(data)
-			objectSize = int64(len(data))
-		} else {
-			_, _ = file.Seek(0, io.SeekStart)
-		}
-	} else {
-		_, _ = file.Seek(0, io.SeekStart)
-	}
-
-	info, err := s.mc.PutObject(ctx.Request.Context(), s.bucket, objectName, finalReader, objectSize, opts)
+	prepared, err := s.prepareAssetUpload(file, fileHeader, contentType)
 	if err != nil {
-		s.log.Errorf("minio PutObject (update) error: %v", err)
+		s.log.Errorf("prepare asset update error: %v", err)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "read failed"})
+		return
+	}
+	if prepared.cleanup != nil {
+		defer prepared.cleanup()
+	}
+
+	objectName, etag, _, err := s.ensureAssetStored(ctx.Request.Context(), prepared, fileHeader.Filename, contentType, cacheControl)
+	if err != nil {
+		s.log.Errorf("asset store/register update error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update failed"})
+		return
+	}
+
+	refRes, err := s.storageCli.ReplaceAssetRef(ctx.Request.Context(), &pb.ReplaceAssetRefReq{
+		Checksum:  prepared.checksum,
+		OwnerType: postAssetOwnerType,
+		OwnerId:   blogID,
+		Purpose:   postAssetPurpose,
+		FileName:  fileName,
+	})
+	if err != nil || !refRes.Success {
+		msg := ""
+		if refRes != nil {
+			msg = refRes.Error
+		}
+		s.log.Errorf("replace asset ref error: %v %s", err, msg)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "update reference failed"})
 		return
 	}
 
 	resp := gin.H{
 		"bucket":      s.bucket,
 		"object":      objectName,
-		"etag":        info.ETag,
-		"size":        info.Size,
+		"fileName":    fileName,
+		"refId":       refRes.RefId,
+		"checksum":    prepared.checksum,
+		"etag":        etag,
+		"size":        prepared.size,
 		"contentType": contentType,
 	}
-	s.enrichResponse(ctx.Request.Context(), resp, objectName, opts)
+	s.enrichPreparedResponse(ctx.Request.Context(), resp, objectName, prepared, cacheControl)
 	ctx.JSON(http.StatusOK, resp)
 }
 
@@ -582,7 +737,15 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
 	fileName := ctx.Param("fileName")
 	objectName := "posts/" + blogID + "/" + fileName
+	s.streamObject(ctx, objectName, "file not found")
+}
 
+func (s *Service) GetAssetFile(ctx *gin.Context) {
+	objectName := "assets/sha256/" + ctx.Param("p1") + "/" + ctx.Param("p2") + "/" + ctx.Param("fileName")
+	s.streamObject(ctx, objectName, "file not found")
+}
+
+func (s *Service) streamObject(ctx *gin.Context, objectName, notFoundMessage string) {
 	obj, err := s.mc.GetObject(ctx.Request.Context(), s.bucket, objectName, minio.GetObjectOptions{})
 	if err != nil {
 		s.log.Errorf("minio GetObject error: %v", err)
@@ -594,7 +757,7 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 	stat, err := obj.Stat()
 	if err != nil {
 		// Not found or access error
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "file not found"})
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": notFoundMessage})
 		return
 	}
 
@@ -635,7 +798,7 @@ func (s *Service) GetPostFile(ctx *gin.Context) {
 
 // DeletePostFile
 // Method: DELETE /api/v2/storage/posts/:id/:fileName (auth required)
-// Behavior: deletes the object if it exists
+// Behavior: deletes the blog reference; legacy path-based objects are removed as a fallback.
 // Response: 200 JSON { message: "deleted", object }
 func (s *Service) DeletePostFile(ctx *gin.Context) {
 	blogID := ctx.Param("id")
@@ -660,14 +823,30 @@ func (s *Service) DeletePostFile(ctx *gin.Context) {
 	fileName := ctx.Param("fileName")
 	objectName := "posts/" + blogID + "/" + fileName
 
-	// Optionally check existence
+	deleteRes, err := s.storageCli.DeleteAssetRef(ctx.Request.Context(), &pb.DeleteAssetRefReq{
+		OwnerType: postAssetOwnerType,
+		OwnerId:   blogID,
+		Purpose:   postAssetPurpose,
+		FileName:  fileName,
+	})
+	if err == nil && deleteRes.Success && deleteRes.DeletedCount > 0 {
+		ctx.JSON(http.StatusOK, gin.H{"message": "deleted", "fileName": fileName, "deletedRefs": deleteRes.DeletedCount})
+		return
+	}
+	if err != nil {
+		s.log.Warnw("delete asset ref failed; trying legacy object delete", "blog_id", blogID, "file_name", fileName, "err", err)
+	} else if deleteRes != nil && !deleteRes.Success {
+		s.log.Warnw("delete asset ref unsuccessful; trying legacy object delete", "blog_id", blogID, "file_name", fileName, "error", deleteRes.Error)
+	}
+
+	// Legacy fallback for pre-CAS objects stored under posts/{blogId}/.
 	_, statErr := s.mc.StatObject(ctx.Request.Context(), s.bucket, objectName, minio.StatObjectOptions{})
 	if statErr != nil {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "file not found"})
 		return
 	}
 
-	err := s.mc.RemoveObject(ctx.Request.Context(), s.bucket, objectName, minio.RemoveObjectOptions{})
+	err = s.mc.RemoveObject(ctx.Request.Context(), s.bucket, objectName, minio.RemoveObjectOptions{})
 	if err != nil {
 		s.log.Errorf("minio RemoveObject error: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "delete failed"})
