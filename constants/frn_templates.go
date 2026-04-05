@@ -8,6 +8,7 @@ const (
 	FRNTplNewCommentInApp  = "new_comment_inapp"
 	FRNTplNewCommentSSE    = "new_comment_sse"
 	FRNTplBlogLikedInApp   = "blog_liked_inapp"
+	FRNTplBlogLikedSSE     = "blog_liked_sse"
 
 	// Collaboration
 	FRNTplCoAuthorInviteInApp  = "coauthor_invite_inapp"
