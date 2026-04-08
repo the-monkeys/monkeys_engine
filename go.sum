@@ -179,6 +179,10 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/the-monkeys/freerangenotify v0.2.2 h1:kxdemBfDvb4TLwjfJOl7htOTCzIRChP08bAPkWXNYPI=
 github.com/the-monkeys/freerangenotify v0.2.2/go.mod h1:BhVGIs6OD8/vQ8fm6tB0zGB4Dk16rkxagLVnumbvQ8s=
+github.com/the-monkeys/freerangenotify v1.0.0 h1:H59OIxnZAfTxZkbwf03f6e4rsxYoTHJQFtHkiAOmrnQ=
+github.com/the-monkeys/freerangenotify v1.0.0/go.mod h1:6OYkvhwPwGgWFM+Vg0hRXupktdN2O5fveHsS96cGoLY=
+github.com/the-monkeys/freerangenotify v1.0.1-0.20260408153637-78f488aa00a1 h1:WehBX4ZyAK4siIN1g9b8rASLhEQMJu5IELOthZc/M6k=
+github.com/the-monkeys/freerangenotify v1.0.1-0.20260408153637-78f488aa00a1/go.mod h1:ep5rSA48xF9sWIWaDRmd1q92heIsSOGJdGZLCOBT00A=
 github.com/tinylib/msgp v1.3.0 h1:ULuf7GPooDaIlbyvgAxBV/FI7ynli6LZ1/nVUNu+0ww=
 github.com/tinylib/msgp v1.3.0/go.mod h1:ykjzy2wzgrlvpDCRc4LA8UXy6D8bzMSuAF3WD57Gok0=
 github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS4MhqMhdFk5YI=

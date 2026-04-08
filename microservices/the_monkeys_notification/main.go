@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -49,7 +50,6 @@ func main() {
 	frn := freerangenotify.NewClient(
 		cfg.FreeRangeNotify.BaseURL,
 		cfg.FreeRangeNotify.APIKey,
-		cfg.FreeRangeNotify.DevEmail,
 		log,
 	)
 
@@ -63,6 +63,10 @@ func main() {
 	// Connect to rabbitmq server — consumer now calls FRN instead of PostgreSQL
 	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log, frn)
+
+	// Background sync: ensure all existing Monkeys users are registered in FRN.
+	// Runs once at startup; skips users already in FRN (409). Non-blocking.
+	go freerangenotify.SyncUsers(context.Background(), frn, db, log)
 
 	notificationSvc := services.NewNotificationSvc(db, log, cfg)
 

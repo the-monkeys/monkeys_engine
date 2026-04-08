@@ -31,6 +31,9 @@ const (
 	PASSWORD_RESET_REQUESTED = "password_reset_requested"
 	EMAIL_CHANGED            = "email_changed"
 	USERNAME_CHANGED         = "username_changed"
+	USER_DEACTIVATED         = "user_deactivated"
+	USER_REACTIVATED         = "user_reactivated"
+	PREFERENCES_CHANGED      = "preferences_changed"
 )
 
 // RestrictedUsernames contains usernames that are not allowed for user registration

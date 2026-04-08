@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/lib/pq"                // Keep for pq.Array functionality
 
 	"github.com/the-monkeys/the_monkeys/config"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/freerangenotify"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_notification/internal/models"
 	"go.uber.org/zap"
 )
@@ -19,6 +21,9 @@ type NotificationDB interface {
 	MarkNotificationAsSeen(notificationIDs []int64, username string) error
 	CheckIfUsernameExist(username string) (*models.TheMonkeysUser, error)
 	GetUnseenNotifications(username string, limit int64, offset int64) ([]*models.Notification, error)
+
+	// ListActiveUsers returns all active users for FRN sync.
+	ListActiveUsers(ctx context.Context) ([]freerangenotify.BasicUser, error)
 }
 
 type notificationDB struct {
@@ -287,4 +292,33 @@ func (uh *notificationDB) GetUnseenNotifications(username string, limit int64, o
 
 	// previously info log removed / converted to debug (left silent intentionally)
 	return notifications, nil
+}
+
+// ListActiveUsers returns all active users for FRN sync.
+func (uh *notificationDB) ListActiveUsers(ctx context.Context) ([]freerangenotify.BasicUser, error) {
+	rows, err := uh.db.QueryContext(ctx, `
+		SELECT ua.account_id, ua.username, ua.email,
+		       COALESCE(ua.first_name, ''), COALESCE(ua.last_name, '')
+		FROM user_account ua
+		JOIN user_status us ON ua.user_status = us.id
+		WHERE us.status = 'active'
+		ORDER BY ua.id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query active users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []freerangenotify.BasicUser
+	for rows.Next() {
+		var u freerangenotify.BasicUser
+		if err := rows.Scan(&u.AccountID, &u.Username, &u.Email, &u.FirstName, &u.LastName); err != nil {
+			return nil, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return users, nil
 }
