@@ -301,7 +301,7 @@ func (uh *notificationDB) ListActiveUsers(ctx context.Context) ([]freerangenotif
 		       COALESCE(ua.first_name, ''), COALESCE(ua.last_name, '')
 		FROM user_account ua
 		JOIN user_status us ON ua.user_status = us.id
-		WHERE us.status = 'active'
+		WHERE LOWER(us.status) = 'active'
 		ORDER BY ua.id
 	`)
 	if err != nil {

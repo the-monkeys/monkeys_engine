@@ -27,7 +27,7 @@ type BasicUser struct {
 // Uses BulkCreate with SkipExisting so already-registered users are silently skipped.
 // Runs in the background — errors are logged, never fatal.
 func SyncUsers(ctx context.Context, client *Client, lister UserLister, log *zap.SugaredLogger) {
-	log.Info("FRN user sync: starting background sync of existing users")
+	log.Debug("FRN user sync: starting background sync of existing users")
 	start := time.Now()
 
 	users, err := lister.ListActiveUsers(ctx)
@@ -35,10 +35,10 @@ func SyncUsers(ctx context.Context, client *Client, lister UserLister, log *zap.
 		log.Errorw("FRN user sync: failed to list active users from DB", "err", err)
 		return
 	}
-	log.Infow("FRN user sync: fetched user list", "count", len(users))
+	log.Debugw("FRN user sync: fetched user list", "count", len(users))
 
 	if len(users) == 0 {
-		log.Info("FRN user sync: no users to sync")
+		log.Debug("FRN user sync: no users to sync")
 		return
 	}
 
@@ -66,7 +66,7 @@ func SyncUsers(ctx context.Context, client *Client, lister UserLister, log *zap.
 		return
 	}
 
-	log.Infow("FRN user sync: complete",
+	log.Debugw("FRN user sync: complete",
 		"response", resp,
 		"total", len(users),
 		"duration", time.Since(start).Round(time.Millisecond),
