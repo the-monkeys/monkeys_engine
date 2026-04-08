@@ -74,20 +74,12 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 
 	switch user.Action {
 	case constants.USER_REGISTER:
-		log.Debugf("Received user registration: %s", user.Username)
-		// Register user in FRN so it can receive future notifications
-		if err := frn.RegisterUser(ctx, user.Email, user.Username); err != nil {
-			log.Errorw("FRN user registration failed", "user", user.Username, "err", err)
-		}
-		// Send welcome notification (in_app only)
-		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
-			UserID:   user.Username,
-			InAppTpl: constants.FRNTplEmailVerifiedInApp,
-			Priority: "high",
-			Category: constants.FRNCategorySecurity,
-			Data:     map[string]interface{}{},
-		}, log); err != nil {
-			log.Errorw("FRN welcome notification failed", "user", user.Username, "err", err)
+		log.Debugw("Processing user registration", "username", user.Username, "email", user.Email, "first_name", user.FirstName, "last_name", user.LastName, "account_id", user.AccountId)
+		// Register user in FRN: maps username → external_id for future notification routing
+		if err := frn.RegisterUser(ctx, user.Email, user.Username, user.FirstName, user.LastName); err != nil {
+			log.Errorw("FRN user registration failed", "username", user.Username, "email", user.Email, "err", err)
+		} else {
+			log.Debugw("FRN user registered successfully", "username", user.Username, "external_id", user.Username)
 		}
 
 	case constants.USER_FOLLOWED:
@@ -107,6 +99,10 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 
 	case constants.BLOG_LIKE:
 		log.Debugf("Received blog like: %s liked %s", user.NewUsername, user.BlogId)
+		blogTitle := user.BlogTitle
+		if blogTitle == "" {
+			blogTitle = user.BlogId // Fallback: publisher doesn't always include title
+		}
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplBlogLikedInApp,
@@ -116,6 +112,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 			Data: map[string]interface{}{
 				"liker_name": user.NewUsername,
 				"blog_id":    user.BlogId,
+				"blog_title": blogTitle,
 			},
 		}, log); err != nil {
 			log.Errorw("FRN like notification failed", "user", user.Username, "err", err)
@@ -265,7 +262,15 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		}
 
 	case constants.EMAIL_CHANGED:
-		log.Debugf("Received email changed: %s", user.Username)
+		log.Debugw("Processing email change", "username", user.Username, "new_email", user.Email)
+		// Update email in FRN via PUT /users/{external_id} so future email notifications use the new address
+		log.Debugw("Updating email in FRN", "external_id", user.Username, "new_email", user.Email)
+		if err := frn.UpdateUserEmail(ctx, user.Username, user.Email); err != nil {
+			log.Errorw("FRN email update failed", "username", user.Username, "new_email", user.Email, "err", err)
+		} else {
+			log.Debugw("FRN user email updated successfully", "username", user.Username, "new_email", user.Email)
+		}
+		// Notify user about the email change
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplEmailChangedInApp,
@@ -276,11 +281,11 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 				"new_email": user.Email,
 			},
 		}, log); err != nil {
-			log.Errorw("FRN email changed notification failed", "user", user.Username, "err", err)
+			log.Errorw("FRN email changed notification failed", "username", user.Username, "err", err)
 		}
 
 	case constants.USERNAME_CHANGED:
-		log.Debugf("Received username changed: %s → %s", user.Username, user.NewUsername)
+		log.Debugw("Processing username change", "old_username", user.Username, "new_username", user.NewUsername)
 		// Send notification under the OLD username (FRN still knows the user by this external_id)
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
@@ -291,14 +296,103 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 				"new_username": user.NewUsername,
 			},
 		}, log); err != nil {
-			log.Errorw("FRN username changed notification failed", "user", user.Username, "err", err)
+			log.Errorw("FRN username changed notification failed", "old_username", user.Username, "new_username", user.NewUsername, "err", err)
 		}
-		// Update FRN external_id so future notifications route to the new username
+		// Update FRN external_id: old_username → new_username via PUT /users/{external_id}
+		log.Debugw("Updating FRN external_id", "old_external_id", user.Username, "new_external_id", user.NewUsername)
 		if err := frn.UpdateUserExternalID(ctx, user.Username, user.NewUsername); err != nil {
 			log.Errorw("FRN external_id update failed — user may not receive future notifications",
 				"old", user.Username, "new", user.NewUsername, "err", err)
 		} else {
-			log.Infow("FRN external_id updated", "old", user.Username, "new", user.NewUsername)
+			log.Debugw("FRN external_id updated successfully", "old_username", user.Username, "new_username", user.NewUsername)
+		}
+
+	case constants.USER_ACCOUNT_DELETE:
+		log.Debugw("Processing user account deletion", "username", user.Username, "account_id", user.AccountId)
+		// Send farewell notification before deleting from FRN
+		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
+			UserID:   user.Username,
+			InAppTpl: constants.FRNTplAccountDeletedInApp,
+			EmailTpl: constants.FRNTplAccountDeletedEmail,
+			Priority: "high",
+			Category: constants.FRNCategoryAccount,
+			Data:     map[string]interface{}{},
+		}, log); err != nil {
+			log.Warnw("FRN account deleted notification failed (proceeding with delete)", "user", user.Username, "err", err)
+		}
+		// Remove user from FRN via DELETE /users/{external_id}
+		log.Debugw("Deleting user from FRN", "external_id", user.Username)
+		if err := frn.DeleteUser(ctx, user.Username); err != nil {
+			log.Errorw("FRN user deletion failed", "user", user.Username, "err", err)
+		} else {
+			log.Debugw("FRN user deleted successfully", "username", user.Username)
+		}
+
+	case constants.USER_DEACTIVATED:
+		log.Debugw("Processing user deactivation", "username", user.Username)
+		// Enable DND in FRN to suppress all notifications while deactivated
+		log.Debugw("Setting DND=true in FRN", "external_id", user.Username)
+		if err := frn.DeactivateUser(ctx, user.Username); err != nil {
+			log.Errorw("FRN user deactivation (DND on) failed", "user", user.Username, "err", err)
+		} else {
+			log.Debugw("FRN user DND enabled successfully", "username", user.Username)
+		}
+		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
+			UserID:   user.Username,
+			InAppTpl: constants.FRNTplAccountDeactivatedInApp,
+			Priority: "normal",
+			Category: constants.FRNCategoryAccount,
+			Data:     map[string]interface{}{},
+		}, log); err != nil {
+			log.Warnw("FRN deactivation notification failed", "user", user.Username, "err", err)
+		}
+
+	case constants.USER_REACTIVATED:
+		log.Debugw("Processing user reactivation", "username", user.Username)
+		// Clear DND in FRN to resume notifications
+		log.Debugw("Setting DND=false in FRN", "external_id", user.Username)
+		if err := frn.ReactivateUser(ctx, user.Username); err != nil {
+			log.Errorw("FRN user reactivation (DND off) failed", "user", user.Username, "err", err)
+		} else {
+			log.Debugw("FRN user DND disabled successfully", "username", user.Username)
+		}
+		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
+			UserID:   user.Username,
+			InAppTpl: constants.FRNTplAccountReactivatedInApp,
+			Priority: "normal",
+			Category: constants.FRNCategoryAccount,
+			Data:     map[string]interface{}{},
+		}, log); err != nil {
+			log.Warnw("FRN reactivation notification failed", "user", user.Username, "err", err)
+		}
+
+	case constants.PREFERENCES_CHANGED:
+		log.Debugw("Processing preferences change", "username", user.Username, "raw_payload", user.Notification)
+		// Sync notification preferences to FRN
+		// The message carries preference flags in the Notification field as JSON
+		emailEnabled := true // default on
+		pushEnabled := true  // default on
+		if user.Notification != "" {
+			var prefs struct {
+				EmailEnabled *bool `json:"email_enabled"`
+				PushEnabled  *bool `json:"push_enabled"`
+			}
+			if err := json.Unmarshal([]byte(user.Notification), &prefs); err != nil {
+				log.Warnw("Failed to parse preferences payload, using defaults", "user", user.Username, "err", err)
+			} else {
+				if prefs.EmailEnabled != nil {
+					emailEnabled = *prefs.EmailEnabled
+				}
+				if prefs.PushEnabled != nil {
+					pushEnabled = *prefs.PushEnabled
+				}
+			}
+		}
+		log.Debugw("Syncing preferences to FRN", "external_id", user.Username, "email_enabled", emailEnabled, "push_enabled", pushEnabled)
+		if err := frn.UpdateUserPreferences(ctx, user.Username, emailEnabled, pushEnabled); err != nil {
+			log.Errorw("FRN preferences sync failed", "user", user.Username, "err", err)
+		} else {
+			log.Debugw("FRN preferences synced successfully", "username", user.Username, "email_enabled", emailEnabled, "push_enabled", pushEnabled)
 		}
 
 	default:

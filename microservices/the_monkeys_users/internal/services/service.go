@@ -221,6 +221,13 @@ func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProf
 			us.log.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
 		}
 	}()
+
+	// Notify FRN to clean up the user
+	go func() {
+		if err := us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx); err != nil {
+			us.log.Errorf("failed to publish delete notification for user: %s, error: %v", user.Username, err)
+		}
+	}()
 	// Return the response
 	return &pb.DeleteUserProfileRes{
 		Success: "user has been deleted successfully",

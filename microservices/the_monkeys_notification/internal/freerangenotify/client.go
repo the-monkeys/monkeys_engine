@@ -1,91 +1,106 @@
 package freerangenotify
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
+	"strings"
 	"time"
 
 	frn "github.com/the-monkeys/freerangenotify/sdk/go/freerangenotify"
 	"go.uber.org/zap"
 )
 
-// Client wraps the official FRN Go SDK, adding dev-email override logic.
+// Client wraps the official FRN Go SDK.
 // Only the notification service uses this — other services publish to RabbitMQ.
 type Client struct {
-	SDK      *frn.Client
-	BaseURL  string // Stored for raw HTTP calls the SDK doesn't support
-	APIKey   string
-	DevEmail string // Override all email recipients in dev (empty = no override)
-	Log      *zap.SugaredLogger
+	SDK *frn.Client
+	Log *zap.SugaredLogger
 }
 
-func NewClient(baseURL, apiKey, devEmail string, log *zap.SugaredLogger) *Client {
+func NewClient(baseURL, apiKey string, log *zap.SugaredLogger) *Client {
 	sdk := frn.New(apiKey,
 		frn.WithBaseURL(baseURL),
 		frn.WithTimeout(5*time.Second),
 	)
 	return &Client{
-		SDK:      sdk,
-		BaseURL:  baseURL,
-		APIKey:   apiKey,
-		DevEmail: devEmail,
-		Log:      log,
+		SDK: sdk,
+		Log: log,
 	}
 }
 
 // RegisterUser registers a Monkeys user in FRN so it can receive notifications.
-func (c *Client) RegisterUser(ctx context.Context, email, username string) error {
-	if c.DevEmail != "" {
-		email = c.DevEmail
-	}
+// Maps username → external_id for future notification routing.
+func (c *Client) RegisterUser(ctx context.Context, email, username, firstName, lastName string) error {
+	fullName := strings.TrimSpace(firstName + " " + lastName)
+	c.Log.Debugw("FRN RegisterUser called", "username", username, "email", email, "full_name", fullName)
+
 	_, err := c.SDK.Users.Create(ctx, frn.CreateUserParams{
+		FullName:   fullName,
 		Email:      email,
 		ExternalID: username,
 	})
+	if err != nil {
+		c.Log.Debugw("FRN RegisterUser failed", "username", username, "email", email, "err", err)
+	} else {
+		c.Log.Debugw("FRN RegisterUser succeeded", "username", username, "external_id", username, "full_name", fullName)
+	}
 	return err
 }
 
 // Send dispatches a single notification via the FRN SDK.
 func (c *Client) Send(ctx context.Context, params frn.NotificationSendParams) error {
+	c.Log.Debugw("FRN Send called", "user_id", params.UserID, "channel", params.Channel, "template", params.TemplateID)
 	_, err := c.SDK.Notifications.Send(ctx, params)
+	if err != nil {
+		c.Log.Debugw("FRN Send failed", "user_id", params.UserID, "channel", params.Channel, "err", err)
+	}
 	return err
 }
 
-// UpdateUserExternalID updates a user's external_id in FRN via direct HTTP call.
-// The SDK's Users.Update requires an internal UUID, but we only have the external_id
-// (Monkeys username). FRN's API resolves external_id in /users/{external_id}.
+// UpdateUserExternalID updates a user's external_id in FRN.
+// SDK now accepts external_id as the identifier directly.
 func (c *Client) UpdateUserExternalID(ctx context.Context, oldExternalID, newExternalID string) error {
-	payload, err := json.Marshal(map[string]string{
-		"external_id": newExternalID,
+	c.Log.Debugw("FRN UpdateUserExternalID called", "old_external_id", oldExternalID, "new_external_id", newExternalID)
+	_, err := c.SDK.Users.Update(ctx, oldExternalID, frn.UpdateUserParams{
+		ExternalID: newExternalID,
 	})
-	if err != nil {
-		return fmt.Errorf("failed to marshal update payload: %w", err)
-	}
+	return err
+}
 
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+// UpdateUserEmail updates a user's email in FRN, identified by their username (external_id).
+func (c *Client) UpdateUserEmail(ctx context.Context, username, newEmail string) error {
+	c.Log.Debugw("FRN UpdateUserEmail called", "external_id", username, "new_email", newEmail)
+	_, err := c.SDK.Users.Update(ctx, username, frn.UpdateUserParams{
+		Email: newEmail,
+	})
+	return err
+}
 
-	url := fmt.Sprintf("%s/users/%s", c.BaseURL, oldExternalID)
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPut, url, bytes.NewReader(payload))
-	if err != nil {
-		return fmt.Errorf("failed to build FRN user update request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", c.APIKey)
+// DeleteUser removes a user from FRN, identified by their username (external_id).
+func (c *Client) DeleteUser(ctx context.Context, username string) error {
+	c.Log.Debugw("FRN DeleteUser called", "external_id", username)
+	return c.SDK.Users.Delete(ctx, username)
+}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to update FRN user external_id: %w", err)
-	}
-	defer resp.Body.Close()
+// DeactivateUser sets DND (Do Not Disturb) on the FRN user to suppress all notifications.
+func (c *Client) DeactivateUser(ctx context.Context, username string) error {
+	c.Log.Debugw("FRN DeactivateUser called (DND=true)", "external_id", username)
+	_, err := c.SDK.Users.UpdatePreferences(ctx, username, frn.Preferences{DND: true})
+	return err
+}
 
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("FRN user update returned %d: %s", resp.StatusCode, string(body))
-	}
-	return nil
+// ReactivateUser clears DND on the FRN user to resume notifications.
+func (c *Client) ReactivateUser(ctx context.Context, username string) error {
+	c.Log.Debugw("FRN ReactivateUser called (DND=false)", "external_id", username)
+	_, err := c.SDK.Users.UpdatePreferences(ctx, username, frn.Preferences{DND: false})
+	return err
+}
+
+// UpdateUserPreferences syncs notification preferences from Monkeys to FRN.
+func (c *Client) UpdateUserPreferences(ctx context.Context, username string, emailEnabled, pushEnabled bool) error {
+	c.Log.Debugw("FRN UpdateUserPreferences called", "external_id", username, "email_enabled", emailEnabled, "push_enabled", pushEnabled)
+	_, err := c.SDK.Users.UpdatePreferences(ctx, username, frn.Preferences{
+		EmailEnabled: &emailEnabled,
+		PushEnabled:  &pushEnabled,
+	})
+	return err
 }
