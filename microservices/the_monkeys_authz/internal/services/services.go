@@ -622,11 +622,12 @@ func (as *AuthzSvc) Login(ctx context.Context, req *pb.LoginUserRequest) (*pb.Lo
 
 	// Publish login notification
 	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
-		Username:  user.Username,
-		AccountId: user.AccountId,
-		Action:    constants.LOGIN_DETECTED,
-		IpAddress: clientInfo.IPAddress,
-		Client:    clientInfo.Client,
+		Username:    user.Username,
+		AccountId:   user.AccountId,
+		Action:      constants.LOGIN_DETECTED,
+		IpAddress:   clientInfo.IPAddress,
+		Client:      clientInfo.Client,
+		LoginMethod: constants.AuthTheMonkeys,
 	})
 	if err != nil {
 		as.logger.Errorf("failed to marshal login notification: %v", err)
@@ -1279,11 +1280,16 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 				return nil, status.Errorf(codes.Aborted, "user cannot login using google at this time")
 			}
 
+			// Extract client info for existing Google user login notification
+			gClientInfo := as.extractClientInfo(req)
+
 			// Publish login notification for existing Google user
 			gLoginMsg, marshalErr := json.Marshal(models.TheMonkeysMessage{
 				Username:    existingUser.Username,
 				AccountId:   existingUser.AccountId,
 				Action:      constants.LOGIN_DETECTED,
+				IpAddress:   gClientInfo.IPAddress,
+				Client:      gClientInfo.Client,
 				LoginMethod: constants.AuthGoogleOauth2,
 			})
 			if marshalErr != nil {
