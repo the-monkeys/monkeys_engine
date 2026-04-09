@@ -36,6 +36,12 @@ const (
 	FRNTplEmailChangedInApp     = "email_changed_inapp"
 	FRNTplEmailChangedEmail     = "email_changed_email"
 	FRNTplUsernameChangedInApp  = "username_changed_inapp"
+
+	// Account lifecycle
+	FRNTplAccountDeletedInApp     = "account_deleted_inapp"
+	FRNTplAccountDeletedEmail     = "account_deleted_email"
+	FRNTplAccountDeactivatedInApp = "account_deactivated_inapp"
+	FRNTplAccountReactivatedInApp = "account_reactivated_inapp"
 )
 
 // FRN Categories
@@ -44,4 +50,5 @@ const (
 	FRNCategoryCollaboration = "collaboration"
 	FRNCategoryContent       = "content"
 	FRNCategorySecurity      = "security"
+	FRNCategoryAccount       = "account"
 )

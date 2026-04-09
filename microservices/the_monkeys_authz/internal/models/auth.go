@@ -69,6 +69,8 @@ type TheMonkeysMessage struct {
 	AccountId    string `json:"account_id"`
 	Username     string `json:"username"`
 	NewUsername  string `json:"new_username"`
+	FirstName    string `json:"first_name"`
+	LastName     string `json:"last_name"`
 	Email        string `json:"email"`
 	LoginMethod  string `json:"login_method"`
 	ClientId     string `json:"client_id"`

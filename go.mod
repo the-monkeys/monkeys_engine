@@ -1,6 +1,6 @@
 module github.com/the-monkeys/the_monkeys
 
-go 1.24.4
+go 1.26.1
 
 require (
 	github.com/bbrks/go-blurhash v1.1.1
@@ -15,7 +15,7 @@ require (
 	github.com/spf13/viper v1.18.2
 	github.com/streadway/amqp v1.1.0
 	github.com/stretchr/testify v1.11.1
-	github.com/the-monkeys/freerangenotify v0.2.2
+	github.com/the-monkeys/freerangenotify v1.0.1-0.20260408153637-78f488aa00a1
 	github.com/ulule/limiter/v3 v3.11.2
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.47.0

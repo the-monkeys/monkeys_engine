@@ -461,6 +461,9 @@ func (as *AuthzSvc) RegisterUser(ctx context.Context, req *pb.RegisterUserReques
 	bx, err := json.Marshal(models.TheMonkeysMessage{
 		Username:     user.Username,
 		AccountId:    user.AccountId,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		Email:        user.Email,
 		Action:       constants.USER_REGISTER,
 		Notification: constants.NotificationRegister,
 	})
@@ -1054,23 +1057,25 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		return nil, status.Errorf(codes.Internal, "something went wrong")
 	}
 
+	// Marshal notification message BEFORE the goroutine to avoid data race
+	// (user.Username gets overwritten to req.NewUsername after the goroutine is spawned)
+	notifBx, err := json.Marshal(models.TheMonkeysMessage{
+		Username:    user.Username,
+		NewUsername: req.NewUsername,
+		AccountId:   user.AccountId,
+		Action:      constants.USERNAME_CHANGED,
+	})
+	if err != nil {
+		as.logger.Errorf("failed to marshal username changed notification: %v", err)
+		return nil, status.Errorf(codes.Internal, "something went wrong")
+	}
+
 	go func() {
 		err = as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[0], bx)
 		if err != nil {
 			as.logger.Errorf("failed to publish message for user: %s for updating profile, error: %v", user.Username, err)
 		}
 
-		// Send a separate notification message with USERNAME_CHANGED action
-		notifBx, mErr := json.Marshal(models.TheMonkeysMessage{
-			Username:    user.Username,
-			NewUsername: req.NewUsername,
-			AccountId:   user.AccountId,
-			Action:      constants.USERNAME_CHANGED,
-		})
-		if mErr != nil {
-			as.logger.Errorf("failed to marshal username changed notification: %v", mErr)
-			return
-		}
 		if err := as.qConn.PublishMessage(as.config.RabbitMQ.Exchange, as.config.RabbitMQ.RoutingKeys[4], notifBx); err != nil {
 			as.logger.Errorf("failed to publish username change notification for user: %s, error: %v", user.Username, err)
 		}
@@ -1363,6 +1368,9 @@ func (as *AuthzSvc) GoogleLogin(ctx context.Context, req *pb.RegisterUserRequest
 	bx, err := json.Marshal(models.TheMonkeysMessage{
 		Username:     user.Username,
 		AccountId:    user.AccountId,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		Email:        user.Email,
 		Action:       constants.USER_REGISTER,
 		Notification: constants.NotificationRegister,
 	})
