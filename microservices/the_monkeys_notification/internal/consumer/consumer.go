@@ -61,6 +61,13 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 				log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 				continue
 			}
+			log.Debugw("Notification consumer: message received",
+				"queue", queueName,
+				"action", user.Action,
+				"username", user.Username,
+				"account_id", user.AccountId,
+				"email", user.Email,
+			)
 			handleUserAction(user, log, frn)
 		}
 
@@ -307,18 +314,13 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		}
 
 	case constants.USER_ACCOUNT_DELETE:
-		log.Debugw("Processing user account deletion", "username", user.Username, "account_id", user.AccountId)
-		// Send farewell notification before deleting from FRN
-		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
-			UserID:   user.Username,
-			InAppTpl: constants.FRNTplAccountDeletedInApp,
-			EmailTpl: constants.FRNTplAccountDeletedEmail,
-			Priority: "high",
-			Category: constants.FRNCategoryAccount,
-			Data:     map[string]interface{}{},
-		}, log); err != nil {
-			log.Warnw("FRN account deleted notification failed (proceeding with delete)", "user", user.Username, "err", err)
-		}
+		log.Debugw("=== NOTIFICATION: USER_ACCOUNT_DELETE received ===",
+			"username", user.Username,
+			"account_id", user.AccountId,
+			"email", user.Email,
+			"blog_ids_count", len(user.BlogIds),
+		)
+
 		// Remove user from FRN via DELETE /users/{external_id}
 		log.Debugw("Deleting user from FRN", "external_id", user.Username)
 		if err := frn.DeleteUser(ctx, user.Username); err != nil {
@@ -326,6 +328,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		} else {
 			log.Debugw("FRN user deleted successfully", "username", user.Username)
 		}
+		log.Debugw("=== NOTIFICATION: USER_ACCOUNT_DELETE complete ===", "username", user.Username)
 
 	case constants.USER_DEACTIVATED:
 		log.Debugw("Processing user deactivation", "username", user.Username)

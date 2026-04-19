@@ -106,6 +106,14 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 				logger.ZapSugar().Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 				continue
 			}
+			log.Debugw("Storage consumer: message received",
+				"queue", queueName,
+				"action", user.Action,
+				"username", user.Username,
+				"account_id", user.AccountId,
+				"blog_id", user.BlogId,
+				"blog_ids_count", len(user.BlogIds),
+			)
 			handleUserAction(user, log, cfg, mc)
 		}
 
@@ -118,40 +126,138 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
 	switch user.Action {
 	case constants.USER_REGISTER:
-		log.Debugf("Creating user folder: %s", user.Username)
+		log.Debugw("=== STORAGE: USER_REGISTER received ===", "username", user.Username)
+
+		log.Debugw("Creating user profile folder (FS)", "username", user.Username)
 		if err := CreateUserFolder(user.Username); err != nil {
-			log.Errorf("Failed to create user folder: %v", err)
+			log.Errorf("Failed to create user folder (FS): %v", err)
+		} else {
+			log.Debugw("Created user profile folder (FS)", "username", user.Username)
 		}
-	case constants.USERNAME_UPDATE:
-		log.Debugf("Updating user folder: %s", user.Username)
-		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
-			log.Errorf("Failed to update user folder (filesystem): %v", err)
-		}
+
+		// Upload default profile photo to MinIO
 		if mc != nil && cfg != nil {
-			if err := UpdateMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username, user.NewUsername); err != nil {
-				log.Errorf("Failed to update MinIO profile folder: %v", err)
+			profilePath := filepath.Join(constant.ProfileDir, user.Username, "profile.png")
+			objectKey := "profiles/" + user.Username + "/profile.png"
+			log.Debugw("Uploading default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
+			file, err := os.Open(profilePath)
+			if err != nil {
+				log.Errorw("Failed to open profile photo for MinIO upload", "username", user.Username, "err", err)
+			} else {
+				info, _ := file.Stat()
+				_, putErr := mc.PutObject(context.Background(), cfg.Minio.Bucket, objectKey, file, info.Size(), minio.PutObjectOptions{
+					ContentType: "image/png",
+				})
+				file.Close()
+				if putErr != nil {
+					log.Errorw("Failed to upload profile photo to MinIO", "username", user.Username, "err", putErr)
+				} else {
+					log.Debugw("Uploaded default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
+				}
 			}
 		}
-	case constants.USER_ACCOUNT_DELETE:
-		log.Debugf("Deleting user folder: %s", user.Username)
-		if err := DeleteUserFolder(user.Username); err != nil {
-			log.Errorf("Failed to delete user folder: %v", err)
+
+		log.Debugw("=== STORAGE: USER_REGISTER complete ===", "username", user.Username)
+
+	case constants.USERNAME_UPDATE:
+		log.Debugw("=== STORAGE: USERNAME_UPDATE received ===",
+			"old_username", user.Username,
+			"new_username", user.NewUsername,
+		)
+
+		log.Debugw("Renaming user profile folder (FS)", "from", user.Username, "to", user.NewUsername)
+		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
+			log.Errorw("Failed to rename user folder (FS)", "from", user.Username, "to", user.NewUsername, "err", err)
+		} else {
+			log.Debugw("Renamed user profile folder (FS)", "from", user.Username, "to", user.NewUsername)
 		}
+
 		if mc != nil && cfg != nil {
+			log.Debugw("Renaming user profile folder (MinIO)",
+				"from_prefix", "profiles/"+user.Username+"/",
+				"to_prefix", "profiles/"+user.NewUsername+"/",
+			)
+			if err := UpdateMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username, user.NewUsername); err != nil {
+				log.Errorw("Failed to rename MinIO profile folder", "from", user.Username, "to", user.NewUsername, "err", err)
+			} else {
+				log.Debugw("Renamed user profile folder (MinIO)", "from", user.Username, "to", user.NewUsername)
+			}
+		}
+
+		log.Debugw("=== STORAGE: USERNAME_UPDATE complete ===", "old_username", user.Username, "new_username", user.NewUsername)
+
+	case constants.USER_ACCOUNT_DELETE:
+		log.Debugw("=== STORAGE: USER_ACCOUNT_DELETE received ===",
+			"username", user.Username,
+			"account_id", user.AccountId,
+			"blog_ids_count", len(user.BlogIds),
+			"blog_ids", user.BlogIds,
+		)
+
+		// 1. Delete profile folder from filesystem
+		log.Debugw("Deleting user profile folder (FS)", "username", user.Username)
+		if err := DeleteUserFolder(user.Username); err != nil {
+			log.Errorf("Failed to delete user folder (FS): %v", err)
+		} else {
+			log.Debugw("Deleted user profile folder (FS)", "username", user.Username)
+		}
+
+		// 2. Delete profile folder from MinIO
+		if mc != nil && cfg != nil {
+			log.Debugw("Deleting user profile folder (MinIO)", "username", user.Username, "prefix", "profiles/"+user.Username+"/")
 			if err := DeleteMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username); err != nil {
 				log.Errorf("Failed to delete MinIO profile folder: %v", err)
+			} else {
+				log.Debugw("Deleted user profile folder (MinIO)", "username", user.Username)
 			}
 		}
+
+		// 3. Delete blog files for each owned blog from FS + MinIO
+		for i, blogId := range user.BlogIds {
+			log.Debugw("Deleting blog files", "blog_index", i+1, "total", len(user.BlogIds), "blog_id", blogId)
+
+			// FS: blogs/{blogId}/
+			if err := DeleteBlogFolder(blogId); err != nil {
+				log.Errorw("Failed to delete blog folder (FS)", "blog_id", blogId, "err", err)
+			} else {
+				log.Debugw("Deleted blog folder (FS)", "blog_id", blogId)
+			}
+
+			// MinIO: posts/{blogId}/
+			if mc != nil && cfg != nil {
+				if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, blogId); err != nil {
+					log.Errorw("Failed to delete blog folder (MinIO)", "blog_id", blogId, "err", err)
+				} else {
+					log.Debugw("Deleted blog folder (MinIO)", "blog_id", blogId, "prefix", "posts/"+blogId+"/")
+				}
+			}
+		}
+
+		log.Debugw("=== STORAGE: USER_ACCOUNT_DELETE complete ===",
+			"username", user.Username,
+			"profile_deleted", true,
+			"blogs_processed", len(user.BlogIds),
+		)
 	case constants.BLOG_DELETE:
-		log.Debugf("Deleting blog folder: %s", user.BlogId)
+		log.Debugw("=== STORAGE: BLOG_DELETE received ===", "blog_id", user.BlogId)
+
+		log.Debugw("Deleting blog folder (FS)", "blog_id", user.BlogId)
 		if err := DeleteBlogFolder(user.BlogId); err != nil {
-			log.Errorf("Failed to delete user folder: %v", err)
+			log.Errorw("Failed to delete blog folder (FS)", "blog_id", user.BlogId, "err", err)
+		} else {
+			log.Debugw("Deleted blog folder (FS)", "blog_id", user.BlogId)
 		}
+
 		if mc != nil && cfg != nil {
+			log.Debugw("Deleting blog folder (MinIO)", "blog_id", user.BlogId, "prefix", "posts/"+user.BlogId+"/")
 			if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, user.BlogId); err != nil {
-				log.Errorf("Failed to delete MinIO blog folder: %v", err)
+				log.Errorw("Failed to delete MinIO blog folder", "blog_id", user.BlogId, "err", err)
+			} else {
+				log.Debugw("Deleted blog folder (MinIO)", "blog_id", user.BlogId)
 			}
 		}
+
+		log.Debugw("=== STORAGE: BLOG_DELETE complete ===", "blog_id", user.BlogId)
 	default:
 		log.Errorf("Unknown action: %s", user.Action)
 	}
