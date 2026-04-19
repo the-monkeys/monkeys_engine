@@ -270,11 +270,10 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		} else {
 			log.Debugw("FRN user email updated successfully", "username", user.Username, "new_email", user.Email)
 		}
-		// Notify user about the email change
+		// Notify user about the email change (in-app only — SMTP emails already sent by authz service)
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplEmailChangedInApp,
-			EmailTpl: constants.FRNTplEmailChangedEmail,
 			Priority: "high",
 			Category: constants.FRNCategorySecurity,
 			Data: map[string]interface{}{

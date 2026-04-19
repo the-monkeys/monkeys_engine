@@ -128,8 +128,9 @@ func ResetPasswordTemplate(firstName, lastName, secret string, username string) 
 
         <p>
             Once your password is reset, you can dive in and start using <span style="font-weight: bold">The
-                Monkeys</span> again. If you have any trouble verifying your email, please feel free to contact our
-            support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy to help.
+                Monkeys</span> again. If you have any trouble, visit our
+            <a href="` + Address + `/contact-us" target="_blank" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or
+            email us at <b><a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a></b>. We're happy to help.
         </p>
 
         <p>We always welcome to the community,</p>
@@ -318,8 +319,9 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 			<p>
 				Once you verify your email, you'll be ready to dive in and start
 				using <span style="font-weight: bold">The Monkeys</span>. If you
-				have any trouble verifying your email, please feel free to
-				contact our support team at <b>monkeys.admin@monkeys.com.co</b>. We're happy
+				have any trouble verifying your email, visit our
+				<a href="` + Address + `/contact-us" target="_blank" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or
+				email us at <b><a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a></b>. We're happy
 				to help.
 			</p>
 
@@ -423,7 +425,7 @@ func RegistrationOTPEmailHTML(firstName, lastName, otpCode string) string {
                     </tr>
                     <tr>
                         <td style="padding-bottom:24px;">
-                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Enter this code to complete your registration:</p>
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `, enter this code to complete your <strong>account registration</strong> on The Monkeys:</p>
                         </td>
                     </tr>
                     <tr>
@@ -438,8 +440,13 @@ func RegistrationOTPEmailHTML(firstName, lastName, otpCode string) string {
                         </td>
                     </tr>
                     <tr>
-                        <td>
-                            <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+                        <td style="padding-bottom:16px;">
+                            <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't create an account, ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top:16px; border-top:1px solid #e4e4e7;">
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#a1a1aa;">Need help? Visit our <a href="` + Address + `/contact-us" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or email us at <a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a>.</p>
                         </td>
                     </tr>
                 </table>
@@ -471,7 +478,7 @@ func PasswordResetOTPEmailHTML(firstName, lastName, otpCode string) string {
                     </tr>
                     <tr>
                         <td style="padding-bottom:24px;">
-                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Enter this code to reset your password:</p>
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `, you requested a <strong>password reset</strong> for your The Monkeys account. Enter this code to proceed:</p>
                         </td>
                     </tr>
                     <tr>
@@ -486,8 +493,13 @@ func PasswordResetOTPEmailHTML(firstName, lastName, otpCode string) string {
                         </td>
                     </tr>
                     <tr>
-                        <td>
+                        <td style="padding-bottom:16px;">
                             <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't request a password reset, ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top:16px; border-top:1px solid #e4e4e7;">
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#a1a1aa;">Need help? Visit our <a href="` + Address + `/contact-us" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or email us at <a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a>.</p>
                         </td>
                     </tr>
                 </table>
@@ -520,7 +532,7 @@ func EmailChangeOTPEmailHTML(firstName, lastName, otpCode string) string {
                     </tr>
                     <tr>
                         <td style="padding-bottom:24px;">
-                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `, enter this code to confirm your new email address on The Monkeys:</p>
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `, you requested an <strong>email address change</strong> on your The Monkeys account. Enter this code to confirm your new email:</p>
                         </td>
                     </tr>
                     <tr>
@@ -535,8 +547,116 @@ func EmailChangeOTPEmailHTML(firstName, lastName, otpCode string) string {
                         </td>
                     </tr>
                     <tr>
-                        <td>
+                        <td style="padding-bottom:16px;">
                             <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't request an email change, ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top:16px; border-top:1px solid #e4e4e7;">
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#a1a1aa;">Need help? Visit our <a href="` + Address + `/contact-us" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or email us at <a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a>.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`
+}
+
+// EmailChangedNotifyOldEmailHTML returns an HTML email sent to the OLD email address
+// alerting the user that their account email was just changed. Defense-in-depth measure:
+// if the account was compromised, the real owner gets immediate visibility.
+func EmailChangedNotifyOldEmailHTML(firstName, lastName, newEmail string) string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Changed - The Monkeys</title>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; width:100%;">
+                    <tr>
+                        <td style="padding-bottom:32px;">
+                            <h2 style="margin:0; font-size:22px; font-weight:700; color:#18181b;">Your email address was changed</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `,</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">The email address associated with your <strong>The Monkeys</strong> account has been changed to:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" style="background-color:#f4f4f5; border-radius:8px; padding:16px 0;">
+                                        <span style="font-size:18px; font-weight:600; color:#18181b;">` + newEmail + `</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:16px;">
+                            <p style="margin:0; font-size:14px; line-height:1.5; color:#dc2626; font-weight:600;">If you did not make this change, your account may be compromised.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top:16px; border-top:1px solid #e4e4e7;">
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#a1a1aa;">Please contact us immediately via our <a href="` + Address + `/contact-us" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or email <a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a> to secure your account.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`
+}
+
+// EmailChangedConfirmNewEmailHTML returns an HTML email sent to the NEW email address
+// confirming that this address is now linked to the user's account.
+func EmailChangedConfirmNewEmailHTML(firstName, lastName string) string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Confirmed - The Monkeys</title>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; width:100%;">
+                    <tr>
+                        <td style="padding-bottom:32px;">
+                            <h2 style="margin:0; font-size:22px; font-weight:700; color:#18181b;">Email address confirmed</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Hi ` + firstName + ` ` + lastName + `,</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">This email address is now linked to your <strong>The Monkeys</strong> account. You will receive all future communications here.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top:16px; border-top:1px solid #e4e4e7;">
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#a1a1aa;">If you did not make this change, visit our <a href="` + Address + `/contact-us" style="color:#ff462e; text-decoration:underline;">Contact Us</a> page or email <a href="mailto:monkeys.admin@monkeys.com.co" style="color:#ff462e; text-decoration:underline;">monkeys.admin@monkeys.com.co</a>.</p>
                         </td>
                     </tr>
                 </table>

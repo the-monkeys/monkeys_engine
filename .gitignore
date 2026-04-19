@@ -48,6 +48,12 @@ bc
 es.json
 es.prod.json
 
+# Restore/utility scripts
+restore-postgres.ps1
+restore-postgres.sh
+restore-snapshots.ps1
+restore-snapshots.sh
+
 # Environment files - NEVER COMMIT THESE!
 .env
 .env.local
@@ -64,3 +70,4 @@ monkeys-seo-cred.json
 monkeys-cred.json
 err.log
 the_monkeys/*
+test/*

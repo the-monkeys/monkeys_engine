@@ -159,6 +159,22 @@ func (as *AuthzSvc) VerifyEmailChangeOTP(ctx context.Context, req *pb.VerifyEmai
 	user.IpAddress, user.Client = utils.IpClientConvert(clientInfo.IPAddress, clientInfo.Client)
 	as.trackAuthActivity(user, "verify_email_change", req)
 
+	// Send notification emails to BOTH old and new addresses.
+	// Old email: alert that the address was changed (compromised-account visibility).
+	// New email: confirm it is now linked to the account.
+	go func() {
+		oldBody := utils.EmailChangedNotifyOldEmailHTML(user.FirstName, user.LastName, req.NewEmail)
+		if err := as.SendMail(data.OldEmail, oldBody); err != nil {
+			as.logger.Errorf("failed to send email-changed alert to old address %s: %v", data.OldEmail, err)
+		}
+	}()
+	go func() {
+		newBody := utils.EmailChangedConfirmNewEmailHTML(user.FirstName, user.LastName)
+		if err := as.SendMail(req.NewEmail, newBody); err != nil {
+			as.logger.Errorf("failed to send email-changed confirmation to new address %s: %v", req.NewEmail, err)
+		}
+	}()
+
 	// Publish email changed notification
 	user.Email = req.NewEmail
 	notifMsg, err := json.Marshal(models.TheMonkeysMessage{

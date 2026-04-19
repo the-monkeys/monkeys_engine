@@ -156,10 +156,9 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config, log *zap.Sugared
 
 	routes.POST("/req-email-verification", asc.ReqEmailVerification)
 	routes.PUT("/settings/username/:username", asc.UpdateUserName)
-	routes.PUT("/settings/email/:username", asc.UpdateEmailAddress)
 	routes.PUT("/settings/password/:username", asc.ChangePasswordWithCurrentPassword)
 
-	// OTP-based email change flow (authenticated)
+	// OTP-based email change flow (authenticated) — replaces the old PUT /settings/email/:username
 	routes.POST("/settings/email/initiate/:username", asc.InitiateEmailChange)
 	routes.POST("/settings/email/verify-otp/:username", asc.VerifyEmailChangeOTP)
 	routes.POST("/settings/email/resend-otp/:username", asc.ResendEmailChangeOTP)
@@ -826,7 +825,7 @@ func (asc *ServiceClient) UpdateEmailAddress(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "user not found"})
 			return
 		} else if status.Code(err) == codes.AlreadyExists {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "the email is already in use"})
+			ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"message": "the email is already in use"})
 			return
 		} else {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "couldn't update email"})
