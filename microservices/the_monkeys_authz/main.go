@@ -43,6 +43,11 @@ func main() {
 		log.Fatalw("cannot connect to db", "error", err)
 	}
 
+	otpRepo, err := db.NewOTPRepository(cfg, log)
+	if err != nil {
+		log.Fatalw("cannot connect to Redis for OTP storage", "error", err)
+	}
+
 	jwt := utils.JwtWrapper{
 		SecretKey:       cfg.JWT.SecretKey,
 		Issuer:          "tm-authz",
@@ -59,7 +64,7 @@ func main() {
 
 	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
 
-	authServer := services.NewAuthzSvc(dbHandler, jwt, cfg, qConn, log)
+	authServer := services.NewAuthzSvc(dbHandler, otpRepo, jwt, cfg, qConn, log)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterAuthServiceServer(grpcServer, authServer)

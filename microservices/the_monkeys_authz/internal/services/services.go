@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,21 +26,23 @@ import (
 )
 
 type AuthzSvc struct {
-	dbConn db.AuthDBHandler
-	jwt    utils.JwtWrapper
-	config *config.Config
-	logger *zap.SugaredLogger
-	qConn  *rabbitmq.ConnManager
+	dbConn  db.AuthDBHandler
+	otpRepo *db.OTPRepository
+	jwt     utils.JwtWrapper
+	config  *config.Config
+	logger  *zap.SugaredLogger
+	qConn   *rabbitmq.ConnManager
 	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthzSvc(dbCli db.AuthDBHandler, jwt utils.JwtWrapper, config *config.Config, qConn *rabbitmq.ConnManager, logger *zap.SugaredLogger) *AuthzSvc {
+func NewAuthzSvc(dbCli db.AuthDBHandler, otpRepo *db.OTPRepository, jwt utils.JwtWrapper, config *config.Config, qConn *rabbitmq.ConnManager, logger *zap.SugaredLogger) *AuthzSvc {
 	return &AuthzSvc{
-		dbConn: dbCli,
-		jwt:    jwt,
-		config: config,
-		logger: logger,
-		qConn:  qConn,
+		dbConn:  dbCli,
+		otpRepo: otpRepo,
+		jwt:     jwt,
+		config:  config,
+		logger:  logger,
+		qConn:   qConn,
 	}
 }
 
@@ -517,8 +518,8 @@ func (as *AuthzSvc) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.
 		return nil, status.Errorf(codes.NotFound, "email does not exist")
 	}
 
-	if claims.TokenType != "" && claims.TokenType != "access" {
-		as.logger.Errorf("invalid token type: expected access, got %s", claims.TokenType)
+	if claims.TokenType != "" && claims.TokenType != "access" && claims.TokenType != "password_reset" {
+		as.logger.Errorf("invalid token type: expected access or password_reset, got %s", claims.TokenType)
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token type")
 	}
 
@@ -696,30 +697,39 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 	if err != nil {
 		as.logger.Errorf("Error checking if username exists in the database: %v", err)
 		if err == sql.ErrNoRows {
-			return nil, status.Errorf(codes.NotFound, "If the account is registered with this email, you’ll receive an email verification link to reset your password.")
+			// Don't reveal whether user exists - always return success message
+			return &pb.ForgotPasswordRes{
+				StatusCode: 200,
+				Message:    "If the account is registered with this email, you will receive a verification code.",
+			}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Something went wrong while getting user")
 	}
 
-	var alphaNumRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_")
-	randomHash := make([]rune, 64)
-	for i := 0; i < 64; i++ {
-		// Intn() returns, as an int, a non-negative pseudo-random number in [0,n).
-		randomHash[i] = alphaNumRunes[rand.Intn(len(alphaNumRunes)-1)]
+	// Generate 6-digit OTP (crypto/rand, secure)
+	otpCode, err := utils.GenerateOTP(6)
+	if err != nil {
+		as.logger.Errorf("failed to generate reset OTP for %s: %v", req.Email, err)
+		return nil, status.Errorf(codes.Internal, "Something went wrong")
 	}
 
-	emailVerifyHash := utils.HashPassword(string(randomHash))
-
-	if err = as.dbConn.UpdatePasswordRecoveryToken(emailVerifyHash, user); err != nil {
-		as.logger.Errorf("Error occurred while updating email verification token for %s, error: %v", req.Email, err)
-		return nil, status.Errorf(codes.Internal, "Something went wrong while updating verification token")
+	// Store OTP hash in Redis with 10-min TTL
+	resetData := &db.ResetOTPData{
+		Email:    req.Email,
+		OTPHash:  utils.HashPassword(otpCode),
+		Attempts: 0,
+		CreateAt: time.Now(),
+	}
+	if err := as.otpRepo.StoreResetOTP(ctx, resetData); err != nil {
+		as.logger.Errorf("failed to store reset OTP for %s: %v", req.Email, err)
+		return nil, status.Errorf(codes.Internal, "Something went wrong")
 	}
 
-	emailBody := utils.ResetPasswordTemplate(user.FirstName, user.LastName, string(randomHash), user.Username)
+	// Send OTP email
+	emailBody := utils.PasswordResetOTPEmailHTML(user.FirstName, user.LastName, otpCode)
 	go func() {
-		err := as.SendMail(req.Email, emailBody)
-		if err != nil {
-			as.logger.Errorf("Failed to send mail for password recovery: %v", err)
+		if err := as.SendMail(req.Email, emailBody); err != nil {
+			as.logger.Errorf("Failed to send OTP mail for password recovery: %v", err)
 		}
 	}()
 
@@ -749,7 +759,7 @@ func (as *AuthzSvc) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRe
 
 	return &pb.ForgotPasswordRes{
 		StatusCode: 200,
-		Message:    "Verification link has been sent to the email!",
+		Message:    "If the account is registered with this email, you will receive a verification code.",
 	}, nil
 }
 

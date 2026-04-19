@@ -248,18 +248,18 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 
 	case constants.PASSWORD_RESET_REQUESTED:
 		log.Debugf("Received password reset requested: %s", user.Username)
-		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
-			UserID:   user.Username,
-			InAppTpl: constants.FRNTplPasswordResetReqInApp,
-			EmailTpl: constants.FRNTplPasswordResetReqEmail,
-			Priority: "high",
-			Category: constants.FRNCategorySecurity,
-			Data: map[string]interface{}{
-				"ip_address": user.IpAddress,
-			},
-		}, log); err != nil {
-			log.Errorw("FRN password reset requested notification failed", "user", user.Username, "err", err)
-		}
+		// if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
+		// 	UserID:   user.Username,
+		// 	InAppTpl: constants.FRNTplPasswordResetReqInApp,
+		// 	EmailTpl: constants.FRNTplPasswordResetReqEmail,
+		// 	Priority: "high",
+		// 	Category: constants.FRNCategorySecurity,
+		// 	Data: map[string]interface{}{
+		// 		"ip_address": user.IpAddress,
+		// 	},
+		// }, log); err != nil {
+		// 	log.Errorw("FRN password reset requested notification failed", "user", user.Username, "err", err)
+		// }
 
 	case constants.EMAIL_CHANGED:
 		log.Debugw("Processing email change", "username", user.Username, "new_email", user.Email)
