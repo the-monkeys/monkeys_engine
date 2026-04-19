@@ -34,6 +34,10 @@ const (
 	AuthService_GoogleLogin_FullMethodName                 = "/auth_svc.AuthService/GoogleLogin"
 	AuthService_DecodeSignedJWT_FullMethodName             = "/auth_svc.AuthService/DecodeSignedJWT"
 	AuthService_RefreshToken_FullMethodName                = "/auth_svc.AuthService/RefreshToken"
+	AuthService_InitiateRegistration_FullMethodName        = "/auth_svc.AuthService/InitiateRegistration"
+	AuthService_VerifyRegistrationOTP_FullMethodName       = "/auth_svc.AuthService/VerifyRegistrationOTP"
+	AuthService_ResendRegistrationOTP_FullMethodName       = "/auth_svc.AuthService/ResendRegistrationOTP"
+	AuthService_VerifyResetOTP_FullMethodName              = "/auth_svc.AuthService/VerifyResetOTP"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -55,6 +59,12 @@ type AuthServiceClient interface {
 	GoogleLogin(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
 	DecodeSignedJWT(ctx context.Context, in *DecodeSignedJWTRequest, opts ...grpc.CallOption) (*DecodeSignedJWTResponse, error)
 	RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenRes, error)
+	// OTP-based registration (two-step)
+	InitiateRegistration(ctx context.Context, in *InitiateRegistrationReq, opts ...grpc.CallOption) (*InitiateRegistrationRes, error)
+	VerifyRegistrationOTP(ctx context.Context, in *VerifyRegistrationOTPReq, opts ...grpc.CallOption) (*VerifyRegistrationOTPRes, error)
+	ResendRegistrationOTP(ctx context.Context, in *ResendRegistrationOTPReq, opts ...grpc.CallOption) (*ResendRegistrationOTPRes, error)
+	// OTP-based password reset
+	VerifyResetOTP(ctx context.Context, in *VerifyResetOTPReq, opts ...grpc.CallOption) (*VerifyResetOTPRes, error)
 }
 
 type authServiceClient struct {
@@ -215,6 +225,46 @@ func (c *authServiceClient) RefreshToken(ctx context.Context, in *RefreshTokenRe
 	return out, nil
 }
 
+func (c *authServiceClient) InitiateRegistration(ctx context.Context, in *InitiateRegistrationReq, opts ...grpc.CallOption) (*InitiateRegistrationRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateRegistrationRes)
+	err := c.cc.Invoke(ctx, AuthService_InitiateRegistration_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) VerifyRegistrationOTP(ctx context.Context, in *VerifyRegistrationOTPReq, opts ...grpc.CallOption) (*VerifyRegistrationOTPRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyRegistrationOTPRes)
+	err := c.cc.Invoke(ctx, AuthService_VerifyRegistrationOTP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ResendRegistrationOTP(ctx context.Context, in *ResendRegistrationOTPReq, opts ...grpc.CallOption) (*ResendRegistrationOTPRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResendRegistrationOTPRes)
+	err := c.cc.Invoke(ctx, AuthService_ResendRegistrationOTP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) VerifyResetOTP(ctx context.Context, in *VerifyResetOTPReq, opts ...grpc.CallOption) (*VerifyResetOTPRes, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyResetOTPRes)
+	err := c.cc.Invoke(ctx, AuthService_VerifyResetOTP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -234,6 +284,12 @@ type AuthServiceServer interface {
 	GoogleLogin(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
 	DecodeSignedJWT(context.Context, *DecodeSignedJWTRequest) (*DecodeSignedJWTResponse, error)
 	RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error)
+	// OTP-based registration (two-step)
+	InitiateRegistration(context.Context, *InitiateRegistrationReq) (*InitiateRegistrationRes, error)
+	VerifyRegistrationOTP(context.Context, *VerifyRegistrationOTPReq) (*VerifyRegistrationOTPRes, error)
+	ResendRegistrationOTP(context.Context, *ResendRegistrationOTPReq) (*ResendRegistrationOTPRes, error)
+	// OTP-based password reset
+	VerifyResetOTP(context.Context, *VerifyResetOTPReq) (*VerifyResetOTPRes, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -288,6 +344,18 @@ func (UnimplementedAuthServiceServer) DecodeSignedJWT(context.Context, *DecodeSi
 }
 func (UnimplementedAuthServiceServer) RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenRes, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshToken not implemented")
+}
+func (UnimplementedAuthServiceServer) InitiateRegistration(context.Context, *InitiateRegistrationReq) (*InitiateRegistrationRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateRegistration not implemented")
+}
+func (UnimplementedAuthServiceServer) VerifyRegistrationOTP(context.Context, *VerifyRegistrationOTPReq) (*VerifyRegistrationOTPRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyRegistrationOTP not implemented")
+}
+func (UnimplementedAuthServiceServer) ResendRegistrationOTP(context.Context, *ResendRegistrationOTPReq) (*ResendRegistrationOTPRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResendRegistrationOTP not implemented")
+}
+func (UnimplementedAuthServiceServer) VerifyResetOTP(context.Context, *VerifyResetOTPReq) (*VerifyResetOTPRes, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyResetOTP not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -580,6 +648,78 @@ func _AuthService_RefreshToken_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_InitiateRegistration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateRegistrationReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).InitiateRegistration(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_InitiateRegistration_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).InitiateRegistration(ctx, req.(*InitiateRegistrationReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_VerifyRegistrationOTP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyRegistrationOTPReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).VerifyRegistrationOTP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_VerifyRegistrationOTP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).VerifyRegistrationOTP(ctx, req.(*VerifyRegistrationOTPReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ResendRegistrationOTP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResendRegistrationOTPReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ResendRegistrationOTP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ResendRegistrationOTP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ResendRegistrationOTP(ctx, req.(*ResendRegistrationOTPReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_VerifyResetOTP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyResetOTPReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).VerifyResetOTP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_VerifyResetOTP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).VerifyResetOTP(ctx, req.(*VerifyResetOTPReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -646,6 +786,22 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshToken",
 			Handler:    _AuthService_RefreshToken_Handler,
+		},
+		{
+			MethodName: "InitiateRegistration",
+			Handler:    _AuthService_InitiateRegistration_Handler,
+		},
+		{
+			MethodName: "VerifyRegistrationOTP",
+			Handler:    _AuthService_VerifyRegistrationOTP_Handler,
+		},
+		{
+			MethodName: "ResendRegistrationOTP",
+			Handler:    _AuthService_ResendRegistrationOTP_Handler,
+		},
+		{
+			MethodName: "VerifyResetOTP",
+			Handler:    _AuthService_VerifyResetOTP_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

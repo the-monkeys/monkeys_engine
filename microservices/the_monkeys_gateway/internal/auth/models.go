@@ -49,3 +49,25 @@ type GoogleUser struct {
 	Picture       string `json:"picture"`
 	VerifiedEmail bool   `json:"verified_email"`
 }
+
+// OTP-based registration flow
+type InitiateRegistrationBody struct {
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email" binding:"required,email"`
+	Password  string `json:"password" binding:"required,min=8"`
+}
+
+type VerifyRegistrationOTPBody struct {
+	Email   string `json:"email" binding:"required,email"`
+	OTPCode string `json:"otp_code" binding:"required,len=6"`
+}
+
+type ResendOTPBody struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyResetOTPBody struct {
+	Email   string `json:"email" binding:"required,email"`
+	OTPCode string `json:"otp_code" binding:"required,len=6"`
+}
