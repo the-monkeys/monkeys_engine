@@ -158,6 +158,17 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config, log *zap.Sugared
 	routes.PUT("/settings/username/:username", asc.UpdateUserName)
 	routes.PUT("/settings/email/:username", asc.UpdateEmailAddress)
 	routes.PUT("/settings/password/:username", asc.ChangePasswordWithCurrentPassword)
+
+	// OTP-based email change flow (authenticated)
+	routes.POST("/settings/email/initiate/:username", asc.InitiateEmailChange)
+	routes.POST("/settings/email/verify-otp/:username", asc.VerifyEmailChangeOTP)
+	routes.POST("/settings/email/resend-otp/:username", asc.ResendEmailChangeOTP)
+
+	// User verification checkmark (authenticated)
+	routes.POST("/verification/request", asc.RequestUserVerification)
+	routes.GET("/verification/status/:username", asc.GetUserVerificationStatus)
+	routes.POST("/verification/review", asc.ReviewUserVerification) // Admin-only: review verification requests
+
 	// Roles for blog
 	routes.GET("/roles", asc.GetRoles)
 	routes.GET("/role/:id", asc.GetRoles)
@@ -922,4 +933,186 @@ func (asc *ServiceClient) ValidateSession(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, resp)
+}
+
+// --- OTP-based email change handlers ---
+
+func (asc *ServiceClient) InitiateEmailChange(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	var body InitiateEmailChangeBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.InitiateEmailChange(context.Background(), &pb.InitiateEmailChangeReq{
+		Username:   username,
+		NewEmail:   body.NewEmail,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message":    res.Message,
+		"expires_in": res.ExpiresIn,
+	})
+}
+
+func (asc *ServiceClient) VerifyEmailChangeOTP(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	var body VerifyEmailChangeOTPBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.VerifyEmailChangeOTP(context.Background(), &pb.VerifyEmailChangeOTPReq{
+		Username:   username,
+		NewEmail:   body.NewEmail,
+		OtpCode:    body.OTPCode,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
+
+	response, _ := json.Marshal(&res)
+	var responseMap map[string]interface{}
+	_ = json.Unmarshal(response, &responseMap)
+	delete(responseMap, "token")
+
+	ctx.JSON(int(res.StatusCode), responseMap)
+}
+
+func (asc *ServiceClient) ResendEmailChangeOTP(ctx *gin.Context) {
+	username := ctx.Param("username")
+
+	if username != ctx.GetString("userName") {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "you aren't authorized to perform this action"})
+		return
+	}
+
+	var body ResendEmailChangeOTPBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.ResendEmailChangeOTP(context.Background(), &pb.ResendEmailChangeOTPReq{
+		Username:   username,
+		NewEmail:   body.NewEmail,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message":    res.Message,
+		"expires_in": res.ExpiresIn,
+	})
+}
+
+// --- User verification checkmark handlers ---
+
+func (asc *ServiceClient) RequestUserVerification(ctx *gin.Context) {
+	username := ctx.GetString("userName")
+	if username == "" {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var body RequestUserVerificationBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.RequestUserVerification(context.Background(), &pb.RequestUserVerificationReq{
+		Username:         username,
+		VerificationType: body.VerificationType,
+		ProofUrls:        body.ProofURLs,
+		AdditionalInfo:   body.AdditionalInfo,
+		ClientInfo:       asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message":    res.Message,
+		"request_id": res.RequestId,
+	})
+}
+
+func (asc *ServiceClient) GetUserVerificationStatus(ctx *gin.Context) {
+	username := ctx.Param("username")
+	if username == "" {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "username is required"})
+		return
+	}
+
+	res, err := asc.Client.GetUserVerificationStatus(context.Background(), &pb.GetUserVerificationStatusReq{
+		Username: username,
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"is_verified":         res.IsVerified,
+		"verification_status": res.VerificationStatus,
+		"verified_at":         res.VerifiedAt,
+	})
+}
+
+func (asc *ServiceClient) ReviewUserVerification(ctx *gin.Context) {
+	reviewerUsername := ctx.GetString("userName")
+	if reviewerUsername == "" {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var body ReviewUserVerificationBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.ReviewUserVerification(context.Background(), &pb.ReviewUserVerificationReq{
+		RequestId:        body.RequestID,
+		ReviewerUsername: reviewerUsername,
+		Approved:         body.Approved,
+		RejectionReason:  body.RejectionReason,
+		ClientInfo:       asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message": res.Message,
+	})
 }

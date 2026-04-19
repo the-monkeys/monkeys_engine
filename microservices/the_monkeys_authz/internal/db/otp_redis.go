@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	otpRegisterPrefix = "tm:otp:register:" // Key: "tm:otp:register:<email>"
-	otpResetPrefix    = "tm:otp:reset:"    // Key: "tm:otp:reset:<email>"
-	otpTTL            = 10 * time.Minute
-	maxOTPAttempts    = 5
+	otpRegisterPrefix    = "tm:otp:register:"     // Key: "tm:otp:register:<email>"
+	otpResetPrefix       = "tm:otp:reset:"        // Key: "tm:otp:reset:<email>"
+	otpEmailChangePrefix = "tm:otp:email-change:" // Key: "tm:otp:email-change:<new_email>"
+	otpTTL               = 10 * time.Minute
+	maxOTPAttempts       = 5
 )
 
 // PendingRegistration is the data stored in Redis while awaiting OTP verification.
@@ -35,6 +36,16 @@ type PendingRegistration struct {
 // ResetOTPData is the data stored in Redis for password reset OTP.
 type ResetOTPData struct {
 	Email    string    `json:"email"`
+	OTPHash  string    `json:"otp_hash"`
+	Attempts int       `json:"attempts"`
+	CreateAt time.Time `json:"created_at"`
+}
+
+// EmailChangeOTPData is the data stored in Redis while awaiting OTP verification for email change.
+type EmailChangeOTPData struct {
+	Username string    `json:"username"`
+	OldEmail string    `json:"old_email"`
+	NewEmail string    `json:"new_email"`
 	OTPHash  string    `json:"otp_hash"`
 	Attempts int       `json:"attempts"`
 	CreateAt time.Time `json:"created_at"`
@@ -197,4 +208,69 @@ func (r *OTPRepository) IncrementResetAttempts(ctx context.Context, email string
 // DeleteResetOTP removes a password reset OTP.
 func (r *OTPRepository) DeleteResetOTP(ctx context.Context, email string) error {
 	return r.client.Del(ctx, r.resetKey(email)).Err()
+}
+
+// --- Email Change OTP ---
+
+func (r *OTPRepository) emailChangeKey(newEmail string) string {
+	return otpEmailChangePrefix + newEmail
+}
+
+// StoreEmailChangeOTP stores an email change OTP with automatic TTL expiry.
+func (r *OTPRepository) StoreEmailChangeOTP(ctx context.Context, data *EmailChangeOTPData) error {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal email change OTP data: %w", err)
+	}
+	return r.client.Set(ctx, r.emailChangeKey(data.NewEmail), b, otpTTL).Err()
+}
+
+// GetEmailChangeOTP retrieves an email change OTP. Returns nil if not found/expired.
+func (r *OTPRepository) GetEmailChangeOTP(ctx context.Context, newEmail string) (*EmailChangeOTPData, error) {
+	b, err := r.client.Get(ctx, r.emailChangeKey(newEmail)).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get email change OTP: %w", err)
+	}
+
+	var data EmailChangeOTPData
+	if err := json.Unmarshal(b, &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal email change OTP: %w", err)
+	}
+	return &data, nil
+}
+
+// IncrementEmailChangeAttempts increments the email change OTP failed attempt counter.
+func (r *OTPRepository) IncrementEmailChangeAttempts(ctx context.Context, newEmail string) (int, error) {
+	data, err := r.GetEmailChangeOTP(ctx, newEmail)
+	if err != nil {
+		return 0, err
+	}
+	if data == nil {
+		return 0, fmt.Errorf("no email change OTP found")
+	}
+
+	data.Attempts++
+	if data.Attempts >= maxOTPAttempts {
+		_ = r.DeleteEmailChangeOTP(ctx, newEmail)
+		return data.Attempts, nil
+	}
+
+	ttl, err := r.client.TTL(ctx, r.emailChangeKey(newEmail)).Result()
+	if err != nil || ttl <= 0 {
+		ttl = otpTTL
+	}
+
+	b, _ := json.Marshal(data)
+	if err := r.client.Set(ctx, r.emailChangeKey(newEmail), b, ttl).Err(); err != nil {
+		return data.Attempts, fmt.Errorf("failed to update email change attempts: %w", err)
+	}
+	return data.Attempts, nil
+}
+
+// DeleteEmailChangeOTP removes an email change OTP.
+func (r *OTPRepository) DeleteEmailChangeOTP(ctx context.Context, newEmail string) error {
+	return r.client.Del(ctx, r.emailChangeKey(newEmail)).Err()
 }
