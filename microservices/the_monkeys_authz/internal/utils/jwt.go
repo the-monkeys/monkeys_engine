@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -105,4 +106,27 @@ func (w *JwtWrapper) ValidateToken(signedToken string) (claims *jwtClaims, err e
 	}
 
 	return claims, nil
+}
+
+// GeneratePasswordResetToken creates a short-lived JWT (5 min) with token_type "password_reset".
+// This token is returned after OTP verification and used to authorize the password update.
+func (w *JwtWrapper) GeneratePasswordResetToken(user *models.TheMonkeysUser) (string, error) {
+	claims := &jwtClaims{
+		AccountId: user.AccountId,
+		Email:     user.Email,
+		Username:  user.Username,
+		TokenType: "password_reset",
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Local().Add(5 * time.Minute).Unix(),
+			Issuer:    w.Issuer,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(w.SecretKey))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign password reset token: %w", err)
+	}
+
+	return signedToken, nil
 }

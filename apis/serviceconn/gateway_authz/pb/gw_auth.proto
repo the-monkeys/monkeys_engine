@@ -333,4 +333,77 @@ service AuthService {
   rpc GoogleLogin(RegisterUserRequest) returns (RegisterUserResponse) {}
   rpc DecodeSignedJWT(DecodeSignedJWTRequest) returns (DecodeSignedJWTResponse) {}
   rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenRes) {}
+
+  // OTP-based registration (two-step)
+  rpc InitiateRegistration(InitiateRegistrationReq) returns (InitiateRegistrationRes) {}
+  rpc VerifyRegistrationOTP(VerifyRegistrationOTPReq) returns (VerifyRegistrationOTPRes) {}
+  rpc ResendRegistrationOTP(ResendRegistrationOTPReq) returns (ResendRegistrationOTPRes) {}
+
+  // OTP-based password reset
+  rpc VerifyResetOTP(VerifyResetOTPReq) returns (VerifyResetOTPRes) {}
+}
+
+// ── OTP Registration Messages ──
+
+message InitiateRegistrationReq {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+  string password = 4;
+  ClientInfo client_info = 5;
+}
+
+message InitiateRegistrationRes {
+  int64 status_code = 1;
+  string message = 2;
+  int32 expires_in = 3;
+  Error error = 4;
+}
+
+message VerifyRegistrationOTPReq {
+  string email = 1;
+  string otp_code = 2;
+  ClientInfo client_info = 3;
+}
+
+// Same shape as RegisterUserResponse for frontend compatibility
+message VerifyRegistrationOTPRes {
+  int64 status_code = 1;
+  string token = 2;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string username = 5;
+  string first_name = 6;
+  string last_name = 7;
+  string email = 8;
+  string email_verification_status = 9;
+  Error error = 10;
+  string account_id = 11;
+  string refresh_token = 12;
+}
+
+message ResendRegistrationOTPReq {
+  string email = 1;
+  ClientInfo client_info = 2;
+}
+
+message ResendRegistrationOTPRes {
+  int64 status_code = 1;
+  string message = 2;
+  int32 expires_in = 3;
+  Error error = 4;
+}
+
+// ── OTP Password Reset Messages ──
+
+message VerifyResetOTPReq {
+  string email = 1;
+  string otp_code = 2;
+  ClientInfo client_info = 3;
+}
+
+message VerifyResetOTPRes {
+  int64 status_code = 1;
+  string token = 2;
+  Error error = 3;
 }

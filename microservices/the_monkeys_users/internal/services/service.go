@@ -14,7 +14,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/utils"
@@ -162,8 +161,6 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-
-	go cache.AddUserLog(us.dbConn, userLog, constants.UpdateProfile, constants.ServiceUser, constants.EventForgotPassword, us.log)
 
 	return &pb.UpdateUserProfileRes{
 		Username: dbUserInfo.Username,
@@ -335,8 +332,6 @@ func (us *UserSvc) FollowTopics(ctx context.Context, req *pb.TopicActionReq) (*p
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.FollowedTopics, req.Topic), constants.ServiceUser, constants.EventFollowTopics, us.log)
-
 	return &pb.TopicActionRes{
 		Status:  http.StatusOK,
 		Message: fmt.Sprintf("user's interest in the topics %v is updated successfully", req.Topic),
@@ -377,8 +372,6 @@ func (us *UserSvc) UnFollowTopics(ctx context.Context, req *pb.TopicActionReq) (
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
 
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnFollowedTopics, req.Topic), constants.ServiceUser, constants.EventUnFollowTopics, us.log)
-
 	return &pb.TopicActionRes{
 		Status:  http.StatusOK,
 		Message: fmt.Sprintf("user's un-followed the topics %v is updated successfully", req.Topic),
@@ -410,8 +403,6 @@ func (us *UserSvc) InviteCoAuthor(ctx context.Context, req *pb.CoAuthorAccessReq
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.InvitedAsACoAuthor, req.Username, req.BlogId), constants.ServiceUser, constants.EventInviteCoAuthor, us.log)
 
 	// Publish notification event for co-author invite
 	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
@@ -463,8 +454,6 @@ func (us *UserSvc) RevokeCoAuthorAccess(ctx context.Context, req *pb.CoAuthorAcc
 	}
 
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RevokedCoAuthorRequest, req.Username, req.BlogId), constants.ServiceUser, constants.EventRemoveCoAuthor, us.log)
 
 	// Publish notification event for co-author removal
 	notifMsg, err := json.Marshal(models.TheMonkeysMessage{
@@ -548,7 +537,6 @@ func (us *UserSvc) CreateNewTopics(ctx context.Context, req *pb.CreateTopicsReq)
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.CreatedTopics, req.Topics), constants.ServiceUser, constants.EventCreateTopics, us.log)
 
 	return &pb.CreateTopicsRes{
 		Status:  http.StatusOK,
@@ -578,7 +566,6 @@ func (us *UserSvc) BookMarkBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.B
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.BookMarkedBlog, req.BlogId), constants.ServiceUser, constants.EventBookMarkBlog, us.log)
 
 	return &pb.BookMarkRes{
 		Status:  http.StatusOK,
@@ -608,7 +595,6 @@ func (us *UserSvc) RemoveBookMark(ctx context.Context, req *pb.BookMarkReq) (*pb
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.RemoveBookMark, req.BlogId), constants.ServiceUser, constants.EventRemoveBookMark, us.log)
 
 	return &pb.BookMarkRes{
 		Status:  http.StatusOK,
@@ -633,7 +619,6 @@ func (us *UserSvc) FollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb.U
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.FollowedUser, req.Username), constants.ServiceUser, constants.EventFollowUser, us.log)
 
 	if req.FollowerUsername != req.Username {
 		// Send a notification to the user
@@ -679,7 +664,6 @@ func (us *UserSvc) UnFollowUser(ctx context.Context, req *pb.UserFollowReq) (*pb
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnFollowUser, req.Username), constants.ServiceUser, constants.EventUnFollowUser, us.log)
 
 	return &pb.UserFollowRes{
 		Status:  http.StatusOK,
@@ -836,7 +820,6 @@ func (us *UserSvc) UnlikeBlog(ctx context.Context, req *pb.BookMarkReq) (*pb.Boo
 		Client:    req.Client,
 	}
 	userLog.IpAddress, userLog.Client = utils.IpClientConvert(req.Ip, req.Client)
-	go cache.AddUserLog(us.dbConn, userLog, fmt.Sprintf(constants.UnlikeBlog, req.BlogId), constants.ServiceUser, constants.EventBlogUnlike, us.log)
 
 	return &pb.BookMarkRes{
 		Status:  http.StatusOK,

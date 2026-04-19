@@ -4,7 +4,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -139,3 +142,43 @@ func IsRestrictedUsername(username string) bool {
 //	// Convert the runes slice back to a string and return
 //	return string(runes)
 //}
+
+// GenerateOTP generates a cryptographically secure numeric OTP of the given length.
+// Uses crypto/rand for security — never math/rand.
+func GenerateOTP(length int) (string, error) {
+	max := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(length)), nil)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate OTP: %w", err)
+	}
+	return fmt.Sprintf("%0*d", length, n), nil
+}
+
+// emailRegex is a compiled RFC 5322 simplified email pattern.
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+// ValidateEmailFormat performs strict email validation:
+// 1. RFC 5322 format check
+// 2. MX record DNS lookup to verify the domain can receive mail
+func ValidateEmailFormat(email string) error {
+	email = strings.TrimSpace(strings.ToLower(email))
+
+	if !emailRegex.MatchString(email) {
+		return fmt.Errorf("invalid email format")
+	}
+
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid email format")
+	}
+
+	domain := parts[1]
+
+	// MX record lookup — rejects domains that cannot receive mail
+	mxRecords, err := net.LookupMX(domain)
+	if err != nil || len(mxRecords) == 0 {
+		return fmt.Errorf("email domain %s cannot receive mail", domain)
+	}
+
+	return nil
+}

@@ -130,6 +130,15 @@ func RegisterAuthRouter(router *gin.Engine, cfg *config.Config, log *zap.Sugared
 
 	routes.POST("/register", asc.Register)
 	routes.POST("/login", asc.Login)
+
+	// OTP-based registration flow
+	routes.POST("/register/initiate", asc.InitiateRegistration)
+	routes.POST("/register/verify-otp", asc.VerifyRegistrationOTP)
+	routes.POST("/register/resend-otp", asc.ResendRegistrationOTP)
+
+	// OTP-based password reset verification
+	routes.POST("/verify-reset-otp", asc.VerifyResetOTP)
+
 	routes.GET("/is-authenticated", asc.IsUserAuthenticated)
 	routes.GET("/logout", asc.Logout)
 
@@ -232,6 +241,132 @@ func (asc *ServiceClient) Register(ctx *gin.Context) {
 	delete(registerRespMap, "refresh_token")
 
 	ctx.JSON(int(res.StatusCode), &registerRespMap)
+}
+
+// InitiateRegistration handles POST /register/initiate — step 1 of OTP registration.
+func (asc *ServiceClient) InitiateRegistration(ctx *gin.Context) {
+	var body InitiateRegistrationBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.InitiateRegistration(context.Background(), &pb.InitiateRegistrationReq{
+		FirstName:  body.FirstName,
+		LastName:   body.LastName,
+		Email:      body.Email,
+		Password:   body.Password,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message":    res.Message,
+		"expires_in": res.ExpiresIn,
+	})
+}
+
+// VerifyRegistrationOTP handles POST /register/verify-otp — step 2, creates the account.
+func (asc *ServiceClient) VerifyRegistrationOTP(ctx *gin.Context) {
+	var body VerifyRegistrationOTPBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.VerifyRegistrationOTP(context.Background(), &pb.VerifyRegistrationOTPReq{
+		Email:      body.Email,
+		OtpCode:    body.OTPCode,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	utils.SetMonkeysAuthCookie(ctx, res.Token)
+	utils.SetMonkeysRefreshCookie(ctx, res.RefreshToken)
+
+	respJson, _ := json.Marshal(res)
+	var respMap map[string]interface{}
+	_ = json.Unmarshal(respJson, &respMap)
+	delete(respMap, "token")
+	delete(respMap, "refresh_token")
+
+	ctx.JSON(int(res.StatusCode), respMap)
+}
+
+// ResendRegistrationOTP handles POST /register/resend-otp.
+func (asc *ServiceClient) ResendRegistrationOTP(ctx *gin.Context) {
+	var body ResendOTPBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.ResendRegistrationOTP(context.Background(), &pb.ResendRegistrationOTPReq{
+		Email:      body.Email,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"message":    res.Message,
+		"expires_in": res.ExpiresIn,
+	})
+}
+
+// VerifyResetOTP handles POST /verify-reset-otp — verifies password reset OTP, returns reset token.
+func (asc *ServiceClient) VerifyResetOTP(ctx *gin.Context) {
+	var body VerifyResetOTPBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "invalid request: " + err.Error()})
+		return
+	}
+
+	res, err := asc.Client.VerifyResetOTP(context.Background(), &pb.VerifyResetOTPReq{
+		Email:      body.Email,
+		OtpCode:    body.OTPCode,
+		ClientInfo: asc.createClientInfo(ctx),
+	})
+	if err != nil {
+		asc.handleGRPCError(ctx, err)
+		return
+	}
+
+	ctx.JSON(int(res.StatusCode), gin.H{
+		"token": res.Token,
+	})
+}
+
+// handleGRPCError translates gRPC status codes to HTTP responses.
+func (asc *ServiceClient) handleGRPCError(ctx *gin.Context, err error) {
+	if st, ok := status.FromError(err); ok {
+		switch st.Code() {
+		case codes.InvalidArgument:
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": st.Message()})
+		case codes.AlreadyExists:
+			ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"message": st.Message()})
+		case codes.NotFound:
+			ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": st.Message()})
+		case codes.DeadlineExceeded:
+			ctx.AbortWithStatusJSON(http.StatusGone, gin.H{"message": st.Message()})
+		case codes.ResourceExhausted:
+			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"message": st.Message()})
+		case codes.Aborted:
+			ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{"message": st.Message()})
+		default:
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		}
+		return
+	}
+	ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 }
 
 func (asc *ServiceClient) Login(ctx *gin.Context) {

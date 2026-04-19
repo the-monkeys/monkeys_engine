@@ -12,7 +12,6 @@ import (
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
-	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/cache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/models"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_users/internal/utils"
@@ -124,7 +123,6 @@ func processMessage(userCon *UserDbConn, log *zap.SugaredLogger, body []byte) er
 			log.Errorf("Error creating blog: %v", err)
 			return fmt.Errorf("AddBlogWithId failed for %s: %w", user.BlogId, err)
 		}
-		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.CreateBlog, user.BlogId), constants.ServiceBlog, constants.EventCreatedBlog, userCon.log)
 
 	case constants.BLOG_UPDATE:
 		usr, err := userCon.dbConn.GetBlogByBlogId(user.BlogId)
@@ -137,7 +135,6 @@ func processMessage(userCon *UserDbConn, log *zap.SugaredLogger, body []byte) er
 				log.Errorf("Can't update blog status to draft: %v", err)
 				return fmt.Errorf("UpdateBlogStatusToDraft failed for %s: %w", user.BlogId, err)
 			}
-			go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.MovedBlogToDraft, user.BlogId), constants.ServiceBlog, constants.EventDraftedBlog, userCon.log)
 		}
 
 	case constants.BLOG_PUBLISH:
@@ -152,14 +149,12 @@ func processMessage(userCon *UserDbConn, log *zap.SugaredLogger, body []byte) er
 				// Non-critical: don't send to DLQ for tag insertion failures
 			}
 		}
-		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.PublishBlog, user.BlogId), constants.ServiceBlog, constants.EventPublishedBlog, userCon.log)
 
 	case constants.BLOG_DELETE:
 		if err := userCon.dbConn.DeleteBlogAndReferences(user.BlogId); err != nil {
 			log.Errorf("Can't delete blog %s from user service: %v", user.BlogId, err)
 			return fmt.Errorf("DeleteBlogAndReferences failed for %s: %w", user.BlogId, err)
 		}
-		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.DeleteBlog, user.BlogId), constants.ServiceBlog, constants.EventDeleteBlog, userCon.log)
 
 	case constants.BLOG_SCHEDULE:
 		log.Infof("User scheduled a blog: blogId=%s, accountId=%s", user.BlogId, user.AccountId)
@@ -172,7 +167,6 @@ func processMessage(userCon *UserDbConn, log *zap.SugaredLogger, body []byte) er
 				log.Errorf("Can't insert topic for schedule: %v", err)
 			}
 		}
-		go cache.AddUserLog(userCon.dbConn, userLog, fmt.Sprintf(constants.ScheduleBlog, user.BlogId), constants.ServiceBlog, constants.EventScheduledBlog, userCon.log)
 
 	default:
 		log.Errorf("Unknown action: %s", user.Action)

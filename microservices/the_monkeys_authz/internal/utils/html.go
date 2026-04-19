@@ -401,3 +401,99 @@ func EmailVerificationHTML(firstName, lastName, username, secret string) string 
 	</body>
 </html>`
 }
+
+// RegistrationOTPEmailHTML returns an HTML email body containing a 6-digit OTP for registration verification.
+func RegistrationOTPEmailHTML(firstName, lastName, otpCode string) string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify Your Email - The Monkeys</title>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; width:100%;">
+                    <tr>
+                        <td style="padding-bottom:32px;">
+                            <h2 style="margin:0; font-size:22px; font-weight:700; color:#18181b;">Verify your email</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Enter this code to complete your registration:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" style="background-color:#f4f4f5; border-radius:8px; padding:24px 0;">
+                                        <span style="font-size:36px; font-weight:700; letter-spacing:8px; color:#18181b; font-family:'Courier New', monospace;">` + otpCode + `</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`
+}
+
+// PasswordResetOTPEmailHTML returns an HTML email body containing a 6-digit OTP for password reset.
+func PasswordResetOTPEmailHTML(firstName, lastName, otpCode string) string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Password Reset - The Monkeys</title>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; width:100%;">
+                    <tr>
+                        <td style="padding-bottom:32px;">
+                            <h2 style="margin:0; font-size:22px; font-weight:700; color:#18181b;">Reset your password</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <p style="margin:0; font-size:16px; line-height:1.5; color:#3f3f46;">Enter this code to reset your password:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding-bottom:24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" style="background-color:#f4f4f5; border-radius:8px; padding:24px 0;">
+                                        <span style="font-size:36px; font-weight:700; letter-spacing:8px; color:#18181b; font-family:'Courier New', monospace;">` + otpCode + `</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p style="margin:0; font-size:14px; line-height:1.5; color:#71717a;">This code expires in 10 minutes. If you didn't request a password reset, ignore this email.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`
+}

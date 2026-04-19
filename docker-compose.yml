@@ -91,6 +91,27 @@ services:
       retries: 5
     restart: always
 
+  the_monkeys_cache:
+    image: redis:7-alpine
+    container_name: the-monkeys-redis
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - monkeys-network
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
   minio:
     image: minio/minio:latest
     container_name: the-monkeys-minio
@@ -244,6 +265,7 @@ services:
       - rabbitmq
       - db-migrations
       - the_monkeys_db
+      - the_monkeys_cache
     ports:
       - "${MICROSERVICES_AUTHZ_PORT}:${MICROSERVICES_AUTHZ_INTERNAL_PORT}"
     restart: unless-stopped
@@ -517,6 +539,7 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
+  redis_data:
   elasticsearch-data1:
     driver: local
   minio_data:
