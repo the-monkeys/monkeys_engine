@@ -314,7 +314,7 @@ func (uh *uDBHandler) DeleteUserProfile(username string) error {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
 			uh.log.Errorf("Failed to rollback transaction for deleting user profile %s, error: %+v", username, err)
 		}
 	}()

@@ -2,6 +2,10 @@ package freerangenotify
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,8 +16,11 @@ import (
 // Client wraps the official FRN Go SDK.
 // Only the notification service uses this — other services publish to RabbitMQ.
 type Client struct {
-	SDK *frn.Client
-	Log *zap.SugaredLogger
+	SDK     *frn.Client
+	Log     *zap.SugaredLogger
+	baseURL string
+	apiKey  string
+	http    *http.Client
 }
 
 func NewClient(baseURL, apiKey string, log *zap.SugaredLogger) *Client {
@@ -22,8 +29,11 @@ func NewClient(baseURL, apiKey string, log *zap.SugaredLogger) *Client {
 		frn.WithTimeout(5*time.Second),
 	)
 	return &Client{
-		SDK: sdk,
-		Log: log,
+		SDK:     sdk,
+		Log:     log,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+		http:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -56,14 +66,65 @@ func (c *Client) Send(ctx context.Context, params frn.NotificationSendParams) er
 	return err
 }
 
-// UpdateUserExternalID updates a user's external_id in FRN.
-// SDK now accepts external_id as the identifier directly.
+// UpdateUserExternalID renames a user's external_id in FRN.
+// FRN's PUT /users/:id with external_id as identifier creates a new empty user
+// instead of updating when the identifier-as-external_id differs from the body.
+// Workaround: resolve internal UUID via GetByExternalID, then PUT by UUID.
+//
+// NOTE: The FRN SDK unmarshals response envelopes {"data":{...},"success":true}
+// directly into the target struct, leaving all fields zero. We use raw HTTP here
+// to correctly unwrap the envelope.
 func (c *Client) UpdateUserExternalID(ctx context.Context, oldExternalID, newExternalID string) error {
 	c.Log.Debugw("FRN UpdateUserExternalID called", "old_external_id", oldExternalID, "new_external_id", newExternalID)
-	_, err := c.SDK.Users.Update(ctx, oldExternalID, frn.UpdateUserParams{
+
+	internalID, err := c.resolveInternalID(ctx, oldExternalID)
+	if err != nil {
+		return fmt.Errorf("resolve user by external_id %q: %w", oldExternalID, err)
+	}
+	if internalID == "" {
+		return fmt.Errorf("user with external_id %q not found in FRN", oldExternalID)
+	}
+
+	if _, err := c.SDK.Users.Update(ctx, internalID, frn.UpdateUserParams{
 		ExternalID: newExternalID,
-	})
-	return err
+	}); err != nil {
+		return fmt.Errorf("update user %s external_id: %w", internalID, err)
+	}
+	return nil
+}
+
+// resolveInternalID fetches a user by external_id and returns their internal UUID.
+// Parses the FRN envelope {"data":{"user_id":"..."},"success":true}.
+func (c *Client) resolveInternalID(ctx context.Context, externalID string) (string, error) {
+	url := c.baseURL + "/users/by-external-id/" + externalID
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("FRN GET user status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	var env struct {
+		Data    frn.User `json:"data"`
+		Success bool     `json:"success"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return "", fmt.Errorf("decode FRN user response: %w", err)
+	}
+	return env.Data.UserID, nil
 }
 
 // UpdateUserEmail updates a user's email in FRN, identified by their username (external_id).

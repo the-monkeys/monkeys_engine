@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -126,51 +127,43 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
 	switch user.Action {
 	case constants.USER_REGISTER:
-		log.Debugw("=== STORAGE: USER_REGISTER received ===", "username", user.Username)
+		log.Debugw("Handling USER_REGISTER", "username", user.Username)
 
-		log.Debugw("Creating user profile folder (FS)", "username", user.Username)
-		if err := CreateUserFolder(user.Username); err != nil {
-			log.Errorf("Failed to create user folder (FS): %v", err)
-		} else {
-			log.Debugw("Created user profile folder (FS)", "username", user.Username)
-		}
-
-		// Upload default profile photo to MinIO
-		if mc != nil && cfg != nil {
-			profilePath := filepath.Join(constant.ProfileDir, user.Username, "profile.png")
-			objectKey := "profiles/" + user.Username + "/profile.png"
-			log.Debugw("Uploading default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
-			file, err := os.Open(profilePath)
+		// Fetch default profile image: try remote URL, fall back to bundled local copy
+		imageBytes, err := readImageFromURL(constant.DefaultProfilePhoto)
+		if err != nil {
+			log.Warnw("Remote profile photo fetch failed, using bundled fallback",
+				"username", user.Username, "remote_err", err)
+			imageBytes, err = os.ReadFile(constant.DefaultProfilePhotoLocal)
 			if err != nil {
-				log.Errorw("Failed to open profile photo for MinIO upload", "username", user.Username, "err", err)
-			} else {
-				info, _ := file.Stat()
-				_, putErr := mc.PutObject(context.Background(), cfg.Minio.Bucket, objectKey, file, info.Size(), minio.PutObjectOptions{
-					ContentType: "image/png",
-				})
-				file.Close()
-				if putErr != nil {
-					log.Errorw("Failed to upload profile photo to MinIO", "username", user.Username, "err", putErr)
-				} else {
-					log.Debugw("Uploaded default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
-				}
+				log.Errorw("Failed to read bundled fallback profile photo",
+					"username", user.Username, "path", constant.DefaultProfilePhotoLocal, "err", err)
+				break
 			}
 		}
 
-		log.Debugw("=== STORAGE: USER_REGISTER complete ===", "username", user.Username)
+		// Upload to MinIO
+		if mc != nil && cfg != nil {
+			objectKey := "profiles/" + user.Username + "/profile.svg"
+			log.Debugw("Uploading default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
+			reader := bytes.NewReader(imageBytes)
+			_, putErr := mc.PutObject(context.Background(), cfg.Minio.Bucket, objectKey, reader, int64(len(imageBytes)), minio.PutObjectOptions{
+				ContentType: "image/svg+xml",
+			})
+			if putErr != nil {
+				log.Errorw("Failed to upload profile photo to MinIO", "username", user.Username, "err", putErr)
+			} else {
+				log.Debugw("Uploaded default profile photo (MinIO)", "username", user.Username, "object_key", objectKey)
+			}
+		}
+
+		log.Debugw("USER_REGISTER done", "username", user.Username)
 
 	case constants.USERNAME_UPDATE:
-		log.Debugw("=== STORAGE: USERNAME_UPDATE received ===",
+		log.Debugw("Handling USERNAME_UPDATE",
 			"old_username", user.Username,
 			"new_username", user.NewUsername,
 		)
-
-		log.Debugw("Renaming user profile folder (FS)", "from", user.Username, "to", user.NewUsername)
-		if err := UpdateUserFolder(user.Username, user.NewUsername); err != nil {
-			log.Errorw("Failed to rename user folder (FS)", "from", user.Username, "to", user.NewUsername, "err", err)
-		} else {
-			log.Debugw("Renamed user profile folder (FS)", "from", user.Username, "to", user.NewUsername)
-		}
 
 		if mc != nil && cfg != nil {
 			log.Debugw("Renaming user profile folder (MinIO)",
@@ -184,35 +177,27 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 			}
 		}
 
-		log.Debugw("=== STORAGE: USERNAME_UPDATE complete ===", "old_username", user.Username, "new_username", user.NewUsername)
+		log.Debugw("USERNAME_UPDATE done", "old_username", user.Username, "new_username", user.NewUsername)
 
 	case constants.USER_ACCOUNT_DELETE:
-		log.Debugw("=== STORAGE: USER_ACCOUNT_DELETE received ===",
+		log.Debugw("Handling USER_ACCOUNT_DELETE",
 			"username", user.Username,
 			"account_id", user.AccountId,
 			"blog_ids_count", len(user.BlogIds),
 			"blog_ids", user.BlogIds,
 		)
 
-		// 1. Delete profile folder from filesystem
-		log.Debugw("Deleting user profile folder (FS)", "username", user.Username)
-		if err := DeleteUserFolder(user.Username); err != nil {
-			log.Errorf("Failed to delete user folder (FS): %v", err)
-		} else {
-			log.Debugw("Deleted user profile folder (FS)", "username", user.Username)
-		}
-
-		// 2. Delete profile folder from MinIO
+		// 1. Delete profile folder from MinIO
 		if mc != nil && cfg != nil {
 			log.Debugw("Deleting user profile folder (MinIO)", "username", user.Username, "prefix", "profiles/"+user.Username+"/")
 			if err := DeleteMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username); err != nil {
-				log.Errorf("Failed to delete MinIO profile folder: %v", err)
+				log.Errorw("Failed to delete MinIO profile folder", "username", user.Username, "err", err)
 			} else {
 				log.Debugw("Deleted user profile folder (MinIO)", "username", user.Username)
 			}
 		}
 
-		// 3. Delete blog files for each owned blog from FS + MinIO
+		// 2. Delete blog files for each owned blog from FS + MinIO
 		for i, blogId := range user.BlogIds {
 			log.Debugw("Deleting blog files", "blog_index", i+1, "total", len(user.BlogIds), "blog_id", blogId)
 
@@ -233,13 +218,12 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 			}
 		}
 
-		log.Debugw("=== STORAGE: USER_ACCOUNT_DELETE complete ===",
+		log.Debugw("USER_ACCOUNT_DELETE done",
 			"username", user.Username,
-			"profile_deleted", true,
 			"blogs_processed", len(user.BlogIds),
 		)
 	case constants.BLOG_DELETE:
-		log.Debugw("=== STORAGE: BLOG_DELETE received ===", "blog_id", user.BlogId)
+		log.Debugw("Handling BLOG_DELETE", "blog_id", user.BlogId)
 
 		log.Debugw("Deleting blog folder (FS)", "blog_id", user.BlogId)
 		if err := DeleteBlogFolder(user.BlogId); err != nil {
@@ -257,30 +241,30 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 			}
 		}
 
-		log.Debugw("=== STORAGE: BLOG_DELETE complete ===", "blog_id", user.BlogId)
+		log.Debugw("BLOG_DELETE done", "blog_id", user.BlogId)
 	default:
-		log.Errorf("Unknown action: %s", user.Action)
+		log.Errorw("Unknown action", "action", user.Action)
 	}
 }
 
-func CreateUserFolder(userName string) error {
-	dirPath, filePath := ConstructPath(constant.ProfileDir, userName, "profile.png")
-	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		logger.ZapSugar().Errorf("Cannot create directory structure for user: %s, error: %v", userName, err)
-		return err
-	}
-	imageByte, err := readImageFromURL(constant.DefaultProfilePhoto)
-	if err != nil {
-		logger.ZapSugar().Errorf("Error fetching image for user: %s, error: %v", userName, err)
-		return fmt.Errorf("error fetching image: %v", err)
-	}
-	if err = os.WriteFile(filePath, imageByte, 0644); err != nil {
-		logger.ZapSugar().Errorf("Cannot write profile image file for user: %s, error: %v", userName, err)
-		return err
-	}
-	logger.ZapSugar().Debugf("Done uploading profile pic: %s", filePath)
-	return nil
-}
+// func CreateUserFolder(userName string) error {
+// 	dirPath, filePath := ConstructPath(constant.ProfileDir, userName, "profile.png")
+// 	if err := os.MkdirAll(dirPath, 0755); err != nil {
+// 		logger.ZapSugar().Errorf("Cannot create directory structure for user: %s, error: %v", userName, err)
+// 		return err
+// 	}
+// 	imageByte, err := readImageFromURL(constant.DefaultProfilePhoto)
+// 	if err != nil {
+// 		logger.ZapSugar().Errorf("Error fetching image for user: %s, error: %v", userName, err)
+// 		return fmt.Errorf("error fetching image: %v", err)
+// 	}
+// 	if err = os.WriteFile(filePath, imageByte, 0644); err != nil {
+// 		logger.ZapSugar().Errorf("Cannot write profile image file for user: %s, error: %v", userName, err)
+// 		return err
+// 	}
+// 	logger.ZapSugar().Debugf("Done uploading profile pic: %s", filePath)
+// 	return nil
+// }
 
 func readImageFromURL(url string) ([]byte, error) {
 	client := http.Client{}
@@ -313,35 +297,35 @@ func ConstructPath(baseDir, userName, fileName string) (string, string) {
 	return dirPath, filePath
 }
 
-func UpdateUserFolder(currentName, newName string) error {
-	currentPath := filepath.Join(constant.ProfileDir, currentName)
-	newPath := filepath.Join(constant.ProfileDir, newName)
+// func UpdateUserFolder(currentName, newName string) error {
+// 	currentPath := filepath.Join(constant.ProfileDir, currentName)
+// 	newPath := filepath.Join(constant.ProfileDir, newName)
 
-	log.Printf("updating user folder %s to %s", currentName, newName)
+// 	log.Printf("updating user folder %s to %s", currentName, newName)
 
-	from, err := os.Stat(currentPath)
-	if err != nil {
-		return errors.New("could not stat current directory: " + err.Error())
-	}
+// 	from, err := os.Stat(currentPath)
+// 	if err != nil {
+// 		return errors.New("could not stat current directory: " + err.Error())
+// 	}
 
-	if !from.IsDir() {
-		return errors.New(currentPath + " is not a directory")
-	}
+// 	if !from.IsDir() {
+// 		return errors.New(currentPath + " is not a directory")
+// 	}
 
-	to := currentPath + "_temp"
+// 	to := currentPath + "_temp"
 
-	err = os.Rename(currentPath, to)
-	if err != nil {
-		return errors.New("failed to rename directory: " + err.Error())
-	}
+// 	err = os.Rename(currentPath, to)
+// 	if err != nil {
+// 		return errors.New("failed to rename directory: " + err.Error())
+// 	}
 
-	err = os.Rename(to, newPath)
-	if err != nil {
-		return errors.New("failed to rename directory to new name: " + err.Error())
-	}
+// 	err = os.Rename(to, newPath)
+// 	if err != nil {
+// 		return errors.New("failed to rename directory to new name: " + err.Error())
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // UpdateMinioProfileFolder renames the object prefix in MinIO from
 // profiles/{oldName}/ -> profiles/{newName}/ by copying each object then deleting the old one.

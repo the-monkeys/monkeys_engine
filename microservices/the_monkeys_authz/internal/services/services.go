@@ -1074,6 +1074,9 @@ func (as *AuthzSvc) UpdateUsername(ctx context.Context, req *pb.UpdateUsernameRe
 		Username:    user.Username,
 		NewUsername: req.NewUsername,
 		AccountId:   user.AccountId,
+		Email:       user.Email,
+		FirstName:   user.FirstName,
+		LastName:    user.LastName,
 		Action:      constants.USERNAME_CHANGED,
 	})
 	if err != nil {
