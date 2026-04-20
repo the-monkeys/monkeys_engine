@@ -61,12 +61,6 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 					"unmapped_type": "date", // Use this to handle missing fields
 				},
 			},
-			{
-				"blog.time": map[string]interface{}{
-					"order":         "desc",
-					"unmapped_type": "long", // Use this as a fallback
-				},
-			},
 		},
 		"from": offset,
 		"size": limit,
@@ -186,8 +180,9 @@ func (es *elasticsearchStorage) GetBlogsByTagsAccId(ctx context.Context, account
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -318,8 +313,9 @@ func (es *elasticsearchStorage) GetBlogsByAccountId(ctx context.Context, account
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -645,8 +641,9 @@ func (es *elasticsearchStorage) GetBlogsByTags(ctx context.Context, tags []strin
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -772,8 +769,9 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -870,18 +868,13 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 }
 
 func (es *elasticsearchStorage) GetAllPublishedBlogsLatestFirst(ctx context.Context, limit, offset int) ([]map[string]interface{}, error) {
-	// Build the query to get all published blogs with sorting by published_time or blog.time as fallback
+	// Build the query to get all published blogs sorted by published_time
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
 				"published_time": map[string]interface{}{
 					"order":         "desc",
 					"unmapped_type": "date", // Handle cases where published_time is missing
-				},
-			},
-			{
-				"blog.time": map[string]string{
-					"order": "desc",
 				},
 			},
 		},
