@@ -66,6 +66,13 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 				log.Errorf("Blog consumer: message deserialization failed: %v", err)
 				continue
 			}
+			log.Debugw("Blog consumer: message received",
+				"queue", queueName,
+				"action", user.Action,
+				"account_id", user.AccountId,
+				"blog_id", user.BlogId,
+				"blog_ids_count", len(user.BlogIds),
+			)
 			handleUserAction(user, log, db)
 		}
 
@@ -86,16 +93,23 @@ func nextBackoff(d time.Duration) time.Duration {
 func handleUserAction(user models.InterServiceMessage, log *zap.SugaredLogger, db database.ElasticsearchStorage) {
 	switch user.Action {
 	case constants.USER_ACCOUNT_DELETE:
-		log.Debug("Processing user account deletion request")
+		log.Debugw("=== BLOG: USER_ACCOUNT_DELETE received ===",
+			"account_id", user.AccountId,
+			"blog_ids_count", len(user.BlogIds),
+			"blog_ids", user.BlogIds,
+		)
 		resp, err := db.DeleteBlogsByOwnerAccountID(context.Background(), user.AccountId)
 		if err != nil {
-			log.Errorf("Blog deletion operation failed: %v", err)
+			log.Errorw("Blog ES deletion failed", "account_id", user.AccountId, "err", err)
 			return
 		}
 		if resp == nil {
-			log.Info("User account deletion completed - no associated blogs found")
+			log.Debugw("=== BLOG: USER_ACCOUNT_DELETE complete — no blogs found in ES ===", "account_id", user.AccountId)
 		} else {
-			log.Infof("User account deletion completed successfully - blogs removed (status: %d)", resp.StatusCode)
+			log.Debugw("=== BLOG: USER_ACCOUNT_DELETE complete — blogs removed from ES ===",
+				"account_id", user.AccountId,
+				"status_code", resp.StatusCode,
+			)
 		}
 
 	default:

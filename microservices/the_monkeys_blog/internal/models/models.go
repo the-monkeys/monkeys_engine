@@ -30,6 +30,7 @@ type InterServiceMessage struct {
 	AccountId    string    `json:"account_id"`
 	UserStatus   string    `json:"user_status"`
 	BlogId       string    `json:"blog_id"`
+	BlogIds      []string  `json:"blog_ids,omitempty"`
 	Action       string    `json:"action"`
 	BlogStatus   string    `json:"blog_status"`
 	IpAddress    string    `json:"ip_address"`

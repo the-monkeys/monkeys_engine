@@ -61,6 +61,13 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 				log.Errorf("Failed to unmarshal user from RabbitMQ: %v", err)
 				continue
 			}
+			log.Debugw("Notification consumer: message received",
+				"queue", queueName,
+				"action", user.Action,
+				"username", user.Username,
+				"account_id", user.AccountId,
+				"email", user.Email,
+			)
 			handleUserAction(user, log, frn)
 		}
 
@@ -75,7 +82,6 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 	switch user.Action {
 	case constants.USER_REGISTER:
 		log.Debugw("Processing user registration", "username", user.Username, "email", user.Email, "first_name", user.FirstName, "last_name", user.LastName, "account_id", user.AccountId)
-		// Register user in FRN: maps username → external_id for future notification routing
 		if err := frn.RegisterUser(ctx, user.Email, user.Username, user.FirstName, user.LastName); err != nil {
 			log.Errorw("FRN user registration failed", "username", user.Username, "email", user.Email, "err", err)
 		} else {
@@ -270,11 +276,10 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		} else {
 			log.Debugw("FRN user email updated successfully", "username", user.Username, "new_email", user.Email)
 		}
-		// Notify user about the email change
+		// Notify user about the email change (in-app only — SMTP emails already sent by authz service)
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplEmailChangedInApp,
-			EmailTpl: constants.FRNTplEmailChangedEmail,
 			Priority: "high",
 			Category: constants.FRNCategorySecurity,
 			Data: map[string]interface{}{
@@ -286,7 +291,8 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 
 	case constants.USERNAME_CHANGED:
 		log.Debugw("Processing username change", "old_username", user.Username, "new_username", user.NewUsername)
-		// Send notification under the OLD username (FRN still knows the user by this external_id)
+
+		// Send notification under the OLD username — FRN still knows the user by this external_id
 		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
 			UserID:   user.Username,
 			InAppTpl: constants.FRNTplUsernameChangedInApp,
@@ -298,28 +304,23 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		}, log); err != nil {
 			log.Errorw("FRN username changed notification failed", "old_username", user.Username, "new_username", user.NewUsername, "err", err)
 		}
-		// Update FRN external_id: old_username → new_username via PUT /users/{external_id}
+
+		// Now update FRN external_id: old → new
 		log.Debugw("Updating FRN external_id", "old_external_id", user.Username, "new_external_id", user.NewUsername)
 		if err := frn.UpdateUserExternalID(ctx, user.Username, user.NewUsername); err != nil {
-			log.Errorw("FRN external_id update failed — user may not receive future notifications",
-				"old", user.Username, "new", user.NewUsername, "err", err)
+			log.Errorw("FRN external_id update failed", "old", user.Username, "new", user.NewUsername, "err", err)
 		} else {
-			log.Debugw("FRN external_id updated successfully", "old_username", user.Username, "new_username", user.NewUsername)
+			log.Debugw("FRN external_id updated", "old", user.Username, "new", user.NewUsername)
 		}
 
 	case constants.USER_ACCOUNT_DELETE:
-		log.Debugw("Processing user account deletion", "username", user.Username, "account_id", user.AccountId)
-		// Send farewell notification before deleting from FRN
-		if err := freerangenotify.Notify(ctx, frn, freerangenotify.NotifyRequest{
-			UserID:   user.Username,
-			InAppTpl: constants.FRNTplAccountDeletedInApp,
-			EmailTpl: constants.FRNTplAccountDeletedEmail,
-			Priority: "high",
-			Category: constants.FRNCategoryAccount,
-			Data:     map[string]interface{}{},
-		}, log); err != nil {
-			log.Warnw("FRN account deleted notification failed (proceeding with delete)", "user", user.Username, "err", err)
-		}
+		log.Debugw("=== NOTIFICATION: USER_ACCOUNT_DELETE received ===",
+			"username", user.Username,
+			"account_id", user.AccountId,
+			"email", user.Email,
+			"blog_ids_count", len(user.BlogIds),
+		)
+
 		// Remove user from FRN via DELETE /users/{external_id}
 		log.Debugw("Deleting user from FRN", "external_id", user.Username)
 		if err := frn.DeleteUser(ctx, user.Username); err != nil {
@@ -327,6 +328,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, frn
 		} else {
 			log.Debugw("FRN user deleted successfully", "username", user.Username)
 		}
+		log.Debugw("=== NOTIFICATION: USER_ACCOUNT_DELETE complete ===", "username", user.Username)
 
 	case constants.USER_DEACTIVATED:
 		log.Debugw("Processing user deactivation", "username", user.Username)

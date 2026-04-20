@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"time"
 )
 
 // type TheMonkeysUser struct {
@@ -81,4 +82,19 @@ type TheMonkeysMessage struct {
 	BlogId       string `json:"blog_id"`
 	BlogStatus   string `json:"blog_status"`
 	BlogTitle    string `json:"blog_title"`
+}
+
+// VerificationRequest tracks user verification requests for the checkmark system.
+type VerificationRequest struct {
+	ID               string         `json:"id"`
+	Username         string         `json:"username"`
+	VerificationType string         `json:"verification_type"` // "social_proof", "id_document", "professional"
+	ProofURLs        string         `json:"proof_urls"`        // JSON array of URLs
+	AdditionalInfo   string         `json:"additional_info"`
+	Status           string         `json:"status"` // "pending", "approved", "rejected"
+	ReviewerUsername sql.NullString `json:"reviewer_username"`
+	RejectionReason  sql.NullString `json:"rejection_reason"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	ReviewedAt       sql.NullTime   `json:"reviewed_at"`
 }

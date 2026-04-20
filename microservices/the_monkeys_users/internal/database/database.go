@@ -64,6 +64,7 @@ type UserDb interface {
 	UpdateBlogStatusToDraft(blogId string, status string) error
 
 	// Delete queries
+	GetOwnedBlogIDs(username string) ([]string, error)
 	DeleteUserProfile(username string) error
 	RemoveUserInterest(interests []string, username string) error
 	RevokeBlogPermissionFromAUser(blogId string, userId int64, permissionType string) error
@@ -281,13 +282,39 @@ func (uh *uDBHandler) UpdateUserProfile(username string, dbUserInfo *models.User
 	return nil
 }
 
+// GetOwnedBlogIDs returns the blog_id strings for all blogs owned by the given username.
+// Must be called BEFORE DeleteUserProfile so the rows still exist.
+func (uh *uDBHandler) GetOwnedBlogIDs(username string) ([]string, error) {
+	rows, err := uh.db.Query(
+		`SELECT b.blog_id FROM blog b
+		 JOIN user_account ua ON b.user_id = ua.id
+		 WHERE ua.username = $1`, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query owned blog IDs for %s: %w", username, err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan blog_id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return ids, nil
+}
+
 func (uh *uDBHandler) DeleteUserProfile(username string) error {
 	tx, err := uh.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
 			uh.log.Errorf("Failed to rollback transaction for deleting user profile %s, error: %+v", username, err)
 		}
 	}()
