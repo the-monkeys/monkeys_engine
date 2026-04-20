@@ -341,6 +341,16 @@ service AuthService {
 
   // OTP-based password reset
   rpc VerifyResetOTP(VerifyResetOTPReq) returns (VerifyResetOTPRes) {}
+
+  // OTP-based email change (two-step)
+  rpc InitiateEmailChange(InitiateEmailChangeReq) returns (InitiateEmailChangeRes) {}
+  rpc VerifyEmailChangeOTP(VerifyEmailChangeOTPReq) returns (VerifyEmailChangeOTPRes) {}
+  rpc ResendEmailChangeOTP(ResendEmailChangeOTPReq) returns (ResendEmailChangeOTPRes) {}
+
+  // User verification
+  rpc RequestUserVerification(RequestUserVerificationReq) returns (RequestUserVerificationRes) {}
+  rpc GetUserVerificationStatus(GetUserVerificationStatusReq) returns (GetUserVerificationStatusRes) {}
+  rpc ReviewUserVerification(ReviewUserVerificationReq) returns (ReviewUserVerificationRes) {}
 }
 
 // ── OTP Registration Messages ──
@@ -405,5 +415,96 @@ message VerifyResetOTPReq {
 message VerifyResetOTPRes {
   int64 status_code = 1;
   string token = 2;
+  Error error = 3;
+}
+
+// ── OTP Email Change Messages ──
+
+message InitiateEmailChangeReq {
+  string username = 1;
+  string new_email = 2;
+  ClientInfo client_info = 3;
+}
+
+message InitiateEmailChangeRes {
+  int64 status_code = 1;
+  string message = 2;
+  int32 expires_in = 3;
+  Error error = 4;
+}
+
+message VerifyEmailChangeOTPReq {
+  string username = 1;
+  string new_email = 2;
+  string otp_code = 3;
+  ClientInfo client_info = 4;
+}
+
+message VerifyEmailChangeOTPRes {
+  int64 status_code = 1;
+  string token = 2;
+  bool email_verified = 3;
+  int64 user_id = 4;
+  string user_name = 5;
+  string first_name = 6;
+  string last_name = 7;
+  string email = 8;
+  Error error = 9;
+  string account_id = 10;
+}
+
+message ResendEmailChangeOTPReq {
+  string username = 1;
+  string new_email = 2;
+  ClientInfo client_info = 3;
+}
+
+message ResendEmailChangeOTPRes {
+  int64 status_code = 1;
+  string message = 2;
+  int32 expires_in = 3;
+  Error error = 4;
+}
+
+// ── User Verification Messages ──
+
+message RequestUserVerificationReq {
+  string username = 1;
+  string verification_type = 2; // e.g. "social_proof", "id_document", "professional"
+  repeated string proof_urls = 3; // Links to social profiles, portfolio, etc.
+  string additional_info = 4; // Free text for extra context
+  ClientInfo client_info = 5;
+}
+
+message RequestUserVerificationRes {
+  int64 status_code = 1;
+  string message = 2;
+  string request_id = 3;
+  Error error = 4;
+}
+
+message GetUserVerificationStatusReq {
+  string username = 1;
+}
+
+message GetUserVerificationStatusRes {
+  int64 status_code = 1;
+  bool is_verified = 2;
+  string verification_status = 3; // "none", "pending", "approved", "rejected"
+  string verified_at = 4;
+  Error error = 5;
+}
+
+message ReviewUserVerificationReq {
+  string request_id = 1;
+  string reviewer_username = 2;
+  bool approved = 3;
+  string rejection_reason = 4;
+  ClientInfo client_info = 5;
+}
+
+message ReviewUserVerificationRes {
+  int64 status_code = 1;
+  string message = 2;
   Error error = 3;
 }

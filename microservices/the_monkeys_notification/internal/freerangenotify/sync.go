@@ -47,7 +47,8 @@ func SyncUsers(ctx context.Context, client *Client, lister UserLister, log *zap.
 	for _, u := range users {
 		externalID := u.Username
 		if externalID == "" {
-			externalID = u.AccountID
+			log.Debugw("FRN user sync: skipping user without username", "account_id", u.AccountID)
+			continue
 		}
 		fullName := strings.TrimSpace(u.FirstName + " " + u.LastName)
 		createParams = append(createParams, frn.CreateUserParams{

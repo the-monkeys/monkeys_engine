@@ -104,6 +104,7 @@ type TheMonkeysMessage struct {
 	IpAddress    string   `json:"ip_address"`
 	Action       string   `json:"action"`
 	BlogId       string   `json:"blog_id"`
+	BlogIds      []string `json:"blog_ids,omitempty"`
 	BlogStatus   string   `json:"blog_status"`
 	Notification string   `json:"notification"`
 	Tags         []string `json:"tags"`

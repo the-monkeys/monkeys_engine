@@ -63,8 +63,8 @@ func main() {
 	// Create a gin router and add the Recovery middleware to recover from panics
 	server := newServer()
 	server.router.Use(gin.Recovery())
-	// retain default gin logger? use custom zap middleware later
-	// server.router.Use(gin.Logger())
+	// Structured request logger via zap — logs at debug level, zero cost in production
+	server.router.Use(middleware.ZapRequestLogger())
 	server.router.MaxMultipartMemory = 100 << 20
 
 	// Apply security middleware

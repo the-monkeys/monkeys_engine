@@ -40,8 +40,10 @@ func isConflictErr(err error) bool {
 
 // Notify sends in_app (always), then SSE and email if templates are provided.
 // SSE and email failures are logged but do not propagate — only in_app is critical.
-// If the first send fails because the user doesn't exist in FRN, it auto-registers
-// the user and retries once.
+//
+// If the user is not in FRN we do NOT auto-register with empty fields (that would
+// pollute FRN with junk rows). USER_REGISTER is the single source of truth for
+// creating FRN users; SyncUsers handles backfill at startup.
 func Notify(ctx context.Context, client *Client, req NotifyRequest, log *zap.SugaredLogger) error {
 	// in_app — always sent, error propagated
 	if err := client.Send(ctx, frn.NotificationSendParams{
@@ -52,33 +54,13 @@ func Notify(ctx context.Context, client *Client, req NotifyRequest, log *zap.Sug
 		Category:   req.Category,
 		Data:       req.Data,
 	}); err != nil {
-		// Auto-register user in FRN if they don't exist (handles pre-integration users)
 		if isUserNotFoundErr(err) {
-			log.Infow("FRN user not found, auto-registering", "user", req.UserID)
-			if regErr := client.RegisterUser(ctx, "", req.UserID, "", ""); regErr != nil {
-				// 409 = user already exists with same email (DevEmail override) — safe to retry
-				if !isConflictErr(regErr) {
-					log.Errorw("FRN auto-registration failed", "user", req.UserID, "err", regErr)
-					return err // return original error
-				}
-				log.Infow("FRN user already exists (409), retrying notification", "user", req.UserID)
-			}
-			// Retry the in_app send after registration
-			if retryErr := client.Send(ctx, frn.NotificationSendParams{
-				UserID:     req.UserID,
-				Channel:    "in_app",
-				Priority:   req.Priority,
-				TemplateID: req.InAppTpl,
-				Category:   req.Category,
-				Data:       req.Data,
-			}); retryErr != nil {
-				log.Errorw("FRN in_app notification failed after auto-register", "user", req.UserID, "tpl", req.InAppTpl, "err", retryErr)
-				return retryErr
-			}
-		} else {
-			log.Errorw("FRN in_app notification failed", "user", req.UserID, "tpl", req.InAppTpl, "err", err)
+			log.Warnw("FRN user not found; skipping notification (no auto-register)",
+				"user", req.UserID, "tpl", req.InAppTpl)
 			return err
 		}
+		log.Errorw("FRN in_app notification failed", "user", req.UserID, "tpl", req.InAppTpl, "err", err)
+		return err
 	}
 
 	// SSE — fire-and-forget

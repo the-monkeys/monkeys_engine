@@ -71,3 +71,31 @@ type VerifyResetOTPBody struct {
 	Email   string `json:"email" binding:"required,email"`
 	OTPCode string `json:"otp_code" binding:"required,len=6"`
 }
+
+// OTP-based email change flow
+type InitiateEmailChangeBody struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+}
+
+type VerifyEmailChangeOTPBody struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+	OTPCode  string `json:"otp_code" binding:"required,len=6"`
+}
+
+type ResendEmailChangeOTPBody struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+}
+
+// User verification request
+type RequestUserVerificationBody struct {
+	VerificationType string   `json:"verification_type" binding:"required"`
+	ProofURLs        []string `json:"proof_urls" binding:"required,min=1"`
+	AdditionalInfo   string   `json:"additional_info"`
+}
+
+// Admin verification review
+type ReviewUserVerificationBody struct {
+	RequestID       string `json:"request_id" binding:"required"`
+	Approved        bool   `json:"approved"`
+	RejectionReason string `json:"rejection_reason"`
+}

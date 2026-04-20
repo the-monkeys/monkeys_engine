@@ -175,57 +175,118 @@ func (us *UserSvc) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserProf
 // 5. Delete the topics of the user
 // 6. Send User a mail
 func (us *UserSvc) DeleteUserAccount(ctx context.Context, req *pb.DeleteUserProfileReq) (*pb.DeleteUserProfileRes, error) {
-	us.log.Debugf("user %s has requested to delete the  profile.", req.Username)
+	us.log.Debugw("=== ACCOUNT DELETION STARTED ===", "username", req.Username)
 
-	// Check if username exits or not
+	// Step 1: Verify user exists and capture their details (email, account_id)
 	user, err := us.dbConn.CheckIfUsernameExist(req.Username)
 	if err != nil {
-		us.log.Errorf("error while checking if the username exists for user %s, err: %v", req.Username, err)
+		us.log.Errorf("cannot verify user existence for %s: %v", req.Username, err)
 		if err == sql.ErrNoRows {
 			return nil, status.Errorf(codes.NotFound, "user %s doesn't exist", req.Username)
 		}
 		return nil, status.Errorf(codes.Internal, "cannot get the user profile")
 	}
+	us.log.Debugw("User verified", "username", user.Username, "account_id", user.AccountId, "email", user.Email)
 
-	// Run delete user query
+	// Step 2: Fetch blog IDs BEFORE deletion (rows disappear after TX commits)
+	blogIDs, err := us.dbConn.GetOwnedBlogIDs(req.Username)
+	if err != nil {
+		us.log.Errorf("failed to fetch owned blog IDs for %s: %v", req.Username, err)
+		// Non-fatal: proceed with deletion but blog files in MinIO may be orphaned
+		blogIDs = nil
+	}
+	us.log.Debugw("Owned blogs collected", "username", req.Username, "blog_count", len(blogIDs), "blog_ids", blogIDs)
+
+	// Step 3: Delete from Postgres (all 16 tables in a single transaction)
 	err = us.dbConn.DeleteUserProfile(req.Username)
 	if err != nil {
-		us.log.Errorf("could not delete the user profile: %v", err)
+		us.log.Errorf("postgres deletion failed for %s: %v", req.Username, err)
 		return nil, status.Errorf(codes.Internal, "cannot delete the user")
 	}
+	us.log.Debugw("Postgres deletion complete", "username", req.Username)
 
-	bx, err := json.Marshal(models.TheMonkeysMessage{
+	// Build the RabbitMQ message with blog IDs and email for downstream consumers
+	msg := models.TheMonkeysMessage{
 		Username:  user.Username,
 		AccountId: user.AccountId,
+		Email:     user.Email,
 		Action:    constants.USER_ACCOUNT_DELETE,
-	})
-
+		BlogIds:   blogIDs,
+	}
+	bx, err := json.Marshal(msg)
 	if err != nil {
-		us.log.Errorf("failed to marshal message, error: %v", err)
+		us.log.Errorf("failed to marshal delete message: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to prepare deletion events")
+	}
+	us.log.Debugw("RabbitMQ message prepared",
+		"username", user.Username,
+		"account_id", user.AccountId,
+		"email", user.Email,
+		"blog_ids_count", len(blogIDs),
+		"routing_keys", []string{
+			us.config.RabbitMQ.RoutingKeys[0],
+			us.config.RabbitMQ.RoutingKeys[3],
+			us.config.RabbitMQ.RoutingKeys[4],
+		},
+	)
+
+	// Step 4: Publish to all consumers using PublishReliable (broker-confirmed delivery)
+	exchange := us.config.RabbitMQ.Exchange
+	maxRetries := us.config.RabbitMQ.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
 	}
 
+	// Storage consumer: deletes profile folder + blog files from MinIO and FS
 	go func() {
-		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[0], bx)
-		if err != nil {
-			us.log.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		rk := us.config.RabbitMQ.RoutingKeys[0]
+		us.log.Debugw("Publishing to storage consumer", "exchange", exchange, "routing_key", rk, "username", user.Username)
+		if err := us.qConn.PublishReliable(exchange, rk, bx, maxRetries); err != nil {
+			us.log.Errorw("FAILED to publish to storage consumer", "routing_key", rk, "username", user.Username, "err", err)
+		} else {
+			us.log.Debugw("Published to storage consumer (broker confirmed)", "routing_key", rk, "username", user.Username)
 		}
 	}()
 
-	// TODO: Asynchronously delete the blogs from the blog service
+	// Blog consumer: bulk-deletes blog documents from Elasticsearch
 	go func() {
-		err = us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[3], bx)
-		if err != nil {
-			us.log.Errorf("failed to publish message for user: %s, error: %v", user.Username, err)
+		rk := us.config.RabbitMQ.RoutingKeys[3]
+		us.log.Debugw("Publishing to blog consumer", "exchange", exchange, "routing_key", rk, "username", user.Username)
+		if err := us.qConn.PublishReliable(exchange, rk, bx, maxRetries); err != nil {
+			us.log.Errorw("FAILED to publish to blog consumer", "routing_key", rk, "username", user.Username, "err", err)
+		} else {
+			us.log.Debugw("Published to blog consumer (broker confirmed)", "routing_key", rk, "username", user.Username)
 		}
 	}()
 
-	// Notify FRN to clean up the user
+	// Notification consumer: sends farewell notification + deletes user from FRN
 	go func() {
-		if err := us.qConn.PublishMessage(us.config.RabbitMQ.Exchange, us.config.RabbitMQ.RoutingKeys[4], bx); err != nil {
-			us.log.Errorf("failed to publish delete notification for user: %s, error: %v", user.Username, err)
+		rk := us.config.RabbitMQ.RoutingKeys[4]
+		us.log.Debugw("Publishing to notification consumer", "exchange", exchange, "routing_key", rk, "username", user.Username)
+		if err := us.qConn.PublishReliable(exchange, rk, bx, maxRetries); err != nil {
+			us.log.Errorw("FAILED to publish to notification consumer", "routing_key", rk, "username", user.Username, "err", err)
+		} else {
+			us.log.Debugw("Published to notification consumer (broker confirmed)", "routing_key", rk, "username", user.Username)
 		}
 	}()
-	// Return the response
+
+	// Step 5: Send farewell email directly via SMTP (best-effort, fire-and-forget)
+	go func() {
+		if user.Email == "" {
+			us.log.Warn("No email address for deleted user, skipping farewell email", "username", user.Username)
+			return
+		}
+		us.log.Debugw("Sending farewell email", "username", user.Username, "email", user.Email)
+		emailBody := utils.AccountDeletedEmailHTML(user.FirstName, user.LastName, user.Username)
+		if err := utils.SendMail(us.config, user.Email, emailBody); err != nil {
+			us.log.Errorw("Failed to send farewell email", "username", user.Username, "email", user.Email, "err", err)
+		} else {
+			us.log.Debugw("Farewell email sent", "username", user.Username, "email", user.Email)
+		}
+	}()
+
+	us.log.Debugw("=== ACCOUNT DELETION COMPLETED ===", "username", req.Username, "account_id", user.AccountId)
+
 	return &pb.DeleteUserProfileRes{
 		Success: "user has been deleted successfully",
 		Status:  "200",

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -100,4 +101,30 @@ func RateLimiterMiddleware(limit string) gin.HandlerFunc {
 	store := memory.NewStore()
 	instance := limiter.New(store, rate)
 	return limiterGin.NewMiddleware(instance)
+}
+
+// ZapRequestLogger logs every HTTP request at debug level via zap.
+// Zero cost in production when LOG_LEVEL >= info because zap skips the message entirely.
+func ZapRequestLogger() gin.HandlerFunc {
+	lg := zap.S().With("middleware", "access_log")
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+
+		c.Next()
+
+		latency := time.Since(start)
+		status := c.Writer.Status()
+
+		lg.Debugw("request",
+			"method", c.Request.Method,
+			"path", path,
+			"query", query,
+			"status", status,
+			"latency_ms", latency.Milliseconds(),
+			"client_ip", c.ClientIP(),
+			"user", c.GetString("userName"),
+		)
+	}
 }

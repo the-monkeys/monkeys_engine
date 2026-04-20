@@ -52,6 +52,10 @@ RUN mkdir -p profile blogs local_blogs local_profiles && \
 COPY --from=builder /app/storage-service .
 COPY --from=builder /tmp/grpc_health_probe /usr/local/bin/grpc_health_probe
 
+# Bundle default profile photo for offline fallback
+COPY --from=builder /app/static/default.jpg /app/static/default.jpg
+COPY --from=builder /app/static/default-profile.svg /app/static/default-profile.svg
+
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app && \
     chmod +x /app/storage-service

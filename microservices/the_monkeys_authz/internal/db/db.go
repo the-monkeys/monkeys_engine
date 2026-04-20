@@ -33,6 +33,15 @@ type AuthDBHandler interface {
 	UpdateEmailVerificationStatus(req *models.TheMonkeysUser) error
 	UpdateUserName(currentUsername, newUsername string) error
 	UpdateEmailId(emailId string, user *models.TheMonkeysUser) error
+	UpdateEmailIdAndMarkVerified(emailId string, user *models.TheMonkeysUser) error
+
+	// User verification
+	CreateVerificationRequest(req *models.VerificationRequest) error
+	GetVerificationRequest(username string) (*models.VerificationRequest, error)
+	GetVerificationRequestByID(requestID string) (*models.VerificationRequest, error)
+	UpdateVerificationRequest(req *models.VerificationRequest) error
+	SetUserVerified(username string, verified bool) error
+	IsUserVerified(username string) (bool, error)
 
 	// Create user logs to track activity
 	CreateUserLog(user *models.TheMonkeysUser, description string) error
@@ -660,3 +669,154 @@ func (adh *authDBHandler) GetUserAccessForABlog(accountId, blogId string) ([]str
 
 // 	return permissions, nil
 // }
+
+// UpdateEmailIdAndMarkVerified updates the email and marks email_validation_status as verified in a single transaction.
+func (adh *authDBHandler) UpdateEmailIdAndMarkVerified(emailId string, user *models.TheMonkeysUser) error {
+	if emailId == "" || user.Username == "" {
+		return errors.New("both emailId and username are required")
+	}
+
+	tx, err := adh.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	// Update the email in user_account
+	var userID int64
+	err = tx.QueryRow(`
+		UPDATE user_account
+		SET email = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE username = $2
+		RETURNING id
+	`, emailId, user.Username).Scan(&userID)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to update email: %w", err)
+	}
+
+	// Mark email as verified in user_auth_info
+	result, err := tx.Exec(`
+		UPDATE user_auth_info
+		SET email_validation_status = (SELECT id FROM email_validation_status WHERE status = $1),
+		    email_validation_time = $2
+		WHERE user_id = $3
+	`, constants.EmailVerificationStatusVerified, time.Now(), userID)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to update email validation status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		_ = tx.Rollback()
+		return fmt.Errorf("no user_auth_info record found for user_id %d", userID)
+	}
+
+	if err = tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+// CreateVerificationRequest inserts a new user verification request.
+func (adh *authDBHandler) CreateVerificationRequest(req *models.VerificationRequest) error {
+	_, err := adh.db.Exec(`
+		INSERT INTO verification_requests (id, username, verification_type, proof_urls, additional_info, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, req.ID, req.Username, req.VerificationType, req.ProofURLs, req.AdditionalInfo, req.Status, req.CreatedAt, req.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to create verification request: %w", err)
+	}
+	return nil
+}
+
+// GetVerificationRequest retrieves the latest verification request for a username.
+func (adh *authDBHandler) GetVerificationRequest(username string) (*models.VerificationRequest, error) {
+	var req models.VerificationRequest
+	err := adh.db.QueryRow(`
+		SELECT id, username, verification_type, proof_urls, additional_info, status,
+		       reviewer_username, rejection_reason, created_at, updated_at, reviewed_at
+		FROM verification_requests
+		WHERE username = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, username).Scan(&req.ID, &req.Username, &req.VerificationType, &req.ProofURLs,
+		&req.AdditionalInfo, &req.Status, &req.ReviewerUsername, &req.RejectionReason,
+		&req.CreatedAt, &req.UpdatedAt, &req.ReviewedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get verification request: %w", err)
+	}
+	return &req, nil
+}
+
+// GetVerificationRequestByID retrieves a verification request by its ID.
+func (adh *authDBHandler) GetVerificationRequestByID(requestID string) (*models.VerificationRequest, error) {
+	var req models.VerificationRequest
+	err := adh.db.QueryRow(`
+		SELECT id, username, verification_type, proof_urls, additional_info, status,
+		       reviewer_username, rejection_reason, created_at, updated_at, reviewed_at
+		FROM verification_requests
+		WHERE id = $1
+	`, requestID).Scan(&req.ID, &req.Username, &req.VerificationType, &req.ProofURLs,
+		&req.AdditionalInfo, &req.Status, &req.ReviewerUsername, &req.RejectionReason,
+		&req.CreatedAt, &req.UpdatedAt, &req.ReviewedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get verification request by ID: %w", err)
+	}
+	return &req, nil
+}
+
+// UpdateVerificationRequest updates an existing verification request (for admin review).
+func (adh *authDBHandler) UpdateVerificationRequest(req *models.VerificationRequest) error {
+	result, err := adh.db.Exec(`
+		UPDATE verification_requests
+		SET status = $1, reviewer_username = $2, rejection_reason = $3, reviewed_at = $4, updated_at = $5
+		WHERE id = $6
+	`, req.Status, req.ReviewerUsername, req.RejectionReason, req.ReviewedAt, req.UpdatedAt, req.ID)
+	if err != nil {
+		return fmt.Errorf("failed to update verification request: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("verification request %s not found", req.ID)
+	}
+	return nil
+}
+
+// SetUserVerified sets the is_verified flag on user_account.
+func (adh *authDBHandler) SetUserVerified(username string, verified bool) error {
+	result, err := adh.db.Exec(`
+		UPDATE user_account SET is_verified = $1, updated_at = CURRENT_TIMESTAMP WHERE username = $2
+	`, verified, username)
+	if err != nil {
+		return fmt.Errorf("failed to set user verified: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("user %s not found", username)
+	}
+	return nil
+}
+
+// IsUserVerified checks if a user has the is_verified flag set.
+func (adh *authDBHandler) IsUserVerified(username string) (bool, error) {
+	var isVerified bool
+	err := adh.db.QueryRow(`
+		SELECT COALESCE(is_verified, false) FROM user_account WHERE username = $1
+	`, username).Scan(&isVerified)
+	if err != nil {
+		return false, fmt.Errorf("failed to check user verification: %w", err)
+	}
+	return isVerified, nil
+}
