@@ -1004,23 +1004,58 @@ func (asc *UserServiceClient) ConnectionCount(ctx *gin.Context) {
 
 // GetActiveUsers returns the count of active users
 // GET /api/v2/user/active-users
+//
+// Implements a progressive time-range fallback: if the requested window
+// yields zero active users (common on quiet dev / staging databases), we
+// widen the window through 7d → 30d → 1y until we find any. The window
+// actually used is surfaced as `time_range_used` so the client can react.
 func (usc *UserServiceClient) GetActiveUsers(ctx *gin.Context) {
 	accID := ctx.Query("account_id")
-	timeRange := ctx.DefaultQuery("time_range", "3h")
+	requested := ctx.DefaultQuery("time_range", "3h")
 
-	resp, err := usc.ActivityCli.GetActiveUsers(context.Background(), &activity_pb.GetActiveUsersRequest{
-		AccountId: accID,
-		TimeRange: timeRange,
-	})
+	// Fallback ladder — ordered narrow → wide. Requested window goes first
+	// so a fresh, populated index returns the natural answer in one call.
+	candidates := []string{requested, "7d", "30d", "1y"}
+	seen := make(map[string]struct{}, len(candidates))
 
-	if err != nil {
-		usc.log.Errorf("failed to get active users: %v", err)
+	var (
+		resp      *activity_pb.GetActiveUsersResponse
+		usedRange string
+		lastErr   error
+	)
+
+	for _, tr := range candidates {
+		if _, dup := seen[tr]; dup {
+			continue
+		}
+		seen[tr] = struct{}{}
+
+		r, err := usc.ActivityCli.GetActiveUsers(ctx.Request.Context(), &activity_pb.GetActiveUsersRequest{
+			AccountId: accID,
+			TimeRange: tr,
+		})
+		if err != nil {
+			lastErr = err
+			usc.log.Errorw("active users call failed", "time_range", tr, "err", err)
+			continue
+		}
+
+		resp = r
+		usedRange = tr
+		if len(r.GetUserList()) > 0 {
+			break
+		}
+	}
+
+	if resp == nil {
+		// All attempts errored — return the last error to the caller.
+		usc.log.Errorf("failed to get active users after fallback: %v", lastErr)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch active users"})
 		return
 	}
 
-	// Collect usernames from the active users list
-	var accIds []string
+	// Collect account ids from the active users list.
+	accIds := make([]string, 0, len(resp.UserList))
 	for _, user := range resp.UserList {
 		if user.UserId != "" {
 			accIds = append(accIds, user.UserId)
@@ -1029,7 +1064,7 @@ func (usc *UserServiceClient) GetActiveUsers(ctx *gin.Context) {
 
 	var userDetails []*pb.UserDetailsResp
 	if len(accIds) > 0 {
-		usersResp, err := usc.Client.GetBatchUserDetails(context.Background(), &pb.GetBatchUserDetailsReq{
+		usersResp, err := usc.Client.GetBatchUserDetails(ctx.Request.Context(), &pb.GetBatchUserDetailsReq{
 			AccountIds: accIds,
 		})
 
@@ -1042,8 +1077,9 @@ func (usc *UserServiceClient) GetActiveUsers(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"active_users": resp.ActiveUsers,
-		"user_details": userDetails,
-		"status_code":  resp.StatusCode,
+		"active_users":    resp.ActiveUsers,
+		"user_details":    userDetails,
+		"status_code":     resp.StatusCode,
+		"time_range_used": usedRange,
 	})
 }
