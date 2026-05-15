@@ -53,6 +53,7 @@ restore-postgres.ps1
 restore-postgres.sh
 restore-snapshots.ps1
 restore-snapshots.sh
+restore-minio.ps1
 
 # Environment files - NEVER COMMIT THESE!
 .env
@@ -71,3 +72,7 @@ monkeys-cred.json
 err.log
 the_monkeys/*
 test/*
+
+# Local debug / scratch dumps
+/a.json
+/abc.json

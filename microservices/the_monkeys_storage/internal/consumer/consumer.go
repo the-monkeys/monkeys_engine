@@ -18,16 +18,26 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
 	"github.com/the-monkeys/the_monkeys/logger"
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/models"
 	"go.uber.org/zap"
 )
 
-func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, log *zap.SugaredLogger) {
+// CAS owner-type constants must mirror the values used by the Gateway in
+// microservices/the_monkeys_gateway/internal/storage_v2/routes.go so that
+// reference lookups across services agree.
+const (
+	ownerTypeBlog    = "blog"
+	ownerTypeProfile = "profile"
+)
+
+func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, db database.StorageDB, log *zap.SugaredLogger) {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -54,28 +64,13 @@ func ConsumeFromQueue(mgr *rabbitmq.ConnManager, conf config.RabbitMQ, log *zap.
 		}
 	}
 
-	go consumeQueue(mgr, conf.Queues[0], log, cfg, mc)
-	go consumeQueue(mgr, conf.Queues[2], log, cfg, mc)
-
-	if mc != nil && cfg != nil {
-		if cfg.Minio.EnableFSToMinioSync {
-			log.Info("FS→MinIO periodic sync: ENABLED")
-			go startPeriodicSync(cfg, mc, log)
-		} else {
-			log.Info("FS→MinIO periodic sync: DISABLED (set MINIO_ENABLE_FS_TO_MINIO_SYNC=true to enable)")
-		}
-		if cfg.Minio.EnableMinioToFSSync {
-			log.Info("MinIO→FS periodic sync: ENABLED")
-			go startMinioToFileSystemSync(cfg, mc, log)
-		} else {
-			log.Info("MinIO→FS periodic sync: DISABLED (set MINIO_ENABLE_MINIO_TO_FS_SYNC=true to enable)")
-		}
-	}
+	go consumeQueue(mgr, conf.Queues[0], log, cfg, mc, db)
+	go consumeQueue(mgr, conf.Queues[2], log, cfg, mc, db)
 
 	select {}
 }
 
-func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
+func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client, db database.StorageDB) {
 	backoff := time.Second
 
 	for {
@@ -115,7 +110,7 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 				"blog_id", user.BlogId,
 				"blog_ids_count", len(user.BlogIds),
 			)
-			handleUserAction(user, log, cfg, mc)
+			handleUserAction(user, log, cfg, mc, db)
 		}
 
 		// Channel closed — reconnect
@@ -124,7 +119,28 @@ func consumeQueue(mgr *rabbitmq.ConnManager, queueName string, log *zap.SugaredL
 	}
 }
 
-func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client) {
+// softDeleteAssetRefs soft-deletes every active CAS asset reference for the
+// given (ownerType, ownerId). It is a no-op if db is nil or ownerId is blank.
+// The shared physical objects under assets/sha256/... are NEVER removed here;
+// only the storage GC may reclaim them once their active ref count hits zero.
+func softDeleteAssetRefs(db database.StorageDB, log *zap.SugaredLogger, ownerType, ownerId string) {
+	if db == nil || strings.TrimSpace(ownerId) == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	res, err := db.DeleteAssetRef(ctx, &pb.DeleteAssetRefReq{
+		OwnerType: ownerType,
+		OwnerId:   ownerId,
+	})
+	if err != nil {
+		log.Errorw("Failed to soft-delete asset refs", "owner_type", ownerType, "owner_id", ownerId, "err", err)
+		return
+	}
+	log.Debugw("Soft-deleted asset refs", "owner_type", ownerType, "owner_id", ownerId, "deleted_count", res.GetDeletedCount())
+}
+
+func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg *config.Config, mc *minio.Client, db database.StorageDB) {
 	switch user.Action {
 	case constants.USER_REGISTER:
 		log.Debugw("Handling USER_REGISTER", "username", user.Username)
@@ -187,7 +203,10 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 			"blog_ids", user.BlogIds,
 		)
 
-		// 1. Delete profile folder from MinIO
+		// 0. Soft-delete CAS asset references owned by this profile.
+		softDeleteAssetRefs(db, log, ownerTypeProfile, user.Username)
+
+		// 1. Delete profile folder from MinIO (legacy path-based objects only).
 		if mc != nil && cfg != nil {
 			log.Debugw("Deleting user profile folder (MinIO)", "username", user.Username, "prefix", "profiles/"+user.Username+"/")
 			if err := DeleteMinioProfileFolder(context.Background(), mc, cfg.Minio.Bucket, user.Username); err != nil {
@@ -201,14 +220,18 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 		for i, blogId := range user.BlogIds {
 			log.Debugw("Deleting blog files", "blog_index", i+1, "total", len(user.BlogIds), "blog_id", blogId)
 
-			// FS: blogs/{blogId}/
+			// Soft-delete CAS asset references owned by this blog.
+			softDeleteAssetRefs(db, log, ownerTypeBlog, blogId)
+
+			// FS: blogs/{blogId}/ (legacy)
 			if err := DeleteBlogFolder(blogId); err != nil {
 				log.Errorw("Failed to delete blog folder (FS)", "blog_id", blogId, "err", err)
 			} else {
 				log.Debugw("Deleted blog folder (FS)", "blog_id", blogId)
 			}
 
-			// MinIO: posts/{blogId}/
+			// MinIO: posts/{blogId}/ (legacy path-based objects only;
+			// CAS keys live under assets/sha256/... and are untouched).
 			if mc != nil && cfg != nil {
 				if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, blogId); err != nil {
 					log.Errorw("Failed to delete blog folder (MinIO)", "blog_id", blogId, "err", err)
@@ -225,6 +248,9 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 	case constants.BLOG_DELETE:
 		log.Debugw("Handling BLOG_DELETE", "blog_id", user.BlogId)
 
+		// Soft-delete every active CAS asset reference owned by this blog.
+		softDeleteAssetRefs(db, log, ownerTypeBlog, user.BlogId)
+
 		log.Debugw("Deleting blog folder (FS)", "blog_id", user.BlogId)
 		if err := DeleteBlogFolder(user.BlogId); err != nil {
 			log.Errorw("Failed to delete blog folder (FS)", "blog_id", user.BlogId, "err", err)
@@ -232,6 +258,7 @@ func handleUserAction(user models.TheMonkeysMessage, log *zap.SugaredLogger, cfg
 			log.Debugw("Deleted blog folder (FS)", "blog_id", user.BlogId)
 		}
 
+		// Legacy posts/{blogId}/ prefix only. CAS keys (assets/sha256/...) are not affected.
 		if mc != nil && cfg != nil {
 			log.Debugw("Deleting blog folder (MinIO)", "blog_id", user.BlogId, "prefix", "posts/"+user.BlogId+"/")
 			if err := DeleteMinioBlogFolder(context.Background(), mc, cfg.Minio.Bucket, user.BlogId); err != nil {
@@ -400,331 +427,5 @@ func DeleteBlogFolder(blogId string) error {
 		return errors.New("failed to remove directory: " + err.Error())
 	}
 
-	return nil
-}
-
-// startPeriodicSync runs filesystem to MinIO sync every 24 hours
-func startPeriodicSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ticker := time.NewTicker(3 * time.Hour)
-	defer ticker.Stop()
-
-	// Run initial sync after 1 minute
-	time.Sleep(1 * time.Minute)
-	syncFilesystemToMinio(cfg, mc, log)
-
-	for range ticker.C {
-		syncFilesystemToMinio(cfg, mc, log)
-	}
-}
-
-// syncFilesystemToMinio syncs blog files and profile files from filesystem to MinIO if they don't exist
-func syncFilesystemToMinio(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ctx := context.Background()
-
-	log.Debug("Starting periodic sync of filesystem files to MinIO")
-
-	// Sync blog files
-	syncBlogFiles(ctx, cfg, mc, log)
-
-	// Sync profile files
-	syncProfileFiles(ctx, cfg, mc, log)
-
-	log.Debug("Completed periodic sync of filesystem files to MinIO")
-}
-
-// syncBlogFiles syncs blog files from blogs/ directory to posts/ prefix in MinIO
-func syncBlogFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	blogsDir := constant.BlogDir
-
-	if _, err := os.Stat(blogsDir); os.IsNotExist(err) {
-		log.Warn("Blogs directory does not exist, skipping blog sync")
-		return
-	}
-
-	log.Debug("Syncing blog files...")
-
-	err := filepath.Walk(blogsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Errorf("Error accessing path %s: %v", path, err)
-			return nil // Continue with other files
-		}
-
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
-
-		// Extract blog ID and filename from path
-		relPath, err := filepath.Rel(blogsDir, path)
-		if err != nil {
-			log.Errorf("Error getting relative path for %s: %v", path, err)
-			return nil
-		}
-
-		pathParts := strings.Split(filepath.ToSlash(relPath), "/")
-		if len(pathParts) < 2 {
-			log.Warnf("Unexpected blog file structure: %s", relPath)
-			return nil
-		}
-
-		blogID := pathParts[0]
-		fileName := strings.Join(pathParts[1:], "/")
-		objectKey := fmt.Sprintf("posts/%s/%s", blogID, fileName)
-
-		return syncFileToMinio(ctx, cfg, mc, log, path, objectKey, info)
-	})
-
-	if err != nil {
-		log.Errorf("Error during blog files walk: %v", err)
-	}
-}
-
-// syncProfileFiles syncs profile files from profiles/ directory to profiles/ prefix in MinIO
-func syncProfileFiles(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	profilesDir := constant.ProfileDir
-
-	if _, err := os.Stat(profilesDir); os.IsNotExist(err) {
-		log.Warn("Profiles directory does not exist, skipping profile sync")
-		return
-	}
-
-	log.Debug("Syncing profile files...")
-
-	err := filepath.Walk(profilesDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Errorf("Error accessing path %s: %v", path, err)
-			return nil // Continue with other files
-		}
-
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
-
-		// Extract username and filename from path
-		relPath, err := filepath.Rel(profilesDir, path)
-		if err != nil {
-			log.Errorf("Error getting relative path for %s: %v", path, err)
-			return nil
-		}
-
-		pathParts := strings.Split(filepath.ToSlash(relPath), "/")
-		if len(pathParts) < 2 {
-			log.Warnf("Unexpected profile file structure: %s", relPath)
-			return nil
-		}
-
-		username := pathParts[0]
-		fileName := strings.Join(pathParts[1:], "/")
-		objectKey := fmt.Sprintf("profiles/%s/%s", username, fileName)
-
-		return syncFileToMinio(ctx, cfg, mc, log, path, objectKey, info)
-	})
-
-	if err != nil {
-		log.Errorf("Error during profile files walk: %v", err)
-	}
-}
-
-// syncFileToMinio uploads a single file to MinIO if it doesn't already exist
-func syncFileToMinio(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, filePath, objectKey string, info os.FileInfo) error {
-	// Check if object already exists in MinIO
-	_, err := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
-	if err == nil {
-		// Object exists, skip
-		return nil
-	}
-
-	// Object doesn't exist, upload it
-	log.Debugf("Syncing file: %s -> %s", filePath, objectKey)
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Errorf("Error opening file %s: %v", filePath, err)
-		return nil
-	}
-	defer file.Close()
-
-	contentType := getContentType(filepath.Base(objectKey))
-
-	_, err = mc.PutObject(ctx, cfg.Minio.Bucket, objectKey, file, info.Size(), minio.PutObjectOptions{
-		ContentType: contentType,
-	})
-	if err != nil {
-		log.Errorf("Error uploading file %s to MinIO: %v", objectKey, err)
-		return nil
-	}
-
-	log.Debugf("Successfully synced: %s", objectKey)
-	return nil
-}
-
-// getContentType determines content type based on file extension
-func getContentType(fileName string) string {
-	ext := strings.ToLower(filepath.Ext(fileName))
-	switch ext {
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".png":
-		return "image/png"
-	case ".gif":
-		return "image/gif"
-	case ".webp":
-		return "image/webp"
-	case ".avif":
-		return "image/avif"
-	case ".svg":
-		return "image/svg+xml"
-	case ".mp4":
-		return "video/mp4"
-	case ".webm":
-		return "video/webm"
-	case ".pdf":
-		return "application/pdf"
-	case ".txt":
-		return "text/plain"
-	case ".json":
-		return "application/json"
-	default:
-		return "application/octet-stream"
-	}
-}
-
-// startMinioToFileSystemSync runs MinIO to filesystem sync every 24 hours
-func startMinioToFileSystemSync(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ticker := time.NewTicker(4 * time.Hour)
-	defer ticker.Stop()
-
-	// Run initial sync after 2 minutes (offset from filesystem->minio sync)
-	time.Sleep(2 * time.Minute)
-	syncMinioToFileSystem(cfg, mc, log)
-
-	for range ticker.C {
-		syncMinioToFileSystem(cfg, mc, log)
-	}
-}
-
-// syncMinioToFileSystem syncs MinIO objects to filesystem (local or remote via SSH)
-func syncMinioToFileSystem(cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	ctx := context.Background()
-
-	log.Debug("Starting MinIO to filesystem sync")
-
-	// Sync posts from MinIO to filesystem
-	syncMinioPostsToFileSystem(ctx, cfg, mc, log)
-
-	// Sync profiles from MinIO to filesystem
-	syncMinioProfilesToFileSystem(ctx, cfg, mc, log)
-
-	log.Debug("Completed MinIO to filesystem sync")
-}
-
-// syncMinioPostsToFileSystem syncs posts/{blogID}/ objects to blogs/{blogID}/ filesystem
-func syncMinioPostsToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	log.Debug("Syncing MinIO posts to filesystem...")
-
-	// List all objects with posts/ prefix
-	opts := minio.ListObjectsOptions{Prefix: "posts/", Recursive: true}
-	for obj := range mc.ListObjects(ctx, cfg.Minio.Bucket, opts) {
-		if obj.Err != nil {
-			log.Errorf("Error listing MinIO objects: %v", obj.Err)
-			continue
-		}
-
-		// Skip empty folders
-		if strings.HasSuffix(obj.Key, "/") {
-			continue
-		}
-
-		// Extract blog ID and filename from object key: posts/{blogID}/{fileName}
-		parts := strings.SplitN(strings.TrimPrefix(obj.Key, "posts/"), "/", 2)
-		if len(parts) != 2 {
-			log.Warnf("Unexpected object key format: %s", obj.Key)
-			continue
-		}
-
-		blogID := parts[0]
-		fileName := parts[1]
-		localPath := filepath.Join(constant.LocalBlogsDir, blogID, fileName)
-
-		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
-			log.Errorf("Failed to sync %s: %v", obj.Key, err)
-		}
-	}
-}
-
-// syncMinioProfilesToFileSystem syncs profiles/{username}/ objects to filesystem
-func syncMinioProfilesToFileSystem(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger) {
-	log.Debug("Syncing MinIO profiles to filesystem...")
-
-	// List all objects with profiles/ prefix
-	opts := minio.ListObjectsOptions{Prefix: "profiles/", Recursive: true}
-	for obj := range mc.ListObjects(ctx, cfg.Minio.Bucket, opts) {
-		if obj.Err != nil {
-			log.Errorf("Error listing MinIO objects: %v", obj.Err)
-			continue
-		}
-
-		// Skip empty folders
-		if strings.HasSuffix(obj.Key, "/") {
-			continue
-		}
-
-		// Extract username and filename from object key: profiles/{username}/{fileName}
-		parts := strings.SplitN(strings.TrimPrefix(obj.Key, "profiles/"), "/", 2)
-		if len(parts) != 2 {
-			log.Warnf("Unexpected object key format: %s", obj.Key)
-			continue
-		}
-
-		username := parts[0]
-		fileName := parts[1]
-		localPath := filepath.Join(constant.LocalProfilesDir, username, fileName)
-
-		if err := syncMinioObjectToFile(ctx, cfg, mc, log, obj.Key, localPath); err != nil {
-			log.Errorf("Failed to sync %s: %v", obj.Key, err)
-		}
-	}
-}
-
-// syncMinioObjectToFile downloads a MinIO object to local filesystem if it doesn't exist or is different
-func syncMinioObjectToFile(ctx context.Context, cfg *config.Config, mc *minio.Client, log *zap.SugaredLogger, objectKey, localPath string) error {
-	// Local filesystem sync (remote sync is now handled by minio-sync container)
-	// Check if local file exists and compare with MinIO object
-	if info, err := os.Stat(localPath); err == nil {
-		objInfo, err2 := mc.StatObject(ctx, cfg.Minio.Bucket, objectKey, minio.StatObjectOptions{})
-		if err2 == nil && info.Size() == objInfo.Size && !objInfo.LastModified.After(info.ModTime()) {
-			// File is up to date, skip
-			return nil
-		}
-	}
-
-	log.Debugf("Syncing from MinIO: %s -> %s", objectKey, localPath)
-
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
-	}
-
-	// Get object from MinIO
-	obj, err := mc.GetObject(ctx, cfg.Minio.Bucket, objectKey, minio.GetObjectOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get object from MinIO: %v", err)
-	}
-	defer obj.Close()
-
-	// Create local file
-	file, err := os.Create(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to create local file: %v", err)
-	}
-	defer file.Close()
-
-	// Copy data
-	if _, err := io.Copy(file, obj); err != nil {
-		return fmt.Errorf("failed to copy data: %v", err)
-	}
-
-	log.Debugf("Successfully synced: %s", localPath)
 	return nil
 }
