@@ -50,12 +50,21 @@ func (uh *uDBHandler) FindUsersV2(ctx context.Context, searchTerm string, limit,
 	}
 
 	// Notes on the query:
-	//   * `%` is the pg_trgm similarity operator (set_limit defaults to
-	//     0.3). It uses the GIN index on search_doc.
-	//   * `username ILIKE $2 || '%'` (NOT leading-%) is index-friendly
+	//   * `<%` is the pg_trgm word_similarity operator. Unlike `%`
+	//     (similarity), it scores the query against the BEST-MATCHING
+	//     extent of the indexed text rather than the whole string, so
+	//     a short query word like "joseph" still matches a long
+	//     search_doc that includes "Shinu Joseph ...long bio...".
+	//     Verified empirically: similarity('joseph', 'SJ Shinu Joseph
+	//     The fourth monkey') = 0.21 (below 0.3 threshold), whereas
+	//     word_similarity is 1.0. The GIN(gin_trgm_ops) index on
+	//     search_doc supports `<%` natively in PG 11+.
+	//   * `username ILIKE $1 || '%'` (NOT leading-%) is index-friendly
 	//     via the trigram GIN index on username.
 	//   * lower() comparisons keep the CASE deterministic across locales.
-	//   * similarity() is computed once per row, then re-used in ORDER BY.
+	//   * word_similarity() is computed once per row, then re-used in
+	//     ORDER BY so ranking matches the predicate that selected the
+	//     row.
 	//   * account_id is selected so callers (gRPC service) can resolve
 	//     profile pic URIs deterministically.
 	const query = `
@@ -71,12 +80,12 @@ func (uh *uDBHandler) FindUsersV2(ctx context.Context, searchTerm string, limit,
 		               WHEN lower(ua.username) LIKE lower($1) || '%'    THEN 50
 		               ELSE 0
 		           END
-		           + COALESCE(similarity(ua.search_doc, $1), 0) * 30
+		           + COALESCE(word_similarity($1, ua.search_doc), 0) * 30
 		       ) AS rank
 		FROM   user_account ua
 		JOIN   user_status  us ON us.id = ua.user_status
 		WHERE  us.status = 'Active'
-		  AND  ( ua.search_doc % $1
+		  AND  ( $1 <% ua.search_doc
 		         OR ua.username ILIKE $1 || '%' )
 		ORDER  BY rank DESC, ua.username ASC
 		LIMIT  $2 OFFSET $3;

@@ -4,24 +4,53 @@ Step-wise procedure to roll Search v2 (Phases 0–5) onto a live cluster.
 Estimated wall-clock: **20–30 min** of work, plus a 1-week soak before
 the final cleanup.
 
-> Prerequisites: shell access to the prod node running `docker compose`,
-> the prod `.env`, `kubectl` or `docker exec` reach into the
-> `elasticsearch-node1` and `the-monkeys-psql` containers, and a recent
-> snapshot taken (step 0).
+> **Prod topology assumed by this runbook**
+>
+> - **App services** (`the_monkeys_gateway`, `the_monkeys_user`,
+>   `the_monkeys_blog`, etc.) run under `docker compose` on the prod node.
+> - **Postgres** runs **directly on the host** (systemd / managed
+>   service), not inside a container. Reached over TCP at
+>   `$POSTGRES_HOST:$POSTGRES_PORT` from the app containers and from
+>   your shell on the host.
+> - **Elasticsearch** runs **directly on the host**, reached at
+>   `$OPENSEARCH_HOST:$OPENSEARCH_HTTP_PORT` (typically
+>   `http://127.0.0.1:9200` on the host; whatever the app `.env`
+>   resolves `OPENSEARCH_OS_HOST` to).
+> - You have shell on the prod node (sudo for systemd ops), the prod
+>   `.env`, the `psql` CLI, the `migrate` CLI (or a one-off migrate
+>   container), and Go toolchain available somewhere (host or jump
+>   box) to run the reindex script.
+>
+> Every step below uses `psql` / `curl` directly. There is no
+> `docker exec the-monkeys-psql` or `docker exec elasticsearch-node1`
+> because those containers don't exist in this environment.
+
+Define these once at the top of your shell:
+
+```bash
+export PG_DSN="host=$POSTGRES_HOST port=$POSTGRES_PORT dbname=$POSTGRESQL_PRIMARY_DB_DB_NAME user=$POSTGRESQL_PRIMARY_DB_DB_USERNAME password=$POSTGRESQL_PRIMARY_DB_DB_PASSWORD sslmode=require"
+export ES="http://$OPENSEARCH_HOST:$OPENSEARCH_HTTP_PORT"
+```
+
+(Adjust `sslmode` to match prod — `require` / `verify-full` / `disable`.)
 
 ---
 
 ## 0. Pre-flight — take snapshots (non-negotiable)
 
 ```bash
-# Postgres logical dump
-docker exec the-monkeys-psql pg_dump -U $POSTGRESQL_PRIMARY_DB_DB_USERNAME \
-  -d $POSTGRESQL_PRIMARY_DB_DB_NAME -Fc -f /backup/preSearchV2_$(date +%F).dump
+# Postgres logical dump (run as a user that can read all blog/user tables,
+# typically the same role the app uses, or postgres).
+PGPASSWORD="$POSTGRESQL_PRIMARY_DB_DB_PASSWORD" pg_dump \
+  -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
+  -U "$POSTGRESQL_PRIMARY_DB_DB_USERNAME" \
+  -d "$POSTGRESQL_PRIMARY_DB_DB_NAME" \
+  -Fc -f "/var/backups/postgres/preSearchV2_$(date +%F).dump"
 
-# Elasticsearch snapshot (repo `local-fs` must already exist; see
-# elasticsearch_snapshots/ in the repo for the local-fs configuration).
-ES=http://localhost:$OPENSEARCH_HTTP_PORT
-curl -X PUT "$ES/_snapshot/local-fs/pre_search_v2_$(date +%F)?wait_for_completion=true" \
+# Elasticsearch snapshot (repo `local-fs` must already be registered on
+# the host ES; see elasticsearch_snapshots/ for the path.repo setting in
+# elasticsearch.yml).
+curl -s -X PUT "$ES/_snapshot/local-fs/pre_search_v2_$(date +%F)?wait_for_completion=true" \
   -H 'Content-Type: application/json' \
   -d '{"indices":"the_monkeys_blogs*","include_global_state":false}'
 ```
@@ -45,23 +74,49 @@ Builds are read-only; no traffic impact yet.
 
 ## 2. Apply Postgres migrations (v6 + v7)
 
-Migrations land automatically on `compose up`, but applying them
-first — before bringing new app containers up — surfaces failures
-early and keeps the cut-over window small.
+Postgres is on the host, so we apply migrations with the `migrate` CLI
+directly against `$PG_DSN`. **Do not** rely on a `db-migrations`
+compose service to reach a host Postgres unless its connection string
+in `.env` already targets the host correctly (some prod compose files
+strip the migrate sidecar entirely).
 
 ```bash
-docker compose --env-file .env up -d --no-deps db-migrations
-docker logs the-monkeys-migrate --tail 20
-docker exec the-monkeys-psql psql -U $POSTGRESQL_PRIMARY_DB_DB_USERNAME \
-  -d $POSTGRESQL_PRIMARY_DB_DB_NAME \
+# Pin the same migrate version the project uses in dev (v4.15.2).
+MIGRATE="migrate -path ./schema -database 'postgres://$POSTGRESQL_PRIMARY_DB_DB_USERNAME:$POSTGRESQL_PRIMARY_DB_DB_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRESQL_PRIMARY_DB_DB_NAME?sslmode=require'"
+
+# Current schema version (sanity check before migrating)
+eval $MIGRATE version
+
+# Apply v6 + v7
+eval $MIGRATE up 2
+
+# Verify
+PGPASSWORD="$POSTGRESQL_PRIMARY_DB_DB_PASSWORD" psql \
+  -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
+  -U "$POSTGRESQL_PRIMARY_DB_DB_USERNAME" \
+  -d "$POSTGRESQL_PRIMARY_DB_DB_NAME" \
   -c "SELECT version, dirty FROM schema_migrations;"
 ```
 
 Expected: `version=7  dirty=f`.
 
+If you don't have `migrate` on the host, run it as a one-shot container
+bound to the host network so it can see Postgres on `127.0.0.1`:
+
+```bash
+docker run --rm --network=host \
+  -v "$PWD/schema:/migrations" migrate/migrate:v4.15.2 \
+  -path=/migrations \
+  -database "postgres://$POSTGRESQL_PRIMARY_DB_DB_USERNAME:$POSTGRESQL_PRIMARY_DB_DB_PASSWORD@127.0.0.1:$POSTGRES_PORT/$POSTGRESQL_PRIMARY_DB_DB_NAME?sslmode=require" \
+  up 2
+```
+
 What v6 + v7 do:
 
-- **v6** enables `pg_trgm` (CREATE EXTENSION). Idempotent.
+- **v6** enables `pg_trgm` (CREATE EXTENSION). Idempotent. Requires
+  superuser the first time it runs in prod — if your app role can't
+  `CREATE EXTENSION`, run this single statement as `postgres` manually,
+  then `migrate force 6` and continue.
 - **v7** adds the STORED `search_doc` column on `user_account` plus two
   GIN trigram indexes. The `CREATE INDEX` is **not** `CONCURRENTLY` —
   on the prod table (≲100k users today) the AccessExclusiveLock is
@@ -72,47 +127,77 @@ What v6 + v7 do:
 Rollback:
 
 ```bash
-docker compose --env-file .env run --rm db-migrations down 2
+eval $MIGRATE down 2
 ```
 
 ---
 
 ## 3. Build the new Elasticsearch index
 
-ES requires a manual cut-over because the new mapping (`mapping_v3.json`)
-is incompatible with the live `..._v2` mapping — you cannot change an
-analyzer on an existing field in place.
+`the_monkeys_blogs` is an **alias** in prod pointing at a backing
+index (`BACKING`). Verified in dev (ES 8.16.1) and confirmed by
+reading the live config:
 
-```bash
-ES=http://localhost:$OPENSEARCH_HTTP_PORT
-
-# 3.1 — create the v3 index with the new mapping
-docker cp documents/reindex/mapping_v3.json elasticsearch-node1:/tmp/mapping_v3.json
-docker exec elasticsearch-node1 curl -s -X PUT "$ES/the_monkeys_blogs_v3" \
-  -H 'Content-Type: application/json' --data-binary "@/tmp/mapping_v3.json"
-# expect: {"acknowledged":true,"shards_acknowledged":true,"index":"..."}
-
-# 3.2 — dry-run the reindex to catch transform errors before touching v3
-ES_ADDR=$ES go run ./scripts/reindex_blogs_v3 \
-  -src the_monkeys_blogs_v2 -dst the_monkeys_blogs_v3 -dry-run
-
-# 3.3 — for real (idempotent; safe to re-run)
-ES_ADDR=$ES go run ./scripts/reindex_blogs_v3 \
-  -src the_monkeys_blogs_v2 -dst the_monkeys_blogs_v3
+```
+alias              index                 is_write_index
+the_monkeys_blogs  the_monkeys_blogs_v2  -
 ```
 
-Verify:
+So prod's `BACKING = the_monkeys_blogs_v2` unless your ES says
+otherwise. **Confirm before doing anything**:
 
 ```bash
-curl -s $ES/the_monkeys_blogs_v2/_count
-curl -s $ES/the_monkeys_blogs_v3/_count
-# Counts MUST match. Investigate before continuing if they don't.
+curl -s -u "elastic:pass" "$ES/_cat/aliases/the_monkeys_blogs?v"
+# record the value in the `index` column — that's BACKING.
+
+# Abort if v3 already exists (means someone half-ran this before):
+curl -s -u "elastic:pass" -o /dev/null -w '%{http_code}\n' \
+  "$ES/the_monkeys_blogs_v3"
+# expected: 404. If 200, investigate before continuing.
 ```
 
-Spot-check a denormalised doc:
+Two files in the current working directory:
+
+- `mapping_v3.json` — copy of [documents/reindex/mapping_v3.json](../reindex/mapping_v3.json).
+- `reindex.json` — the reindex body:
+
+  ```json
+  {
+    "source": { "index": "the_monkeys_blogs" },
+    "dest":   { "index": "the_monkeys_blogs_v3" }
+  }
+  ```
+
+  ES resolves `source.index` through the alias to `BACKING`, so this
+  works without hardcoding the backing name.
+
+### Linux
 
 ```bash
-curl -s "$ES/the_monkeys_blogs_v3/_search?size=2&_source=blog_id,title,summary,tags"
+# 3.1 — create v3 with the new mapping
+curl -u "elastic:pass" -X PUT "$ES/the_monkeys_blogs_v3" \
+  -H "Content-Type: application/json" -d @mapping_v3.json
+
+# 3.2 — reindex (blocking; for large corpora drop wait_for_completion
+#        and poll /_tasks/<id> instead)
+curl -u "elastic:pass" -X POST "$ES/_reindex?wait_for_completion=true" \
+  -H "Content-Type: application/json" -d @reindex.json
+
+# 3.3 — verify counts before the alias swap
+curl -s -u "elastic:pass" "$ES/the_monkeys_blogs/_count"
+curl -s -u "elastic:pass" "$ES/the_monkeys_blogs_v3/_count"
+# counts MUST match (dev currently shows alias=566, v3=566)
+```
+
+### Windows (PowerShell, using `curl.exe`)
+
+```powershell
+cmd /c "curl.exe -X PUT http://localhost:9200/the_monkeys_blogs_v3 -H ""Content-Type: application/json"" -d @mapping_v3.json"
+
+cmd /c "curl.exe -X POST http://localhost:9200/_reindex?wait_for_completion=true -H ""Content-Type: application/json"" -d @reindex.json"
+
+curl.exe http://localhost:9200/the_monkeys_blogs/_count
+curl.exe http://localhost:9200/the_monkeys_blogs_v3/_count
 ```
 
 ### 3.1 — Mapping breaking change you MUST be aware of
@@ -143,40 +228,59 @@ lowercase token.
 Verification before the alias swap:
 
 ```bash
-# Sanity: pick any known blog id and confirm v3 returns it via top-level field
-curl -s -X POST "$ES/the_monkeys_blogs_v3/_search" -H 'Content-Type: application/json' \
-  -d '{"query":{"term":{"blog_id":"<known_blog_id>"}},"_source":false}' | jq '.hits.total'
+curl -s -u "elastic:pass" -X POST "$ES/the_monkeys_blogs_v3/_search" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":{"term":{"blog_id":"<known_blog_id>"}},"_source":false}' \
+  | jq '.hits.total'
 # expected: { value: 1, relation: "eq" }
 ```
 
-If you ever cherry-pick the `mapping_v3.json` onto an older blog-svc
-image that still has `.keyword` in its queries, GET-by-id breaks in
-prod. Roll the blog image forward first, or apply the same s/\.keyword//
-fix to the older code.
+If you ever apply `mapping_v3.json` on an older blog-svc image that
+still has `.keyword` in its queries, GET-by-id breaks in prod. Roll
+the blog image forward first.
 
 ---
 
 ## 4. Atomic alias swap (the actual cut-over)
 
-The application reads/writes through the alias `the_monkeys_blogs`,
-never the physical index, so this single request flips traffic with
-zero downtime.
+Single request — ES applies all actions atomically. Zero downtime,
+no 404 window. **Do NOT `DELETE /the_monkeys_blogs`** — since it's
+an alias, that would delete the backing index `BACKING` and destroy
+your rollback path.
+
+Note: dev's alias has no `is_write_index` set and writes work fine
+because the alias resolves to a single index. We match that here.
+
+### Linux
 
 ```bash
-ES=http://localhost:$OPENSEARCH_HTTP_PORT
-curl -s -X POST "$ES/_aliases" -H 'Content-Type: application/json' -d '{
-  "actions": [
-    { "remove": { "index": "*",                    "alias": "the_monkeys_blogs" } },
-    { "add":    { "index": "the_monkeys_blogs_v3", "alias": "the_monkeys_blogs" } }
-  ]
-}'
+curl -u "elastic:pass" -X POST "$ES/_aliases" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actions": [
+      { "remove": { "index": "*",                    "alias": "the_monkeys_blogs" } },
+      { "add":    { "index": "the_monkeys_blogs_v3", "alias": "the_monkeys_blogs" } }
+    ]
+  }'
 
-curl -s "$ES/_cat/aliases/the_monkeys_blogs?v"
-# expected: the_monkeys_blogs -> the_monkeys_blogs_v3
+curl -s -u "elastic:pass" "$ES/_cat/aliases/the_monkeys_blogs?v"
+# expected:
+# alias              index                 ... is_write_index
+# the_monkeys_blogs  the_monkeys_blogs_v3  ... -
 ```
 
-**Rollback (one liner):** swap the index name back to `..._v2` and
-re-issue. Keep `..._v2` around for at least 7 days.
+### Windows (PowerShell)
+
+```powershell
+cmd /c "curl.exe -X POST http://localhost:9200/_aliases -H ""Content-Type: application/json"" -d ""{\""actions\"":[{\""remove\"":{\""index\"":\""*\"",\""alias\"":\""the_monkeys_blogs\""}},{\""add\"":{\""index\"":\""the_monkeys_blogs_v3\"",\""alias\"":\""the_monkeys_blogs\""}}]}"""
+
+curl.exe http://localhost:9200/_cat/aliases/the_monkeys_blogs?v
+```
+
+**Rollback (one liner):** re-issue the same `POST /_aliases` with
+`BACKING` (recorded in §3, expected: `the_monkeys_blogs_v2`) in
+place of `the_monkeys_blogs_v3`. Keep `BACKING` around for at least
+7 days; drop it in §9.
 
 ---
 
@@ -194,13 +298,51 @@ Watch the gateway boot log for the search-v2 init line:
 
 ```bash
 docker logs the-monkeys-gateway --tail 50 | grep -Ei 'blogsearch|opensearch'
-# expected: "blogsearch: connected  addr=http://elasticsearch-node1:9200 alias=the_monkeys_blogs"
+# expected: "blogsearch: connected  addr=<your $OPENSEARCH_OS_HOST> alias=the_monkeys_blogs"
 ```
 
-If the gateway logs `dial tcp [::1]:9201: connect: connection refused`,
-the OpenSearch env is wrong: the gateway must use **`OPENSEARCH_OS_HOST`**
-(container-network), not `OPENSEARCH_ADDRESS` (host-network). Fix the
-`.env` and `docker compose up -d the_monkeys_gateway` again.
+### Container → host networking (CRITICAL)
+
+Because ES and Postgres run on the **host**, the app containers cannot
+reach them on `127.0.0.1` inside the container. Pick **one** of these
+in your `docker-compose.yml` / `.env` and verify it before the rollout:
+
+1. **`network_mode: host`** on the affected services (Linux only). The
+   container shares the host network namespace, so `127.0.0.1:5432`
+   and `127.0.0.1:9200` Just Work. Simplest, but you lose Docker's
+   service-to-service DNS.
+2. **Bridge network + `host.docker.internal`** (or the host's LAN IP /
+   `172.17.0.1` on Linux). Set in `.env`:
+
+   ```env
+   POSTGRES_HOST=host.docker.internal
+   OPENSEARCH_OS_HOST=http://host.docker.internal:9200
+   ```
+
+   On Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]`
+   to each app service in `docker-compose.yml`.
+3. **Explicit LAN IP / hostname** of the prod node. Cleanest if you ever
+   plan to split the app tier off the DB tier onto separate hosts.
+
+Failure modes you'll see in the gateway log if this is wrong:
+
+- `dial tcp [::1]:9200: connect: connection refused` → `OPENSEARCH_OS_HOST`
+  is pointing at the loopback inside the container. Fix per option 2
+  or 3 above.
+- `dial tcp 127.0.0.1:5432: connect: connection refused` → same problem
+  for Postgres.
+- `dial tcp <ip>:9200: i/o timeout` → host firewall blocks the bridge
+  subnet. Allow `172.17.0.0/16` (or whatever the compose network CIDR
+  is) inbound to ES / Postgres.
+
+Also make sure the **host** services bind on an address the containers
+can reach, not just `127.0.0.1`:
+
+- Postgres `postgresql.conf`: `listen_addresses = '127.0.0.1, 172.17.0.1'`
+  (or `*` + tight `pg_hba.conf`).
+- Elasticsearch `elasticsearch.yml`: `network.host: 0.0.0.0` (bound to a
+  private interface, never the public one), and an ES-level allow-list
+  if you run with security enabled.
 
 ---
 
@@ -291,21 +433,21 @@ A sustained spike in `zero_result` is the canary for the
 
 ## 9. Cleanup — **schedule for T+7 days**
 
-Only after the 24h metrics look good AND a full week of v3 traffic:
+Only after the 24h metrics look good AND a full week of v3 traffic.
+Replace `<BACKING>` with the old backing index you recorded in §3.
 
 ```bash
-ES=http://localhost:$OPENSEARCH_HTTP_PORT
-
 # Sanity: alias still on v3?
-curl -s "$ES/_cat/aliases/the_monkeys_blogs?v"
+curl -s -u "elastic:pass" "$ES/_cat/aliases/the_monkeys_blogs?v"
 
-# Final snapshot of v2 (paranoia)
-curl -s -X PUT "$ES/_snapshot/local-fs/pre_drop_v2_$(date +%F)?wait_for_completion=true" \
+# Final snapshot of the old backing index (paranoia)
+curl -s -u "elastic:pass" -X PUT \
+  "$ES/_snapshot/local-fs/pre_drop_backing_$(date +%F)?wait_for_completion=true" \
   -H 'Content-Type: application/json' \
-  -d '{"indices":"the_monkeys_blogs_v2","include_global_state":false}'
+  -d '{"indices":"<BACKING>","include_global_state":false}'
 
-# Drop the old index
-curl -s -X DELETE "$ES/the_monkeys_blogs_v2"
+# Drop the old backing index
+curl -s -u "elastic:pass" -X DELETE "$ES/<BACKING>"
 ```
 
 The legacy `/api/v1/user/search` and `/api/v2/blog/search` 308 shims
@@ -320,9 +462,11 @@ stay in place for one more release after that, then are deleted.
 | Gateway 5xx on any `/api/v2/*search`                     | Re-deploy previous gateway image. Cache and ES are unaffected.                                                                                                               |
 | Blog search results suddenly all zero                    | Verify alias → v3, then check `is_draft/is_archived` field presence (see §6 above).                                                                                          |
 | `GET /api/v2/blog/:id` returns 404 "the blog does not exist" but doc exists in ES | Blog-svc image still queries `"blog_id.keyword"` against v3. Either roll the blog image forward, or **temporarily** swing alias back to `_v2` until the new image is in place. See §3.1. |
-| ES v3 corrupted mid-reindex                              | `POST _aliases` to swing alias back to `the_monkeys_blogs_v2`. v3 can be rebuilt.                                                                                            |
+| ES v3 corrupted mid-reindex                              | `POST _aliases` to swing alias back to `<BACKING>` (recorded in §3). v3 can be rebuilt.                                                                                            |
 | Postgres v7 migration fails dirty                        | `migrate force 6`, drop the indexes, fix, re-run.                                                                                                                            |
 | Front-end calls 404                                      | Old front-end shipped against new gateway — redeploy front-end immediately.                                                                                                  |
+| App container logs `dial tcp 127.0.0.1:5432` or `[::1]:9200` refused | Container is resolving DB/ES to its own loopback. ES + Postgres are on the **host** in prod — fix `POSTGRES_HOST` / `OPENSEARCH_OS_HOST` per §5 (use `host.docker.internal` + `extra_hosts`, the LAN IP, or `network_mode: host`). |
+| App container logs `dial tcp <host-ip>:9200 i/o timeout` | Host firewall is blocking the docker bridge. Allow the compose network CIDR (commonly `172.17.0.0/16`) inbound to ES/Postgres on the host. |
 
 Every step in §§1–5 is independently reversible. Cleanup (§9) is the
 only destructive action and is intentionally gated behind a one-week

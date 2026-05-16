@@ -80,11 +80,12 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.POST("/follow/:username", usc.FollowUser)
 		routes.POST("/unfollow/:username", usc.UnfollowUser)
 		routes.GET("/is-followed/:username", usc.IsUserFollowed)
-		// Search v2 deprecation (Phase 5): v1 user search now permanently
-		// redirects to /api/v2/user/search. 308 preserves the GET method
-		// and the query string (search_term, limit, offset are identical
-		// between v1 and v2), so existing clients keep working without
-		// code changes. Will be removed entirely after one release.
+		// DEPRECATED route — Search v2 deprecation (Phase 5): v1 user
+		// search now permanently redirects to /api/v2/user/search. 308
+		// preserves the GET method and the query string (search_term,
+		// limit, offset are identical between v1 and v2), so existing
+		// clients keep working without code changes. Will be removed
+		// entirely after one release. Do not add new callers.
 		routes.GET("/search", redirectToV2UserSearch)
 	}
 
@@ -930,11 +931,12 @@ func (asc *UserServiceClient) CountLikes(ctx *gin.Context) {
 }
 
 func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
-	// Deprecated (Phase 5): the v1 streaming search handler is no longer
+	// Deprecated: the v1 streaming search handler is no longer
 	// registered on any route. The /api/v1/user/search path now issues a
 	// 308 redirect to /api/v2/user/search (see redirectToV2UserSearch).
 	// This stub remains only because the bidi gRPC method on the user
-	// service is still wired for potential internal callers.
+	// service is still wired for potential internal callers. Do not add
+	// new callers — use FindUsersV2 / /api/v2/user/search instead.
 	ctx.Redirect(http.StatusPermanentRedirect, buildRedirectTarget(ctx, "/api/v2/user/search"))
 }
 
@@ -942,6 +944,10 @@ func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
 // deprecated /api/v1/user/search to /api/v2/user/search, preserving the
 // raw query string. 308 (vs 301/302) guarantees the GET method and the
 // body — if any — are not mutated by intermediaries.
+//
+// Deprecated: this handler exists only as a transitional shim. New
+// code must call /api/v2/user/search directly. The route will be
+// removed one release after the Search v2 rollout soaks.
 func redirectToV2UserSearch(ctx *gin.Context) {
 	ctx.Redirect(http.StatusPermanentRedirect, buildRedirectTarget(ctx, "/api/v2/user/search"))
 }

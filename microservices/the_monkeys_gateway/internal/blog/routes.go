@@ -165,13 +165,13 @@ func RegisterBlogRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routesV2.GET("/meta-feed", rateLimiter, blogClient.GetsMetaFeed)
 		// Get all blogs
 		routesV2.GET("/feed", rateLimiter, blogClient.GetLatestBlogs) // Get all blogs, latest first with limit and offset
-		// Search blogs with query — deprecated in Phase 5. The legacy
+		// DEPRECATED route — Search blogs with query, Phase 5. The legacy
 		// path /api/v2/blog/search now 308-redirects to the v2 query
 		// engine at /api/v2/blog/search/v2 (Elasticsearch v3 index,
 		// ranked + highlighted). Query string is preserved; the new
 		// endpoint accepts `search_term` for back-compat with v1
 		// callers, so this redirect is a true drop-in. Will be removed
-		// entirely after one release.
+		// entirely after one release. Do not add new callers.
 		routesV2.GET("/search", rateLimiter, redirectToBlogSearchV2)
 		// Get blogs by tags, as users can filter the blogs using multiple tags
 		routesV2.POST("/tags", rateLimiter, blogClient.GetBlogsByTags) // Get blogs by tags
@@ -2414,6 +2414,10 @@ func (asc *BlogServiceClient) GetAdvancedAnalytics(ctx *gin.Context) {
 // back-compat alias for `q`, so old clients keep working unchanged.
 // 308 (not 301/302) is used so the GET method is preserved by
 // intermediaries.
+//
+// Deprecated: transitional shim. New code must call
+// /api/v2/blog/search/v2 directly. The route will be removed one
+// release after the Search v2 rollout soaks.
 func redirectToBlogSearchV2(ctx *gin.Context) {
 	target := "/api/v2/blog/search/v2"
 	if raw := ctx.Request.URL.RawQuery; raw != "" {
