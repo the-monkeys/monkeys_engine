@@ -22,7 +22,7 @@ func (es *elasticsearchStorage) DeleteBlogsByOwnerAccountID(ctx context.Context,
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"term": map[string]interface{}{
-				"owner_account_id.keyword": ownerAccountId,
+				"owner_account_id": ownerAccountId,
 			},
 		},
 	}

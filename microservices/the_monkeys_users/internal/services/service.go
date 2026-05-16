@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
 	"github.com/the-monkeys/the_monkeys/config"
@@ -979,13 +980,13 @@ func (us *UserSvc) SearchUser(stream pb.UserService_SearchUserServer) error {
 
 		us.log.Debugf("Received search request for username: %s or account_id: %s", req.GetUsername(), req.GetAccountId())
 
-		// Search user based on the provided details
-		var users []models.UserAccount
-		//if req.GetSearchTerm() == "" {
-		//
-		//}
-
-		users, err = us.dbConn.FindUsersWithPagination(req.SearchTerm, int(req.Limit), int(req.Offset))
+		// Search v2 (Phase 1): index-backed, ranked, Active-only.
+		// Bounded server-side context keeps a slow query from holding
+		// the gRPC connection forever even if the caller forgets a
+		// deadline.
+		searchCtx, cancel := context.WithTimeout(stream.Context(), 500*time.Millisecond)
+		users, err := us.dbConn.FindUsersV2(searchCtx, req.GetSearchTerm(), int(req.GetLimit()), int(req.GetOffset()))
+		cancel()
 		if err != nil {
 			us.log.Errorf("Error searching user: %v", err)
 			return status.Errorf(codes.Internal, "Failed to search users: %v", err)

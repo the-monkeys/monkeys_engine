@@ -85,7 +85,7 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 								for _, tag := range normalizedTags {
 									shouldClauses = append(shouldClauses, map[string]interface{}{
 										"term": map[string]interface{}{
-											"tags.keyword": map[string]interface{}{
+											"tags": map[string]interface{}{
 												"value":            tag,
 												"case_insensitive": true,
 											},
@@ -599,7 +599,7 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 	must := []map[string]interface{}{
 		{
 			"term": map[string]interface{}{
-				"owner_account_id.keyword": accountId,
+				"owner_account_id": accountId,
 			},
 		},
 	}
@@ -897,7 +897,7 @@ func (es *elasticsearchStorage) GetBlogsMetaByBlogIdsV2(ctx context.Context, blo
 				"must": []map[string]interface{}{
 					{
 						"terms": map[string]interface{}{
-							"blog_id.keyword": blogIds,
+							"blog_id": blogIds,
 						},
 					},
 					{
