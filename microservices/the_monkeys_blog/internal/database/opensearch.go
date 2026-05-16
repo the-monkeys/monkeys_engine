@@ -155,7 +155,7 @@ func (es *elasticsearchStorage) GetDraftBlogsByOwnerAccountID(ctx context.Contex
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": ownerAccountID,
+							"owner_account_id": ownerAccountID,
 						},
 					},
 					{
@@ -267,7 +267,7 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": ownerAccountID,
+							"owner_account_id": ownerAccountID,
 						},
 					},
 					{
@@ -405,7 +405,7 @@ func (es *elasticsearchStorage) GetScheduledBlogsByOwnerAccountID(ctx context.Co
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": ownerAccountID,
+							"owner_account_id": ownerAccountID,
 						},
 					},
 					{
@@ -1063,7 +1063,7 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 								for _, tag := range normalizedTags {
 									shouldClauses = append(shouldClauses, map[string]interface{}{
 										"term": map[string]interface{}{
-											"tags.keyword": map[string]interface{}{
+											"tags": map[string]interface{}{
 												"value":            tag,
 												"case_insensitive": true,
 											},
@@ -1203,7 +1203,7 @@ func (es *elasticsearchStorage) GetPublishedBlogById(ctx context.Context, id str
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": id,
+							"blog_id": id,
 						},
 					},
 					{
@@ -1522,12 +1522,12 @@ func (es *elasticsearchStorage) GetDraftedBlogByIdAndOwner(ctx context.Context, 
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": blogId,
+							"blog_id": blogId,
 						},
 					},
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": ownerAccountId,
+							"owner_account_id": ownerAccountId,
 						},
 					},
 					{
@@ -1652,12 +1652,12 @@ func (es *elasticsearchStorage) GetPublishedBlogByIdAndOwner(ctx context.Context
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": blogId,
+							"blog_id": blogId,
 						},
 					},
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": ownerAccountId,
+							"owner_account_id": ownerAccountId,
 						},
 					},
 					{
@@ -1779,7 +1779,7 @@ func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds [
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"terms": map[string]interface{}{
-				"blog_id.keyword": blogIds,
+				"blog_id": blogIds,
 			},
 		},
 		"sort": []map[string]interface{}{
@@ -1888,7 +1888,7 @@ func (es *elasticsearchStorage) GetDraftBlogByBlogId(ctx context.Context, blogId
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": blogId,
+							"blog_id": blogId,
 						},
 					},
 					{

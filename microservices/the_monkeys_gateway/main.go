@@ -16,6 +16,8 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/admin"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/auth"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blog"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blogsearch"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/cache/searchcache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage_v2"
@@ -57,6 +59,15 @@ func main() {
 	log := logger.ZapForService("gateway")
 	defer logger.Sync()
 
+	// Search v2 cache (Phase 0 plumbing). Safe-to-fail: returns a usable
+	// instance even if Redis is down so search still serves traffic.
+	searchCache := searchcache.New(cfg, log)
+	defer func() {
+		if err := searchCache.Close(); err != nil {
+			log.Warnw("searchcache close failed", "err", err)
+		}
+	}()
+	_ = searchCache // additional consumers wired in later phases
 	// Set Gin to Release mode
 	gin.SetMode(gin.ReleaseMode)
 
@@ -90,8 +101,12 @@ func main() {
 
 	// Register REST routes for all the microservices
 	authClient := auth.RegisterAuthRouter(server.router, cfg, log)
-	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient, log)
+	userClient := user_service.RegisterUserRouter(server.router, cfg, authClient, log, searchCache)
 	blog.RegisterBlogRouter(server.router, cfg, authClient, userClient, log)
+	// Phase 3: search-v2 blog & autocomplete endpoints. Hits ES via the
+	// the_monkeys_blogs alias, so it follows whichever physical index
+	// the Phase 2 alias swap is currently pointing at.
+	blogsearch.RegisterRoutes(server.router, cfg, searchCache, log)
 	storageClient := storage.RegisterFileStorageRouter(server.router, cfg, authClient, log)
 	storage_v2.RegisterRoutes(server.router, cfg, storageClient.Client, authClient, log)
 	notification.RegisterNotificationRoute(server.router, cfg, authClient, log)

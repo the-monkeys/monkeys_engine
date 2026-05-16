@@ -16,59 +16,128 @@ produces:
   
 paths:
   /blog/search:
-    post:
+    get:
       tags:
         - Blog
-      summary: Search blogs
-      description: Search blogs using query text
-      operationId: searchBlogs
+      summary: "[DEPRECATED] Search blogs (legacy)"
+      description: >
+        DEPRECATED — Phase 5 of Search v2 deprecation.
+
+        This route now returns 308 Permanent Redirect to
+        `/api/v2/blog/search/v2` with the original query string preserved.
+        The v2 engine accepts the legacy `search_term` parameter as a
+        back-compat alias for `q`, so existing GET clients keep working
+        without code changes.
+
+        Scheduled for removal one release after the v3 index is steady.
+      deprecated: true
+      operationId: searchBlogsLegacy
       parameters:
+        - name: search_term
+          in: query
+          description: Search text (forwarded as `q` to the v2 engine).
+          required: true
+          type: string
         - name: limit
           in: query
-          description: Number of blogs to return
           required: false
           type: integer
           default: 20
-        - name: offset
+      responses:
+        '308':
+          description: Permanent Redirect to `/api/v2/blog/search/v2`.
+
+  /blog/search/v2:
+    get:
+      tags:
+        - Blog
+      summary: Search blogs (v2 — ranked, highlighted, cursor-paginated)
+      description: >
+        Elasticsearch-backed full-text blog search. Ranking uses
+        `function_score` with a 90-day Gaussian recency decay plus a
+        `log1p(like_count)` popularity boost on top of a `multi_match`
+        (best_fields, AND) over title, summary, body, tags and author
+        fields with `AUTO:4,7` fuzziness. Rate limited to 30 req/s per
+        client. Response is cached at the gateway for 60 s.
+      operationId: searchBlogsV2
+      parameters:
+        - name: q
           in: query
-          description: Number of blogs to skip for pagination
+          description: Search text (1–128 chars). Alias `search_term` accepted for back-compat.
+          required: true
+          type: string
+          minLength: 1
+          maxLength: 128
+        - name: limit
+          in: query
           required: false
           type: integer
-          default: 0
-        - name: body
-          in: body
-          description: Search query
-          required: true
-          schema:
-            type: object
-            properties:
-              searchQuery:
-                type: string
-                description: Search text to find in blog content or titles
-                example: "docker kubernetes"
-            required:
-              - searchQuery
+          default: 20
+          maximum: 50
+        - name: cursor
+          in: query
+          description: Opaque base64url-encoded cursor returned as `next_cursor` from the previous page.
+          required: false
+          type: string
       responses:
         '200':
           description: Successful operation
           schema:
             type: object
             properties:
-              total_blogs:
-                type: integer
-                description: Total number of blogs matching the search criteria
-              blogs:
+              hits:
                 type: array
                 items:
-                  $ref: '#/definitions/BlogMetadata'
+                  $ref: '#/definitions/BlogSearchHit'
+              next_cursor:
+                type: string
+                description: Cursor for the next page; absent on the last page.
+              took_ms:
+                type: integer
+              total:
+                type: integer
+                description: Approximate total match count from Elasticsearch.
         '400':
-          description: Invalid input
+          description: Invalid input (missing `q`, out-of-range `limit`, malformed `cursor`).
           schema:
             $ref: '#/definitions/Error'
-        '500':
-          description: Internal server error
+        '429':
+          description: Rate limit exceeded.
+
+  /search/suggest:
+    get:
+      tags:
+        - Blog
+      summary: Autocomplete (title suggestions)
+      description: >
+        Edge-ngram-backed autocomplete over blog titles. Gated to queries
+        of 2+ characters. Fails closed — returns `{ "hits": [] }` on any
+        backend error so the UI is never blocked. Rate limited to
+        30 req/s; gateway-side Redis cache TTL is 30 s.
+      operationId: searchSuggest
+      parameters:
+        - name: q
+          in: query
+          required: true
+          type: string
+          minLength: 2
+          maxLength: 128
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          default: 5
+          maximum: 10
+      responses:
+        '200':
+          description: Successful operation
           schema:
-            $ref: '#/definitions/Error'
+            type: object
+            properties:
+              hits:
+                type: array
+                items:
+                  $ref: '#/definitions/BlogSuggestHit'
 
   /blog/tags:
     post:
@@ -558,6 +627,50 @@ paths:
         - Bearer: []
 
 definitions:
+  BlogSearchHit:
+    type: object
+    description: Single ranked blog hit returned by `/blog/search/v2`.
+    properties:
+      blog_id: { type: string }
+      title: { type: string }
+      summary: { type: string }
+      slug: { type: string }
+      author_username: { type: string }
+      author_display_name: { type: string }
+      owner_account_id: { type: string }
+      published_time: { type: string, format: date-time }
+      like_count: { type: integer }
+      view_count: { type: integer }
+      tags:
+        type: array
+        items: { type: string }
+      score: { type: number, format: float }
+      highlight:
+        type: object
+        description: >
+          Per-field highlight fragments wrapped in `<mark>` tags.
+          Sanitised server-side. Only the keys listed are emitted.
+        properties:
+          title:
+            type: array
+            items: { type: string }
+          summary:
+            type: array
+            items: { type: string }
+          body:
+            type: array
+            items: { type: string }
+
+  BlogSuggestHit:
+    type: object
+    description: Slim title-only hit for `/search/suggest`.
+    properties:
+      blog_id: { type: string }
+      title: { type: string }
+      slug: { type: string }
+      author_username: { type: string }
+      published_time: { type: string, format: date-time }
+
   BlogMetadata:
     type: object
     properties:

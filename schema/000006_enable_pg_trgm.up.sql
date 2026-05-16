@@ -1,0 +1,15 @@
+-- Search v2 — Phase 0 foundation.
+--
+-- pg_trgm is a built-in PostgreSQL extension that provides:
+--   * the % operator (trigram similarity), used for typo-tolerant matching;
+--   * GIN-compatible operator classes (gin_trgm_ops) so that ILIKE '%...%'
+--     and similarity() queries can use an index instead of a sequential scan.
+--
+-- We enable it here so subsequent migrations (Phase 1) can create the
+-- search_doc generated column and its GIN index without touching extensions
+-- in the middle of a data-shape change. Keeping schema/data changes apart
+-- also keeps each migration's intent obvious in `migrate version` output.
+--
+-- IF NOT EXISTS makes the migration safe to re-run and safe on environments
+-- where the extension was created out-of-band (e.g. a restored snapshot).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;

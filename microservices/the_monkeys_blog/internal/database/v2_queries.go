@@ -9,10 +9,17 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/constants"
+	"github.com/the-monkeys/the_monkeys/searchdoc"
 )
 
 func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error) {
 	blogId, _ := blog["blog_id"].(string)
+
+	// Denormalise editorjs blocks into the flat search-v2 fields
+	// (title/summary/body/tags). This runs on every write so the v3
+	// alias receives a self-contained, search-ready document without
+	// any cross-shard joins at query time.
+	blog = searchdoc.Apply(blog)
 
 	bs, err := json.Marshal(blog)
 	if err != nil {
@@ -75,7 +82,7 @@ func (es *elasticsearchStorage) GetBlogsOfUsersByAccountIds(ctx context.Context,
 				"must": []map[string]interface{}{
 					{
 						"terms": map[string]interface{}{
-							"owner_account_id.keyword": accountIds,
+							"owner_account_id": accountIds,
 						},
 					},
 					{
@@ -198,7 +205,7 @@ func (es *elasticsearchStorage) GetBlogsByTagsAccId(ctx context.Context, account
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": accountId,
+							"owner_account_id": accountId,
 						},
 					},
 					{
@@ -208,7 +215,7 @@ func (es *elasticsearchStorage) GetBlogsByTagsAccId(ctx context.Context, account
 								for _, tag := range normalizedTags {
 									shouldClauses = append(shouldClauses, map[string]interface{}{
 										"term": map[string]interface{}{
-											"tags.keyword": map[string]interface{}{
+											"tags": map[string]interface{}{
 												"value":            tag,
 												"case_insensitive": true,
 											},
@@ -330,7 +337,7 @@ func (es *elasticsearchStorage) GetBlogsByAccountId(ctx context.Context, account
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": accountId,
+							"owner_account_id": accountId,
 						},
 					},
 					{
@@ -434,7 +441,7 @@ func (es *elasticsearchStorage) GetBlogByBlogId(ctx context.Context, blogId stri
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": blogId,
+							"blog_id": blogId,
 						},
 					},
 					{
@@ -538,12 +545,12 @@ func (es *elasticsearchStorage) GetABlogByBlogIdAccId(ctx context.Context, blogI
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"blog_id.keyword": blogId,
+							"blog_id": blogId,
 						},
 					},
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": accountId,
+							"owner_account_id": accountId,
 						},
 					},
 					{
@@ -662,7 +669,7 @@ func (es *elasticsearchStorage) GetBlogsByTags(ctx context.Context, tags []strin
 								for _, tag := range normalizedTags {
 									shouldClauses = append(shouldClauses, map[string]interface{}{
 										"term": map[string]interface{}{
-											"tags.keyword": map[string]interface{}{
+											"tags": map[string]interface{}{
 												"value":            tag,
 												"case_insensitive": true,
 											},
@@ -784,7 +791,7 @@ func (es *elasticsearchStorage) GetBlogsByBlogIdsV2(ctx context.Context, blogIds
 				"must": []map[string]interface{}{
 					{
 						"terms": map[string]interface{}{
-							"blog_id.keyword": blogIds,
+							"blog_id": blogIds,
 						},
 					},
 				},
@@ -991,7 +998,7 @@ func (es *elasticsearchStorage) GetAllTagsFromUserPublishedBlogs(ctx context.Con
 				"must": []map[string]interface{}{
 					{
 						"term": map[string]interface{}{
-							"owner_account_id.keyword": accountID,
+							"owner_account_id": accountID,
 						},
 					},
 					{
