@@ -63,8 +63,9 @@ The mapping/indexing work. No new query yet.
 - [x] Blog service write path: `SaveBlog` now calls `searchdoc.Apply` to populate `title` / `summary` / `body` / `tags` from the editorjs blocks. Same helper backs the reindex job so live and backfilled docs are byte-identical.
 - [x] Reindex job: `scripts/reindex_blogs_v3/main.go` — bounded-memory scroll + bulk in 500-doc batches, idempotent on `blog_id`, `-dry-run` and `-require-dst` flags.
 - [x] Cut-over: PowerShell `_aliases` swap snippet in the README (atomic). Roll-back snippet included.
+- [x] **Post-deploy keyword fix (2026-05-17):** `mapping_v3.json` made `blog_id`, `owner_account_id`, and `tags` top-level `keyword` fields (no `.keyword` sub-field). The legacy blog-svc read path used `"blog_id.keyword"` / `"owner_account_id.keyword"` / `"tags.keyword"` in 25 `term` queries across `internal/database/{opensearch,v2_queries,query,blogs_matadata}.go`. ES does not error on a missing field, so GET-by-id and several metadata endpoints returned silent 404s post cut-over. Fixed by dropping the `.keyword` suffix on those fields; backward-compatible with the v2 `text` mapping because blog IDs tokenise to a single lowercase term. Captured in `documents/deploy/SEARCH_V2_PROD_DEPLOY.md` §3.1 and §10.
 
-Acceptance: count of docs in v3 == v2; spot-check 20 random blogs and confirm `title`, `summary`, `body` look correct; old query still works against the alias (because we did not change it yet).
+Acceptance: count of docs in v3 == v2; spot-check 20 random blogs and confirm `title`, `summary`, `body` look correct; old query still works against the alias (because we did not change it yet); `GET /api/v2/blog/:id` returns 200 against the v3 alias.
 
 ---
 

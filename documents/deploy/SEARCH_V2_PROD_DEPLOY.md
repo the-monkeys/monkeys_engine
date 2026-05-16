@@ -115,6 +115,45 @@ Spot-check a denormalised doc:
 curl -s "$ES/the_monkeys_blogs_v3/_search?size=2&_source=blog_id,title,summary,tags"
 ```
 
+### 3.1 — Mapping breaking change you MUST be aware of
+
+`mapping_v3.json` declares `blog_id`, `owner_account_id`, and `tags` as
+**top-level `keyword`** fields. The legacy v2 mapping had them as `text`
+with a `.keyword` sub-field. Every `term` query in the blog service
+that used `"<field>.keyword"` returns **zero hits** against v3 — and ES
+does not error on a non-existent field, so the failure mode is silent
+404s on:
+
+- `GET /api/v2/blog/:blog_id`
+- `GET /api/v2/blog/:blog_id/stats`
+- `GET /api/v2/blog/user/:username`
+- `GET /api/v2/blog/trending`
+- archive / delete / bookmark code paths
+
+The fix is already in this release: 25 callsites across
+[opensearch.go](../../microservices/the_monkeys_blog/internal/database/opensearch.go),
+[v2_queries.go](../../microservices/the_monkeys_blog/internal/database/v2_queries.go),
+[query.go](../../microservices/the_monkeys_blog/internal/database/query.go),
+[blogs_matadata.go](../../microservices/the_monkeys_blog/internal/database/blogs_matadata.go)
+were changed from `"blog_id.keyword"` → `"blog_id"` (same for
+`owner_account_id` and `tags`). It is backward-compatible with the v2
+mapping because the legacy `text` field tokenises blog IDs as a single
+lowercase token.
+
+Verification before the alias swap:
+
+```bash
+# Sanity: pick any known blog id and confirm v3 returns it via top-level field
+curl -s -X POST "$ES/the_monkeys_blogs_v3/_search" -H 'Content-Type: application/json' \
+  -d '{"query":{"term":{"blog_id":"<known_blog_id>"}},"_source":false}' | jq '.hits.total'
+# expected: { value: 1, relation: "eq" }
+```
+
+If you ever cherry-pick the `mapping_v3.json` onto an older blog-svc
+image that still has `.keyword` in its queries, GET-by-id breaks in
+prod. Roll the blog image forward first, or apply the same s/\.keyword//
+fix to the older code.
+
 ---
 
 ## 4. Atomic alias swap (the actual cut-over)
@@ -184,6 +223,12 @@ curl -s "$G/api/v2/search/suggest?q=ru&limit=3" | jq .
 # Legacy paths must 308 (preserves query string + GET method)
 curl -sI "$G/api/v1/user/search?search_term=admin" | grep -E '^(HTTP/|Location:)'
 curl -sI "$G/api/v2/blog/search?search_term=python"  | grep -E '^(HTTP/|Location:)'
+
+# CRITICAL — non-search GET paths that read from the alias.
+# These break silently if .keyword fix from §3.1 is not in the image.
+curl -s -w '\nHTTP=%{http_code}\n' "$G/api/v2/blog/<known_published_blog_id>" | tail -c 200
+curl -s -w '\nHTTP=%{http_code}\n' "$G/api/v2/blog/user/<known_username>" | tail -c 200
+curl -s -w '\nHTTP=%{http_code}\n' "$G/api/v2/blog/trending?limit=3" | tail -c 200
 ```
 
 Pass criteria:
@@ -193,6 +238,9 @@ Pass criteria:
 - Suggest returns `<=3` titles for a 2+ char prefix.
 - Both legacy paths return `308` with a `Location:` pointing at the
   v2 endpoint and identical query string.
+- `GET /api/v2/blog/:id` returns `200` with body — **not** `404 the blog
+  does not exist`. A 404 here means the running blog-svc image is
+  missing the §3.1 keyword fix; do not proceed.
 
 ---
 
@@ -267,13 +315,14 @@ stay in place for one more release after that, then are deleted.
 
 ## 10. Roll-back playbook
 
-| Symptom                              | Action                                                                              |
-| ------------------------------------ | ----------------------------------------------------------------------------------- |
-| Gateway 5xx on any `/api/v2/*search` | Re-deploy previous gateway image. Cache and ES are unaffected.                      |
-| Blog results suddenly all zero       | Verify alias → v3, then check `is_draft/is_archived` field presence (see §6 above). |
-| ES v3 corrupted mid-reindex          | `POST _aliases` to swing alias back to `the_monkeys_blogs_v2`. v3 can be rebuilt.   |
-| Postgres v7 migration fails dirty    | `migrate force 6`, drop the indexes, fix, re-run.                                   |
-| Front-end calls 404                  | Old front-end shipped against new gateway — redeploy front-end immediately.         |
+| Symptom                                                  | Action                                                                                                                                                                       |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gateway 5xx on any `/api/v2/*search`                     | Re-deploy previous gateway image. Cache and ES are unaffected.                                                                                                               |
+| Blog search results suddenly all zero                    | Verify alias → v3, then check `is_draft/is_archived` field presence (see §6 above).                                                                                          |
+| `GET /api/v2/blog/:id` returns 404 "the blog does not exist" but doc exists in ES | Blog-svc image still queries `"blog_id.keyword"` against v3. Either roll the blog image forward, or **temporarily** swing alias back to `_v2` until the new image is in place. See §3.1. |
+| ES v3 corrupted mid-reindex                              | `POST _aliases` to swing alias back to `the_monkeys_blogs_v2`. v3 can be rebuilt.                                                                                            |
+| Postgres v7 migration fails dirty                        | `migrate force 6`, drop the indexes, fix, re-run.                                                                                                                            |
+| Front-end calls 404                                      | Old front-end shipped against new gateway — redeploy front-end immediately.                                                                                                  |
 
 Every step in §§1–5 is independently reversible. Cleanup (§9) is the
 only destructive action and is intentionally gated behind a one-week
