@@ -76,6 +76,7 @@ func newService(cfg *config.Config, storageCli pb.UploadBlogFileClient, log *zap
 		Secure: cfg.Minio.UseSSL,
 	})
 	if err != nil {
+		log.Error(err.Error())
 		return nil, err
 	}
 

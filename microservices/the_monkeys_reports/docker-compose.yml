@@ -1,0 +1,20 @@
+version: '3.0'
+
+services:
+  the_monkeys_reports:
+    container_name: "the_monkeys_reports"
+    build:
+      context: microservices/the_monkeys_reports
+      args:
+        MICROSERVICE_REPORTS_SERVICE_INTERNAL_PORT: ${MICROSERVICE_REPORTS_SERVICE_INTERNAL_PORT}
+    networks:
+      - monkeys-network
+    restart: unless-stopped
+
+    ports:
+      - "${MICROSERVICE_REPORTS_SERVICE_PORT}:${MICROSERVICE_REPORTS_SERVICE_INTERNAL_PORT}"
+    depends_on:
+      - the_monkeys_db
+    env_file:
+      - .env
+

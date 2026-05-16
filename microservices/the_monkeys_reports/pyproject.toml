@@ -1,0 +1,11 @@
+[project]
+name = "the-monkeys-reports"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "sqlalchemy>=2.0.43",
+    "grpcio-tools>=1.75.1",
+    "psycopg2-binary>=2.9.11",
+]
