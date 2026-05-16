@@ -5,6 +5,8 @@ import (
 	"net"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/config"
 	"github.com/the-monkeys/the_monkeys/constants"
@@ -12,6 +14,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/rabbitmq"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/consumer"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -67,9 +70,16 @@ func main() {
 	}
 	log := logger.ZapForService("tm_storage")
 
+	// Initialize Database Logic before starting consumers so the consumer
+	// can soft-delete asset references on BLOG_DELETE / USER_ACCOUNT_DELETE.
+	dbLogic, err := database.NewStorageDB(cfg, log)
+	if err != nil {
+		log.Fatalf("Storage failed to connect to postgres: %v", err)
+	}
+
 	// Connect to rabbitmq server
 	qConn := rabbitmq.NewConnManager(cfg.RabbitMQ)
-	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, log)
+	go consumer.ConsumeFromQueue(qConn, cfg.RabbitMQ, dbLogic, log)
 
 	// Bind to all interfaces for health checks to work
 	listenAddr := fmt.Sprintf("0.0.0.0:%d", cfg.Microservices.StoragePort)
@@ -78,7 +88,7 @@ func main() {
 		log.Errorf("File server failed to listen at port %v, error: %+v", listenAddr, err)
 	}
 
-	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir, log)
+	fileService := server.NewFileService(constant.BlogDir, constant.ProfileDir, dbLogic, log)
 
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(constants.MaxMsgSize), grpc.MaxSendMsgSize(constants.MaxMsgSize))
 	pb.RegisterUploadBlogFileServer(grpcServer, fileService)

@@ -2155,39 +2155,79 @@ func (asc *BlogServiceClient) TrackBlogActivity(ctx *gin.Context) {
 
 // GetTrendingBlogs returns trending blogs from the activity service
 // GET /api/v2/blog/trending
+//
+// Query params:
+//   - time_range: ES date math suffix (e.g. "24h", "14d", "90d"). Default "24h".
+//   - limit, offset, account_id
+//
+// When the requested window contains no activity, the handler progressively
+// widens the window (24h -> 14d -> 90d -> 1y) until it finds data. This keeps
+// the landing page useful when activity data is sparse without forcing the
+// frontend to pick the right window. The actually used window is returned in
+// the response as "time_range_used".
 func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
 	accID := ctx.Query("account_id")
-	timeRange := ctx.DefaultQuery("time_range", "24h")
+	requestedRange := ctx.DefaultQuery("time_range", "24h")
 	limitInt := utils.GetIntQuery(ctx, "limit", 10)
 	offsetInt := utils.GetIntQuery(ctx, "offset", 0)
 	clientInfo := utils.GetClientInfo(ctx)
 
-	resp, err := asc.ActivityCli.GetTrendingBlogs(context.Background(), &activity_pb.GetTrendingBlogsRequest{
-		AccountId: accID,
-		TimeRange: timeRange,
-		Limit:     int32(limitInt),
-	})
-
-	if err != nil {
-		asc.log.Errorf("failed to get trending blogs: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch trending blogs"})
-		return
+	// Fallback ladder. Always tries the caller's requested window first, then
+	// progressively wider windows. Duplicates are deduped, the requested
+	// window is never skipped.
+	windows := []string{requestedRange}
+	for _, w := range []string{"14d", "90d", "1y"} {
+		if w != requestedRange {
+			windows = append(windows, w)
+		}
 	}
 
-	blogIds := []string{}
+	var (
+		resp    *activity_pb.GetTrendingBlogsResponse
+		usedWin string
+		blogIds []string
+		callErr error
+	)
 	blogStats := make(map[string]struct {
 		Views int64
 		Score float64
 	})
-	for _, blog := range resp.Blogs {
-		blogIds = append(blogIds, blog.BlogId)
-		blogStats[blog.BlogId] = struct {
-			Views int64
-			Score float64
-		}{
-			Views: blog.Views,
-			Score: blog.Score,
+
+	for _, win := range windows {
+		resp, callErr = asc.ActivityCli.GetTrendingBlogs(context.Background(), &activity_pb.GetTrendingBlogsRequest{
+			AccountId: accID,
+			TimeRange: win,
+			Limit:     int32(limitInt),
+		})
+		if callErr != nil {
+			asc.log.Errorw("failed to get trending blogs", "window", win, "err", callErr)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch trending blogs"})
+			return
 		}
+		if len(resp.Blogs) > 0 {
+			usedWin = win
+			blogIds = make([]string, 0, len(resp.Blogs))
+			for _, b := range resp.Blogs {
+				blogIds = append(blogIds, b.BlogId)
+				blogStats[b.BlogId] = struct {
+					Views int64
+					Score float64
+				}{Views: b.Views, Score: b.Score}
+			}
+			break
+		}
+	}
+
+	// Still nothing across all windows: return an empty result rather than
+	// calling the blog service with an empty BlogIds slice (which returns
+	// InvalidArgument).
+	if len(blogIds) == 0 {
+		ctx.JSON(http.StatusOK, gin.H{
+			"total_blogs":     0,
+			"blogs":           []map[string]interface{}{},
+			"time_range_used": requestedRange,
+		})
+		return
 	}
 
 	// Call gRPC to get blog metadata with client tracking
@@ -2230,10 +2270,14 @@ func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
 			break
 		}
 		if err != nil {
-			if status, ok := status.FromError(err); ok {
-				switch status.Code() {
+			asc.log.Errorf("trending: error receiving blog stream item: %v", err)
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
 				case codes.NotFound:
 					ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "no blogs found for the given tags"})
+					return
+				case codes.InvalidArgument:
+					ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": st.Message()})
 					return
 				case codes.Internal:
 					ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
@@ -2243,6 +2287,8 @@ func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
 					return
 				}
 			}
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "error receiving blog from stream"})
+			return
 		}
 
 		// Unmarshal into a map since response structure has changed
@@ -2303,8 +2349,9 @@ func (asc *BlogServiceClient) GetTrendingBlogs(ctx *gin.Context) {
 
 	// Final response including total blogs count
 	responseBlogs := map[string]interface{}{
-		"total_blogs": totalBlogs,
-		"blogs":       allBlogs,
+		"total_blogs":     totalBlogs,
+		"blogs":           allBlogs,
+		"time_range_used": usedWin,
 	}
 
 	ctx.JSON(http.StatusOK, responseBlogs)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_file_service/pb"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/constant"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/database"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_storage/internal/utils"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -21,16 +22,17 @@ type FileService struct {
 	path           string
 	profilePicPath string
 	log            *zap.SugaredLogger
+	db             database.StorageDB
 	pb.UnimplementedUploadBlogFileServer
 }
 
-func NewFileService(path, profilePic string, log *zap.SugaredLogger) *FileService {
-	return &FileService{path: path, profilePicPath: profilePic, log: log}
+func NewFileService(path, profilePic string, db database.StorageDB, log *zap.SugaredLogger) *FileService {
+	return &FileService{path: path, profilePicPath: profilePic, db: db, log: log}
 }
 
 func (fs *FileService) UploadBlogFile(stream pb.UploadBlogFile_UploadBlogFileServer) error {
 	var byteSlice []byte
-	var blogId, fileName string
+	var blogID, fileName string
 	for {
 		chunk, err := stream.Recv()
 		if err == io.EOF {
@@ -40,26 +42,25 @@ func (fs *FileService) UploadBlogFile(stream pb.UploadBlogFile_UploadBlogFileSer
 			return err
 		}
 		byteSlice = append(byteSlice, chunk.Data...)
-		blogId = chunk.BlogId
+		blogID = chunk.BlogId
 		fileName = chunk.FileName
 	}
-	fs.log.Debugf("Uploading a file for blog id: %v", blogId)
+	fs.log.Debugf("Uploading a file for blog id: %v", blogID)
 
 	fileName = utils.RemoveSpecialChar(fileName)
-	dirPath, filePath := utils.ConstructPath(fs.path, blogId, fileName)
+	dirPath, filePath := utils.ConstructPath(fs.path, blogID, fileName)
 
-	// Check if directory exists, if not create it
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		fs.log.Debugf("the directory, %s doesn't exists", dirPath)
 
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			fs.log.Errorf("cannot create a directory for this blog id: %s", blogId)
+			fs.log.Errorf("cannot create a directory for this blog id: %s", blogID)
 			return err
 		}
 	}
-	// Write the file (overwrite if exists)
+
 	if err := os.WriteFile(filePath, byteSlice, 0644); err != nil {
-		fs.log.Errorf("cannot write file for blog id: %s, error: %v", blogId, err)
+		fs.log.Errorf("cannot write file for blog id: %s, error: %v", blogID, err)
 		return err
 	}
 
@@ -70,7 +71,6 @@ func (fs *FileService) UploadBlogFile(stream pb.UploadBlogFile_UploadBlogFileSer
 	})
 }
 
-// TODO: return error 404 if file doesn't exist
 func (fs *FileService) GetBlogFile(req *pb.GetBlogFileReq, stream pb.UploadBlogFile_GetBlogFileServer) error {
 	fileName := filepath.Join(fs.path, req.BlogId, req.FileName)
 	fs.log.Debugf("there is a request to retrieve the file, %s", fileName)
@@ -79,9 +79,8 @@ func (fs *FileService) GetBlogFile(req *pb.GetBlogFileReq, stream pb.UploadBlogF
 	if err != nil {
 		if os.IsNotExist(err) {
 			return status.Error(codes.NotFound, fmt.Sprintf("image for blog id %v not found", req.BlogId))
-		} else {
-			return status.Errorf(codes.Internal, "something went wrong")
 		}
+		return status.Errorf(codes.Internal, "something went wrong")
 	}
 
 	rawFileName := strings.ReplaceAll(fileName, "\n", "")
@@ -137,7 +136,6 @@ func (fs *FileService) UploadProfilePic(stream pb.UploadBlogFile_UploadProfilePi
 	fileName := "profile.png"
 	dirPath, filePath := utils.ConstructPath(fs.profilePicPath, userName, fileName)
 
-	// Check if directory exists, if not create it
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		fs.log.Debugf("the directory, %s doesn't exists", dirPath)
 
@@ -157,7 +155,6 @@ func (fs *FileService) UploadProfilePic(stream pb.UploadBlogFile_UploadProfilePi
 		Status:   http.StatusOK,
 		FileName: fileName,
 	})
-
 }
 
 func (fs *FileService) GetProfilePic(req *pb.GetProfilePicReq, stream pb.UploadBlogFile_GetProfilePicServer) error {
@@ -167,9 +164,8 @@ func (fs *FileService) GetProfilePic(req *pb.GetProfilePicReq, stream pb.UploadB
 	if err != nil {
 		if os.IsNotExist(err) {
 			return status.Error(codes.NotFound, fmt.Sprintf("profile picture for %v not found", req.UserId))
-		} else {
-			return status.Errorf(codes.Internal, "something went wrong")
 		}
+		return status.Errorf(codes.Internal, "something went wrong")
 	}
 
 	fileBytes, err := os.ReadFile(fileName)
@@ -210,4 +206,63 @@ func (fs *FileService) DeleteProfilePic(ctx context.Context, req *pb.DeleteProfi
 		Message: "successfully deleted",
 		Status:  http.StatusOK,
 	}, nil
+}
+
+func (fs *FileService) CheckAsset(ctx context.Context, req *pb.CheckAssetReq) (*pb.CheckAssetRes, error) {
+	res, err := fs.db.CheckAsset(ctx, req.Checksum)
+	if err != nil {
+		fs.log.Errorf("failed to check asset: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to check asset")
+	}
+	return res, nil
+}
+
+func (fs *FileService) RegisterAsset(ctx context.Context, req *pb.RegisterAssetReq) (*pb.RegisterAssetRes, error) {
+	res, err := fs.db.RegisterAsset(ctx, req)
+	if err != nil {
+		fs.log.Errorf("failed to register asset: %v", err)
+		return &pb.RegisterAssetRes{Success: false, Error: err.Error()}, nil
+	}
+
+	return res, nil
+}
+
+func (fs *FileService) UpdateNSFW(ctx context.Context, req *pb.UpdateNSFWReq) (*pb.UpdateNSFWRes, error) {
+	err := fs.db.UpdateNSFW(ctx, req.Checksum, req.IsNsfw, req.NsfwScore)
+	if err != nil {
+		fs.log.Errorf("failed to update NSFW: %v", err)
+		return &pb.UpdateNSFWRes{Success: false, Error: err.Error()}, nil
+	}
+
+	return &pb.UpdateNSFWRes{Success: true}, nil
+}
+
+func (fs *FileService) CreateAssetRef(ctx context.Context, req *pb.CreateAssetRefReq) (*pb.CreateAssetRefRes, error) {
+	res, err := fs.db.CreateAssetRef(ctx, req)
+	if err != nil {
+		fs.log.Errorf("failed to create asset ref: %v", err)
+		return &pb.CreateAssetRefRes{Success: false, Error: err.Error()}, nil
+	}
+
+	return res, nil
+}
+
+func (fs *FileService) DeleteAssetRef(ctx context.Context, req *pb.DeleteAssetRefReq) (*pb.DeleteAssetRefRes, error) {
+	res, err := fs.db.DeleteAssetRef(ctx, req)
+	if err != nil {
+		fs.log.Errorf("failed to delete asset ref: %v", err)
+		return &pb.DeleteAssetRefRes{Success: false, Error: err.Error()}, nil
+	}
+
+	return res, nil
+}
+
+func (fs *FileService) ReplaceAssetRef(ctx context.Context, req *pb.ReplaceAssetRefReq) (*pb.ReplaceAssetRefRes, error) {
+	res, err := fs.db.ReplaceAssetRef(ctx, req)
+	if err != nil {
+		fs.log.Errorf("failed to replace asset ref: %v", err)
+		return &pb.ReplaceAssetRefRes{Success: false, Error: err.Error()}, nil
+	}
+
+	return res, nil
 }
