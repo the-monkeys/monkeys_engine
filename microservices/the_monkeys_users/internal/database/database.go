@@ -55,6 +55,7 @@ type UserDb interface {
 	GetBookmarkBlogsByUsername(username string) ([]models.Blog, error)
 	GetBlogLikeCount(blogId string) (int64, error)
 	FindUsersWithPagination(searchTerm string, limit int, offset int) ([]models.UserAccount, error)
+	FindUsersV2(ctx context.Context, searchTerm string, limit, offset int) ([]models.UserAccount, error)
 	GetFollowersAndFollowingsCounts(username string) (int, int, error)
 	GetBlogByBlogId(blogId string) (*models.Blog, error)
 	GetUsersByAccountIds(accIds []string) ([]models.UserProfileRes, error)

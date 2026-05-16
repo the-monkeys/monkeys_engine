@@ -9,10 +9,17 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_blog/internal/constants"
+	"github.com/the-monkeys/the_monkeys/searchdoc"
 )
 
 func (es *elasticsearchStorage) SaveBlog(ctx context.Context, blog map[string]interface{}) (*esapi.Response, error) {
 	blogId, _ := blog["blog_id"].(string)
+
+	// Denormalise editorjs blocks into the flat search-v2 fields
+	// (title/summary/body/tags). This runs on every write so the v3
+	// alias receives a self-contained, search-ready document without
+	// any cross-shard joins at query time.
+	blog = searchdoc.Apply(blog)
 
 	bs, err := json.Marshal(blog)
 	if err != nil {

@@ -9,6 +9,84 @@ consumes:
 produces:
   - application/json
 paths:
+  /v1/user/search:
+    get:
+      tags:
+        - Search
+      summary: "[DEPRECATED] People search (legacy)"
+      description: >
+        DEPRECATED — Phase 5 of Search v2 deprecation.
+
+        This route now returns 308 Permanent Redirect to
+        `/api/v2/user/search` with the original query string preserved
+        (`search_term`, `limit`, `offset` are identical between v1 and
+        v2). Scheduled for removal one release after the v2 path is
+        steady.
+      deprecated: true
+      operationId: UserService.searchLegacy
+      parameters:
+        - name: search_term
+          in: query
+          required: true
+          type: string
+      responses:
+        '308':
+          description: Permanent Redirect to `/api/v2/user/search`.
+
+  /v2/user/search:
+    get:
+      tags:
+        - Search
+      summary: People search (v2 — ranked, Active-only)
+      description: >
+        Postgres `pg_trgm`-backed people search. Ranks exact-username
+        matches first, then prefix matches, then trigram similarity
+        across username, first/last name and bio. Only `Active` users
+        are returned. Rate limited to 100 req/s per client. Response is
+        cached at the gateway for 30 s.
+      operationId: UserService.searchV2
+      parameters:
+        - name: search_term
+          in: query
+          required: true
+          type: string
+          minLength: 1
+          maxLength: 128
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          default: 10
+          maximum: 50
+        - name: offset
+          in: query
+          required: false
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Successful operation.
+          schema:
+            type: object
+            properties:
+              users:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    account_id: { type: string }
+                    username: { type: string }
+                    first_name: { type: string }
+                    last_name: { type: string }
+                    bio: { type: string }
+                    avatar_url: { type: string }
+              limit: { type: integer }
+              offset: { type: integer }
+        '400':
+          description: Invalid input (`search_term` missing or out of range, `limit` over cap).
+        '429':
+          description: Rate limit exceeded.
+
   /user/:username:
     get:
       operationId: UserService.getProfile

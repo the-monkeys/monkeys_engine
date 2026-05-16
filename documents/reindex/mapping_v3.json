@@ -1,0 +1,185 @@
+{
+    "settings": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+        "refresh_interval": "5s",
+        "analysis": {
+            "filter": {
+                "english_stop": {
+                    "type": "stop",
+                    "stopwords": "_english_"
+                },
+                "english_stemmer": {
+                    "type": "stemmer",
+                    "language": "light_english"
+                },
+                "english_possessive_stemmer": {
+                    "type": "stemmer",
+                    "language": "possessive_english"
+                },
+                "autocomplete_edge_ngram": {
+                    "type": "edge_ngram",
+                    "min_gram": 2,
+                    "max_gram": 20
+                }
+            },
+            "analyzer": {
+                "blog_text_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                        "english_possessive_stemmer",
+                        "english_stop",
+                        "english_stemmer"
+                    ]
+                },
+                "autocomplete_index_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding",
+                        "autocomplete_edge_ngram"
+                    ]
+                },
+                "autocomplete_search_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding"
+                    ]
+                }
+            },
+            "normalizer": {
+                "lowercase_keyword": {
+                    "type": "custom",
+                    "filter": [
+                        "lowercase",
+                        "asciifolding"
+                    ]
+                }
+            }
+        }
+    },
+    "mappings": {
+        "_meta": {
+            "version": "v3",
+            "owner": "search-platform",
+            "notes": "search-v2 blog index. Flat denormalised search fields (title/summary/body/tags/author_*) live alongside the legacy blog.* nested document for back-compat. Search-v2 queries hit only the flat fields. See documents/design/SEARCH_V2_DESIGN.md."
+        },
+        "dynamic": "true",
+        "properties": {
+            "blog_id": {
+                "type": "keyword"
+            },
+            "owner_account_id": {
+                "type": "keyword"
+            },
+            "owner_username": {
+                "type": "keyword",
+                "normalizer": "lowercase_keyword"
+            },
+            "is_draft": {
+                "type": "boolean"
+            },
+            "is_archived": {
+                "type": "boolean"
+            },
+            "is_scheduled": {
+                "type": "boolean"
+            },
+            "published_time": {
+                "type": "date"
+            },
+            "created_at": {
+                "type": "date"
+            },
+            "like_count": {
+                "type": "integer"
+            },
+            "view_count": {
+                "type": "integer"
+            },
+            "bookmark_count": {
+                "type": "integer"
+            },
+            "slug": {
+                "type": "keyword"
+            },
+            "title": {
+                "type": "text",
+                "analyzer": "blog_text_analyzer",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword",
+                        "normalizer": "lowercase_keyword",
+                        "ignore_above": 512
+                    },
+                    "autocomplete": {
+                        "type": "text",
+                        "analyzer": "autocomplete_index_analyzer",
+                        "search_analyzer": "autocomplete_search_analyzer"
+                    }
+                }
+            },
+            "summary": {
+                "type": "text",
+                "analyzer": "blog_text_analyzer"
+            },
+            "body": {
+                "type": "text",
+                "analyzer": "blog_text_analyzer",
+                "index_options": "offsets",
+                "term_vector": "with_positions_offsets"
+            },
+            "tags": {
+                "type": "keyword",
+                "normalizer": "lowercase_keyword",
+                "fields": {
+                    "text": {
+                        "type": "text",
+                        "analyzer": "blog_text_analyzer"
+                    }
+                }
+            },
+            "author_username": {
+                "type": "keyword",
+                "normalizer": "lowercase_keyword",
+                "fields": {
+                    "text": {
+                        "type": "text",
+                        "analyzer": "blog_text_analyzer"
+                    }
+                }
+            },
+            "author_display_name": {
+                "type": "text",
+                "analyzer": "blog_text_analyzer",
+                "fields": {
+                    "keyword": {
+                        "type": "keyword",
+                        "normalizer": "lowercase_keyword",
+                        "ignore_above": 256
+                    }
+                }
+            },
+            "co_author_usernames": {
+                "type": "keyword",
+                "normalizer": "lowercase_keyword"
+            },
+            "language": {
+                "type": "keyword"
+            },
+            "reading_time_sec": {
+                "type": "integer"
+            },
+            "blog": {
+                "type": "object",
+                "enabled": true
+            }
+        }
+    }
+}

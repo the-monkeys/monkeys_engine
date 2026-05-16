@@ -2,10 +2,13 @@ package user_service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_user/pb"
@@ -23,12 +26,14 @@ import (
 
 	activity_pb "github.com/the-monkeys/the_monkeys/apis/serviceconn/gateway_activity/pb"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/activity"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/cache/searchcache"
 )
 
 type UserServiceClient struct {
 	Client      pb.UserServiceClient
 	ActivityCli activity_pb.ActivityServiceClient
 	log         *zap.SugaredLogger
+	cache       *searchcache.Cache
 }
 
 func NewUserServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.UserServiceClient {
@@ -41,13 +46,14 @@ func NewUserServiceClient(cfg *config.Config, lg *zap.SugaredLogger) pb.UserServ
 	return pb.NewUserServiceClient(cc)
 }
 
-func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger) *UserServiceClient {
+func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth.ServiceClient, log *zap.SugaredLogger, cache *searchcache.Cache) *UserServiceClient {
 	mware := auth.InitAuthMiddleware(authClient, log)
 
 	usc := &UserServiceClient{
 		Client:      NewUserServiceClient(cfg, log),
 		ActivityCli: activity.NewActivityServiceClient(cfg, log),
 		log:         log,
+		cache:       cache,
 	}
 	routes := router.Group("/api/v1/user")
 	routes.GET("/topics", usc.GetAllTopics)
@@ -74,7 +80,12 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 		routes.POST("/follow/:username", usc.FollowUser)
 		routes.POST("/unfollow/:username", usc.UnfollowUser)
 		routes.GET("/is-followed/:username", usc.IsUserFollowed)
-		routes.GET("/search", usc.SearchUser)
+		// Search v2 deprecation (Phase 5): v1 user search now permanently
+		// redirects to /api/v2/user/search. 308 preserves the GET method
+		// and the query string (search_term, limit, offset are identical
+		// between v1 and v2), so existing clients keep working without
+		// code changes. Will be removed entirely after one release.
+		routes.GET("/search", redirectToV2UserSearch)
 	}
 
 	// Invite and un invite as coauthor
@@ -100,6 +111,10 @@ func RegisterUserRouter(router *gin.Engine, cfg *config.Config, authClient *auth
 	rateLimiter := middleware.RateLimiterMiddleware("100-S")
 	{
 		routesV2.GET("/active-users", rateLimiter, usc.GetActiveUsers)
+		// Search-v2 (Phase 1): index-backed, ranked, Active-only people
+		// search. Rate limited to keep cheap typo-tolerant queries from
+		// being weaponised into a CPU DoS against pg_trgm.
+		routesV2.GET("/search", rateLimiter, usc.SearchUserV2)
 	}
 
 	return usc
@@ -915,69 +930,32 @@ func (asc *UserServiceClient) CountLikes(ctx *gin.Context) {
 }
 
 func (asc *UserServiceClient) SearchUser(ctx *gin.Context) {
-	// Extract query parameters
-	searchTerm := ctx.Query("search_term")
-	limit := ctx.DefaultQuery("limit", "10")
-	offset := ctx.DefaultQuery("offset", "0")
+	// Deprecated (Phase 5): the v1 streaming search handler is no longer
+	// registered on any route. The /api/v1/user/search path now issues a
+	// 308 redirect to /api/v2/user/search (see redirectToV2UserSearch).
+	// This stub remains only because the bidi gRPC method on the user
+	// service is still wired for potential internal callers.
+	ctx.Redirect(http.StatusPermanentRedirect, buildRedirectTarget(ctx, "/api/v2/user/search"))
+}
 
-	// Convert limit and offset to integers
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil || limitInt <= 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid limit parameter"})
-		return
+// redirectToV2UserSearch issues a 308 Permanent Redirect from the
+// deprecated /api/v1/user/search to /api/v2/user/search, preserving the
+// raw query string. 308 (vs 301/302) guarantees the GET method and the
+// body — if any — are not mutated by intermediaries.
+func redirectToV2UserSearch(ctx *gin.Context) {
+	ctx.Redirect(http.StatusPermanentRedirect, buildRedirectTarget(ctx, "/api/v2/user/search"))
+}
+
+// buildRedirectTarget appends the inbound query string (if any) to the
+// new path so that ?search_term=…&limit=…&offset=… is forwarded
+// untouched. We do NOT pass through the host — Gin's Redirect will
+// emit a relative Location which the client resolves against the
+// originating origin, which is what we want behind the load balancer.
+func buildRedirectTarget(ctx *gin.Context, newPath string) string {
+	if raw := ctx.Request.URL.RawQuery; raw != "" {
+		return newPath + "?" + raw
 	}
-
-	offsetInt, err := strconv.Atoi(offset)
-	if err != nil || offsetInt < 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid offset parameter"})
-		return
-	}
-
-	// Start the gRPC streaming client
-	stream, err := asc.Client.SearchUser(context.Background())
-	if err != nil {
-		asc.log.Errorw("Failed to initialize SearchUser stream: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to initiate search"})
-		return
-	}
-
-	// Send the initial search request
-	err = stream.Send(&pb.UserDetailReq{
-		SearchTerm: searchTerm,
-		Limit:      int32(limitInt),
-		Offset:     int32(offsetInt),
-	})
-	if err != nil {
-		asc.log.Errorw("Failed to send search request: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send search request"})
-		return
-	}
-
-	// Close the stream after sending
-	if err := stream.CloseSend(); err != nil {
-		asc.log.Warnw("Failed to close send stream: %v", err)
-	}
-
-	// Collect responses from the stream
-	var results []*pb.User
-	for {
-		resp, err := stream.Recv()
-		if err == io.EOF {
-			// End of stream
-			break
-		}
-		if err != nil {
-			asc.log.Errorw("Error receiving search response: %v", err)
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Error receiving search results"})
-			return
-		}
-
-		// Append users to results
-		results = append(results, resp.Users...)
-	}
-
-	// Return results to the client
-	ctx.JSON(http.StatusOK, gin.H{"users": results})
+	return newPath
 }
 
 func (asc *UserServiceClient) ConnectionCount(ctx *gin.Context) {
@@ -1082,4 +1060,164 @@ func (usc *UserServiceClient) GetActiveUsers(ctx *gin.Context) {
 		"status_code":     resp.StatusCode,
 		"time_range_used": usedRange,
 	})
+}
+
+// searchV2QueryMaxLen bounds the user-supplied query string to prevent
+// a malicious caller from passing a multi-MB string into pg_trgm where
+// the trigram extraction cost grows linearly with input size.
+const (
+	searchV2QueryMaxLen = 128
+	searchV2LimitMax    = 50
+	searchV2LimitDflt   = 10
+	searchV2Timeout     = 500 * time.Millisecond
+	searchV2CacheTTL    = 30 * time.Second
+)
+
+// SearchUserV2 is the search-v2 (Phase 1) HTTP handler for people search.
+//
+// Differences from the v1 handler:
+//
+//   - Strict input validation. Query length is bounded, limit is hard-
+//     capped server-side, both numeric params reject negatives. v1
+//     accepted unbounded limit values and forwarded them to the DB.
+//   - Bounded gRPC deadline. v1 used context.Background() which meant a
+//     slow user service could block the gateway forever. v2 uses
+//     context.WithTimeout from the inbound request context so client
+//     cancellations propagate.
+//   - Read-through Redis cache. Identical queries within 30s return the
+//     cached result without hitting Postgres at all. Cache key is a
+//     hashed tuple of (query, limit, offset) — never the raw query, so
+//     keys cannot leak PII through Redis MONITOR.
+//   - Structured search_event log line for observability (zero-result
+//     queries, cache hit ratio, latency). No raw PII in logs.
+//   - Stable JSON response shape: {"users": [...], "limit", "offset"}.
+//     Keeps the existing v1 frontend contract for the users array so
+//     migration is incremental.
+func (asc *UserServiceClient) SearchUserV2(ctx *gin.Context) {
+	start := time.Now()
+
+	rawQuery := strings.TrimSpace(ctx.Query("search_term"))
+	if rawQuery == "" {
+		// Empty query is a client error — every match would be returned
+		// otherwise, which is both expensive and a privacy hazard.
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "search_term is required"})
+		return
+	}
+	if len(rawQuery) > searchV2QueryMaxLen {
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "search_term too long"})
+		return
+	}
+
+	limitInt, err := strconv.Atoi(ctx.DefaultQuery("limit", strconv.Itoa(searchV2LimitDflt)))
+	if err != nil || limitInt <= 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid limit parameter"})
+		return
+	}
+	if limitInt > searchV2LimitMax {
+		limitInt = searchV2LimitMax
+	}
+
+	offsetInt, err := strconv.Atoi(ctx.DefaultQuery("offset", "0"))
+	if err != nil || offsetInt < 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid offset parameter"})
+		return
+	}
+
+	// Normalise the cache key on a lowercased query so "Alice" and "alice"
+	// share a cache entry. The DB-side ranking is already case-insensitive.
+	cacheKey := searchcache.CacheKeyInts("user:"+strings.ToLower(rawQuery), limitInt, offsetInt)
+
+	cacheHit := false
+	if cached, cErr := asc.cache.Get(ctx.Request.Context(), cacheKey); cErr == nil && cached != "" {
+		cacheHit = true
+		searchcache.LogSearchEvent(asc.log, searchcache.Event{
+			Query:       rawQuery, // logged at debug-level only; see helper
+			Type:        "user",
+			Limit:       limitInt,
+			Offset:      offsetInt,
+			ResultCount: -1, // unknown from cache without re-parsing
+			CacheHit:    true,
+			Latency:     time.Since(start),
+			UserID:      searchcache.HashUserID(ctx.GetString("accountId")),
+		})
+		ctx.Data(http.StatusOK, "application/json", []byte(cached))
+		return
+	}
+
+	rpcCtx, cancel := context.WithTimeout(ctx.Request.Context(), searchV2Timeout)
+	defer cancel()
+
+	// Reuse the existing bidi-stream RPC. The user service's DB layer
+	// now executes the v2 ranked query, so the wire shape is unchanged
+	// but the result quality is upgraded transparently. A unary RPC is
+	// a future refactor (see SEARCH_V2_IMPLEMENTATION_PLAN.md).
+	stream, err := asc.Client.SearchUser(rpcCtx)
+	if err != nil {
+		asc.log.Errorw("v2 search: failed to open stream", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "search unavailable"})
+		return
+	}
+
+	if err := stream.Send(&pb.UserDetailReq{
+		SearchTerm: rawQuery,
+		Limit:      int32(limitInt),
+		Offset:     int32(offsetInt),
+	}); err != nil {
+		asc.log.Errorw("v2 search: failed to send request", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "search failed"})
+		return
+	}
+	if err := stream.CloseSend(); err != nil {
+		asc.log.Warnw("v2 search: close send failed", "err", err)
+	}
+
+	// Pre-allocate the slice to the cap to avoid grow churn in the
+	// (common) full-page response case.
+	results := make([]*pb.User, 0, limitInt)
+	for {
+		resp, recvErr := stream.Recv()
+		if recvErr == io.EOF {
+			break
+		}
+		if recvErr != nil {
+			if status.Code(recvErr) == codes.DeadlineExceeded {
+				asc.log.Warnw("v2 search: deadline exceeded", "query_len", len(rawQuery))
+				ctx.JSON(http.StatusGatewayTimeout, gin.H{"message": "search timed out"})
+				return
+			}
+			asc.log.Errorw("v2 search: stream recv failed", "err", recvErr)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"message": "search failed"})
+			return
+		}
+		results = append(results, resp.Users...)
+	}
+
+	payload := gin.H{
+		"users":  results,
+		"limit":  limitInt,
+		"offset": offsetInt,
+	}
+
+	// Best-effort cache write. We marshal once for both the response
+	// body and the cache value to avoid double encoding cost.
+	if body, mErr := json.Marshal(payload); mErr == nil {
+		// Cache.Set is fire-and-forget by design (errors logged inside)
+		// so we never let a flaky Redis turn into a user-visible 5xx.
+		asc.cache.Set(ctx.Request.Context(), cacheKey, string(body), searchV2CacheTTL)
+		searchcache.LogSearchEvent(asc.log, searchcache.Event{
+			Query:       rawQuery,
+			Type:        "user",
+			Limit:       limitInt,
+			Offset:      offsetInt,
+			ResultCount: len(results),
+			CacheHit:    cacheHit,
+			Latency:     time.Since(start),
+			UserID:      searchcache.HashUserID(ctx.GetString("accountId")),
+		})
+		ctx.Data(http.StatusOK, "application/json", body)
+		return
+	}
+
+	// Marshal fell back: still serve the response, just without caching.
+	ctx.JSON(http.StatusOK, payload)
 }
