@@ -141,12 +141,13 @@ func (es *elasticsearchStorage) GetDraftBlogsByOwnerAccountID(ctx context.Contex
 		return nil, fmt.Errorf("ownerAccountID cannot be empty")
 	}
 
-	// Build the query to search for draft blogs by owner_account_id, sorted by time in descending order
+	// Build the query to search for draft blogs by owner_account_id, sorted by published_time in descending order
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -253,12 +254,13 @@ func (es *elasticsearchStorage) GetPublishedBlogsByOwnerAccountID(ctx context.Co
 		return nil, fmt.Errorf("ownerAccountID cannot be empty")
 	}
 
-	// Build the query to search for published blogs by owner_account_id, sorted by time in descending order
+	// Build the query to search for published blogs by owner_account_id, sorted by published_time in descending order
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -395,8 +397,9 @@ func (es *elasticsearchStorage) GetScheduledBlogsByOwnerAccountID(ctx context.Co
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"schedule_time": map[string]interface{}{
+					"order":         "asc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -1047,8 +1050,9 @@ func (es *elasticsearchStorage) GetPublishedBlogByTagsName(ctx context.Context, 
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -1383,12 +1387,13 @@ func (es *elasticsearchStorage) DeleteABlogById(ctx context.Context, blogId stri
 
 // GetLast100BlogsLatestFirst retrieves the last 100 blogs sorted by the latest first
 func (es *elasticsearchStorage) GetLast100BlogsLatestFirst(ctx context.Context) (*pb.GetBlogsByTagsNameRes, error) {
-	// Build the query to retrieve the last 100 blogs, sorted by the time field in descending order
+	// Build the query to retrieve the last 100 blogs, sorted by published_time in descending order
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -1775,7 +1780,7 @@ func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds [
 		return nil, fmt.Errorf("blogIds array cannot be empty")
 	}
 
-	// Build the query to search for blogs by blog_id and sort by blog time in descending order (latest first)
+	// Build the query to search for blogs by blog_id and sort by published_time in descending order (latest first)
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"terms": map[string]interface{}{
@@ -1784,8 +1789,9 @@ func (es *elasticsearchStorage) GetBlogsByBlogIds(ctx context.Context, blogIds [
 		},
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},

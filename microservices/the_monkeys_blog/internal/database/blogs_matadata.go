@@ -60,8 +60,9 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
-				"blog.time": map[string]string{
-					"order": "desc",
+				"published_time": map[string]interface{}{
+					"order":         "desc",
+					"unmapped_type": "date",
 				},
 			},
 		},
@@ -229,18 +230,13 @@ func (es *elasticsearchStorage) GetBlogsMetadataByTags(ctx context.Context, tags
 }
 
 func (es *elasticsearchStorage) GetAllPublishedBlogsMetadata(ctx context.Context, limit, offset int) ([]map[string]interface{}, int, error) {
-	// Build the query to get all published blogs with sorting by published_time or blog.time as fallback
+	// Build the query to get all published blogs sorted by published_time
 	query := map[string]interface{}{
 		"sort": []map[string]interface{}{
 			{
 				"published_time": map[string]interface{}{
 					"order":         "desc",
 					"unmapped_type": "date", // Handle cases where published_time is missing
-				},
-			},
-			{
-				"blog.time": map[string]string{
-					"order": "desc",
 				},
 			},
 		},
@@ -399,11 +395,6 @@ func (es *elasticsearchStorage) GetBlogsMetadataByQuery(ctx context.Context, que
 				"published_time": map[string]interface{}{
 					"order":         "desc",
 					"unmapped_type": "date",
-				},
-			},
-			{
-				"blog.time": map[string]string{
-					"order": "desc",
 				},
 			},
 		},
@@ -676,8 +667,9 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 		})
 	} else if isDraft {
 		sort = append(sort, map[string]interface{}{
-			"blog.time": map[string]string{
-				"order": "desc",
+			"published_time": map[string]interface{}{
+				"order":         "desc",
+				"unmapped_type": "date",
 			},
 		})
 	} else {
@@ -686,11 +678,6 @@ func (es *elasticsearchStorage) GetBlogsMetaByAccountId(ctx context.Context, acc
 				"published_time": map[string]interface{}{
 					"order":         "desc",
 					"unmapped_type": "date",
-				},
-			},
-			map[string]interface{}{
-				"blog.time": map[string]string{
-					"order": "desc",
 				},
 			},
 		)
@@ -874,11 +861,6 @@ func (es *elasticsearchStorage) GetBlogsMetaByBlogIdsV2(ctx context.Context, blo
 				"published_time": map[string]interface{}{
 					"order":         "desc",
 					"unmapped_type": "date", // Handle cases where published_time is missing
-				},
-			},
-			{
-				"blog.time": map[string]string{
-					"order": "desc",
 				},
 			},
 		},
