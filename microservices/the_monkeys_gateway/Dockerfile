@@ -35,7 +35,7 @@ RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
 # Install ca-certificates, curl, openssh-client, and sshpass for backup operations
-RUN apk --no-cache add ca-certificates tzdata curl openssh-client sshpass && \
+RUN apk --no-cache add ca-certificates tzdata curl openssh-client sshpass ffmpeg && \
     rm -rf /var/cache/apk/*
 
 WORKDIR /app

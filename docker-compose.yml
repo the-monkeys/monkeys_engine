@@ -209,6 +209,7 @@ services:
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
+    mem_limit: 1536m
     build:
       context: .
       dockerfile: microservices/the_monkeys_gateway/Dockerfile
@@ -237,11 +238,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: '0.7'
+          # FFmpeg video compositing needs more headroom than typical API traffic.
+          memory: 1536m
+          cpus: '2'
         reservations:
-          memory: 128M
-          cpus: '0.2'
+          memory: 256m
+          cpus: '0.3'
     # Health check using existing /healthz endpoint
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${THE_MONKEYS_GATEWAY_INTERNAL_PORT}/healthz" ]
