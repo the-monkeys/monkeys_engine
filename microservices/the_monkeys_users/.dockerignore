@@ -15,3 +15,19 @@ node_modules/
 *.swp
 *.swo
 *~
+
+# Exclude large data directories
+blogs/
+profile/
+local/
+local_blogs/
+local_profiles/
+postgres_backup/
+elasticsearch_snapshots/
+backup/
+minio-data/
+logs/
+test_data/
+static/
+monkeys-seo-cred.json/
+documents/

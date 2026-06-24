@@ -28,6 +28,7 @@ local_profiles/
 postgres_backup/
 elasticsearch_snapshots/
 backup/
+minio-data/
 logs/
 test_data/
 static/
