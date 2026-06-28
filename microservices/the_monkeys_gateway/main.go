@@ -19,6 +19,7 @@ import (
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/blogsearch"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/cache/searchcache"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/notification"
+	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/snapshot"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/storage_v2"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_gateway/internal/systems"
@@ -113,6 +114,7 @@ func main() {
 	// monkeys_ai.RegisterRecommendationRoute(server.router, cfg, authClient, log)
 	admin.RegisterAdminRouter(server.router, cfg, log)
 	systems.RegisterSystemRouter(server.router, cfg, log)
+	snapshot.RegisterRoutes(server.router, cfg, log)
 
 	// Health check endpoint
 	server.router.GET("/healthz", func(c *gin.Context) {

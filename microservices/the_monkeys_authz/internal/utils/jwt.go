@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/the-monkeys/the_monkeys/microservices/the_monkeys_authz/internal/models"
 )
 
