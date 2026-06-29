@@ -38,6 +38,7 @@ local_profiles/
 postgres_backup/
 elasticsearch_snapshots/
 backup/
+minio-data/
 static/
 test_data/
 monkeys-seo-cred.json/
