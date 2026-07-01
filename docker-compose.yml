@@ -209,7 +209,7 @@ services:
 
   the_monkeys_gateway:
     container_name: "the-monkeys-gateway"
-    mem_limit: 1536m
+    mem_limit: 2560m
     build:
       context: .
       dockerfile: microservices/the_monkeys_gateway/Dockerfile
@@ -239,7 +239,7 @@ services:
       resources:
         limits:
           # FFmpeg video compositing needs more headroom than typical API traffic.
-          memory: 1536m
+          memory: 2560m
           cpus: '2'
         reservations:
           memory: 256m
